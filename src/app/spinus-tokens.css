@@ -3630,6 +3630,202 @@ details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
   .sp-img-linea .sp-rx-det { max-width: 100%; }
 }
 
+/* ── 26.4 · SOLICITUD DE INTERNAMIENTO COMPACTA (maqueta `internamiento.html`, aprobada) ──
+   Cinco secciones numeradas (`.sp-int-sec`), UNA abierta (filete `--accion` a
+   la izquierda) y las demás en una línea: número, título y resumen truncado;
+   completa en verde (`--ok-*`), con un obligatorio que falta tras intentar
+   imprimir en rojo. Campos con la piel de 26.1 (`.sp-rx-campo`, `.sp-rx-rot`,
+   `.sp-rx-fi`, `.sp-rx-ta`, `.sp-rx-par`); tipo y ASA como botones de un toque
+   (`.sp-int-op`, `role="radio"`); requerimientos por menú (`.sp-int-menu`,
+   `absolute` bajo su botón) con lo elegido en fichas (`.sp-int-ficha`); las
+   indicaciones de piso como hoja de órdenes (`.sp-int-gp`: nombre a la
+   izquierda en 150, renglones a la derecha). Táctil: toques de 44 y letra de
+   16 en los campos; `ih`/`esc`: densidad de ratón (32–36, 13–15). Contenedor
+   estrecho (< 560): el resumen baja a un segundo renglón, botones de 42–44 y
+   los grupos de piso en una columna. Nada aquí es `fixed`. */
+.sp-int { display: flex; flex-direction: column; gap: 10px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int { gap: 8px; }
+.sp-int-sec { background: var(--sup); border-radius: var(--r-tarjeta); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-int-sec { border-radius: var(--r-tarjeta-ancha); }
+/* La abierta sube sobre el pie fijo (`z-index: 1`): su menú de requerimientos
+   puede caer encima de la barra. */
+.sp-int-sec[data-estado="abierta"] { position: relative; z-index: 2; box-shadow: inset 3px 0 0 var(--accion); }
+.sp-int-sec-h { margin: 0; font: inherit; }
+.sp-int-sec-b {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; margin: 0; padding: 10px 16px;
+  border: 0; border-radius: inherit; background: transparent; color: var(--tinta); font: inherit; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-sec-b { min-height: 44px; padding: 8px 16px; }
+.sp-int-sec-b:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+@media (hover: hover) { .sp-int-sec:not([data-estado="abierta"]) .sp-int-sec-b:hover { background: var(--sup2); } }
+.sp-int-n {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sp-int-sec[data-estado="abierta"] .sp-int-n { background: var(--accion); color: var(--sobre-accion); }
+.sp-int-sec[data-estado="completa"] .sp-int-n { background: var(--ok-fondo); color: var(--ok-tinta); }
+.sp-int-sec[data-estado="falta"] .sp-int-n { background: var(--mal-fondo); color: var(--mal-tinta); }
+.sp-int-t { flex: none; font-size: 15px; line-height: 20px; font-weight: 600; }
+.sp-int-sec[data-estado="completa"] .sp-int-t { color: var(--ok-tinta); }
+.sp-int-res {
+  flex: 1; min-width: 0; font-size: 13px; line-height: 18px; color: var(--tinta2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-int-sec[data-estado="falta"] .sp-int-res { color: var(--mal-tinta); font-weight: 600; }
+.sp-int-chev { flex: none; width: 18px; height: 18px; margin-left: auto; color: var(--tinta2); transition: transform var(--dur-toque) ease-out; }
+.sp-int-sec[data-estado="abierta"] .sp-int-chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .sp-int-chev { transition: none; } }
+.sp-int-cuerpo { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 14px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sp-int-cuerpo { animation: sp-rx-entra var(--dur-sale) var(--resorte-entra); }
+}
+.sp-int-ob { margin-left: 2px; color: var(--mal-tinta); }
+.sp-int-cuerpo .sp-rx-rot { width: 112px; }
+.sp-int-quitar { margin-right: -8px; }
+
+/* Filas «rótulo — botones». */
+.sp-int-blo { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 8px; min-width: 0; }
+.sp-int-rot {
+  flex: none; width: 124px; padding-left: 12px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-int-blo > .sp-int-rot { padding-top: calc((var(--k-toque) - 16px) / 2); }
+.sp-int-opciones { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-int-op {
+  position: relative; display: inline-flex; align-items: center; height: var(--k-toque); margin: 0; padding: 0 15px;
+  border: 1px solid var(--borde); border-radius: var(--r-pildora); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform var(--dur-toque) ease-out;
+}
+.sp-int-op[aria-checked="true"] { background: var(--accion); border-color: var(--accion); color: var(--sobre-accion); font-weight: 600; }
+@media (hover: hover) { .sp-int-op:hover:not([aria-checked="true"]) { background: var(--sup2); } }
+.sp-int-op:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { .sp-int-op:active { transform: none; } }
+.sp-int-op:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-int-urgente { min-height: var(--k-toque); padding-left: 12px; }
+
+/* Requerimientos: botón + menú; lo elegido en fichas con ✕. */
+.sp-int-reqs { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: var(--k-toque); }
+.sp-int-reqs > .sp-int-rot { align-self: center; }
+.sp-int-ficha {
+  display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 2px 0 12px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 13px; line-height: 18px; font-weight: 600; max-width: 100%;
+}
+.sp-int-ficha > button {
+  position: relative; display: grid; place-items: center; width: 28px; height: 28px; margin: 0; padding: 0; border: 0;
+  border-radius: var(--r-pildora); background: transparent; color: inherit; cursor: pointer;
+}
+.sp-int-ficha > button::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: var(--k-toque); height: var(--k-toque); transform: translate(-50%, -50%);
+}
+.sp-int-ficha > button > svg { width: 14px; height: 14px; }
+.sp-int-ficha > button:focus-visible { outline: 3px solid var(--enlace); outline-offset: 0; }
+.sp-int-reqbtn > svg { width: 16px; height: 16px; }
+.sp-int-menu {
+  position: absolute; z-index: 6; left: 0; top: calc(100% + 6px); width: min(360px, 100%); padding: 6px;
+  background: var(--sup); border-radius: 14px; box-shadow: var(--sombra-capa);
+}
+.sp-int-menu-op {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--k-toque); margin: 0; padding: 8px 10px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--tinta); font: inherit; font-size: 15px; line-height: 20px;
+  text-align: left; cursor: pointer;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-menu-op { font-size: 14px; padding: 6px 10px; }
+@media (hover: hover) { .sp-int-menu-op:hover { background: var(--sup2); } }
+.sp-int-menu-op:focus-visible { outline: 2px solid var(--enlace); outline-offset: -2px; }
+.sp-int-casilla {
+  flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px;
+  border: 1.5px solid var(--tinta2); color: var(--sobre-accion);
+}
+.sp-int-casilla > svg { width: 13px; height: 13px; }
+.sp-int-menu-op[aria-checked="true"] .sp-int-casilla { background: var(--accion); border-color: var(--accion); }
+.sp-int-menu-otro {
+  display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 44px; padding: 0 10px;
+  border-radius: var(--r-control); background: var(--sup2);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-menu-otro { min-height: 38px; }
+.sp-int-menu-otro:focus-within { outline: 2px solid var(--enlace); }
+.sp-int-menu-otro > .sp-int-rot { width: auto; padding-left: 0; }
+.sp-int-menu-fi {
+  flex: 1; min-width: 0; min-height: var(--k-toque); margin: 0; padding: 9px 0; border: 0; background: transparent; color: var(--tinta);
+  font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-menu-fi { font-size: 15px; line-height: 20px; padding: 7px 0; }
+.sp-int-menu-fi:focus { outline: none; }
+.sp-int-menu-fi::placeholder { color: var(--tinta2); opacity: .75; }
+
+/* Instrucciones: el texto estándar entero, sin tirador. */
+.sp-int-ins { min-height: 120px; }
+
+/* Indicaciones de piso: una hoja de órdenes. */
+.sp-int-piso { display: flex; flex-direction: column; }
+.sp-int-gp { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 0 10px; padding: 4px 0; border-top: 1px solid var(--linea); }
+.sp-int-gp:first-child { border-top: 0; }
+.sp-int-gn { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 6px; min-width: 0; padding-top: 10px; }
+.sp-int-gn-t > .sp-int-gn-c { margin-left: 6px; white-space: nowrap; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-gn { padding-top: 8px; }
+.sp-int-gn-t { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--tinta); }
+.sp-int-gn-c { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--tinta2); font-variant-numeric: tabular-nums; }
+.sp-int-gn-fi {
+  flex: 1; min-width: 0; margin: -6px 0 0; padding: 5px 8px; border: 0; border-radius: 8px; background: var(--sup2);
+  color: var(--tinta); font: inherit; font-size: 16px; line-height: 20px; font-weight: 600;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-gn-fi { font-size: 13px; line-height: 18px; }
+.sp-int-gn-fi:focus { outline: 2px solid var(--enlace); }
+.sp-int-gn-fi[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-int-gn-x { margin: -10px -8px -10px auto; }
+.sp-int-gn-err { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--mal-tinta); }
+.sp-int-rs { display: flex; flex-direction: column; min-width: 0; }
+.sp-int-rg { display: flex; align-items: center; gap: 6px; }
+.sp-int-rg::before { content: "–"; flex: none; width: 10px; color: var(--tinta2); }
+.sp-int-rg-fi {
+  flex: 1; min-width: 0; min-height: var(--k-toque); margin: 0; padding: 8px 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--tinta); font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-rg-fi { font-size: 15px; line-height: 20px; padding: 6px 8px; }
+.sp-int-rg-fi:focus { outline: 2px solid var(--enlace); background: var(--sup2); }
+.sp-int-rg-fi::placeholder { color: var(--tinta2); opacity: .75; }
+.sp-int-pisopie { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-top: 6px; border-top: 1px solid var(--linea); }
+.sp-int-pisopie svg { width: 16px; height: 16px; }
+.sp-int-ayuda { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+
+/* Densidad de ratón (`ih`/`esc`): las opciones a 32 con área de 36. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-op { height: 32px; padding: 0 12px; font-size: 13px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-op::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-blo > .sp-int-rot { padding-top: 8px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-ficha { height: 28px; font-size: 12px; }
+
+/* Estrecho (`ext`/`tel`): el resumen en un segundo renglón, rótulos encima,
+   botones de 42–44, una columna en la hoja de piso. */
+@container docform (max-width: 559px) {
+  .sp-int-sec-b { flex-wrap: wrap; min-height: 56px; padding: 12px 14px; row-gap: 2px; }
+  .sp-int-t { flex: 1; min-width: 0; }
+  .sp-int-res { flex-basis: 100%; order: 3; padding-left: 34px; }
+  .sp-int-cuerpo { padding: 0 14px 12px; }
+  .sp-int-rot { width: 100%; padding-left: 0; }
+  .sp-int-blo > .sp-int-rot { padding-top: 0; }
+  .sp-int-op { padding: 0 16px; }
+  .sp-int-urgente { padding-left: 0; }
+  .sp-int-cuerpo .sp-rx-rot { width: 100px; letter-spacing: .02em; }
+  .sp-int-reqs > .sp-int-rot { width: auto; }
+  .sp-int-ficha { height: 38px; }
+  .sp-int-menu-op { padding: 12px 10px; }
+  .sp-int-gp { grid-template-columns: minmax(0, 1fr); }
+  .sp-int-gn { padding-top: 8px; }
+}
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con
+   `--sup2` y borde con !important (sin capa); aquí se gana EN capa. */
+html.dark :is(.sp-int-rg-fi, .sp-int-menu-fi) { background-color: transparent !important; border-color: transparent !important; }
+html.dark .sp-int-rg-fi:focus { background-color: var(--sup2) !important; }
+html.dark .sp-int-gn-fi { border-color: transparent !important; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop

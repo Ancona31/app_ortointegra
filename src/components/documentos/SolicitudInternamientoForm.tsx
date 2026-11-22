@@ -3,8 +3,8 @@ import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, BedDouble, Check, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { AlertTriangle, Check, Plus, X } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
@@ -14,11 +14,15 @@ import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileSha
 import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
-import SeccionPlegable from '@/components/documentos/SeccionPlegable'
-import IndicacionesPiso, {
-  contarRenglones, leerGrupos, resumenIndicaciones, textoIndicaciones,
-  type GrupoIndicaciones,
-} from '@/components/documentos/IndicacionesPiso'
+import SeccionPaso from '@/components/documentos/SeccionPaso'
+import OpcionesRapidas from '@/components/documentos/OpcionesRapidas'
+import MenuRequerimientos from '@/components/documentos/MenuRequerimientos'
+import IndicacionesPiso from '@/components/documentos/IndicacionesPiso'
+import {
+  contarRenglones, gruposDeHoja, hojaDeGrupos, leerGrupos, resumenDiagnostico, resumenGenerales,
+  resumenInstrucciones, resumenPiso, resumenRequerimientos, seccionDe, SECCIONES, textoIndicaciones,
+  type GrupoIndicaciones, type Resumen, type SeccionInternamiento,
+} from '@/components/documentos/internamientoCompacto'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
@@ -82,15 +86,23 @@ const TIPOS_INTERNAMIENTO = [
 
 const ASA = ['I', 'II', 'III', 'IV', 'V', 'E (Emergencia)']
 
-const REQUERIMIENTOS = [
-  'Sangre y hemoderivados',
-  'Unidad de Cuidados Intensivos (UCI)',
-  'Material de osteosíntesis',
-  'Implante especial',
-  'Ayuno preoperatorio',
-  'Profilaxis antibiótica',
-  'Tromboprofilaxis',
-]
+/* Los botones de un toque guardan EXACTAMENTE los valores del `<select>` de
+   antes: el tipo tal cual y el ASA como «ASA I» … «ASA E (Emergencia)». */
+const OPCIONES_TIPO = TIPOS_INTERNAMIENTO.map(t => ({ valor: t, etiqueta: t }))
+const OPCIONES_ASA = ASA.map(a => ({ valor: `ASA ${a}`, etiqueta: a }))
+
+/** Ajusta el alto del área de texto a su contenido: una línea que crece, sin tirador. */
+function ajustarAlto(t: HTMLTextAreaElement | null): void {
+  if (!t) return
+  t.style.height = 'auto'
+  t.style.height = `${t.scrollHeight}px`
+}
+
+/** Lo que el Tab recorre dentro de una sección, en orden de documento. */
+function enfocables(raiz: HTMLElement): HTMLElement[] {
+  return Array.from(raiz.querySelectorAll<HTMLElement>('input, textarea, select, button, [tabindex]'))
+    .filter(el => el.tabIndex >= 0 && !el.hasAttribute('disabled') && el.getClientRects().length > 0)
+}
 
 const FECHA_MIN = '1900-01-01'
 
@@ -194,7 +206,9 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [fechaIngreso, setFechaIngreso] = useState('')
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
-  const [diagnosticosSecundarios, setDiagnosticosSecundarios] = useState<string[]>([''])
+  // Nacen sin ninguno: «＋ Diagnóstico secundario» (o Enter en uno) los añade.
+  // Al emitir se filtran los vacíos igual que antes, así que lo guardado es lo mismo.
+  const [diagnosticosSecundarios, setDiagnosticosSecundarios] = useState<string[]>([])
   const [tipoInternamiento, setTipoInternamiento] = useState('')
   const [procedimiento, setProcedimiento] = useState('')
   const [diasEstimados, setDiasEstimados] = useState('')
@@ -205,7 +219,11 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [requerimientosExtra, setRequerimientosExtra] = useState('')
   const [justificacion, setJustificacion] = useState('')
   const [instruccionesPaciente, setInstruccionesPaciente] = useState(INSTRUCCIONES_DEFECTO)
-  const [gruposPiso, setGruposPiso] = useState<GrupoIndicaciones[]>([])
+  // La HOJA de órdenes: los cuatro grupos fijos siempre. Lo que se guarda y se
+  // imprime sale de `gruposDeHoja(hoja)`, con la forma de siempre.
+  const [hojaPiso, setHojaPiso] = useState<GrupoIndicaciones[]>(() => hojaDeGrupos([]))
+  // Una sección abierta a la vez (maqueta aprobada). Nace abierta la primera.
+  const [abierta, setAbierta] = useState<SeccionInternamiento | null>('gen')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
   const [errorAbierto, setErrorAbierto] = useState(false)
@@ -216,10 +234,21 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   const [intentado, setIntentado] = useState(false)
 
   const formRef = useRef<HTMLDivElement>(null)
+  const seccionesRef = useRef<HTMLDivElement>(null)
   const pacienteRef = useRef<HTMLInputElement>(null)
   const lugarRef = useRef<HTMLInputElement>(null)
   const diagnosticoRef = useRef<HTMLInputElement>(null)
   const ingresoRef = useRef<HTMLInputElement>(null)
+  const procedimientoRef = useRef<HTMLTextAreaElement>(null)
+  const justificacionRef = useRef<HTMLTextAreaElement>(null)
+  const instruccionesRef = useRef<HTMLTextAreaElement>(null)
+  // Las tres áreas de texto son una línea que crece (las de instrucciones
+  // nacen altas por su texto). Se miden al cambiar y al abrir su sección.
+  useLayoutEffect(() => {
+    ajustarAlto(procedimientoRef.current)
+    ajustarAlto(justificacionRef.current)
+    ajustarAlto(instruccionesRef.current)
+  }, [procedimiento, justificacion, instruccionesPaciente, abierta])
 
   /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
      que el compilador impide que diverja de su firma.
@@ -230,7 +259,7 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
     paciente, pacienteInicial, diagnostico, diagnosticoInicial,
     secundarios: diagnosticosSecundarios, fechaIngreso, tipoInternamiento,
     diasEstimados, asa, lugar, urgente, procedimiento, requerimientos,
-    requerimientosExtra, justificacion, instruccionesPaciente, grupos: gruposPiso,
+    requerimientosExtra, justificacion, instruccionesPaciente, grupos: hojaPiso,
   }
   const vacio = isFormEmpty(paraVacio)
 
@@ -253,7 +282,8 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
     leer: () => ({
       _v: 1, tipoInternamiento, diasEstimados, asa, lugar, urgente, procedimiento,
       requerimientos, requerimientosExtra, justificacion, instruccionesPaciente,
-      gruposPiso: gruposPiso.map(g => ({ nombre: g.nombre, renglones: [...g.renglones] })),
+      // Sólo los grupos con texto, como cuando un grupo «apagado» no existía.
+      gruposPiso: gruposDeHoja(hojaPiso).map(g => ({ nombre: g.nombre, renglones: [...g.renglones] })),
     }),
     aplicar: (c: ContenidoPlantilla) => {
       // Solo las claves que existen HOY en el formulario, y comprobando el tipo
@@ -276,7 +306,11 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
       setInstruccionesPaciente(typeof c.instruccionesPaciente === 'string'
         ? c.instruccionesPaciente
         : INSTRUCCIONES_DEFECTO)
-      setGruposPiso(leerGrupos(c.gruposPiso))
+      // Los grupos fijos que la plantilla no trae se muestran vacíos.
+      setHojaPiso(hojaDeGrupos(leerGrupos(c.gruposPiso)))
+      // Aplicada, todo plegado (se ve la solicitud entera); vaciada (un
+      // contenido sin claves), la primera abierta para escribir.
+      setAbierta(Object.keys(c).length === 0 ? 'gen' : null)
     },
   })
 
@@ -287,16 +321,89 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
 
-  function toggleRequerimiento(r: string): void {
-    setRequerimientos(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])
+  // ── Secciones: abrir, plegar y Tab al final (maqueta aprobada) ───────────
+  /**
+   * Abre una sección (plegando la que estuviera abierta) y enfoca `el` o, si no
+   * se da, su primer campo. Lo acerca al borde de arriba: en `tel`/`iv` el
+   * encabezado fundido flota SOBRE el scroller y su alto es el relleno de
+   * arriba de `.app-contenido`.
+   */
+  function abrir(s: SeccionInternamiento, el?: () => HTMLElement | null): void {
+    flushSync(() => setAbierta(s))
+    const cuerpo = document.getElementById(`internamiento-${s}-cuerpo`)
+    const destino = el?.() ?? (cuerpo ? enfocables(cuerpo)[0] : null)
+    const contenido = formRef.current?.closest<HTMLElement>('.app-contenido')
+    const margen = contenido ? parseFloat(getComputedStyle(contenido).paddingTop) || 24 : 24
+    enfocarYAcercar(destino ?? null, Math.max(24, margen))
   }
 
-  function addDx() { setDiagnosticosSecundarios(prev => [...prev, '']) }
-  function updateDx(i: number, val: string) {
-    setDiagnosticosSecundarios(prev => prev.map((d, idx) => idx === i ? val : d))
+  /** Tab (sin Mayús) en el último control de una sección: la resume y abre la siguiente. */
+  function teclaCuerpo(s: SeccionInternamiento, e: KeyboardEvent<HTMLDivElement>): void {
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey || e.defaultPrevented) return
+    const sig = SECCIONES[SECCIONES.indexOf(s) + 1]
+    const todos = enfocables(e.currentTarget)
+    if (!sig || document.activeElement !== todos[todos.length - 1]) return
+    e.preventDefault()
+    abrir(sig)
   }
-  function removeDx(i: number) {
-    setDiagnosticosSecundarios(prev => prev.filter((_, idx) => idx !== i))
+
+  /** Pliega la abierta al tocar o enfocar fuera de las secciones (si el foco no volvió dentro). */
+  function plegar(): void {
+    if (abierta === null || seccionesRef.current?.contains(document.activeElement)) return
+    setAbierta(null)
+  }
+  const plegarRef = useRef(plegar)
+  useEffect(() => { plegarRef.current = plegar })
+
+  /*
+   * La escucha de «salir» de la receta. Con el puntero se pliega al SOLTAR y con
+   * un `setTimeout`: plegar cambia el alto de la página, y hacerlo en el
+   * `pointerdown` movería el destino antes del `mouseup` y el clic caería en
+   * otro sitio. Un desplazamiento con el dedo termina en `pointercancel` y no
+   * pliega. Con el teclado (Tab que sale), en el `focusin`. Las capas
+   * (diálogos, alertas, listas, menús) no cuentan como fuera.
+   */
+  useEffect(() => {
+    let abajoFuera = false
+    const fuera = (t: EventTarget | null): boolean => t instanceof Element
+      && !seccionesRef.current?.contains(t)
+      && !t.closest('[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"]')
+    const alBajar = (e: PointerEvent) => { abajoFuera = fuera(e.target) }
+    const alSoltar = () => {
+      if (!abajoFuera) return
+      abajoFuera = false
+      setTimeout(() => plegarRef.current(), 0)
+    }
+    const alCancelar = () => { abajoFuera = false }
+    const alEnfocar = (e: FocusEvent) => { if (!abajoFuera && fuera(e.target)) plegarRef.current() }
+    document.addEventListener('pointerdown', alBajar, true)
+    document.addEventListener('pointerup', alSoltar, true)
+    document.addEventListener('pointercancel', alCancelar, true)
+    document.addEventListener('focusin', alEnfocar)
+    return () => {
+      document.removeEventListener('pointerdown', alBajar, true)
+      document.removeEventListener('pointerup', alSoltar, true)
+      document.removeEventListener('pointercancel', alCancelar, true)
+      document.removeEventListener('focusin', alEnfocar)
+    }
+  }, [])
+
+  // ── Diagnósticos secundarios: Enter añade otro; Retroceso en uno vacío lo quita ──
+  const idSecundario = (i: number): string => `internamiento-secundario-${i}`
+  function secundarios(nuevos: string[], foco: number | null): void {
+    flushSync(() => setDiagnosticosSecundarios(nuevos))
+    const el = foco === null ? diagnosticoRef.current : document.getElementById(idSecundario(foco))
+    el?.focus()
+  }
+  function teclaSecundario(e: KeyboardEvent<HTMLInputElement>, i: number): void {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      secundarios([...diagnosticosSecundarios.slice(0, i + 1), '', ...diagnosticosSecundarios.slice(i + 1)], i + 1)
+    } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
+      e.preventDefault()
+      const quedan = diagnosticosSecundarios.filter((_, j) => j !== i)
+      secundarios(quedan, quedan.length === 0 ? null : Math.max(0, i - 1))
+    }
   }
 
   // ── Validación (§3.8) ───────────────────────────────────────────
@@ -321,11 +428,13 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
     return `${n === 1 ? 'Falta 1 campo' : `Faltan ${n} campos`}: ${cabeza}${resto}`
   }
 
+  /** Abre la sección del faltante y enfoca su campo. */
   function irA(clave: string) {
-    if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
-    if (clave === 'lugar') { enfocarYAcercar(lugarRef.current); return }
-    if (clave === 'fechaIngreso') { enfocarYAcercar(ingresoRef.current); return }
-    enfocarYAcercar(diagnosticoRef.current)
+    const ref = clave === 'paciente' ? pacienteRef
+      : clave === 'lugar' ? lugarRef
+        : clave === 'fechaIngreso' ? ingresoRef
+          : diagnosticoRef
+    abrir(seccionDe(clave), () => ref.current)
   }
 
   async function imprimir() {
@@ -353,6 +462,9 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
     //    el PDF de hoy y los documentos ya emitidos —que no se convierten—; la
     //    estructura es el dato de verdad, y sin ella el grupo y el renglón se
     //    pierden en cuanto la cadena se compone.
+    //    Los dos salen de `gruposDeHoja`: la hoja tiene los cuatro grupos fijos
+    //    siempre, y lo guardado sólo los que llevan texto, como antes.
+    const gruposPiso = gruposDeHoja(hojaPiso)
     const indicacionesPiso = textoIndicaciones(gruposPiso)
     const contenido = {
       paciente, fecha, fechaIngreso, lugar, diagnostico,
@@ -529,8 +641,25 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
   }
 
   const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
-  const conNumeral = diagnosticosSecundarios.length >= 2
   const maxFecha = desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })
+
+  /**
+   * Lo que dice cada sección plegada. Tras intentar imprimir, la que tenga un
+   * obligatorio sin llenar lo dice en rojo («Falta Paciente · Hospital»).
+   */
+  function cabecera(s: SeccionInternamiento, r: Resumen) {
+    const suyos = intentado ? faltantes.filter(f => seccionDe(f.clave) === s) : []
+    const falta = suyos.length > 0
+    return {
+      id: s, resumen: falta ? `Falta ${suyos.map(f => f.nombre).join(' · ')}` : r.texto,
+      completa: r.completa && !falta, falta, abierta: abierta === s,
+      onAlternar: () => (abierta === s ? setAbierta(null) : abrir(s)),
+      onTeclaCuerpo: (e: KeyboardEvent<HTMLDivElement>) => teclaCuerpo(s, e),
+    }
+  }
+  const generales = resumenGenerales({ tipoInternamiento, fechaIngreso, diasEstimados, asa, lugar, urgente })
+  const campo = (clave: string, extra = '') => `sp-rx-campo${extra}${senalar(clave) ? ' sp-rx-campo--falta' : ''}`
+  const obligatorio = <><span aria-hidden="true" className="sp-int-ob">*</span><span className="sr-only"> obligatorio</span></>
 
   return (
     <div ref={formRef} className="sp-doc-form">
@@ -541,205 +670,142 @@ export default function SolicitudInternamientoForm({ pacienteInicial = '', diagn
 
       {plantillas.selector}
 
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <div className="sp-icobox sp-icobox--sm"><BedDouble /></div>
-          <h2 className="sp-label">Datos generales</h2>
+      {/* Solicitud compacta (maqueta `internamiento.html`, aprobada por el
+          dueño): cinco secciones numeradas, UNA abierta a la vez y las demás
+          resumidas en una línea. Tab en el último control de una sección la
+          resume y abre la siguiente; tocar fuera pliega la abierta. Todo local,
+          sin red (lo comparte el búnker). */}
+      <div ref={seccionesRef} className="sp-int">
+
+      <SeccionPaso numero={1} titulo="Datos generales" {...cabecera('gen', generales)}>
+        <div className={campo('paciente')}>
+          <label htmlFor="internamiento-paciente" className="sp-rx-rot">Paciente{obligatorio}</label>
+          <input ref={pacienteRef} id="internamiento-paciente" type="text" value={paciente}
+            onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo" autoComplete="off"
+            aria-invalid={senalar('paciente') || undefined} className="sp-rx-fi" />
         </div>
-        <div className="sp-doc-cardbody">
-          <div className="sp-doc-grid" data-cols="3">
-            <div className="sp-doc-field">
-              <label htmlFor="internamiento-fecha" className="sp-label-field">Fecha</label>
-              <input id="internamiento-fecha" type="date" value={fecha}
-                min={FECHA_MIN} max={maxFecha}
-                onChange={e => setFecha(e.target.value)} className="sp-input" />
-            </div>
-            <div className="sp-doc-field">
-              <label htmlFor="internamiento-paciente" className="sp-label-field">
-                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                <span className="sr-only">obligatorio</span>
-              </label>
-              <input ref={pacienteRef} id="internamiento-paciente" type="text" value={paciente}
-                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
-                aria-invalid={senalar('paciente') || undefined}
-                className={`sp-input ${senalar('paciente') ? 'sp-doc-invalid' : ''}`} />
-            </div>
-            <div className="sp-doc-field">
-              <label htmlFor="internamiento-tipo" className="sp-label-field">Tipo de internamiento</label>
-              <select id="internamiento-tipo" value={tipoInternamiento}
-                onChange={e => setTipoInternamiento(e.target.value)} className="sp-input">
-                <option value="">Seleccionar…</option>
-                {TIPOS_INTERNAMIENTO.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="sp-doc-field">
-              <label htmlFor="internamiento-ingreso" className="sp-label-field">
-                Fecha propuesta de ingreso <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                <span className="sr-only">obligatorio</span>
-              </label>
-              <input ref={ingresoRef} id="internamiento-ingreso" type="date" value={fechaIngreso}
-                min={FECHA_MIN} max={maxFecha}
-                onChange={e => setFechaIngreso(e.target.value)}
-                aria-invalid={senalar('fechaIngreso') || undefined}
-                className={`sp-input ${senalar('fechaIngreso') ? 'sp-doc-invalid' : ''}`} />
-            </div>
-            {/* Texto libre y no numérico: `3-5 días` es la respuesta habitual. */}
-            <div className="sp-doc-field">
-              <label htmlFor="internamiento-dias" className="sp-label-field">Días estimados</label>
-              <input id="internamiento-dias" type="text" value={diasEstimados}
-                onChange={e => setDiasEstimados(e.target.value)}
-                placeholder="Ej: 3-5 días" className="sp-input" />
-            </div>
-            <div className="sp-doc-field">
-              <label htmlFor="internamiento-asa" className="sp-label-field">Clasificación ASA</label>
-              <select id="internamiento-asa" value={asa}
-                onChange={e => setAsa(e.target.value)} className="sp-input">
-                <option value="">Seleccionar…</option>
-                {ASA.map(a => <option key={a} value={`ASA ${a}`}>ASA {a}</option>)}
-              </select>
-            </div>
-            {/* N-01: el hospital vivía fuera de la rejilla, y es obligatorio. */}
-            <div className="sp-doc-field sp-doc-span-2">
-              <label htmlFor="internamiento-lugar" className="sp-label-field">
-                Hospital / lugar de internamiento <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                <span className="sr-only">obligatorio</span>
-              </label>
-              <input ref={lugarRef} id="internamiento-lugar" type="text" value={lugar}
-                onChange={e => setLugar(e.target.value)}
-                placeholder="Ej: Hospital Ángeles Lomas"
-                aria-invalid={senalar('lugar') || undefined}
-                className={`sp-input ${senalar('lugar') ? 'sp-doc-invalid' : ''}`} />
-            </div>
-            {/* El rojo va al badge y no a la etiqueta: en rojo, la casilla
-                competía con los errores del formulario. */}
-            <div className="sp-doc-span-all">
-              <label className="sp-check">
-                <input id="internamiento-urgente" type="checkbox" className="sr-only"
-                  checked={urgente} onChange={e => setUrgente(e.target.checked)} />
-                <span className="sp-check__box"><Check aria-hidden="true" /></span>
-                <span className="sp-check__label">Marcar como URGENTE</span>
-                {urgente && <span className="sp-badge sp-badge--danger">URGENTE</span>}
-              </label>
-            </div>
+        <div className="sp-int-blo">
+          <span className="sp-int-rot" aria-hidden="true">Tipo</span>
+          <OpcionesRapidas id="internamiento-tipo" nombre="Tipo de internamiento" opciones={OPCIONES_TIPO}
+            valor={tipoInternamiento} onCambio={setTipoInternamiento} />
+        </div>
+        <div className="sp-rx-par">
+          <div className={campo('fechaIngreso')}>
+            <label htmlFor="internamiento-ingreso" className="sp-rx-rot">Ingreso{obligatorio}</label>
+            <input ref={ingresoRef} id="internamiento-ingreso" type="date" value={fechaIngreso}
+              min={FECHA_MIN} max={maxFecha} onChange={e => setFechaIngreso(e.target.value)}
+              aria-label="Fecha propuesta de ingreso (obligatorio)"
+              aria-invalid={senalar('fechaIngreso') || undefined} className="sp-rx-fi" />
+          </div>
+          {/* Texto libre y no numérico: `3-5 días` es la respuesta habitual. */}
+          <div className="sp-rx-campo">
+            <label htmlFor="internamiento-dias" className="sp-rx-rot">Días</label>
+            <input id="internamiento-dias" type="text" value={diasEstimados} autoComplete="off"
+              onChange={e => setDiasEstimados(e.target.value)} aria-label="Días estimados"
+              placeholder="Ej: 3-5 días" className="sp-rx-fi" />
           </div>
         </div>
-      </section>
+        <div className="sp-int-blo">
+          <span className="sp-int-rot" aria-hidden="true">ASA</span>
+          <OpcionesRapidas id="internamiento-asa" nombre="Clasificación ASA" opciones={OPCIONES_ASA}
+            valor={asa} onCambio={setAsa} />
+        </div>
+        <div className={campo('lugar')}>
+          <label htmlFor="internamiento-lugar" className="sp-rx-rot">Hospital{obligatorio}</label>
+          <input ref={lugarRef} id="internamiento-lugar" type="text" value={lugar} autoComplete="off"
+            onChange={e => setLugar(e.target.value)} placeholder="Ej: Hospital Ángeles Lomas"
+            aria-label="Hospital / lugar de internamiento (obligatorio)"
+            aria-invalid={senalar('lugar') || undefined} className="sp-rx-fi" />
+        </div>
+        <div className="sp-rx-par">
+          <div className="sp-rx-campo">
+            <label htmlFor="internamiento-fecha" className="sp-rx-rot">Fecha</label>
+            <input id="internamiento-fecha" type="date" value={fecha} min={FECHA_MIN} max={maxFecha}
+              onChange={e => setFecha(e.target.value)} aria-label="Fecha del documento" className="sp-rx-fi" />
+          </div>
+          {/* El rojo va al badge y no a la etiqueta: en rojo, la casilla
+              competía con los errores del formulario. */}
+          <label className="sp-check sp-int-urgente">
+            <input id="internamiento-urgente" type="checkbox" className="sr-only"
+              checked={urgente} onChange={e => setUrgente(e.target.checked)} />
+            <span className="sp-check__box"><Check aria-hidden="true" /></span>
+            <span className="sp-check__label">Marcar como URGENTE</span>
+            {urgente && <span className="sp-badge sp-badge--danger">URGENTE</span>}
+          </label>
+        </div>
+      </SeccionPaso>
 
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Diagnósticos</h2>
-          <button type="button" onClick={addDx} aria-label="Agregar diagnóstico secundario"
-            className="sp-btn sp-btn--compact sp-doc-add">
-            <Plus size={17} /><span className="sp-doc-long">Agregar</span>
+      <SeccionPaso numero={2} titulo="Diagnóstico y procedimiento"
+        {...cabecera('dx', resumenDiagnostico(diagnostico, diagnosticosSecundarios, procedimiento))}>
+        <div className={campo('diagnostico')}>
+          <label htmlFor="internamiento-diagnostico" className="sp-rx-rot">Dx principal{obligatorio}</label>
+          <input ref={diagnosticoRef} id="internamiento-diagnostico" type="text" value={diagnostico} autoComplete="off"
+            onChange={e => setDiagnostico(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); procedimientoRef.current?.focus() } }}
+            placeholder="Diagnóstico principal de ingreso" aria-label="Diagnóstico principal (obligatorio)"
+            aria-invalid={senalar('diagnostico') || undefined} className="sp-rx-fi" />
+        </div>
+        {diagnosticosSecundarios.map((d, i) => (
+          <div key={i} className="sp-rx-campo">
+            <label htmlFor={idSecundario(i)} className="sp-rx-rot">Sec. {i + 1}</label>
+            <input id={idSecundario(i)} type="text" value={d} autoComplete="off"
+              onChange={e => setDiagnosticosSecundarios(prev => prev.map((x, j) => (j === i ? e.target.value : x)))}
+              onKeyDown={e => teclaSecundario(e, i)}
+              aria-label={`Diagnóstico secundario ${i + 1}`} placeholder="Diagnóstico secundario" className="sp-rx-fi" />
+            <button type="button" tabIndex={-1} className="k-b k-b-icono sp-int-quitar"
+              onClick={() => secundarios(diagnosticosSecundarios.filter((_, j) => j !== i), null)}
+              aria-label={d.trim() ? `Eliminar ${d.trim()}` : `Eliminar secundario ${i + 1}`}>
+              <X aria-hidden="true" />
+            </button>
+          </div>
+        ))}
+        <div>
+          <button type="button" className="k-b k-b-texto"
+            onClick={() => secundarios([...diagnosticosSecundarios, ''], diagnosticosSecundarios.length)}>
+            <Plus aria-hidden="true" size={16} /> Diagnóstico secundario
           </button>
         </div>
-        <div className="sp-doc-cardbody">
-          <div className="sp-doc-field">
-            <label htmlFor="internamiento-diagnostico" className="sp-label-field">
-              Diagnóstico principal <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-              <span className="sr-only">obligatorio</span>
-            </label>
-            <input ref={diagnosticoRef} id="internamiento-diagnostico" type="text" value={diagnostico}
-              onChange={e => setDiagnostico(e.target.value)}
-              placeholder="Diagnóstico principal de ingreso"
-              aria-invalid={senalar('diagnostico') || undefined}
-              className={`sp-input ${senalar('diagnostico') ? 'sp-doc-invalid' : ''}`} />
-          </div>
-
-          <p className="sp-label-field" style={{ margin: 'var(--sp-4) 0 var(--sp-gap-label)' }}>
-            Diagnósticos secundarios
-          </p>
-          <div className={diagnosticosSecundarios.length >= 4 ? 'sp-doc-list--long' : undefined}>
-            {diagnosticosSecundarios.map((d, i) => (
-              <div key={i} className="sp-doc-listrow">
-                {conNumeral && <span className="sp-label sp-doc-listnum">{i + 1}.</span>}
-                <input id={`internamiento-secundario-${i}`} type="text" value={d}
-                  onChange={e => updateDx(i, e.target.value)}
-                  aria-label={`Diagnóstico secundario ${i + 1}`}
-                  placeholder={`Secundario ${i + 1}`}
-                  style={{ flex: 1, minWidth: 0 }} className="sp-input" />
-                <button type="button" onClick={() => removeDx(i)}
-                  disabled={diagnosticosSecundarios.length === 1}
-                  aria-label={d.trim() ? `Eliminar ${d.trim()}` : `Eliminar secundario ${i + 1}`}
-                  className="sp-doc-iconbtn">
-                  <Trash2 />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Procedimiento</h2>
-        </div>
-        <div className="sp-doc-cardbody">
-          <label htmlFor="internamiento-procedimiento" className="sr-only">Procedimiento / cirugía solicitada</label>
-          <textarea id="internamiento-procedimiento" value={procedimiento}
-            onChange={e => setProcedimiento(e.target.value)}
+        <div className="sp-rx-campo sp-rx-campo--texto">
+          <label htmlFor="internamiento-procedimiento" className="sp-rx-rot">Procedimiento</label>
+          <textarea ref={procedimientoRef} id="internamiento-procedimiento" rows={1} value={procedimiento}
+            onChange={e => setProcedimiento(e.target.value)} aria-label="Procedimiento / cirugía solicitada"
             placeholder="Ej: Artrodesis posterolateral L4-L5 con tornillos pediculares e injerto óseo autólogo…"
-            className="sp-textarea" />
+            className="sp-rx-fi sp-rx-ta" />
         </div>
-      </section>
+      </SeccionPaso>
 
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Requerimientos especiales</h2>
-        </div>
-        <div className="sp-doc-cardbody">
-          <div className="sp-doc-chips">
-            {REQUERIMIENTOS.map(r => (
-              <button key={r} type="button" onClick={() => toggleRequerimiento(r)}
-                aria-pressed={requerimientos.includes(r)} className="sp-chip">
-                {r}
-              </button>
-            ))}
-          </div>
-          <div className="sp-doc-field" style={{ marginTop: 'var(--sp-4)' }}>
-            <label htmlFor="internamiento-requerimiento-otro" className="sp-label-field">Otro requerimiento</label>
-            <input id="internamiento-requerimiento-otro" type="text" value={requerimientosExtra}
-              onChange={e => setRequerimientosExtra(e.target.value)}
-              placeholder="El que no esté en la lista" className="sp-input" />
-          </div>
-        </div>
-      </section>
-
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Justificación clínica</h2>
-        </div>
-        <div className="sp-doc-cardbody">
-          <label htmlFor="internamiento-justificacion" className="sr-only">Justificación clínica</label>
-          <textarea id="internamiento-justificacion" value={justificacion}
-            onChange={e => setJustificacion(e.target.value)}
+      <SeccionPaso numero={3} titulo="Requerimientos y justificación"
+        {...cabecera('req', resumenRequerimientos([...requerimientos, requerimientosExtra], justificacion))}>
+        <MenuRequerimientos requerimientos={requerimientos} extra={requerimientosExtra}
+          onRequerimientos={setRequerimientos} onExtra={setRequerimientosExtra} />
+        <div className="sp-rx-campo sp-rx-campo--texto">
+          <label htmlFor="internamiento-justificacion" className="sp-rx-rot">Justificación</label>
+          <textarea ref={justificacionRef} id="internamiento-justificacion" rows={1} value={justificacion}
+            onChange={e => setJustificacion(e.target.value)} aria-label="Justificación clínica"
             placeholder="Evolución del padecimiento, hallazgos, fracaso del tratamiento conservador…"
-            className="sp-textarea" />
+            className="sp-rx-fi sp-rx-ta" />
         </div>
-      </section>
+      </SeccionPaso>
 
-      {/* Las dos últimas y las más altas, y por eso nacen plegadas: 58px cada
-          una en vez de las dos que estiraban el formulario antes de escribir
-          nada. El resumen de la cabecera es lo que hace que plegar resuma. */}
-      <SeccionPlegable
-        id="internamiento-instrucciones"
-        titulo="Instrucciones al paciente"
-        resumen={instruccionesPaciente !== INSTRUCCIONES_DEFECTO ? 'Editada' : undefined}
-      >
-        <label htmlFor="internamiento-instrucciones-texto" className="sr-only">Instrucciones al paciente</label>
-        <textarea id="internamiento-instrucciones-texto" value={instruccionesPaciente}
-          onChange={e => setInstruccionesPaciente(e.target.value)}
-          rows={8} className="sp-textarea" />
-      </SeccionPlegable>
+      <SeccionPaso numero={4} titulo="Instrucciones al paciente"
+        {...cabecera('ins', resumenInstrucciones(instruccionesPaciente !== INSTRUCCIONES_DEFECTO))}>
+        <div className="sp-rx-campo sp-rx-campo--texto">
+          <textarea ref={instruccionesRef} id="internamiento-instrucciones-texto" rows={6} value={instruccionesPaciente}
+            onChange={e => setInstruccionesPaciente(e.target.value)} aria-label="Instrucciones al paciente"
+            className="sp-rx-fi sp-rx-ta sp-int-ins" />
+        </div>
+        <div>
+          <button type="button" className="k-b k-b-texto" onClick={() => setInstruccionesPaciente(INSTRUCCIONES_DEFECTO)}>
+            Restablecer el texto estándar
+          </button>
+        </div>
+      </SeccionPaso>
 
-      <SeccionPlegable
-        id="internamiento-piso"
-        titulo="Indicaciones de ingreso a piso"
-        resumen={resumenIndicaciones(gruposPiso, false)}
-        resumenAbierta={resumenIndicaciones(gruposPiso, true)}
-      >
-        <IndicacionesPiso grupos={gruposPiso} onChange={setGruposPiso} />
-      </SeccionPlegable>
+      <SeccionPaso numero={5} titulo="Indicaciones de ingreso a piso" {...cabecera('piso', resumenPiso(hojaPiso))}>
+        <IndicacionesPiso hoja={hojaPiso} onChange={setHojaPiso} />
+      </SeccionPaso>
+
+      </div>
 
       {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
           salía dos veces, en un aviso y en una banda. El texto se queda en
