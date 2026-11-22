@@ -14,7 +14,6 @@ import {
 } from '@/lib/labs/schemas'
 import type { AnalitoCatalogo, CategoriaAnalito } from '@/types'
 
-const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 
 type Modo = 'catalogo' | 'custom'
 
@@ -167,15 +166,15 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
   const botonLabel = submitting ? 'Guardando…' : 'Guardar'
 
   const footer = (
-    <div className="flex items-center justify-between gap-2 px-5 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
       {modo === 'custom' ? (
         <button
           type="button"
           onClick={() => { setModo('catalogo'); setError(null) }}
-          className="inline-flex items-center gap-1 text-[12px] font-medium text-slate-600 hover:text-slate-900 transition-colors"
+          className="k-b k-b-texto -ml-1"
           disabled={submitting}
         >
-          <ArrowLeft size={12} />
+          <ArrowLeft size={16} aria-hidden="true" />
           Volver al catálogo
         </button>
       ) : <span />}
@@ -184,7 +183,7 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
           type="button"
           onClick={onClose}
           disabled={submitting}
-          className="px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:text-slate-900 transition-colors disabled:opacity-50"
+          className="k-b k-b-capa k-b-quieto min-w-[104px]"
         >
           Cancelar
         </button>
@@ -192,8 +191,7 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
           type="submit"
           form="form-agregar-medicion"
           disabled={submitting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-900 text-white rounded-xl text-[13px] font-medium hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          style={{ transitionTimingFunction: IOS_EASING }}
+          className="k-b k-b-capa k-b-prim min-w-[104px]"
         >
           {botonLabel}
         </button>
@@ -208,14 +206,14 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
       title="Agregar medición"
       subtitle={modo === 'custom' ? 'Analito personalizado' : 'Desde catálogo clínico'}
       icon={<Activity size={16} />}
-      iconBg="bg-violet-50 text-violet-600"
+      iconBg="bg-tonal text-tonal-tinta"
       maxWidth="max-w-md"
       footer={footer}
     >
       <form id="form-agregar-medicion" onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
         {modo === 'catalogo' ? (
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label className="k-etiqueta mb-1">
               Analito
             </label>
             <AutocompleteAnalito
@@ -226,49 +224,52 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
               disabled={catalogoLoading || submitting}
             />
             {catalogoLoading && (
-              <p className="mt-1 text-[11px] text-slate-400">Cargando catálogo…</p>
+              <p className="k-campo-ayuda mt-1">Cargando catálogo…</p>
             )}
           </div>
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label htmlFor="med-nombre" className="k-etiqueta mb-1">
                 Nombre del analito
               </label>
               <input
+                id="med-nombre"
                 type="text"
                 value={nombreCustom}
                 onChange={e => setNombreCustom(e.target.value)}
                 placeholder="Ej. Mi marcador personalizado"
                 maxLength={100}
                 disabled={submitting}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+                className="k-campo"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                <label htmlFor="med-unidad" className="k-etiqueta mb-1">
                   Unidad
                 </label>
                 <input
+                id="med-unidad"
                   type="text"
                   value={unidadCustom}
                   onChange={e => setUnidadCustom(e.target.value)}
                   placeholder="mg/dL, UI/mL…"
                   maxLength={30}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+                  className="k-campo"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                <label htmlFor="med-categoria" className="k-etiqueta mb-1">
                   Categoría
                 </label>
                 <select
+                id="med-categoria"
                   value={categoriaCustom}
                   onChange={e => setCategoriaCustom(e.target.value as CategoriaAnalito)}
                   disabled={submitting}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+                  className="k-campo"
                 >
                   {CATEGORIAS_ANALITO.map(c => (
                     <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>
@@ -282,10 +283,11 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
         {modo === 'catalogo' && esTA ? (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label htmlFor="med-sistolica" className="k-etiqueta mb-1">
                 TA sistólica (mmHg)
               </label>
               <input
+                id="med-sistolica"
                 type="number"
                 inputMode="decimal"
                 step="any"
@@ -293,14 +295,15 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
                 onChange={e => setValorSistolica(e.target.value)}
                 placeholder="135"
                 disabled={submitting}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+                className="k-campo"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label htmlFor="med-diastolica" className="k-etiqueta mb-1">
                 TA diastólica (mmHg)
               </label>
               <input
+                id="med-diastolica"
                 type="number"
                 inputMode="decimal"
                 step="any"
@@ -308,17 +311,18 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
                 onChange={e => setValorDiastolica(e.target.value)}
                 placeholder="85"
                 disabled={submitting}
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+                className="k-campo"
               />
             </div>
           </div>
         ) : (
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label htmlFor="med-valor" className="k-etiqueta mb-1">
               Valor
             </label>
             <div className="flex gap-2">
               <input
+                id="med-valor"
                 type="number"
                 inputMode="decimal"
                 step="any"
@@ -326,9 +330,9 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
                 onChange={e => setValor(e.target.value)}
                 placeholder="0"
                 disabled={submitting}
-                className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+                className="k-campo flex-1"
               />
-              <div className="px-3 py-2 border border-slate-200 rounded-xl text-[13px] text-slate-500 bg-slate-50 min-w-[80px] flex items-center justify-center">
+              <div className="flex min-w-[80px] items-center justify-center rounded-[var(--r-control)] bg-sup2 px-3 text-[15px] text-tinta2">
                 {modo === 'catalogo' ? (analito?.unidad ?? '—') : (unidadCustom || '—')}
               </div>
             </div>
@@ -337,51 +341,52 @@ export default function ModalAgregarMedicion({ open, onClose, pacienteId, onSucc
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label htmlFor="med-fecha" className="k-etiqueta mb-1">
               Fecha
             </label>
             <input
+                id="med-fecha"
               type="date"
               value={fecha}
               onChange={e => setFecha(e.target.value)}
               max={hoyISO()}
               disabled={submitting}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+              className="k-campo"
             />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label htmlFor="med-hora" className="k-etiqueta mb-1">
               Hora
             </label>
             <input
+                id="med-hora"
               type="time"
               value={hora}
               onChange={e => setHora(e.target.value)}
               disabled={submitting}
-              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50"
+              className="k-campo"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+          <label htmlFor="med-notas" className="k-etiqueta mb-1">
             Notas (opcional)
           </label>
           <textarea
+                id="med-notas"
             value={notas}
             onChange={e => setNotas(e.target.value)}
             rows={2}
             maxLength={500}
             disabled={submitting}
             placeholder="Contexto clínico breve…"
-            className="w-full px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50 resize-none"
+            className="k-campo min-h-[88px] resize-none"
           />
         </div>
 
         {error && (
-          <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-[12px] text-red-700">
-            {error}
-          </div>
+          <p role="alert" className="k-campo-error">{error}</p>
         )}
       </form>
     </ModalShell>

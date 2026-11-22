@@ -105,24 +105,6 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
   const hay = documentos.length > 0
   const cargando = docsLoading && !hay
 
-  const deleteFooter = (
-    <div className="flex items-center justify-end gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-3)]">
-      <button type="button" onClick={cerrarDelete} disabled={eliminando} className="sp-btn sp-btn--secondary">
-        Cancelar
-      </button>
-      {/* La destructiva, en menor peso visual que cancelar. */}
-      <button
-        type="button"
-        onClick={confirmarDelete}
-        disabled={eliminando}
-        className="sp-btn"
-        style={{ background: 'transparent', color: 'var(--sp-danger)', fontSize: 'var(--sp-fs-btn-sm)', padding: '13px 20px' }}
-      >
-        {eliminando ? 'Eliminando…' : 'Eliminar'}
-      </button>
-    </div>
-  )
-
   /**
    * ⚠️ LA ZONA DE ARRASTRE SUSTITUYE AL BOTÓN SUELTO DEL ENCABEZADO, y por eso
    * allí arriba ya no hay ninguno: dos entradas a lo mismo en la misma pantalla
@@ -152,13 +134,12 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
       onDrop={alSoltar}
       disabled={sinClinica}
       title={sinClinica ? 'Configura tu clínica antes de subir archivos' : undefined}
-      className="flex min-h-[186px] flex-col items-center justify-center gap-[var(--sp-2)] rounded-[14px] border border-dashed px-[var(--sp-3)] text-center transition-colors disabled:opacity-50"
-      style={arrastrando
-        ? { borderColor: 'var(--sp-primary)', background: 'var(--sp-primary-bg-faint)' }
-        : { borderColor: 'var(--sp-line-dash)', background: 'var(--sp-surface)' }}
+      /* La zona de arrastre como fila punteada al pie de la lista (maqueta).
+         Sólo cambia color y borde al arrastrar: nada se mueve. */
+      className={`flex min-h-[56px] w-full items-center justify-center gap-2 rounded-[12px] border border-dashed px-3 py-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${arrastrando ? 'border-accion bg-tonal' : 'border-borde bg-transparent hover:bg-sup2'}`}
     >
-      <UploadCloud size={26} className="text-[var(--sp-ink-150)]" />
-      <span className="text-[12.5px] leading-snug text-[var(--sp-ink-500)]">
+      <UploadCloud size={20} aria-hidden="true" className="shrink-0 text-tinta2" />
+      <span className="text-[14px] leading-5 text-tinta2">
         Arrastra archivos aquí o haz clic para subir
       </span>
     </button>
@@ -169,19 +150,19 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
       {/* Encabezado: título, conteo y filtro por formato. La acción de subir
           va aquí y no en una cabecera aparte — `HeroLabs` se retiró con sus dos
           botones muertos y sus conteos vuelven repartidos por sección. */}
-      <div className="mb-[var(--sp-3-5)] flex flex-wrap items-center justify-between gap-[var(--sp-2-5)]">
-        <div className="flex flex-wrap items-baseline gap-[var(--sp-2-5)]">
-          <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h2 className="k-t-tarjeta">
             Archivos clínicos
           </h2>
           {hay && (
-            <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
+            <p className="k-t-sec">
               {documentos.length} {documentos.length === 1 ? 'archivo' : 'archivos'}
             </p>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-[var(--sp-2-5)]">
+        <div className="flex flex-wrap items-center gap-2">
           {hay && (
             <SelectorSegmentado
               opciones={FORMATOS.map(f => ({ valor: f.clave, rotulo: f.rotulo }))}
@@ -194,35 +175,36 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
       </div>
 
       {cargando ? (
-        <div className="grid grid-cols-2 gap-[var(--sp-2-5)] lg:grid-cols-3">
-          {[1, 2, 3].map(i => <div key={i} className="skeleton h-[92px] rounded-[14px]" />)}
+        <div className="k-tarjeta flex flex-col gap-2" aria-busy="true">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-[44px] rounded-[8px]" />)}
         </div>
       ) : !hay ? (
         /* Sin archivos, SOLO la zona de arrastre: es lo que pide el §6.1 y
            además es la única acción que cabe hacer aquí. */
-        <div className="flex flex-col gap-[var(--sp-2-5)]">
-          <p className="text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
+        <div className="k-tarjeta flex flex-col gap-3">
+          <p className="text-[14px] leading-5 text-tinta2">
             Sin archivos clínicos. Sube resultados de laboratorio o estudios de imagen.
           </p>
-          <div className="max-w-[280px]">{zonaArrastre}</div>
+          {zonaArrastre}
         </div>
       ) : visibles.length === 0 ? (
-        <p className="rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-4)] py-[var(--sp-7)] text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
-          Sin archivos de este formato.
-        </p>
+        <div className="k-tarjeta flex flex-col gap-3">
+          <p className="k-t-sec py-3 text-center">Sin archivos de este formato.</p>
+          {zonaArrastre}
+        </div>
       ) : (
         /* ⚠️ ALTO TOPE Y DESPLAZAMIENTO EN LOS DOS ANCHOS, igual que la lista de
            analitos y que la línea de tiempo del Resumen: una galería de treinta
            estudios empuja las mediciones fuera de alcance. */
-        <div className="max-h-[420px] overflow-y-auto lg:max-h-[560px]">
-          {/* Retícula de relleno automático: dos columnas en móvil, las que
-              quepan a partir de 178 px de ancho mínimo en adelante. */}
-          <div className="grid grid-cols-2 gap-[var(--sp-3-5)] lg:grid-cols-[repeat(auto-fill,minmax(178px,1fr))]">
+        <div className="k-tarjeta max-h-[420px] overflow-y-auto esc:max-h-[560px]">
+          {/* Rediseño B7: lista (ver lo ya creado = lista, CALMA §9) con la
+              zona de arrastre al pie. */}
+          <div className="k-lista">
             {visibles.map(d => (
-              <CardDocumento key={d.id} documento={d} onClick={() => setDocPreview(d)} onDelete={() => setDocDelete(d)} />
+              <CardDocumento key={d.id} layout="list" documento={d} onClick={() => setDocPreview(d)} onDelete={() => setDocDelete(d)} />
             ))}
-            {zonaArrastre}
           </div>
+          <div className="pt-2">{zonaArrastre}</div>
         </div>
       )}
 
@@ -240,32 +222,34 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
 
       <ModalPreviewDocumento documento={docPreview} onClose={() => setDocPreview(null)} />
 
-      {docDelete && (
-        <ModalShell
-          open
-          onClose={cerrarDelete}
-          title="Eliminar archivo"
-          subtitle={docDelete.nombre_original ?? undefined}
-          icon={<AlertTriangle size={16} />}
-          iconBg="bg-[var(--sp-danger-bg)] text-[var(--sp-danger)]"
-          maxWidth="max-w-sm"
-          footer={deleteFooter}
-          elevated
-        >
-          <div className="flex flex-col gap-[var(--sp-2-5)] px-[var(--sp-5)] py-[var(--sp-4)]">
-            <p className="text-[length:var(--sp-fs-body-sm)] leading-relaxed text-[var(--sp-ink-700)]">
-              ¿Seguro que quieres eliminar{' '}
-              <span className="font-semibold">{docDelete.nombre_original ?? 'este archivo'}</span>?
-            </p>
-            <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">Esta acción no se puede deshacer.</p>
-            {deleteError && (
-              <p className="rounded-[var(--sp-r-field-sm)] border border-[color:var(--sp-danger-border)] bg-[var(--sp-danger-bg)] px-[var(--sp-3)] py-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-danger)]">
-                {deleteError}
-              </p>
-            )}
-          </div>
-        </ModalShell>
-      )}
+      {/* Alerta destructiva del catálogo (CALMA §13): el foco entra en «Cancelar». */}
+      <ModalShell
+        open={!!docDelete}
+        onClose={cerrarDelete}
+        variante="alerta"
+        tono="destruir"
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="Eliminar archivo"
+        subtitle={docDelete?.nombre_original ?? undefined}
+        elevated
+        footer={
+          <>
+            <button type="button" autoFocus onClick={cerrarDelete} disabled={eliminando} className="k-b k-b-capa k-b-quieto">
+              Cancelar
+            </button>
+            <button type="button" data-principal onClick={confirmarDelete} disabled={eliminando} className="k-b k-b-capa k-b-mal">
+              {eliminando ? 'Eliminando…' : 'Eliminar'}
+            </button>
+          </>
+        }
+      >
+        <p>
+          ¿Seguro que quieres eliminar{' '}
+          <span className="font-semibold">{docDelete?.nombre_original ?? 'este archivo'}</span>?
+        </p>
+        <p className="mt-2">Esta acción no se puede deshacer.</p>
+        {deleteError && <p role="alert" className="k-campo-error mt-3">{deleteError}</p>}
+      </ModalShell>
     </section>
   )
 }

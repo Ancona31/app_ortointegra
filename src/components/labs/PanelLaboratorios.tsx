@@ -5,8 +5,9 @@ import SeccionDocumentosLabs from './SeccionDocumentosLabs'
 import SeccionMedicionesLabs from './SeccionMedicionesLabs'
 
 /**
- * La pestaña «Mediciones y archivos». Dos secciones, en el orden del §6:
- * archivos clínicos primero, mediciones longitudinales después.
+ * La pestaña «Mediciones y archivos». Dos secciones; desde el rediseño B7, en
+ * el orden de la maqueta `final-expediente`: mediciones longitudinales primero,
+ * archivos clínicos después.
  *
  * ⚠️ RECIBE EL PACIENTE POR PROP Y NO CONSULTA NADA. Los conteos y los estados
  * vacíos los pone cada sección con sus propios datos, que son los que ya tiene
@@ -30,14 +31,11 @@ import SeccionMedicionesLabs from './SeccionMedicionesLabs'
  */
 export default function PanelLaboratorios({ paciente }: { paciente: Paciente }) {
   return (
-    <div className="flex flex-col">
+    /* Las dos secciones se separan por aire (28–32, CALMA §5) y cada una
+       lleva su encabezado propio. */
+    <div className="flex flex-col gap-7 esc:gap-8">
+      <SeccionMedicionesLabs pacienteId={paciente.id} sexoPaciente={paciente.sexo} />
       <SeccionDocumentosLabs pacienteId={paciente.id} />
-
-      {/* Las dos secciones se separan por línea divisoria y cada una lleva su
-          encabezado propio, que es lo que pide el §6.2. */}
-      <div className="mt-[var(--sp-6-5)] border-t border-[color:var(--sp-line-card)] pt-[var(--sp-5-5)]">
-        <SeccionMedicionesLabs pacienteId={paciente.id} sexoPaciente={paciente.sexo} />
-      </div>
     </div>
   )
 }

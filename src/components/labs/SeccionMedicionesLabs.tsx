@@ -111,12 +111,12 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
   return (
     <section>
       {/* Encabezado propio de la sección, con el conteo y la fecha derivados. */}
-      <div className="mb-[var(--sp-3-5)] flex flex-wrap items-baseline justify-between gap-[var(--sp-2-5)]">
-        <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="k-t-tarjeta">
           Mediciones longitudinales
         </h2>
         {hayAnalitos && (
-          <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-350)]">
+          <p className="k-t-sec">
             {analitos.length} {analitos.length === 1 ? 'analito' : 'analitos'}
             {ultimaMedicion && <> · última medición {ultimaMedicion}</>}
           </p>
@@ -124,23 +124,28 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
       </div>
 
       {analitosLoading && !hayAnalitos ? (
-        <div className="rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] p-[var(--sp-4-5)]">
+        <div className="k-tarjeta" aria-busy="true">
           <div className="skeleton h-[220px] rounded-[10px]" />
         </div>
       ) : !hayAnalitos ? (
-        <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-4)] py-[var(--sp-10)]">
-          <Activity size={20} className="text-[var(--sp-ink-150)]" />
-          <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
+        /* Vacío con su acción DENTRO (no tapar el control que lo resuelve). */
+        <div className="flex flex-col items-center rounded-[var(--r-tarjeta)] bg-sup px-5 py-7 text-center ih:rounded-[var(--r-tarjeta-ancha)] iv:rounded-[var(--r-tarjeta-ancha)] esc:rounded-[var(--r-tarjeta-ancha)]">
+          <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-tonal text-tonal-tinta">
+            <Activity size={24} aria-hidden="true" />
+          </span>
+          <p className="max-w-[38ch] text-[14px] leading-5 text-tinta2">
             Sin mediciones registradas. Agrega el primer dato para empezar el seguimiento.
           </p>
-          <button type="button" onClick={() => setModalOpen(true)} className="sp-btn sp-btn--compact">
-            <Plus size={14} /> Medición
+          <button type="button" onClick={() => setModalOpen(true)} className="k-b k-b-tonal mt-3">
+            <Plus size={16} aria-hidden="true" /> Medición
           </button>
         </div>
       ) : (
         /* Lista permanente + detalle. En escritorio en paralelo; por debajo, la
            lista arriba y el detalle debajo, que es el orden del §6.2. */
-        <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
+        /* Rediseño B7: SIEMPRE lista arriba y detalle debajo. Con la ficha a la
+           izquierda en esc, la pestaña ya no tiene ancho para dos columnas. */
+        <div className="flex flex-col gap-4">
           <ListaAnalitos
             analitos={analitos}
             catalogo={catalogo}
@@ -157,7 +162,7 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
               mismo principio que ya gobierna los dos visores.
               Las zonas se separan con espacio y, como mucho, un filete de 1 px;
               las piezas de dentro perdieron su marco y NO deben recuperarlo. */}
-          <div className="min-w-0 flex-1 rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-4-5)]">
+          <div className="k-tarjeta min-w-0">
             {analitoSeleccionado && mediciones.length > 0 && (
               <AnalitoDetailHeader
                 analito={analitoSeleccionado}
@@ -176,10 +181,10 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
 
             {analitoSeleccionado && (
               medicionesLoading && mediciones.length === 0 ? (
-                <div className="skeleton mt-[var(--sp-4)] h-[200px] rounded-[10px]" />
+                <div className="skeleton mt-4 h-[200px] rounded-[10px]" />
               ) : mediciones.length > 0 ? (
                 <>
-                  <div className="mt-[var(--sp-4)]">
+                  <div className="mt-4">
                     <GraficaAnalito
                       analito={analitoSeleccionado}
                       analitoCatalogo={analitoCatalogo}
@@ -189,7 +194,7 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
                     />
                   </div>
 
-                  <div className="mt-[var(--sp-3-5)]">
+                  <div className="mt-3">
                     <LeyendaBandas
                       analito={analitoSeleccionado}
                       analitoCatalogo={analitoCatalogo}
@@ -200,7 +205,7 @@ export default function SeccionMedicionesLabs({ pacienteId, sexoPaciente }: Prop
                   {medicionesFiltradas.length > 0 && (
                     /* El único filete de la card: separa la lectura de la
                        gráfica del registro tabulado. */
-                    <div className="mt-[var(--sp-4)] border-t border-[color:var(--sp-line-divider)] pt-[var(--sp-2)]">
+                    <div className="mt-4 border-t border-linea pt-2">
                       <TablaMediciones
                         mediciones={medicionesFiltradas}
                         analito={analitoSeleccionado}

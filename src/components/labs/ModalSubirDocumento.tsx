@@ -13,7 +13,6 @@ import {
   type TipoDocUpload,
 } from '@/lib/labs/upload-utils'
 
-const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
 const BUCKET = 'labs-documentos'
 const MAX_DESCRIPCION = 200
 
@@ -53,10 +52,12 @@ interface Props {
 }
 
 function iconoPorMime(mime: string) {
-  if (mime === 'application/pdf') return <FileText size={16} className="text-rose-500" />
-  if (mime.startsWith('image/')) return <ImageIcon size={16} className="text-violet-500" />
-  if (mime === 'application/dicom') return <FileArchive size={16} className="text-teal-500" />
-  return <FileText size={16} className="text-slate-400" />
+  /* Iconos de formato en `--tinta2` (CALMA §3): el color de tipo se reserva a
+     los archivos ya guardados, cuyo tipo se conoce. */
+  if (mime === 'application/pdf') return <FileText size={20} aria-hidden="true" className="text-tinta2" />
+  if (mime.startsWith('image/')) return <ImageIcon size={20} aria-hidden="true" className="text-tinta2" />
+  if (mime === 'application/dicom') return <FileArchive size={20} aria-hidden="true" className="text-tinta2" />
+  return <FileText size={20} aria-hidden="true" className="text-tinta2" />
 }
 
 function mapearErrorSupabase(err: unknown): string {
@@ -267,12 +268,12 @@ export default function ModalSubirDocumento({
   const fallidos = resultados ? resultados.filter(r => !r.ok) : []
 
   const footer = (
-    <div className="flex items-center justify-end gap-2 px-5 py-3">
+    <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-3 iv:justify-center">
       <button
         type="button"
         onClick={cerrarModal}
         disabled={subiendo}
-        className="px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:text-slate-900 transition-colors disabled:opacity-50"
+        className="k-b k-b-capa k-b-quieto min-w-[104px]"
       >
         {resultados ? 'Cerrar' : 'Cancelar'}
       </button>
@@ -281,20 +282,16 @@ export default function ModalSubirDocumento({
           type="button"
           onClick={subir}
           disabled={!puedeSubir}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[13px] font-medium text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-          style={{
-            backgroundColor: 'var(--cp, #1e5fa8)',
-            transitionTimingFunction: IOS_EASING,
-          }}
+          className="k-b k-b-capa k-b-prim min-w-[104px]"
         >
           {subiendo ? (
             <>
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
               Subiendo {progresoIdx + 1} de {archivos.filter(a => !a.errorCarga).length}…
             </>
           ) : (
             <>
-              <UploadCloud size={14} />
+              <UploadCloud size={16} aria-hidden="true" />
               Subir {totalVisible} {totalVisible === 1 ? 'archivo' : 'archivos'}
             </>
           )}
@@ -310,7 +307,7 @@ export default function ModalSubirDocumento({
       title="Subir documento clínico"
       subtitle="PDF, JPG, PNG o DICOM"
       icon={<UploadCloud size={16} />}
-      iconBg="bg-teal-50 text-teal-600"
+      iconBg="bg-tonal text-tonal-tinta"
       maxWidth="max-w-xl"
       footer={footer}
     >
@@ -321,17 +318,15 @@ export default function ModalSubirDocumento({
             onDragOver={e => { e.preventDefault(); setDragActive(true) }}
             onDragLeave={e => { e.preventDefault(); setDragActive(false) }}
             onDrop={onDrop}
-            className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-2xl px-4 py-6 cursor-pointer transition-colors ${
-              dragActive
-                ? 'border-teal-400 bg-teal-50/50'
-                : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed px-4 py-6 text-center transition-colors ${
+              dragActive ? 'border-accion bg-tonal' : 'border-borde hover:bg-sup2'
             }`}
           >
-            <UploadCloud size={22} className="text-slate-400" />
-            <p className="text-[13px] font-medium text-slate-700">
+            <UploadCloud size={24} aria-hidden="true" className="text-tinta2" />
+            <p className="text-[15px] font-semibold leading-5 text-tinta">
               Arrastra archivos aquí o click para seleccionar
             </p>
-            <p className="text-[11px] text-slate-500">
+            <p className="k-campo-ayuda">
               PDF, JPG, PNG, DCM · máx 50MB por archivo
             </p>
             <input
@@ -351,60 +346,58 @@ export default function ModalSubirDocumento({
         )}
 
         {errorGlobal && !resultados && (
-          <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-[12px] text-red-700">
-            {errorGlobal}
-          </div>
+          <p role="alert" className="k-campo-error">{errorGlobal}</p>
         )}
 
         {archivos.length > 0 && !resultados && (
-          <ul className="space-y-2">
+          <ul className="k-lista">
             {archivos.map((a) => (
               <li
                 key={a.id}
-                className={`rounded-xl border p-3 ${a.errorCarga ? 'border-red-200 bg-red-50/40' : 'border-slate-200 bg-white'}`}
+                className="py-3"
               >
                 <div className="flex items-start gap-2.5">
-                  <div className="shrink-0 mt-0.5">{iconoPorMime(a.mimeNormalizado)}</div>
+                  <div className="mt-0.5 shrink-0">{iconoPorMime(a.mimeNormalizado)}</div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] font-medium text-slate-800 truncate" title={a.file.name}>
+                    <p className="text-[15px] font-semibold leading-5 text-tinta [overflow-wrap:anywhere]" title={a.file.name}>
                       {a.file.name}
                     </p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="k-num text-[13px] leading-[18px] text-tinta2">
                       {formatearBytes(a.file.size)}
                     </p>
                     {a.errorCarga && (
-                      <p className="text-[11px] text-red-600 mt-1">{a.errorCarga}</p>
+                      <p className="k-campo-error mt-1">{a.errorCarga}</p>
                     )}
                   </div>
                   <button
                     type="button"
                     onClick={() => quitarArchivo(a.id)}
                     disabled={subiendo}
-                    className="shrink-0 w-6 h-6 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors disabled:opacity-50"
+                    className="k-b k-b-icono -mr-2 -mt-2 shrink-0"
                     aria-label="Quitar archivo"
                   >
-                    <X size={12} />
+                    <X aria-hidden="true" />
                   </button>
                 </div>
 
                 {!a.errorCarga && (
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label className="block">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="k-campo-g">
+                      <span className="k-etiqueta">
                         Tipo
                       </span>
                       <select
                         value={a.tipo}
                         onChange={e => actualizarTipo(a.id, e.target.value as TipoDocUpload)}
                         disabled={subiendo}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12.5px] text-slate-700 focus:outline-none focus:border-slate-400 disabled:opacity-50"
+                        className="k-campo"
                       >
                         <option value="resultado_laboratorio">Resultado de laboratorio</option>
                         <option value="estudio_imagen">Estudio de imagen</option>
                       </select>
                     </label>
-                    <label className="block">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                    <label className="k-campo-g">
+                      <span className="k-etiqueta">
                         Fecha del estudio
                       </span>
                       <input
@@ -412,11 +405,11 @@ export default function ModalSubirDocumento({
                         value={a.fecha}
                         onChange={e => actualizarFecha(a.id, e.target.value)}
                         disabled={subiendo}
-                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12.5px] text-slate-700 focus:outline-none focus:border-slate-400 disabled:opacity-50"
+                        className="k-campo"
                       />
                     </label>
-                    <label className="block sm:col-span-2">
-                      <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                    <label className="k-campo-g sm:col-span-2">
+                      <span className="k-etiqueta">
                         Descripción (opcional)
                       </span>
                       <input
@@ -426,7 +419,7 @@ export default function ModalSubirDocumento({
                         disabled={subiendo}
                         maxLength={MAX_DESCRIPCION}
                         placeholder="Ej. Biometría hemática de control"
-                        className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[12.5px] text-slate-700 focus:outline-none focus:border-slate-400 disabled:opacity-50"
+                        className="k-campo"
                       />
                     </label>
                   </div>
@@ -438,20 +431,20 @@ export default function ModalSubirDocumento({
 
         {resultados && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-[13px] font-medium text-slate-800">
-              <CheckCircle size={16} className="text-emerald-500" />
+            <div role="status" className="flex items-center gap-2 text-[15px] font-semibold text-tinta">
+              <CheckCircle size={20} aria-hidden="true" className="text-ok-tinta" />
               {exitosos} de {resultados.length} archivos subidos
             </div>
             {fallidos.length > 0 && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3">
-                <p className="text-[12px] font-semibold text-red-700 mb-1">
+              <div role="alert" className="rounded-[12px] bg-mal-fondo p-3">
+                <p className="mb-1 text-[14px] font-semibold text-mal-tinta">
                   {fallidos.length} {fallidos.length === 1 ? 'archivo falló' : 'archivos fallaron'}
                 </p>
                 <ul className="space-y-1">
                   {fallidos.map((f, i) => (
-                    <li key={i} className="text-[11.5px] text-red-600">
+                    <li key={i} className="text-[13px] leading-[18px] text-mal-tinta">
                       <span className="font-medium">{f.nombre}</span>
-                      {f.error && <span className="text-red-500"> — {f.error}</span>}
+                      {f.error && <span> — {f.error}</span>}
                     </li>
                   ))}
                 </ul>

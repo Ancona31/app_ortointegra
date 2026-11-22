@@ -8,10 +8,7 @@ import ModalShell from '@/components/ui/ModalShell'
 import type { AnalitoCatalogo, MedicionAnalito } from '@/types'
 import type { AnalitoRastreado } from '@/hooks/useAnalitosRastreados'
 
-const IOS_EASING = 'cubic-bezier(0.32, 0.72, 0, 1)'
-
 const LIMITE_DEFAULT = 10
-const NOTAS_TRUNCATE = 50
 
 function formatValor(v: number, precision: number): string {
   if (precision <= 0) return String(Math.round(v))
@@ -30,10 +27,6 @@ function formatHora(iso: string): string {
   return format(parseISO(iso), 'HH:mm')
 }
 
-function truncarNotas(s: string): { mostrar: string; truncada: boolean } {
-  if (s.length <= NOTAS_TRUNCATE) return { mostrar: s, truncada: false }
-  return { mostrar: s.slice(0, NOTAS_TRUNCATE).trimEnd() + '…', truncada: true }
-}
 
 interface Props {
   mediciones: MedicionAnalito[]
@@ -77,46 +70,18 @@ export default function TablaMediciones({ mediciones, analito, analitoCatalogo, 
     setError(null)
   }
 
-  const modalFooter = (
-    <div className="flex items-center justify-end gap-2 px-5 py-3">
-      <button
-        type="button"
-        onClick={cerrarModal}
-        disabled={eliminando}
-        className="px-3.5 py-2 text-[13px] font-medium text-slate-700 hover:text-slate-900 transition-colors disabled:opacity-50"
-      >
-        Cancelar
-      </button>
-      <button
-        type="button"
-        onClick={confirmarEliminar}
-        disabled={eliminando}
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-red-600 text-white rounded-xl text-[13px] font-medium hover:bg-red-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        style={{ transitionTimingFunction: IOS_EASING }}
-      >
-        {eliminando ? 'Eliminando…' : 'Eliminar'}
-      </button>
-    </div>
-  )
-
   return (
     /* Sin marco ni fondo de encabezado: la tabla es la última zona de la card
        del detalle, y sus filas se separan con filetes de 1 px. */
     <div>
       <div className="overflow-x-auto">
-        <table className="w-full text-[12px]">
+        <table className="w-full text-[14px] leading-5">
           <thead>
-            <tr className="border-b border-[color:var(--sp-line-divider)]">
-              <th className="px-[var(--sp-3)] py-[var(--sp-2-5)] text-left text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-                Fecha y hora
-              </th>
-              <th className="px-[var(--sp-3)] py-[var(--sp-2-5)] text-right text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-                Valor
-              </th>
-              <th className="px-[var(--sp-3)] py-[var(--sp-2-5)] text-left text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-                Notas
-              </th>
-              <th className="w-12 px-2 py-2.5" />
+            <tr className="border-b border-linea text-[12px] font-semibold leading-4 text-tinta2">
+              <th className="py-2 pr-3 text-left font-semibold">Fecha y hora</th>
+              <th className="py-2 pr-3 text-right font-semibold">Valor</th>
+              <th className="py-2 pr-3 text-left font-semibold">Notas</th>
+              <th className="w-11 py-2"><span className="sr-only">Eliminar</span></th>
             </tr>
           </thead>
           <tbody>
@@ -124,44 +89,30 @@ export default function TablaMediciones({ mediciones, analito, analitoCatalogo, 
               const fechaActual = fechaDia(m.medido_en)
               const fechaAnterior = idx > 0 ? fechaDia(visibles[idx - 1].medido_en) : null
               const mismaFecha = fechaActual === fechaAnterior
-              const { mostrar, truncada } = truncarNotas(m.notas ?? '')
-
               return (
-                <tr
-                  key={m.id}
-                  className="border-b border-[color:var(--sp-line-divider)] transition-colors last:border-b-0 hover:bg-[var(--sp-surface-muted)]"
-                >
-                  <td className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
+                <tr key={m.id} className="border-b border-linea last:border-b-0">
+                  <td className="k-num whitespace-nowrap py-2 pr-3 align-top text-tinta">
                     {mismaFecha ? (
-                      <span className="inline-flex items-center gap-1 pl-4 text-slate-500">
-                        <span className="text-slate-300">↳</span>
+                      <span className="inline-flex items-center gap-1 pl-4 text-tinta2">
+                        <span aria-hidden="true" className="text-tinta3">↳</span>
                         {formatHora(m.medido_en)}
                       </span>
                     ) : (
                       formatFechaCompleta(m.medido_en)
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-medium text-slate-900">
+                  <td className="k-num whitespace-nowrap py-2 pr-3 text-right align-top font-semibold text-tinta">
                     {formatValor(Number(m.valor), precision)}
-                    <span className="text-slate-400 ml-1 font-normal">{analito.unidad}</span>
+                    <span className="ml-1 text-[13px] font-normal text-tinta2">{analito.unidad}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600 max-w-[240px]">
-                    {m.notas ? (
-                      <span title={truncada ? (m.notas ?? '') : undefined} className="block truncate">
-                        {mostrar}
-                      </span>
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
+                  {/* Arreglo de front (B7): la nota SIN truncar, entera y envuelta;
+                      la nota completa sigue también en el `title`. */}
+                  <td className="min-w-[160px] py-2 pr-3 align-top text-tinta2 [overflow-wrap:anywhere]">
+                    {m.notas ? <span title={m.notas}>{m.notas}</span> : <span aria-hidden="true">—</span>}
                   </td>
-                  <td className="px-2 py-2.5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmar(m)}
-                      className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                      aria-label="Eliminar medición"
-                    >
-                      <Trash2 size={13} />
+                  <td className="py-0.5 text-right align-top">
+                    <button type="button" onClick={() => setConfirmar(m)} className="k-b k-b-icono" aria-label="Eliminar medición">
+                      <Trash2 aria-hidden="true" />
                     </button>
                   </td>
                 </tr>
@@ -172,43 +123,43 @@ export default function TablaMediciones({ mediciones, analito, analitoCatalogo, 
       </div>
 
       {total > LIMITE_DEFAULT && (
-        <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50/30 text-center">
-          <button
-            type="button"
-            onClick={() => setExpandida(e => !e)}
-            className="text-[12px] font-medium text-slate-600 hover:text-slate-900 transition-colors"
-          >
+        <div className="border-t border-linea pt-1 text-center">
+          <button type="button" onClick={() => setExpandida(e => !e)} className="k-b k-b-texto">
             {expandida ? 'Ver menos' : `Ver todas (${total})`}
           </button>
         </div>
       )}
 
-      {confirmar && (
-        <ModalShell
-          open
-          onClose={cerrarModal}
-          title="Eliminar medición"
-          subtitle={analito.nombre}
-          icon={<AlertTriangle size={16} />}
-          iconBg="bg-red-50 text-red-600"
-          maxWidth="max-w-sm"
-          footer={modalFooter}
-        >
-          <div className="px-5 py-4 space-y-3">
-            <p className="text-[13px] text-slate-700 leading-relaxed">
-              ¿Seguro que quieres eliminar esta medición de{' '}
-              <span className="font-semibold">{analito.nombre}</span> del{' '}
-              <span className="font-semibold">{formatFechaCompleta(confirmar.medido_en)}</span>?
-            </p>
-            <p className="text-[12px] text-slate-500">Esta acción no se puede deshacer.</p>
-            {error && (
-              <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-[12px] text-red-700">
-                {error}
-              </div>
-            )}
-          </div>
-        </ModalShell>
-      )}
+      {/* Alerta destructiva del catálogo (CALMA §13): el foco entra en «Cancelar». */}
+      <ModalShell
+        open={!!confirmar}
+        onClose={cerrarModal}
+        variante="alerta"
+        tono="destruir"
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="Eliminar medición"
+        subtitle={analito.nombre}
+        footer={
+          <>
+            <button type="button" autoFocus onClick={cerrarModal} disabled={eliminando} className="k-b k-b-capa k-b-quieto">
+              Cancelar
+            </button>
+            <button type="button" data-principal onClick={confirmarEliminar} disabled={eliminando} className="k-b k-b-capa k-b-mal">
+              {eliminando ? 'Eliminando…' : 'Eliminar'}
+            </button>
+          </>
+        }
+      >
+        {confirmar && (
+          <p>
+            ¿Seguro que quieres eliminar esta medición de{' '}
+            <span className="font-semibold">{analito.nombre}</span> del{' '}
+            <span className="font-semibold">{formatFechaCompleta(confirmar.medido_en)}</span>?
+          </p>
+        )}
+        <p className="mt-2">Esta acción no se puede deshacer.</p>
+        {error && <p role="alert" className="k-campo-error mt-3">{error}</p>}
+      </ModalShell>
     </div>
   )
 }

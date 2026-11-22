@@ -1,17 +1,12 @@
 'use client'
 
-import { FileText, Image as ImageIcon, FileArchive, Trash2 } from 'lucide-react'
+import { FileText, Image as ImageIcon, FileArchive, Trash2, ChevronRight } from 'lucide-react'
+import IconoTipoDocumento from '@/components/ui/IconoTipoDocumento'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { Documento } from '@/types'
 import { formatearBytes } from '@/lib/labs/upload-utils'
 
-const NOMBRE_MAX = 40
-
-function truncarNombre(nombre: string): string {
-  if (nombre.length <= NOMBRE_MAX) return nombre
-  return nombre.slice(0, NOMBRE_MAX - 1) + '…'
-}
 
 /**
  * Formato del archivo, con su glifo, su insignia y su tinta.
@@ -64,36 +59,35 @@ export default function CardDocumento({ documento, onClick, onDelete, layout = '
   }
 
   if (layout === 'list') {
+    /* Rediseño B7 (CALMA §2, §11; maqueta `final-expediente`): una fila de
+       lista. El icono del TIPO en su color, sin fondo —estudio de imagen en
+       `--d-imagen`, resultado de laboratorio en `--d-laboratorio`, «otro» en
+       `--tinta2`—; el nombre entero (envuelve, no se recorta) y debajo «tipo ·
+       formato · fecha · tamaño». La fila abre la vista previa; la papelera es
+       su segundo destino, siempre visible (en táctil no hay hover). */
+    const tipo = documento.tipo === 'estudio_imagen' ? 'Estudio de imagen'
+      : documento.tipo === 'resultado_laboratorio' ? 'Resultado de laboratorio' : null
     return (
       <div
         role="button"
         tabIndex={0}
         onClick={onClick}
         onKeyDown={handleKeyDown}
-        className="group flex w-full cursor-pointer items-center gap-[var(--sp-3)] rounded-[var(--sp-r-card-inner)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-3)] py-[var(--sp-2-5)] text-left transition-colors hover:bg-[var(--sp-surface-muted)]"
+        className="flex min-h-[56px] w-full cursor-pointer items-center gap-3 py-1.5 text-left transition-opacity active:opacity-70 focus-visible:rounded-[var(--r-control)] focus-visible:outline-3 focus-visible:outline-enlace ih:min-h-[52px] esc:min-h-[52px]"
       >
-        <span
-          className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[var(--sp-r-btn-sm)]"
-          style={{ background: `color-mix(in srgb, ${tinta} 12%, var(--sp-surface))`, color: tinta }}
-        >
-          <Icono size={16} />
-        </span>
+        <IconoTipoDocumento tipo={documento.tipo} className="shrink-0" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-ink-800)]" title={nombre}>
-            {truncarNombre(nombre)}
+          <span className="block text-[15px] font-semibold leading-5 text-tinta [overflow-wrap:anywhere]" title={nombre}>
+            {nombre}
           </span>
-          <span className="block text-[11px] text-[var(--sp-ink-350)]">
-            {[fecha, size].filter(Boolean).join(' · ')}
+          <span className="k-num block text-[13px] leading-[18px] text-tinta2">
+            {[tipo, insignia, fecha, size].filter(Boolean).join(' · ')}
           </span>
         </span>
-        <button
-          type="button"
-          onClick={manejarDelete}
-          className="inline-flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-[var(--sp-r-btn-sm)] text-[var(--sp-ink-icon)] transition-colors hover:bg-[var(--sp-danger-bg)] hover:text-[var(--sp-danger)]"
-          aria-label="Eliminar archivo"
-        >
-          <Trash2 size={13} />
+        <button type="button" onClick={manejarDelete} className="k-b k-b-icono shrink-0" aria-label="Eliminar archivo">
+          <Trash2 aria-hidden="true" />
         </button>
+        <ChevronRight className="k-fila-chev" aria-hidden="true" />
       </div>
     )
   }
