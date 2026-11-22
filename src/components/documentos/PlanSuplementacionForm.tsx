@@ -11,6 +11,7 @@ import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import QRCode from 'qrcode'
@@ -334,6 +335,7 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   const [seguimiento, setSeguimiento] = useState('')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // Aviso de recálculo por cambio de peso (S-04). Nace al corregir el peso con
   // suplementos ya elegidos y desaparece en el siguiente cambio de peso.
@@ -641,8 +643,8 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         msg = `El plan quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo generar `
           + 'el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       // eslint-disable-next-line no-console
       console.error('[PlanSuplementacionForm] imprimir falló:', err)
     } finally {
@@ -769,7 +771,25 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
         </div>
       </section>
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">

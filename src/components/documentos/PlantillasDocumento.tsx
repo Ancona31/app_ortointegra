@@ -32,7 +32,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  ArrowLeft, Check, FileText, Pencil, RefreshCw, Save, Settings2, Trash2, X,
+  AlertTriangle, ArrowLeft, Check, FileText, Pencil, RefreshCw, Save, Settings2, Trash2, X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -330,23 +330,25 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
           onGuardar={guardar}
           onTope={() => setDialogo('tope')}
         />
+        {/* Alerta del catálogo (CALMA §13): «Gestionar» y no «Gestionar
+            plantillas» para que los dos botones queden parejos (§20); el
+            título conserva el nombre completo. */}
         <ModalShell
           open={dialogo === 'tope'}
           onClose={() => setDialogo(null)}
-          spinusGeometry="decide"
+          variante="alerta"
+          tono="avisar"
+          icon={<AlertTriangle aria-hidden="true" />}
           title={`Ya tienes ${TOPE_PLANTILLAS} plantillas de ${etiqueta}`}
           footer={
-            <div className="flex items-center gap-2 p-4 md:px-6">
-              <button onClick={() => setDialogo(null)} className="sp-btn sp-btn--ghost">Cancelar</button>
-              <div className="flex-1" />
-              <button onClick={abrirPanel} className="sp-btn sp-btn--primary">Gestionar plantillas</button>
-            </div>
+            <>
+              <button type="button" onClick={() => setDialogo(null)} className="k-b k-b-capa k-b-quieto">Cancelar</button>
+              <button type="button" autoFocus data-principal onClick={abrirPanel} className="k-b k-b-capa k-b-prim">Gestionar</button>
+            </>
           }
         >
           {/* El formulario se conserva íntegro: el panel lo apaga, no lo tira. */}
-          <p className="sp-body p-4 md:p-6">
-            Es el máximo. Para guardar esta, borra o sobrescribe una de las que ya tienes.
-          </p>
+          <p>Es el máximo. Para guardar esta, borra o sobrescribe una de las que ya tienes.</p>
         </ModalShell>
       </>
     ),
@@ -377,10 +379,10 @@ function CardSelector(p: PropsSelector) {
     <section className="sp-card">
       {n === 0 && !p.cargando && !p.errorCarga ? (
         <div className="sp-tpl-empty">
-          <div className="sp-icobox sp-icobox--sm"><FileText /></div>
+          <FileText aria-hidden="true" className="mt-px h-5 w-5 flex-none text-tinta2" />
           <div style={{ minWidth: 0 }}>
-            <h2 className="sp-title-sec">Sin plantillas de {p.etiqueta}</h2>
-            <p className="sp-hint" style={{ marginTop: 2 }}>
+            <h2 className="k-t-fila">Sin plantillas de {p.etiqueta}</h2>
+            <p className="k-t-sec" style={{ marginTop: 2 }}>
               Guarda este formulario como plantilla y la próxima vez lo llenas de un toque.
             </p>
           </div>
@@ -514,13 +516,13 @@ function DialogoGuardar(p: PropsGuardar) {
       title="Guardar como plantilla"
       subtitle="Se guarda todo menos los datos del paciente."
       footer={
-        <div className="flex items-center gap-2 p-4 md:px-6">
-          <button onClick={p.onCerrar} disabled={guardando} className="sp-btn sp-btn--ghost">Cancelar</button>
-          <div className="flex-1" />
+        <div className="flex items-center justify-end gap-2 p-4 md:px-6">
+          <button type="button" onClick={p.onCerrar} disabled={guardando} className="k-b k-b-capa k-b-quieto min-w-[104px]">Cancelar</button>
           <button
+            type="button"
             onClick={() => void confirmar()}
             disabled={!limpio || duplicado || guardando}
-            className="sp-btn sp-btn--primary"
+            className="k-b k-b-capa k-b-prim min-w-[104px]"
           >
             {guardando ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar'}
           </button>
@@ -529,8 +531,8 @@ function DialogoGuardar(p: PropsGuardar) {
     >
       <div className="p-4 md:p-6 flex flex-col gap-[var(--sp-gap-label)]">
         <div className="flex items-baseline justify-between gap-2">
-          <label htmlFor="plantilla-nombre" className="sp-label-field">Nombre</label>
-          {nombre.length >= 30 && <span className="sp-hint">{nombre.length}/{MAX_NOMBRE}</span>}
+          <label htmlFor="plantilla-nombre" className="k-etiqueta">Nombre</label>
+          {nombre.length >= 30 && <span className="k-campo-ayuda k-num">{nombre.length}/{MAX_NOMBRE}</span>}
         </div>
         <input
           id="plantilla-nombre"
@@ -542,15 +544,14 @@ function DialogoGuardar(p: PropsGuardar) {
           autoFocus
           placeholder="Prequirúrgico"
           aria-invalid={duplicado || undefined}
-          className="sp-input"
-          style={duplicado ? { borderColor: 'var(--sp-warn)', borderWidth: 'var(--sp-bw-accent)' } : undefined}
+          className="k-campo"
         />
         {duplicado && (
-          <p className="sp-banner sp-banner--warn">
+          <p className="k-campo-error text-aviso-tinta">
             Ya tienes una plantilla con ese nombre. Usa otro, o sobrescríbela desde Gestionar.
           </p>
         )}
-        {errorRed && <p className="sp-banner sp-banner--danger">{errorRed}</p>}
+        {errorRed && <p role="alert" className="k-campo-error">{errorRed}</p>}
       </div>
     </ModalShell>
   )
@@ -643,13 +644,14 @@ function PanelPlantillas(p: PropsPanel) {
           type="button"
           onClick={p.onVolver}
           aria-label="Volver al formulario"
-          className="sp-tpl-back"
+          className="k-b k-b-icono -ml-2"
         >
-          <ArrowLeft />
+          <ArrowLeft aria-hidden="true" />
         </button>
-        <h2 className="sp-title-card">Plantillas de {p.etiqueta}</h2>
+        <h2 className="k-t-tarjeta min-w-0 flex-1">Plantillas de {p.etiqueta}</h2>
+        {/* Contador como número plano (CALMA §3); ámbar en el tope. */}
         {!p.cargando && (
-          <span className={`sp-badge${n >= TOPE_PLANTILLAS ? ' sp-badge--warn' : ''}`}>
+          <span className={`k-num text-[13px] font-semibold ${n >= TOPE_PLANTILLAS ? 'text-aviso-tinta' : 'text-tinta2'}`}>
             {n} / {TOPE_PLANTILLAS}
           </span>
         )}
@@ -685,14 +687,14 @@ function PanelPlantillas(p: PropsPanel) {
         </p>
       ) : n === 0 ? (
         <div className="sp-tpl-panelempty">
-          <div className="sp-icobox sp-icobox--lg"><FileText /></div>
+          <FileText aria-hidden="true" className="h-7 w-7 text-tinta3" />
           <div>
-            <h3 className="sp-title-sec">Todavía no tienes plantillas de {p.etiqueta}</h3>
-            <p className="sp-hint" style={{ marginTop: 'var(--sp-1)' }}>
+            <h3 className="k-t-fila">Todavía no tienes plantillas de {p.etiqueta}</h3>
+            <p className="k-t-sec" style={{ marginTop: 'var(--sp-1)' }}>
               Llena el formulario y usa «Guardar como plantilla», junto al botón de imprimir.
             </p>
           </div>
-          <button type="button" onClick={p.onVolver} className="sp-btn sp-btn--secondary">
+          <button type="button" onClick={p.onVolver} className="k-b k-b-tonal">
             Volver al formulario
           </button>
         </div>
@@ -719,39 +721,40 @@ function PanelPlantillas(p: PropsPanel) {
 
       {/* Las dos NOMBRAN la plantilla: sobrescribir la equivocada no se nota
           hasta la próxima vez que la usas. */}
+      {/* Alerta destructiva del catálogo (CALMA §13). Las dos NOMBRAN la plantilla
+          en el título. */}
       <ModalShell
         open={confirmar !== null}
         onClose={() => setConfirmar(null)}
-        spinusGeometry="decide"
+        variante="alerta"
+        tono="destruir"
+        icon={confirmar?.accion === 'eliminar' ? <Trash2 aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
         title={confirmar
           ? `${confirmar.accion === 'eliminar' ? '¿Eliminar' : '¿Sobrescribir'} «${truncar(confirmar.plantilla.nombre)}»?`
           : ''}
         footer={
-          <div className="flex items-center gap-2 p-4 md:px-6">
-            <button onClick={() => setConfirmar(null)} className="sp-btn sp-btn--ghost">Cancelar</button>
-            <div className="flex-1" />
+          <>
+            <button type="button" autoFocus onClick={() => setConfirmar(null)} className="k-b k-b-capa k-b-quieto">Cancelar</button>
             <button
+              type="button"
+              data-principal
               onClick={() => confirmar && ejecutarConfirmada(confirmar)}
-              className="sp-btn sp-btn--primary"
+              className="k-b k-b-capa k-b-mal"
             >
               {confirmar?.accion === 'eliminar' ? 'Eliminar' : 'Sobrescribir'}
             </button>
-          </div>
+          </>
         }
       >
-        <div className="p-4 md:p-6">
-          {confirmar?.accion === 'eliminar' ? (
-            <p className="sp-body">
-              Se borra esta plantilla. Los documentos ya emitidos con ella no cambian.
-            </p>
-          ) : (
-            <p className="sp-banner sp-banner--danger">
-              Se reemplaza el contenido guardado de «{confirmar ? truncar(confirmar.plantilla.nombre) : ''}» por
-              lo que hay ahora en el formulario. El nombre y la fecha de creación no cambian.
-              No se puede deshacer.
-            </p>
-          )}
-        </div>
+        {confirmar?.accion === 'eliminar' ? (
+          <p>Se borra esta plantilla. Los documentos ya emitidos con ella no cambian.</p>
+        ) : (
+          <p>
+            Se reemplaza el contenido guardado de «{confirmar ? truncar(confirmar.plantilla.nombre) : ''}» por
+            lo que hay ahora en el formulario. El nombre y la fecha de creación no cambian.
+            No se puede deshacer.
+          </p>
+        )}
       </ModalShell>
     </div>
   )

@@ -2,24 +2,25 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, User, X, Loader2, ChevronRight, UserPlus } from 'lucide-react'
+import { Search, X, Loader2, ChevronRight, AlertTriangle } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
 import { calcularEdad } from '@/lib/patientUtils'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
+import Avatar, { inicialesDe } from '@/components/ui/Avatar'
 import SelectorTipoDocumento, { TIPOS_DOCUMENTO, type TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 
 const FormLoader = () => (
-  <div className="flex items-center justify-center py-16 text-[#86868b]">
-    <Loader2 size={18} className="animate-spin mr-2" />
-    <span className="text-sm">Cargando formulario...</span>
+  <div className="flex items-center justify-center gap-2 py-16 text-tinta2" role="status">
+    <Loader2 size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+    <span className="text-[15px]">Cargando formulario...</span>
   </div>
 )
 
 const FormError = () => (
-  <div className="flex flex-col items-center justify-center py-16 text-[#86868b] gap-2">
-    <p className="text-sm font-medium">No se pudo cargar el formulario</p>
-    <p className="text-xs">Verifica tu conexion e intenta de nuevo</p>
+  <div className="flex flex-col items-center justify-center gap-1 py-16 text-center" role="alert">
+    <p className="text-[15px] font-semibold text-tinta">No se pudo cargar el formulario</p>
+    <p className="text-[13px] text-tinta2">Verifica tu conexion e intenta de nuevo</p>
   </div>
 )
 
@@ -43,7 +44,7 @@ const NotaHonorariosForm      = safeDynamic(() => import('@/components/documento
 
 // `fecha_nacimiento` es opcional porque el alta rápida devuelve un paciente sin
 // ella: quien no la tenga entra al consentimiento con la edad en blanco.
-type Paciente = { id: string; nombre: string; apellidos: string; fecha_nacimiento?: string | null }
+type Paciente = { id: string; nombre: string; apellidos: string; fecha_nacimiento?: string | null; alergias?: string | null }
 
 function DocumentosContent() {
   const searchParams = useSearchParams()
@@ -76,7 +77,8 @@ function DocumentosContent() {
         .from('pacientes')
         // `fecha_nacimiento` no la pinta el buscador: la necesita el
         // consentimiento, que prellena la edad de la ficha (§5 de su guía).
-        .select('id, nombre, apellidos, fecha_nacimiento')
+        // `alergias`, la cabecera de la receta (CALMA §23.4).
+        .select('id, nombre, apellidos, fecha_nacimiento, alergias')
         .neq('activo', false)
         .or(`nombre.ilike.%${busquedaNorm}%,apellidos.ilike.%${busquedaNorm}%`)
         .limit(8)
@@ -103,100 +105,90 @@ function DocumentosContent() {
   const sinResultados = busqueda.length >= 2 && !buscando && resultados.length === 0
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 animate-slide-up">
+    /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
+       la de 600 (§19). */
+    <div lang="es" className="mx-auto w-full max-w-[640px] iv:max-w-[600px] animate-slide-up">
 
       {/* Header */}
-      <div>
-        <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Clínica</p>
-        <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Documentos</h1>
-        <p className="text-sm text-[#86868b] mt-0.5">Genera e imprime documentos con tu membrete oficial</p>
-      </div>
+      <header className="mb-6">
+        <p className="text-[12px] font-bold uppercase leading-4 tracking-[.4px] text-enlace">Clínica</p>
+        <h1 className="k-t-pantalla mt-1">Documentos</h1>
+        <p className="k-t-sec mt-1">Genera e imprime documentos con tu membrete oficial</p>
+      </header>
 
       {/* Paso 1 — Seleccionar paciente */}
       {!pacienteSeleccionado ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 max-w-lg">
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Paso 1</p>
-          <h2 className="text-base font-semibold text-[#1d1d1f] mb-1">Selecciona el paciente</h2>
-          <p className="text-xs text-[#86868b] mb-4">El documento se guardará en su expediente automáticamente.</p>
+        <section aria-labelledby="doc-paso1">
+          <p className="text-[12px] font-bold uppercase leading-4 tracking-[.4px] text-enlace">Paso 1</p>
+          <h2 id="doc-paso1" className="k-t-tarjeta mt-1 mb-3">Selecciona el paciente</h2>
 
           <div className="relative">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" />
+            <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-tinta2" />
             <input
               type="text"
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               placeholder="Buscar por nombre o apellido..."
-              className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all"
+              aria-label="Buscar por nombre o apellido"
+              className="k-campo pl-11"
               autoFocus
             />
           </div>
+          <p className="k-campo-ayuda mt-2">El documento se guardará en su expediente automáticamente.</p>
 
           {resultados.length > 0 && (
-            <div className="mt-2 bg-white border border-slate-200/80 rounded-xl overflow-hidden shadow-sm">
-              {resultados.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => seleccionar(p)}
-                  className="w-full text-left px-4 py-2.5 hover:bg-slate-50 transition-colors flex items-center justify-between border-b border-slate-100 last:border-0 group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                      <User size={13} className="text-[#1e5fa8]" />
-                    </div>
-                    <span className="text-sm font-medium text-[#1d1d1f]">{p.nombre} {p.apellidos}</span>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-300 group-hover:text-[#86868b]" />
-                </button>
+            <ul className="k-tarjeta k-lista mt-3">
+              {resultados.map((p, i) => (
+                <li key={p.id}>
+                  <button type="button" onClick={() => seleccionar(p)} className="k-fila">
+                    <Avatar texto={inicialesDe(p.nombre, p.apellidos)} indice={i} />
+                    <span className="k-fila-t"><span className="k-fila-n font-normal">{p.nombre} {p.apellidos}</span></span>
+                    <ChevronRight aria-hidden="true" className="k-fila-chev" />
+                  </button>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
 
           {buscando && (
-            <p className="text-xs text-[#86868b] mt-2 text-center flex items-center justify-center gap-1.5">
-              <Loader2 size={11} className="animate-spin" /> Buscando...
+            <p role="status" className="k-t-sec mt-3 flex items-center justify-center gap-1.5">
+              <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Buscando...
             </p>
           )}
 
           {sinResultados && (
-            <div className="mt-2 border border-slate-200/80 rounded-xl overflow-hidden">
-              <button
-                onClick={() => setShowQuickPatient(true)}
-                className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                    <UserPlus size={13} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[#1d1d1f]">Registrar "{busqueda}"</p>
-                    <p className="text-[10px] text-emerald-500">Crear nuevo paciente y continuar</p>
-                  </div>
-                </div>
-                <ChevronRight size={14} className="text-slate-300 group-hover:text-[#86868b]" />
+            <div className="k-tarjeta k-lista mt-3">
+              <button type="button" onClick={() => setShowQuickPatient(true)} className="k-fila" aria-label={`Registrar paciente: ${busqueda}`}>
+                <span className="k-fila-t">
+                  <span className="k-fila-n">Registrar &quot;{busqueda}&quot;</span>
+                  <span className="k-fila-s">Crear nuevo paciente y continuar</span>
+                </span>
+                <ChevronRight aria-hidden="true" className="k-fila-chev" />
               </button>
             </div>
           )}
-        </div>
+        </section>
       ) : (
         <>
           {/* Paciente seleccionado */}
-          <div className="flex items-center justify-between bg-white border border-slate-200/80 rounded-2xl px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[#1e5fa8] flex items-center justify-center flex-shrink-0">
-                <User size={15} className="text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[#1d1d1f]">
-                  {pacienteSeleccionado.nombre} {pacienteSeleccionado.apellidos}
-                </p>
-                <p className="text-[11px] text-[#86868b]">Paciente seleccionado</p>
-              </div>
+          <div className="k-tarjeta mb-6 flex items-center gap-3 !py-2.5">
+            <Avatar texto={inicialesDe(pacienteSeleccionado.nombre, pacienteSeleccionado.apellidos)} />
+            <div className="min-w-0 flex-1">
+              <p className="k-t-fila truncate">
+                {pacienteSeleccionado.nombre} {pacienteSeleccionado.apellidos}
+              </p>
+              <p className="k-t-sec">Paciente seleccionado</p>
+              {/* La alergia en la cabecera de la receta (CALMA §23.4); sin
+                  alergias registradas no se dibuja nada. */}
+              {tipo === 'receta' && pacienteSeleccionado.alergias?.trim() && (
+                <span className="k-etq k-etq-mal mt-1.5 h-auto min-h-6 max-w-full whitespace-normal py-0.5">
+                  <AlertTriangle aria-hidden="true" />
+                  Alergias: {pacienteSeleccionado.alergias.trim()}
+                </span>
+              )}
             </div>
-            <button
-              onClick={limpiarPaciente}
-              className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] hover:text-[#3d3d3f] transition-colors"
-            >
-              <X size={14} />
+            <button type="button" onClick={limpiarPaciente} aria-label="Cambiar de paciente" className="k-b k-b-icono -mr-2">
+              <X aria-hidden="true" />
             </button>
           </div>
 
@@ -207,7 +199,12 @@ function DocumentosContent() {
               de los ocho tokens (teal en escrito, amber-600 en suplementación,
               slate en honorarios). */}
           <div className="sp-doc-host">
-            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Paso 2 · Tipo de documento</p>
+            {/* «Paso 2 · Tipo de documento», en rótulo y título como el Paso 1. El
+                margen negativo come parte del hueco de 18 de `.sp-doc-host`. */}
+            <div className="-mb-2">
+              <p className="text-[12px] font-bold uppercase leading-4 tracking-[.4px] text-enlace">Paso 2</p>
+              <h2 className="k-t-tarjeta mt-1">Tipo de documento</h2>
+            </div>
             <SelectorTipoDocumento
               value={tipo}
               onChange={t => { setFormVacio(true); setPanelPlantillas(false); setTipo(t) }}

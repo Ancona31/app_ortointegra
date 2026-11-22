@@ -9,6 +9,7 @@ import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -183,6 +184,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   const [estudios, setEstudios] = useState<Estudio[]>([{ ...ESTUDIO_VACIO }])
   const [urgente, setUrgente] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // Nada acusa antes del primer intento de imprimir; después todo se actualiza
@@ -448,8 +450,8 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         msg = `La solicitud quedó registrada${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
           + 'generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       // eslint-disable-next-line no-console
       console.error('[SolicitudImagenForm] imprimir falló:', err)
     } finally {
@@ -530,7 +532,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
             return (
               <div key={i} className={`sp-doc-studyblock ${roto ? 'sp-doc-studyblock--invalid' : ''}`}>
                 <div className="sp-doc-studyhead">
-                  <span className="sp-label" style={{ fontSize: '11.5px', fontWeight: 'var(--sp-fw-black)' }}>
+                  <span className="sp-label">
                     Estudio {i + 1}
                   </span>
                   {e.region.trim() && (
@@ -608,7 +610,25 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </div>
       </section>
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">

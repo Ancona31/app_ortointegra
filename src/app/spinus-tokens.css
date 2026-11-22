@@ -2797,6 +2797,125 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   .sp-idfoto-controles > .sp-btn { width: 100%; }
 }
 
+/* --- 26. PIEL DEL KIT EN LOS DOCUMENTOS (rediseño B9; CALMA §3, §5, §12, §23) --
+   Va al final y DENTRO de la capa, por lo mismo que la 22–25: así gana a las
+   secciones de arriba por orden y no por especificidad, y una utilidad de
+   Tailwind sigue pudiendo ajustarla. NO cambia marcado, nombres ni orden de
+   campos (alimentan las ranuras del PDF): sólo cómo se ven.
+
+   Maqueta: `docs-a`, `docs-b`, `docs-c`. Lo que se decide aquí:
+   · La sección deja de ser una caja con cabecera dentro: el rótulo sale fuera,
+     13/700 en `--enlace` (§12), y la tarjeta es el cuerpo (`--sup`, sin borde).
+     Las plegables (`.sp-section`) y la del cuerpo del escrito, que no tienen
+     `.sp-doc-cardbody` propio, se quedan como tarjeta con la cabecera dentro.
+   · Nada de caja dentro de caja (§3): el bloque de medicamento, de estudio y
+     de grupo pierden su borde y se separan con una línea `--linea`.
+   · Rótulos de campo en 13/600 `--tinta2`, sin mayúsculas (§4).
+   · La barra del pie: sin sombra ni filete, sobre `--fondo`; en `ext`/`tel`
+     el primario se estira y el secundario va corto en la misma fila; en
+     `ih`/`esc` el par va a la derecha y en `iv` centrado (§23.1). */
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) {
+  background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none;
+}
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardhead {
+  min-height: 0; padding: 0 4px 8px; border-bottom: 0;
+}
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardhead.sp-doc-honohead,
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardhead.sp-doc-consent-head { padding-top: 0; }
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody {
+  background: var(--sup); border-radius: var(--r-tarjeta); padding: 16px;
+}
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody {
+  border-radius: var(--r-tarjeta-ancha); padding: 20px;
+}
+/* El icono delante del rótulo sobra (§3: no hay icono delante de cada rótulo). */
+.sp-doc-cardhead > .sp-icobox { display: none; }
+.sp-doc-cardhead .sp-label {
+  font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .4px; color: var(--enlace);
+}
+.sp-doc-cardhead { border-bottom-color: var(--linea); }
+.sp-section__head { border-bottom-color: var(--linea); }
+
+/* Rótulos de campo y ayudas. */
+.sp-doc-form .sp-label-field {
+  font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--tinta2);
+}
+.sp-doc-form .sp-hint { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+
+/* Bloques repetidos: sin caja propia, separados por una línea. */
+.sp-doc-medblock, .sp-doc-studyblock, .sp-doc-grupo {
+  border: 0; border-radius: 0; background: transparent; padding: 0;
+}
+.sp-doc-medblock + .sp-doc-medblock,
+.sp-doc-studyblock + .sp-doc-studyblock,
+.sp-doc-grupo + .sp-doc-grupo {
+  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linea);
+}
+.sp-doc-studyblock--invalid {
+  padding: 12px; border-radius: var(--r-control); background: var(--mal-fondo);
+}
+.sp-doc-studyblock--invalid + .sp-doc-studyblock,
+.sp-doc-studyblock + .sp-doc-studyblock--invalid { padding-top: 12px; }
+/* «Medicamento 1»: etiqueta tonal (maqueta `docs-a`, vista 2), no rótulo de 11,5. */
+.sp-doc-medhead > .sp-label, .sp-doc-studyhead > .sp-label {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 8px;
+  background: var(--tonal); color: var(--tonal-tinta);
+  font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0; text-transform: none;
+}
+.sp-doc-dashzone { border-color: var(--borde); border-radius: var(--r-control); }
+
+/* Tarjetas elegibles de suplementación: relleno `--sup2` sin borde; la
+   elegida en `--tonal` con contorno de 2 `--accion` (el de la rejilla). */
+.sp-doc-supcard { background: var(--sup2); border-color: transparent; border-radius: 14px; }
+.sp-doc-supcard--on { background: var(--tonal); border-color: transparent; box-shadow: inset 0 0 0 2px var(--accion); }
+.sp-doc-supcard--invalid { box-shadow: inset 0 0 0 2px var(--aviso-tinta); }
+.sp-doc-supref { font-size: 12px; color: var(--tinta2); }
+.sp-doc-supbenefit { color: var(--tinta2); }
+
+/* Menú del desplegable escribible: capa con sombra (§3), sin borde. */
+.sp-doc-menu { border-color: transparent; background: var(--sup); border-radius: 14px; }
+.sp-doc-menu__item { color: var(--tinta); }
+.sp-doc-menu__item[aria-selected="true"] { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-doc-menu__foot { font-size: 12px; color: var(--tinta2); background: var(--sup2); border-top-color: var(--linea); }
+
+/* Urgente: 12 como mínimo (§4), no 11,5. */
+.sp-badge--danger { font-size: 12px; background: var(--mal-fondo); color: var(--mal-tinta); }
+
+/* ── Barra del pie ─────────────────────────────────────────────────────── */
+/* Translúcida y con desenfoque, como la barra de herramientas de iOS: el fondo
+   de la página no siempre es `--fondo` (el `body` de la app aún pinta el suyo)
+   y una barra opaca dibujaba una franja de otro gris. Con transparencia
+   reducida, opaca. */
+.sp-doc-actions {
+  background: color-mix(in srgb, var(--fondo) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  border-top: 0; box-shadow: none;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sp-doc-actions { background: var(--fondo); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+.sp-doc-actions > .sp-btn { min-height: 44px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-actions > .sp-btn { min-height: 36px; padding-top: 0; padding-bottom: 0; font-size: 14px; }
+/* Estrecho (`ext`): ya no se apila; el secundario va corto («Plantilla») a la
+   izquierda y el primario se estira (maqueta `docs-a`, vista 2 en `ext`). */
+@container docform (max-width: 379px) {
+  .sp-doc-actions:not(.sp-doc-actions--filas) { flex-direction: row; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > * { width: auto; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-tpl-guardar { flex: 0 0 auto; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-btn--primary { flex: 1 1 auto; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) .sp-doc-actions__long { display: none; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) .sp-doc-actions__short { display: inline; }
+  .sp-doc-actions > .sp-btn { padding-left: 16px; padding-right: 16px; }
+}
+/* Ancho (`ih`/`esc`): el par pegado a la derecha, cada botón según su texto,
+   104 como mínimo (§21, §23.1). En `iv`, centrado (§23.1). */
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions:not(.sp-doc-actions--filas) { justify-content: flex-end; }
+:where([data-formato="iv"]) .sp-doc-actions:not(.sp-doc-actions--filas) { justify-content: center; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-btn--primary {
+  flex: 0 0 auto; min-width: 104px;
+}
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop

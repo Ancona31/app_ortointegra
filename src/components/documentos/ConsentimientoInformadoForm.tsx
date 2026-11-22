@@ -401,6 +401,7 @@ export default function ConsentimientoInformadoForm({
   const [tipoDoc, setTipoDoc] = useState<TipoDoc>('consentimiento')
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
   // formulario recién abierto no acusa de nada. Después permanece y se
@@ -802,8 +803,8 @@ export default function ConsentimientoInformadoForm({
       const msg = err instanceof Error && err.message === 'SIN_FILAS'
         ? 'No se pudo guardar el borrador: no es tuyo o ya se emitió.'
         : 'No se pudo guardar el borrador. Revisa tu conexión e intenta de nuevo.'
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[ConsentimientoInformadoForm] guardarBorrador falló:', err)
     } finally {
       setGuardandoBorrador(false)
@@ -845,8 +846,8 @@ export default function ConsentimientoInformadoForm({
         ? 'Este navegador no puede calcular la huella del documento porque la página no se '
           + 'abrió por HTTPS. Ábrela por HTTPS o desde localhost para firmar.'
         : 'No se pudo abrir el firmado. Revisa tu conexión e intenta de nuevo.'
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[ConsentimientoInformadoForm] iniciarFirmado falló:', err)
     } finally {
       setGuardandoBorrador(false)
@@ -1075,9 +1076,12 @@ export default function ConsentimientoInformadoForm({
         msg = `El consentimiento quedó sellado${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
           + 'generar el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
-      toast.error(msg)
+      // Sellado pero sin PDF: un solo mensaje, la alerta «No se pudo guardar»
+      // (rediseño B9). El otro caso sigue con su aviso y su texto del firmado.
+      if (!selladoOk) toast.error(msg)
       if (selladoOk) {
         setErrorGuardado(msg)
+        setErrorAbierto(true)
         setFirmando(null)
         setBorradorId(null)
         setBorradorFecha(null)
@@ -1325,8 +1329,8 @@ export default function ConsentimientoInformadoForm({
         msg = `El documento quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo generar el PDF. `
           + 'Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[ConsentimientoInformadoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
@@ -1614,7 +1618,25 @@ export default function ConsentimientoInformadoForm({
         </p>
       )}
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">
