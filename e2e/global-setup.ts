@@ -131,11 +131,24 @@ function apagarInterruptoresAgenda(): void {
      end $$`], { encoding: 'utf8' })
 }
 
+/**
+ * `E2E_SIN_SEMILLA=1`: no resiembra ni apaga la agenda v2 (sólo comprueba el
+ * build y abre las sesiones). Para una base local COMPARTIDA con otros trabajos
+ * en curso, donde resembrar borraría lo suyo. Las pruebas que dependen de la
+ * semilla recién hecha (conteos, «hoy») pueden fallar: no es un verde completo.
+ * Por omisión, la corrida es la de siempre.
+ */
+const SIN_SEMILLA = process.env.E2E_SIN_SEMILLA === '1'
+
 export default async function globalSetup(): Promise<void> {
   comprobarBuildFresco()
-  apagarInterruptoresAgenda()
-  await esperarSuscripcionesRealtimePurgadas()
-  execFileSync('npx', ['tsx', 'scripts/agenda-semilla.ts'], { stdio: 'inherit', cwd: process.cwd() })
+  if (SIN_SEMILLA) {
+    console.warn('global-setup: E2E_SIN_SEMILLA=1, sin resiembra y sin apagar la agenda v2.')
+  } else {
+    apagarInterruptoresAgenda()
+    await esperarSuscripcionesRealtimePurgadas()
+    execFileSync('npx', ['tsx', 'scripts/agenda-semilla.ts'], { stdio: 'inherit', cwd: process.cwd() })
+  }
 
   const dirAuth = path.resolve(process.cwd(), 'e2e/.auth')
   mkdirSync(dirAuth, { recursive: true })
