@@ -205,6 +205,12 @@ Corolarios que cuestan caro si se olvidan:
 
 ### Plataforma actual: Linux vía WSL 2
 
+> **Nota del 2026-11-22:** desde el 2026-11-21 el equipo es **Ubuntu 26.04
+> nativo, sin WSL ni Windows**, con **Docker Engine 29.1.3** (no Docker
+> Desktop), y el repo es un clon normal en `~/proyectos/app_ortointegra-agenda`.
+> Lo que sigue sobre WSL, Docker Desktop y las rutas `/home/ancoa/…` describe
+> el equipo anterior. Detalle práctico: `GUIA_PRUEBAS_AGENDA_V2.md`, §1.1.
+
 **Cambio realizado el 2026-05-04:** El proyecto migró de desarrollo nativo
 en Windows a desarrollo en Linux vía WSL 2. Razones:
 

@@ -10,6 +10,12 @@
 
 ## 1. Plataforma actual
 
+> **Nota del 2026-11-22:** desde el 2026-11-21 el equipo es **Ubuntu 26.04
+> nativo, sin WSL ni Windows**, con **Docker Engine 29.1.3** (no Docker
+> Desktop), y el repo es un clon normal en `~/proyectos/app_ortointegra-agenda`.
+> Lo que sigue sobre WSL, Docker Desktop y `/home/ancoa/…` describe el equipo
+> anterior.
+
 ### Setup oficial (a partir del 2026-05-04)
 
 - **Host:** Windows 11
@@ -88,6 +94,14 @@ proyecto médico son inaceptables.
 ---
 
 ## 3. Estrategia de trabajo con base de datos
+
+> **Superado el 2026-11-22.** Esta sección y la 4 describen el flujo de mayo de
+> 2026. Hoy hay stack local de Supabase en Docker (`supabase/config.toml`, CLI
+> 2.117.0, `supabase db reset --local`) y el camino a producción es otro: clon
+> de la estructura de producción sin datos, ensayo, auditoría, conteos de Angel
+> y su orden explícita, y Angel aplica con la CLI en su terminal. La regla
+> vigente está en `CLAUDE.md`, «🗃️ Base de datos»; donde esta sección la
+> contradiga, manda aquélla. Se conserva como historia.
 
 ### Decisión maestra: trabajo directo en producción
 
@@ -250,6 +264,9 @@ explícitamente si hay cambios de schema/code o no.
 |-------------------------|-------------------------------------------------|
 | `supabase/baseline/`    | Snapshot histórica del schema al 2026-04-26     |
 | `supabase/migrations/`  | Migraciones aplicadas a producción              |
+
+> **Ya no es cierto (2026-11-22):** `supabase/config.toml` existe y el stack
+> local se usa; ver la nota de la sección 3.
 
 **IMPORTANTE:** `supabase/` NO contiene `config.toml`, `.gitignore`
 ni `.temp/`. Estos archivos los crea `supabase init` para uso del
