@@ -6,8 +6,9 @@ import { useProfile } from '@/hooks/useProfile'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Loader2, Save, Upload, X, AlertTriangle, Check, UserCircle, Building2, PenLine,
-  Settings, Moon, ShieldCheck, ExternalLink,
+  Settings, Moon, ShieldCheck, ExternalLink, LogOut,
 } from 'lucide-react'
+import { useCierreSesion } from '@/components/layout/Sidebar'
 import Link from 'next/link'
 import { useTheme } from '@/components/layout/ThemeProvider'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
@@ -141,10 +142,9 @@ function Campo({ etiqueta, obligatorio, error, htmlFor, children }: {
 }
 
 /** El control dentro de una fila: sin caja, a 15 px, alto táctil de 44.
- *  ⚠️ `[html.dark_&&]:!bg-transparent` gana a la regla `html.dark input`
- *  (`!important`, ThemeProvider) que en oscuro le ponía la caja `--sup2`: la
- *  clase doblada sube la especificidad por encima de la suya. */
-const CAMPO_FILA = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none [html.dark_&&]:!bg-transparent'
+ *  ⚠️ `k-campo-sin-caja` (sistema.css) gana a la regla `html.dark input`
+ *  (`!important`, ThemeProvider) que en oscuro le ponía la caja `--sup2`. */
+const CAMPO_FILA = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none k-campo-sin-caja'
 
 /** Una tarjeta de filas separadas por la línea fina del kit. */
 const TARJETA_FILAS = 'k-tarjeta flex flex-col divide-y divide-linea py-1'
@@ -818,6 +818,15 @@ export default function PerfilPage() {
     setRecreandoGcal(false)
   }
 
+  /* El engrane «Ajustes» de la barra enlaza a `#perfil-sec-ajustes`. El
+     navegador no puede desplazarse a la sección mientras se pinta el esqueleto:
+     se hace al terminar de cargar, una vez por ancla. */
+  useEffect(() => {
+    if (loading || loadingProfile) return
+    const id = window.location.hash.slice(1)
+    if (id) document.getElementById(id)?.scrollIntoView({ block: 'start' })
+  }, [loading, loadingProfile])
+
   if (loading || loadingProfile) return <PerfilSkeleton />
 
   /* «No pude» tiene pantalla propia, y no es el esqueleto. Reintentar vuelve a
@@ -1390,15 +1399,16 @@ function BotonPaleta({ paleta, activa, onElegir }: {
  * las mismas filas que el menú de ajustes del pie de la barra, con las mismas
  * funciones de siempre (`useTheme` y el enlace al aviso).
  *
- * ⚠️ «Cerrar sesión» NO ESTÁ AQUÍ TODAVÍA, Y NO ES UN OLVIDO. Su manejador
- * (`useCierreSesion` en `layout/Sidebar.tsx`) audita el cierre con `await`,
- * limpia cachés y vacía la de configuración AL DESMONTARSE la barra; copiarlo
- * aquí duplicaría lógica de sesión fuera de su sitio. Queda pedido exportarlo.
+ * «Cerrar sesión» usa el MISMO manejador que la barra (`useCierreSesion`,
+ * exportado de `layout/Sidebar.tsx`): audita con `await`, limpia cachés y vacía
+ * la de configuración al desmontarse. No copies esa lógica aquí. Sin
+ * confirmación (CALMA §29.14); gira y no admite un segundo toque mientras audita.
  *
  * ⚠️ El enlace al aviso lleva `prefetch={false}` y `rel="noopener noreferrer"`
  * por lo mismo que su gemelo de la barra: pestaña nueva, sin `window.opener`.
  */
 function GrupoAjustes({ dark, alternarTema }: { dark: boolean; alternarTema: () => void }) {
+  const { handleLogout, cerrando } = useCierreSesion()
   return (
     <section aria-labelledby="perfil-sec-ajustes">
       <RotuloSeccion id="perfil-sec-ajustes" icono={Settings} titulo="Ajustes" />
@@ -1427,6 +1437,18 @@ function GrupoAjustes({ dark, alternarTema }: { dark: boolean; alternarTema: () 
           <span className="flex-1">Aviso de Privacidad</span>
           <ExternalLink size={16} aria-hidden="true" className="shrink-0 text-tinta2" />
         </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={cerrando}
+          aria-busy={cerrando}
+          className="flex min-h-12 w-full items-center gap-3 text-left text-[15px] text-mal-tinta disabled:opacity-60"
+        >
+          {cerrando
+            ? <Loader2 size={20} aria-hidden="true" className="shrink-0 animate-spin motion-reduce:animate-none" />
+            : <LogOut size={20} aria-hidden="true" className="shrink-0" />}
+          <span className="flex-1">Cerrar sesión</span>
+        </button>
       </div>
     </section>
   )

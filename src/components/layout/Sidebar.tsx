@@ -278,7 +278,7 @@ interface Ajustes {
 /**
  * Modo oscuro · Aviso de Privacidad · Cerrar sesión. Las mismas tres filas en el
  * menú de ajustes del pie de la barra y en «Más»: hoy son la ÚNICA vía a esas
- * tres funciones fuera de la barra (Mi perfil aún no tiene su grupo «Ajustes»).
+ * tres funciones fuera de la barra, además del grupo «Ajustes» de Mi perfil.
  *
  * ⚠️ EL `prefetch={false}` DEL AVISO VA ATADO AL `target="_blank"`. Sin él este
  * enlace pedía `/privacidad` CINCO VECES en cada carga (es estática y se
@@ -343,14 +343,21 @@ function MenuAjustes({ a, alCerrar, idMenu }: { a: Ajustes; alCerrar: () => void
 
 interface Persona { nombre: string; detalle: string; medico: boolean; perfilActivo: boolean; ayudaActiva: boolean }
 
-/** El pie de la barra: la persona («Mi perfil · Ajustes» del médico, «Ajustes» de la secretaria) y Ayuda. */
+/** El pie de la barra: la persona («Mi perfil · Ajustes» del médico, «Ajustes» de la secretaria) y Ayuda.
+ *  El engrane del médico lleva al grupo «Ajustes» de Mi perfil (mismas tres
+ *  filas, CALMA §23.11). La secretaria no tiene `/perfil`: conserva el menú. */
 function PieBarra({ p, a, alNavegar }: { p: Persona; a: Ajustes; alNavegar: () => void }) {
   const [abierto, setAbierto] = useState(false)
   const idMenu = 'nav-menu-ajustes'
-  const boton = (
+  const boton = p.medico ? (
+    <Link href="/perfil#perfil-sec-ajustes" prefetch={false} onClick={alNavegar} aria-label="Ajustes"
+      className="nav-icono nav-icono--barra k-pulsable">
+      <Settings size={20} aria-hidden="true" />
+    </Link>
+  ) : (
     <button type="button" onClick={() => setAbierto(v => !v)} aria-expanded={abierto} aria-controls={idMenu}
-      aria-label="Ajustes" className={p.medico ? 'nav-icono nav-icono--barra k-pulsable' : 'nav-persona k-pulsable'}>
-      {p.medico ? <Settings size={20} aria-hidden="true" /> : <PersonaTexto p={p} linea="Ajustes" icono={<Settings size={20} aria-hidden="true" />} />}
+      aria-label="Ajustes" className="nav-persona k-pulsable">
+      <PersonaTexto p={p} linea="Ajustes" icono={<Settings size={20} aria-hidden="true" />} />
     </button>
   )
   return (
@@ -495,8 +502,10 @@ function useDatosNavegacion() {
 
    El desmontaje ES la señal de que la navegación ya sacó al usuario del árbol.
    El ref evita que un desmontaje ajeno al logout (StrictMode en desarrollo, por
-   ejemplo) borre la caché de una sesión viva. */
-function useCierreSesion() {
+   ejemplo) borre la caché de una sesión viva.
+   Exportado para el grupo «Ajustes» de `/perfil` (CALMA §23.11): una sola
+   lógica de cierre; quien la use se desmonta igual al llegar a `/login`. */
+export function useCierreSesion() {
   const router = useRouter()
   const { signOut } = useAuth()
   const toast = useToast()
