@@ -448,7 +448,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         <div className="sp-doc-cardhead">
           <h2 className="sp-label">Datos del paciente</h2>
         </div>
-        <div className="sp-doc-cardbody">
+        <div className="sp-doc-cardbody sp-lab-datos">
           <div className="sp-doc-grid" data-cols="3">
             <div className="sp-doc-field">
               <label htmlFor="laboratorio-fecha" className="sp-label-field">Fecha</label>
@@ -501,7 +501,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         <div className="sp-doc-cardhead">
           <h2 className="sp-label">Indicaciones / Notas</h2>
         </div>
-        <div className="sp-doc-cardbody">
+        <div className="sp-doc-cardbody sp-lab-notascuerpo">
           <div className="sp-rx-campo sp-rx-campo--texto sp-lab-notas">
             <label htmlFor="laboratorio-notas" className="sr-only">Indicaciones / Notas</label>
             <textarea ref={notasRef} id="laboratorio-notas" rows={1} value={notas}

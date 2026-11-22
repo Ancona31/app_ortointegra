@@ -3513,6 +3513,30 @@ details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
   .sp-lab-cats { padding: 0 16px 8px; }
 }
 
+/* Densidad de ratón (`ih`/`esc`): el objetivo es no desplazar. Fichas de 32 de
+   dibujo y 13 de letra con huecos de 6, como la maqueta; el área de 36 la da un
+   `::after` centrado (la regla del kit, `.k-b::after`), que no pisa la fila de
+   al lado porque sobresale 2 y el hueco es 6. El ✕ se dibuja de 28 y su área
+   mide 36. Datos, «Estudios» y notas con relleno ceñido. `tel`/`ext`/`iv` no
+   cambian. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody:has(> .sp-lab) { gap: 12px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody:is(.sp-lab-datos, .sp-lab-cuerpo, .sp-lab-notascuerpo) { padding: 12px 16px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-lab-cuerpo { gap: 10px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field { padding-block: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field > .sp-input { min-height: 36px; padding-block: 7px; font-size: 15px; line-height: 20px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field > .sp-label-field { padding-top: 9px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-bus { min-height: 40px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-rot { margin-bottom: 4px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-tog { position: relative; height: 32px; padding: 0 10px; font-size: 13px; line-height: 18px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p { height: 32px; padding: 0 2px 0 11px; font-size: 13px; line-height: 18px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p > button { position: relative; width: 28px; height: 28px; margin: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p > button > svg { width: 14px; height: 14px; }
+:where([data-formato="ih"], [data-formato="esc"]) :is(.sp-lab-tog, .sp-lab-p > button)::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-catalogo-t { min-height: 40px; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
