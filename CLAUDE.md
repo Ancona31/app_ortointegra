@@ -1326,8 +1326,10 @@ labs (retomar en sesión nueva)".
 
 - Editor TipTap WYSIWYG con persistencia dual-write `doc` + `cuerpo` en
   `documentos.contenido`
-- PDF / visor / email consumen JSON ProseMirror cuando
-  `doc.schema === 'tiptap-doc-v1'`
+- PDF y visor consumen JSON ProseMirror cuando
+  `doc.schema === 'tiptap-doc-v1'`. El correo ya no compone el escrito:
+  adjunta el PDF (`generarHtmlEmail` se eliminó; ver
+  `src/app/api/email/enviar-documento/route.ts`)
 - Roboto-BoldItalic registrada en `@react-pdf/renderer` para italic+bold
   combinado
 - Hotfix `src/lib/documentos/editorExtensions.ts` — módulo neutro (sin
