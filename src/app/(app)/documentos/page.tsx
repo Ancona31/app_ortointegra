@@ -106,8 +106,11 @@ function DocumentosContent() {
 
   return (
     /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
-       la de 600 (§19). */
-    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] animate-slide-up${tipo === 'escrito' ? ' esc:max-w-[880px]' : ''}`}>
+       la de 600 (§19). Con un formulario abierto, en `esc` crece a 880 —el
+       mismo criterio para los ocho; no más: las líneas largas se leen peor—
+       (altura compartida de los formularios, aprobada). `ih` no gana nada: su
+       área ya es de ~650. La rejilla de tipos sigue en 640. */
+    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] animate-slide-up${tipo ? ' esc:max-w-[880px]' : ''}`}>
 
       {/* Header */}
       <header className="mb-6">

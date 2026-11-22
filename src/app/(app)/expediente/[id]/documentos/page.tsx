@@ -164,8 +164,11 @@ function DocumentosPacienteContent() {
 
   return (
     /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
-       la de 600 (§19). */
-    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5${tab === 'escrito' ? ' esc:max-w-[880px]' : ''}`}>
+       la de 600 (§19). Con un formulario abierto, en `esc` crece a 880 —el
+       mismo criterio para los ocho; no más: las líneas largas se leen peor—
+       (altura compartida de los formularios, aprobada). `ih` no gana nada: su
+       área ya es de ~650. La rejilla de tipos sigue en 640. */
+    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5${tab ? ' esc:max-w-[880px]' : ''}`}>
       {/* Cabecera: «‹ Expediente» (CALMA §6, §20), título y quién. El regreso
           va a la pestaña Documentos del expediente (`?tab=documentos`, clave de
           `PestanasExpediente`), no al Resumen: se llega aquí desde «Nuevo
