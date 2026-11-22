@@ -4,6 +4,7 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 
 import { useEffect, useRef, useState } from 'react'
@@ -149,6 +150,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   const [estudios, setEstudios] = useState<string[]>([''])
   const [notas, setNotas] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
@@ -412,8 +414,8 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         msg = `La solicitud quedó registrada${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
           + 'generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       // eslint-disable-next-line no-console
       console.error('[SolicitudLabForm] imprimir falló:', err)
     } finally {
@@ -539,7 +541,25 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         </div>
       </section>
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">
