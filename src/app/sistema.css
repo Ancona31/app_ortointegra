@@ -791,6 +791,9 @@ html.dark {
    error y advertencia conservan su «Cerrar aviso». */
 body:has(.k-capa) [data-tipo="info"] { pointer-events: none; }
 
+/* En `@layer components` (B12): antes iba sin capa y obligaba a dejar también
+   sin capa la cabecera del formulario (`spinus-tokens.css` §26). */
+@layer components {
 /* ── Rejilla «Tipo de documento» (CALMA §9, §13, §21; capas-a vista 3) ─────
    La dibuja `documentos/SelectorTipoDocumento.tsx` dentro de la página (no es
    una capa: el formulario vive debajo). Celdas `--sup` sobre el fondo de la
@@ -827,3 +830,4 @@ body:has(.k-capa) [data-tipo="info"] { pointer-events: none; }
 .k-az-cambiar { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--enlace); }
 .k-az-cambiar svg { width: 16px; height: 16px; }
 @media (prefers-reduced-motion: reduce) { .k-az:active { transform: none; } }
+} /* fin @layer components (rejilla) */

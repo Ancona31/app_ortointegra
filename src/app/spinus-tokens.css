@@ -3088,25 +3088,9 @@ html.dark .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field 
 html.dark .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input,
 html.dark .sp-tpl-select { background-color: transparent !important; border-color: transparent !important; }
 
-} /* fin @layer components */
-
-/* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
-   se inyecta sin capa en <head>, y lo no encapado gana a cualquier regla de
-   @layer components sin que la especificidad cuente (la misma lección que
-   touch-action, documentada arriba). Aquí las dos hojas quedan en la misma
-   condición de origen y decide la especificidad: dos clases contra una, gana
-   esto. El marco del rectángulo va aparte, en línea (`MARCO_ESTILO` del
-   componente); esto solo sube el contraste de la retícula de tercios, cuyas
-   líneas son pseudo-elementos y no admiten estilo en línea. */
-.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::before,
-.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
-  border-color: rgba(255, 255, 255, 0.75);
-}
-
-/* ⚠ FUERA DE @layer A PROPÓSITO, como el bloque de arriba: `.k-az-linea` y sus
-   piezas viven SIN capa en `sistema.css` («Rejilla Tipo de documento»), y lo no
-   encapado gana a toda `@layer components` sin que cuente la especificidad.
-   Aquí, sin capa también, decide la especificidad (dos clases contra una). */
+/* La rejilla (`sistema.css`) va ya en `@layer components`, importada DESPUÉS
+   de esta hoja: a igual capa decide la especificidad, y aquí cada regla lleva
+   una clase más que la suya (`.sp-doc-cab`). */
 /* ── Cabecera del formulario (parte 2 de B9; maquetas `docs-a/b/c`) ────────
    La línea plegada de `SelectorTipoDocumento` es la cabecera: el tipo en su
    cuadro tintado y en grande, «Cambiar» tonal a la derecha, sin tarjeta. Sigue
@@ -3146,6 +3130,22 @@ html.dark .sp-tpl-select { background-color: transparent !important; border-colo
   .sp-doc-cab .k-az-linea-t > span:last-child { white-space: normal; }
   .sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas { top: 0; }
 }
+
+} /* fin @layer components */
+
+/* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
+   se inyecta sin capa en <head>, y lo no encapado gana a cualquier regla de
+   @layer components sin que la especificidad cuente (la misma lección que
+   touch-action, documentada arriba). Aquí las dos hojas quedan en la misma
+   condición de origen y decide la especificidad: dos clases contra una, gana
+   esto. El marco del rectángulo va aparte, en línea (`MARCO_ESTILO` del
+   componente); esto solo sube el contraste de la retícula de tercios, cuyas
+   líneas son pseudo-elementos y no admiten estilo en línea. */
+.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::before,
+.sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
 
 
 /* ============================================================================
