@@ -62,9 +62,11 @@ test('teléfono: el panel del Mes abre en HOY, no en el día 1; «siguiente» av
   // Si el día fijo cae después de hoy, se usa hoy (en Mérida).
   const hoyMerida = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Merida' }).format(new Date())
   const candidato = DIA_LABORABLE_FIJO.endsWith('-01') ? DIA_LABORABLE_LIBRE : DIA_LABORABLE_FIJO
-  // Hoy día 1 con el miércoles aún por venir: no hay día pasado que no sea el 1; la prueba no aplica.
-  test.skip(candidato > hoyMerida && hoyMerida.endsWith('-01'), 'hoy es día 1 y el día fijo aún no llega')
-  const diaFijo = candidato > hoyMerida ? hoyMerida : candidato
+  // AG-DT-256: hoy día 1 con el día fijo aún por venir. Antes la prueba se saltaba; ahora usa AYER
+  // (el último día del mes anterior): es pasado, no es día 1 y la semilla lo cubre (4 semanas atrás).
+  const ayerMerida = new Date(Date.parse(`${hoyMerida}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+  const hoyOAyer = hoyMerida.endsWith('-01') ? ayerMerida : hoyMerida
+  const diaFijo = candidato > hoyMerida ? hoyOAyer : candidato
   const [anio, mes] = diaFijo.split('-').map(Number)
   const mesSiguiente = mes === 12 ? `${anio + 1}-01-01` : `${anio}-${String(mes + 1).padStart(2, '0')}-01`
 

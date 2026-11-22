@@ -21,13 +21,18 @@ import { execFileSync } from 'node:child_process'
  *
  * Sólo lee. Habla con el contenedor local, como `sqlLocal` de `ayudas.ts`.
  *
- * Una prueba que NECESITA una cita vieja (las que prueban la ventana) la borra
- * o la cierra antes de terminar; si no puede, lleva la anotación
- * `asistencia-a-proposito` y la guarda no la cuenta en esa prueba (sí en la
- * siguiente, si sigue ahí).
+ * Qué mira y cuándo: al empezar (línea base), durante cada prueba (como mucho
+ * una vez por segundo) y al terminar cada una.
+ *
+ * Las pruebas que prueban la ventana A PROPÓSITO necesitan una cita vieja. Llevan
+ * la anotación `asistencia-a-proposito` y la guarda les perdona las citas que
+ * escribieron y que YA NO disparan la ventana cuando la prueba termina (borradas,
+ * atendidas, canceladas). Lo que dejen abierto se señala igual.
  */
 const CONTENEDOR_DB = 'supabase_db_app_ortointegra'
 const ZONA = 'America/Merida'
+const MS_ENTRE_MUESTRAS = 1000
+/** La anotación de las pruebas que prueban la ventana A PROPÓSITO (ver la cabecera). */
 export const ANOTACION_A_PROPOSITO = 'asistencia-a-proposito'
 
 /** Las citas que la ventana preguntaría al final del domingo de la semana en que arrancó la batería. */
@@ -60,7 +65,7 @@ function lunesSiguienteDe(ahora: Date): string {
 }
 
 /** `fila` acaba en el instante (ms) en que la cita se creó o se tocó por última vez. */
-interface Hallazgo { fila: string }
+interface Hallazgo { id: string; fila: string }
 interface Tramo { donde: string; desde: number; hasta: number }
 
 /**
@@ -68,8 +73,10 @@ interface Tramo { donde: string; desde: number; hasta: number }
  * fila y no por «la prueba que acababa de terminar»: el aviso de fin de prueba
  * llega al proceso principal con retraso y nombraría a la anterior.
  */
+const instanteDe = (fila: string): number => Number(fila.slice(fila.lastIndexOf('|') + 1))
+
 function pruebaDe(fila: string, tramos: Tramo[]): string {
-  const cuando = Number(fila.slice(fila.lastIndexOf('|') + 1))
+  const cuando = instanteDe(fila)
   const dentro = tramos.find(t => t.desde <= cuando && cuando <= t.hasta)
   if (dentro) return dentro.donde
   const antes = tramos.filter(t => t.hasta < cuando).pop()
@@ -79,28 +86,51 @@ function pruebaDe(fila: string, tramos: Tramo[]): string {
 export default class GuardaAsistencia implements Reporter {
   private readonly lunesSiguiente = lunesSiguienteDe(new Date())
   private conocidas: Set<string> | null = null
-  private readonly hallazgos: Hallazgo[] = []
+  private hallazgos: Hallazgo[] = []
   private readonly tramos: Tramo[] = []
 
-  /** La línea base se toma al empezar la primera prueba: la semilla ya corrió. */
-  onTestBegin(): void {
-    if (this.conocidas === null) this.conocidas = new Set(consultar(this.lunesSiguiente).keys())
+  private ultimaMuestra = 0
+
+  /** La línea base: `onBegin` corre DESPUÉS del `globalSetup` (la semilla ya está). */
+  onBegin(): void {
+    this.conocidas = new Set(consultar(this.lunesSiguiente).keys())
+  }
+
+  /** Apunta lo que la regla encuentre y no estuviera ya; devuelve lo que hay ahora. */
+  private muestrear(): Map<string, string> {
+    if (this.conocidas === null) return new Map()
+    this.ultimaMuestra = Date.now()
+    const ahora = consultar(this.lunesSiguiente)
+    for (const [id, fila] of ahora) {
+      if (this.conocidas.has(id)) continue
+      this.conocidas.add(id)
+      this.hallazgos.push({ id, fila })
+    }
+    return ahora
+  }
+
+  /**
+   * También DURANTE la prueba, como mucho una vez por segundo: una cita que la
+   * prueba crea y borra antes de terminar tapa la rejilla igual mientras vive.
+   */
+  onStepEnd(): void {
+    if (Date.now() - this.ultimaMuestra >= MS_ENTRE_MUESTRAS) this.muestrear()
   }
 
   onTestEnd(prueba: TestCase, resultado: TestResult): void {
-    if (this.conocidas === null) return
-    const anotaciones = [...prueba.annotations, ...resultado.annotations]
-    if (anotaciones.some(a => a.type === ANOTACION_A_PROPOSITO)) return
     const desde = resultado.startTime.getTime()
+    const hasta = desde + resultado.duration
     this.tramos.push({
-      donde: `${prueba.location.file.split('/').pop() ?? ''}:${prueba.location.line} › ${prueba.title}`,
-      desde, hasta: desde + resultado.duration,
+      donde: `${prueba.location.file.split('/').pop() ?? ''}:${prueba.location.line} › ${prueba.title}`, desde, hasta,
     })
-    for (const [id, fila] of consultar(this.lunesSiguiente)) {
-      if (this.conocidas.has(id)) continue
-      this.conocidas.add(id)
-      this.hallazgos.push({ fila })
+    const ahora = this.muestrear()
+    if (!prueba.annotations.some(a => a.type === ANOTACION_A_PROPOSITO)) return
+    /* A propósito: se perdona lo que esta prueba escribió y ya no dispara la ventana. */
+    const perdonado = (h: Hallazgo): boolean => {
+      const cuando = instanteDe(h.fila)
+      return desde <= cuando && cuando <= hasta && !ahora.has(h.id)
     }
+    this.hallazgos = this.hallazgos.filter(h => !perdonado(h))
   }
 
   async onEnd(): Promise<{ status?: FullResult['status'] } | undefined> {

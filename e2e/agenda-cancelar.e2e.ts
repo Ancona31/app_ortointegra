@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  irAAgenda, modalCita, soloEscritorio, SESION, DIA_LABORABLE_LIBRE, tituloUnico,
+  irAAgendaSiguiente, modalCita, soloEscritorio, SESION, DIA_FUTURO_LIBRE, tituloUnico,
   eventoConTexto, toastConTexto, enContextoNuevo, interruptorAgenda, sqlLocal,
 } from './ayudas'
 import { editarDesdeTarjeta } from './interaccionesAyudas'
@@ -46,7 +46,7 @@ function idsAdminA(): { medico: string; consultorio: string; paciente: string } 
 /** Da de alta por la API (como el modal) y devuelve el id. */
 async function alta(page: Page, opciones: { hora: string; minutos: number; paciente: boolean; titulo: string }): Promise<string> {
   const ids = idsAdminA()
-  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, opciones.hora, TZ)
+  const inicio = fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, opciones.hora, TZ)
   const fin = new Date(new Date(inicio).getTime() + opciones.minutos * 60_000).toISOString()
   const cuerpo = {
     title: opciones.titulo, start_time: inicio, end_time: fin, medico_id: ids.medico, consultorio_id: ids.consultorio,
@@ -78,7 +78,7 @@ function tarjetaDe(page: Page, hora: string) {
 }
 
 async function abrirAgendaV2(page: Page): Promise<void> {
-  await irAAgenda(page)
+  await irAAgendaSiguiente(page) // AG-DT-256: las citas con paciente van en la semana siguiente
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'encendida')
   /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')
@@ -173,7 +173,7 @@ test('encendido: un DELETE directo sobre una cita con paciente contesta 409 y no
 
 test('apagado: la papelera de una cita con paciente borra como siempre', async ({ page }) => {
   const id = await alta(page, { hora: '16:40', minutos: 15, paciente: true, titulo: 'Paciente Prueba 07' })
-  await irAAgenda(page)
+  await irAAgendaSiguiente(page) // AG-DT-256: las citas con paciente van en la semana siguiente
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'apagada')
 
   await tarjetaDe(page, '16:40').click()

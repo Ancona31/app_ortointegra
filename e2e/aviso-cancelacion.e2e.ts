@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { interruptorAgenda, sqlLocal, soloEscritorio, SESION, tituloUnico } from './ayudas'
+import { interruptorAgenda, sqlLocal, soloEscritorio, SESION, tituloUnico, diaDeLaSemana } from './ayudas'
 
 /**
  * «Avisa a la clínica» (agenda E8, plan_E.md E10 caso 4, segunda mitad): con
@@ -26,7 +26,10 @@ const HASH = 'e8'.repeat(32)
 test.beforeAll(() => {
   interruptorAgenda('A', true)
   titulo = tituloUnico('Cancela E8')
-  // Una cita de esta semana a +3 h (se ve en la vista Semana) con paciente y su enlace.
+  /* AG-DT-256: la cita va el JUEVES DE LA SEMANA SIGUIENTE a las 16:00, una fecha
+     fija respecto de la corrida, y las pruebas pasan a esa semana. Antes iba a
+     `now() + 3 h`: el domingo desde las 21:00 caía en la semana siguiente y no
+     se veía. Siempre es futura, así que el paciente siempre está en plazo. */
   const fila = sqlLocal(`
     with c as (select id from public.clinicas where nombre = 'Clínica Semilla A'),
          m as (select p.id from public.profiles p where p.clinica_id = (select id from c) and p.es_admin_de_clinica limit 1),
@@ -37,12 +40,13 @@ test.beforeAll(() => {
          a as (insert into public.appointments (clinica_id, paciente_id, medico_id, title, start_time, end_time, status,
                                                 consultorio_timezone)
                select (select id from c), (select id from p), (select id from m), :'titulo',
-                      date_trunc('hour', now()) + interval '3 hours', date_trunc('hour', now()) + interval '3 hours 30 min',
+                      (:'dia' || ' 16:00')::timestamp at time zone 'America/Merida',
+                      (:'dia' || ' 16:30')::timestamp at time zone 'America/Merida',
                       'scheduled', 'America/Mexico_City'
                returning id, clinica_id, paciente_id)
     insert into public.cita_confirmaciones (id, clinica_id, appointment_id, codigo_hash, paciente_id)
     select gen_random_uuid(), a.clinica_id, a.id, :'hash', a.paciente_id from a
-    returning appointment_id || '|' || clinica_id || '|' || paciente_id;`, { titulo, hash: HASH })
+    returning appointment_id || '|' || clinica_id || '|' || paciente_id;`, { titulo, hash: HASH, dia: diaDeLaSemana(1, 3) })
   ;[citaId = '', clinicaId = '', pacienteId = ''] = fila.split('|')
 })
 test.afterAll(() => {
@@ -56,6 +60,7 @@ test.afterAll(() => {
 test('el paciente cancela por el enlace: aviso en la agenda abierta y fila en el panel', async ({ page }) => {
   await page.goto('/agenda')
   await expect(page.locator('[data-agenda-v2="encendida"]')).toBeVisible()
+  await page.locator('.fc-next-button').click()
   await expect(page.locator('.fc-event', { hasText: titulo })).toBeVisible({ timeout: 15000 })
   sqlLocal(`
     begin;
@@ -75,6 +80,7 @@ test('el paciente cancela por el enlace: aviso en la agenda abierta y fila en el
 test('una cancelación del personal no avisa', async ({ page }) => {
   sqlLocal(`update public.appointments set status = 'scheduled' where id = :'id';`, { id: citaId })
   await page.goto('/agenda')
+  await page.locator('.fc-next-button').click()
   await expect(page.locator('.fc-event', { hasText: titulo })).toBeVisible({ timeout: 15000 })
   // Como postgres, sin pasar por el enlace: la respuesta guardada ya tiene más de 2 min o es la anterior.
   sqlLocal(`update public.cita_confirmaciones set respondido_en = now() - interval '10 minutes' where appointment_id = :'id';

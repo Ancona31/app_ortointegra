@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import {
-  irAAgenda, modalCita, soloEscritorio, SESION, DIA_LABORABLE_FIJO, tituloUnico,
+  irAAgenda, irAAgendaSiguiente, modalCita, soloEscritorio, SESION, DIA_LABORABLE_FIJO, DIA_FUTURO_FIJO, tituloUnico,
   eventoConTexto, toastConTexto, enContextoNuevo, observarEcosRealtime,
 } from './ayudas'
 
@@ -31,7 +31,7 @@ test('alta de cita con paciente: no duplica el eco propio y persiste en contexto
   // ningún hueco de `HUECOS_ADMIN`/`HUECOS_INV` de `agenda-semilla.ts`).
   const HORA = '10:05'
   const esperarEco = observarEcosRealtime(page)
-  await irAAgenda(page)
+  await irAAgendaSiguiente(page) // AG-DT-256: con paciente, en la semana siguiente
 
   const propiasAntes = await page.locator('.fc-event', { hasText: 'Paciente Prueba 05' }).filter({ hasText: HORA }).count()
   expect(propiasAntes).toBe(0)
@@ -47,7 +47,7 @@ test('alta de cita con paciente: no duplica el eco propio y persiste en contexto
 
   // GRAVE §1: la fecha se escribe también — el modal precarga HOY, que un
   // sábado o domingo cae fuera de horario (ver `diaDeLaSemana` en ayudas.ts).
-  await page.locator('input[type="date"]').first().fill(DIA_LABORABLE_FIJO)
+  await page.locator('input[type="date"]').first().fill(DIA_FUTURO_FIJO)
   await page.locator('input[type="time"]').first().fill(HORA)
 
   // GRAVE §4: el toast es optimista (sale en `handleSave` antes del `fetch`,
@@ -74,7 +74,7 @@ test('alta de cita con paciente: no duplica el eco propio y persiste en contexto
   // GRAVE §3: la persistencia se comprueba en un CONTEXTO NUEVO, no con
   // `page.reload()` (mismo proceso de cliente).
   await enContextoNuevo(browser, SESION.adminA, async (pagina) => {
-    await irAAgenda(pagina)
+    await irAAgendaSiguiente(pagina)
     await expect(pagina.locator('.fc-event', { hasText: 'Paciente Prueba 05' }).filter({ hasText: HORA })).toHaveCount(1)
   })
 })
@@ -122,7 +122,7 @@ test('alta de evento genérico sin paciente: título, color e icono elegidos per
 })
 
 test('edición: cambiar estado a Confirmada y que se mantenga en contexto nuevo', async ({ page, browser }) => {
-  await irAAgenda(page)
+  await irAAgendaSiguiente(page) // AG-DT-256: con paciente, en la semana siguiente
   // Crea su propia CITA en vez de tocar una fila de la semilla: así ninguna
   // otra prueba puede verse afectada por este cambio de estado. Tiene que ser
   // cita y no evento genérico: un evento sólo admite «Agendada»/«Cancelada»
@@ -130,7 +130,7 @@ test('edición: cambiar estado a Confirmada y que se mantenga en contexto nuevo'
   await page.locator('[data-onboard="nueva-cita"]').click()
   await page.getByPlaceholder('Buscar paciente por nombre o apellido...').fill('Prueba 12')
   await page.getByRole('button', { name: /Paciente Prueba 12/ }).click()
-  await page.locator('input[type="date"]').first().fill(DIA_LABORABLE_FIJO)
+  await page.locator('input[type="date"]').first().fill(DIA_FUTURO_FIJO)
   // 15:20 y no 10:00: a esa hora la semilla ya tiene citas casi cualquier día
   // de la semana, y la tarjeta nueva queda tan angosta que el "harness" de la
   // vecina le tapa el punto donde Playwright hace clic.
@@ -158,7 +158,7 @@ test('edición: cambiar estado a Confirmada y que se mantenga en contexto nuevo'
   await expect(tarjeta).toHaveClass(/ag-ev-status--confirmed/)
 
   await enContextoNuevo(browser, SESION.adminA, async (pagina) => {
-    await irAAgenda(pagina)
+    await irAAgendaSiguiente(pagina)
     await expect(
       pagina.locator('.fc-event', { hasText: 'Paciente Prueba 12' }).filter({ hasText: '15:20' }),
     ).toHaveClass(/ag-ev-status--confirmed/)
