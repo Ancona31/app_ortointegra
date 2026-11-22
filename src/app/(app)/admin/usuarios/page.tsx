@@ -213,7 +213,9 @@ export default function AdminUsuariosPage() {
        primario, los contadores como números sueltos y «Tu equipo» en una
        tarjeta de filas con avatar, etiquetas de rol y estado, «Reenviar»
        tonal a la vista y lo destructivo dentro de «···». */
-    <div className="mx-auto max-w-[760px]">
+    /* B12: el contenedor es el de Estadísticas (max-w-6xl) para que la fila de
+       pestañas no salte al cambiar de pestaña; el contenido sigue a 760px. */
+    <div className="mx-auto max-w-6xl [&>*:not(nav)]:max-w-[760px]">
       {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
       <PestanasAdministracion />
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">

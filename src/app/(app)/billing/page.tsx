@@ -123,7 +123,9 @@ function BillingContent() {
      hoy salvo «funciones» y «Prueba» (CALMA §23.10). Sin lógica nueva: los
      mismos estados, los mismos botones y los mismos destinos. */
   return (
-    <div className="mx-auto max-w-[840px]">
+    /* B12: el contenedor es el de Estadísticas (max-w-6xl) para que la fila de
+       pestañas no salte al cambiar de pestaña; el contenido sigue a 840px. */
+    <div className="mx-auto max-w-6xl [&>*:not(nav)]:max-w-[840px]">
       {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
       <PestanasAdministracion />
 
