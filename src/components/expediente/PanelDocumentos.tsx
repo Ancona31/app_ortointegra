@@ -9,6 +9,7 @@ import { useProfile } from '@/hooks/useProfile'
 import { puedeComponer } from '@/lib/mobileShare'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { esSinVisor, type TipoDocumentoBD } from '@/lib/documentos/familias'
+import { ofreceRegenerar } from '@/components/documentos/consentimientoEmbudo'
 import EstadoVacio from '@/components/ui/EstadoVacio'
 import EstadoError from '@/components/ui/EstadoError'
 import ModalShell from '@/components/ui/ModalShell'
@@ -238,7 +239,7 @@ export default function PanelDocumentos({
 
   /* ── Regenerar ─────────────────────────────────────────────────────────── */
   async function regenerar() {
-    if (!doc?.contenido || regenerando) return
+    if (!doc?.contenido || regenerando || !ofreceRegenerar(doc.tipo, doc.estado)) return
     setRegenerando(true)
     setAviso(null)
     try {
@@ -442,7 +443,16 @@ export default function PanelDocumentos({
                 onPreparar: prepararCompartir,
               },
               enviar: { onClick: () => void enviar(), bloqueo: bloqueoEnviar, ocupada: enviando },
-              regenerar: { onClick: () => void regenerar(), bloqueo: bloqueoRegenerar, ocupada: regenerando },
+              /* ⚠️ UN CONSENTIMIENTO SELLADO NO OFRECE «REGENERAR» (CI-DT-1,
+                 decisión del dueño): recompone sólo desde `contenido`, sin
+                 firmas, sello ni identificaciones, y dejaría en el expediente un
+                 papel que dice que nadie firmó. `onClick: null` → no se dibuja.
+                 El resto de tipos y estados, como siempre. */
+              regenerar: {
+                onClick: ofreceRegenerar(doc.tipo, doc.estado) ? () => void regenerar() : null,
+                bloqueo: bloqueoRegenerar,
+                ocupada: regenerando,
+              },
               eliminar: {
                 onClick: () => setConfirmarBorrado(true),
                 rotulo: esBorrador ? 'Cancelar borrador' : 'Eliminar documento',

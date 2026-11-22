@@ -1084,8 +1084,15 @@ export default function ConsentimientoInformadoForm({
         // El caso incómodo: el documento ya es terminal y el folio ya se
         // consumió. Cerrar el modo es lo correcto —no hay nada más que firmar—
         // y el mensaje lleva el número delante para poder encontrarlo.
-        msg = `El consentimiento quedó sellado${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
-          + 'generar el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
+        //
+        // ⚠️ NO MANDA A «RECUPERARLO DESDE LA LISTA», que es lo que decía: eso
+        // era «Regenerar», que compone sin firmas (CI-DT-1) y ya no se ofrece en
+        // un sellado. Hoy NO existe un camino que vuelva a generar el PDF CON las
+        // firmas guardadas, así que el mensaje lo dice y remite a soporte. El caso
+        // queda anotado en DEUDA_CONSENTIMIENTO.md (CI-DT-1, «sellado sin PDF»).
+        msg = `El consentimiento quedó sellado${folio ? ` con folio ${folio}` : ''} y sus firmas están `
+          + 'guardadas, pero no se pudo generar el PDF. La app todavía no puede volver a generarlo con '
+          + 'las firmas: no lo emitas de nuevo y escribe a soporte@spinus.com.mx con el folio para recuperarlo.'
       }
       // Sellado pero sin PDF: un solo mensaje, la alerta «No se pudo guardar»
       // (rediseño B9). El otro caso sigue con su aviso y su texto del firmado.
