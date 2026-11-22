@@ -2,9 +2,10 @@
 
 /**
  * Grupo de botones de un toque con semántica de `radiogroup` (tipo de
- * internamiento y ASA en la solicitud de internamiento). Un SEGUNDO toque
- * deselecciona: los dos campos son opcionales hoy y un `<select>` permitía
- * volver a «Seleccionar…».
+ * internamiento y ASA en la solicitud de internamiento; vigencia, forma de pago
+ * y divisa en honorarios). Un SEGUNDO toque deselecciona salvo con
+ * `obligatoria`: tipo y ASA son opcionales y un `<select>` permitía volver a
+ * «Seleccionar…»; los de honorarios siempre llevan valor, como su `<select>`.
  *
  * Teclado (como la maqueta aprobada): una sola parada de Tab (la marcada, o la
  * primera); ←/→ (y ↑/↓) mueven el foco sin elegir; Espacio o Enter eligen o
@@ -22,9 +23,11 @@ interface Props {
   opciones: readonly Opcion[]
   valor: string
   onCambio: (valor: string) => void
+  /** Siempre hay una elegida (vigencia, forma de pago, divisa): el segundo toque no la quita. */
+  obligatoria?: boolean
 }
 
-export default function OpcionesRapidas({ id, nombre, opciones, valor, onCambio }: Props): ReactElement {
+export default function OpcionesRapidas({ id, nombre, opciones, valor, onCambio, obligatoria = false }: Props): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   const parada = opciones.some(o => o.valor === valor) ? valor : opciones[0]?.valor
 
@@ -43,7 +46,7 @@ export default function OpcionesRapidas({ id, nombre, opciones, valor, onCambio 
       {opciones.map(o => (
         <button key={o.valor} type="button" role="radio" aria-checked={valor === o.valor}
           tabIndex={o.valor === parada ? 0 : -1} className="sp-int-op"
-          onClick={() => onCambio(valor === o.valor ? '' : o.valor)}>
+          onClick={() => onCambio(valor === o.valor && !obligatoria ? '' : o.valor)}>
           {o.etiqueta}
         </button>
       ))}

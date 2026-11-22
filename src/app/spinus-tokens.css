@@ -3826,6 +3826,129 @@ html.dark :is(.sp-int-rg-fi, .sp-int-menu-fi) { background-color: transparent !i
 html.dark .sp-int-rg-fi:focus { background-color: var(--sup2) !important; }
 html.dark .sp-int-gn-fi { border-color: transparent !important; }
 
+/* ── 26.5 · RECIBO DE HONORARIOS Y COTIZACIÓN COMPACTOS (maqueta `honorarios.html`, aprobada) ──
+   Datos en una fila (`.sp-hon-datos`, campos de 26.1), un cobro por línea
+   (`.sp-hon-ln`: número, concepto, «de quién es el cobro» sólo en cotización,
+   precio a la derecha con cifras tabulares, ✕), los totales siempre debajo
+   (`.sp-hon-tot`), y vigencia, forma de pago y divisa como botones de un toque
+   (`.sp-int-op` de 26.4). El origen y la aseguradora son `CampoSugerido`
+   (`.sp-hon-sug`, lista `absolute` bajo el campo). Táctil: toques de 44 y
+   letra de 16; `ih`/`esc`: densidad de ratón. Contenedor estrecho (< 560): el
+   origen baja a un segundo renglón de su línea y los datos a una columna.
+   Nada aquí es `fixed`. */
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-hon-cuerpo { display: flex; flex-direction: column; gap: 8px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-hon-cuerpo { padding: 14px 16px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody:has(> .sp-hon) { gap: 12px; }
+/* La tarjeta con el foco sube: su lista de sugerencias cae sobre la siguiente y sobre el pie. */
+.sp-hon:focus-within { position: relative; z-index: 2; }
+.sp-hon-datos { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-hon-datos > * { flex: 0 0 auto; }
+.sp-hon-datos > :first-child { flex: 1 1 200px; }
+.sp-hon-datos .sp-rx-fi[type="date"] { width: 9.5em; }
+.sp-hon-datos .sp-hon-folio { width: 17ch; }
+.sp-hon-datos .sp-rx-rot, .sp-hon-seguro .sp-rx-rot { width: auto; min-width: 56px; }
+.sp-hon-folio { color: var(--tinta2); }
+.sp-hon-nota { margin: 0; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-hon-vig { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.sp-hon-vig > .sp-int-opciones { flex: 0 1 auto; }
+
+/* Líneas: número · concepto · origen · precio · ✕. */
+.sp-hon-ln {
+  display: grid; grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1fr) 120px var(--k-toque);
+  column-gap: 6px; align-items: center; padding: 2px 0; border-top: 1px solid var(--linea);
+}
+.sp-hon-conceptos[data-tipo="honorarios"] .sp-hon-ln { grid-template-columns: 22px minmax(0, 1fr) 150px var(--k-toque); }
+.sp-hon-cols {
+  border-top: 0; padding: 0 0 2px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-hon-cols > * { min-width: 0; padding-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-hon-cols > .sp-hon-der { text-align: right; padding: 0 8px 0 0; }
+.sp-hon-n { font-size: 12px; line-height: 16px; color: var(--tinta2); text-align: center; font-variant-numeric: tabular-nums; }
+.sp-hon-fi {
+  width: 100%; min-width: 0; min-height: var(--k-toque); margin: 0; padding: 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--tinta); font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-hon-fi { padding: 6px 8px; font-size: 15px; line-height: 20px; }
+.sp-hon-fi:focus { outline: 2px solid var(--enlace); background: var(--sup2); }
+.sp-hon-fi::placeholder { color: var(--tinta2); opacity: .75; }
+.sp-hon-fi--falta { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-hon-p { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.sp-hon-x:disabled { opacity: .35; }
+.sp-hon-err { grid-column: 2 / -1; margin: 0 0 4px; padding-left: 8px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--mal-tinta); }
+
+/* Campo con sugerencias: la lista va bajo el campo, sin portal. */
+.sp-hon-sug { position: relative; min-width: 0; }
+.sp-rx-campo > .sp-hon-sug { flex: 1; position: static; }
+/* En un campo con rótulo (la aseguradora) la lista toma el ancho del campo entero. */
+.sp-rx-campo > .sp-hon-sug > .sp-hon-lista { left: 0; right: 0; min-width: 0; }
+.sp-hon-lista {
+  position: absolute; z-index: 20; left: 0; top: calc(100% + 4px); min-width: max(100%, 240px); max-height: 264px;
+  overflow-y: auto; overscroll-behavior: contain; padding: 4px; background: var(--sup); border-radius: 14px; box-shadow: var(--sombra-capa);
+}
+.sp-hon-op {
+  display: flex; align-items: center; min-height: var(--k-toque); padding: 8px 10px; border-radius: 10px;
+  color: var(--tinta); font-size: 15px; line-height: 20px; cursor: pointer;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-hon-op { font-size: 14px; padding: 6px 10px; }
+.sp-hon-op[aria-selected="true"] { background: var(--tonal); color: var(--tonal-tinta); font-weight: 600; }
+.sp-hon-pie { margin: 2px 0 0; padding: 6px 10px 4px; border-top: 1px solid var(--linea); font-size: 12px; line-height: 16px; color: var(--tinta2); }
+
+/* Totales: siempre a la vista, alineados con la columna del precio. */
+.sp-hon-tot { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; padding-top: 8px; border-top: 2px solid var(--linea); }
+.sp-hon-tf { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-height: 30px; padding-right: calc(var(--k-toque) + 6px); }
+.sp-hon-tl { min-width: 0; font-size: 14px; line-height: 18px; color: var(--tinta2); text-align: right; }
+.sp-hon-cifra { flex: none; min-width: 150px; padding-right: 8px; text-align: right; font-size: 15px; line-height: 20px; font-weight: 500; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.sp-hon-tf--fin .sp-hon-tl { font-size: 16px; font-weight: 600; color: var(--tinta); }
+.sp-hon-tf--fin .sp-hon-cifra { font-size: 18px; line-height: 24px; font-weight: 700; }
+.sp-hon-anticipo { flex: none; width: 150px; background: var(--sup2); }
+
+.sp-hon-seguro { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.sp-hon-quitarseg { margin-left: auto; }
+.sp-hon-notas { min-height: 44px; resize: vertical; }
+.sp-hon-mas { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sp-hon-mas svg { width: 16px; height: 16px; }
+.sp-hon .sp-int-rot { width: 112px; }
+/* El segmentado Recibo/Cotización con el toque del formato (44 táctil, 36 ratón). */
+.sp-hon .sp-doc-segmented__opt { min-height: var(--k-toque); }
+
+/* Estrecho (`ext`/`tel`): datos y seguro en una columna; el origen en un
+   segundo renglón de su línea; totales a la medida. */
+@container docform (max-width: 559px) {
+  .sp-hon-seguro { grid-template-columns: minmax(0, 1fr); }
+  .sp-hon-datos > * { flex: 1 1 100%; }
+  .sp-hon-datos .sp-rx-fi[type="date"], .sp-hon-datos .sp-hon-folio { width: 100%; }
+  .sp-hon .sp-int-rot { width: 100%; }
+  .sp-hon-cols { display: none; }
+  .sp-hon-ln, .sp-hon-conceptos[data-tipo="honorarios"] .sp-hon-ln {
+    grid-template-columns: 22px minmax(0, 1fr) 112px var(--k-toque); padding: 4px 0;
+  }
+  .sp-hon-ln > .sp-hon-n { grid-column: 1; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-c { grid-column: 2; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-p { grid-column: 3; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-x { grid-column: 4; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-sug { grid-column: 2 / 4; grid-row: 2; }
+  .sp-hon-tf { justify-content: space-between; gap: 10px; padding-right: 0; }
+  .sp-hon-tl { flex: 1; text-align: left; }
+  .sp-hon-cifra { min-width: 0; }
+  .sp-hon-anticipo { width: 112px; }
+}
+
+/* Muy estrecho (`ext`, contenedor < 380): el concepto se lleva el primer
+   renglón entero con su ✕; debajo, el origen y el precio. */
+@container docform (max-width: 379px) {
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln { grid-template-columns: 22px minmax(0, 1fr) 104px var(--k-toque); }
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln > .sp-hon-c { grid-column: 2 / 4; }
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln > .sp-hon-p { grid-column: 3; grid-row: 2; }
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln > .sp-hon-sug { grid-column: 2; grid-row: 2; }
+  .sp-hon-conceptos[data-tipo="honorarios"] .sp-hon-ln { grid-template-columns: 22px minmax(0, 1fr) 96px var(--k-toque); }
+}
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con
+   `--sup2` y borde con !important (sin capa); aquí se gana EN capa. */
+html.dark .sp-hon-fi { background-color: transparent !important; border-color: transparent !important; }
+html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(--sup2) !important; }
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
