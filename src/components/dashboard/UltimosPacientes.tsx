@@ -7,8 +7,9 @@ import { es } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { calcularEdad } from '@/lib/patientUtils'
-import { EncabezadoColumna, ChipAccion, AvisoColumna } from './piezasBanda2'
-import { PALETA_AVATAR, ARRANQUE_AVATAR } from './paletaAvatar'
+import { CabeceraTarjeta, ChipAccion, AvisoTarjeta } from './piezasBanda2'
+import Avatar, { ARRANQUE_AVATAR, inicialesDe } from '@/components/ui/Avatar'
+import { TARJETA } from './PiezasCita'
 
 /** Cuatro tarjetas, dos por dos, como la columna equivalente del médico. */
 const TARJETAS = 4
@@ -23,12 +24,12 @@ type Reciente = {
 
 export function UltimosPacientesCargando() {
   return (
-    <div>
-      <EncabezadoColumna titulo="Últimos pacientes registrados" />
-      <div className="mt-[var(--sp-gap-tiles)] grid grid-cols-2 gap-[var(--sp-gap-tiles)]">
-        {[1, 2, 3, 4].map(i => <div key={i} className="skeleton h-[106px] rounded-[14px]" />)}
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Últimos pacientes registrados" />
+      <div className="mt-1 flex flex-col" aria-hidden="true">
+        {[1, 2, 3, 4].map(i => <div key={i} className="skeleton my-2 h-10 rounded-[10px]" />)}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -72,70 +73,52 @@ export default function UltimosPacientes() {
   if (loadingProfile || cargando) return <UltimosPacientesCargando />
 
   if (error) return (
-    <div>
-      <EncabezadoColumna titulo="Últimos pacientes registrados" />
-      <AvisoColumna icono={RotateCw} mensaje="No se pudieron cargar los pacientes." onReintentar={() => { setCargando(true); void cargar() }} />
-    </div>
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Últimos pacientes registrados" />
+      <AvisoTarjeta icono={RotateCw} mensaje="No se pudieron cargar los pacientes." onReintentar={() => { setCargando(true); void cargar() }} />
+    </section>
   )
 
   if (pacientes.length === 0) return (
-    <div>
-      <EncabezadoColumna titulo="Últimos pacientes registrados" />
-      <AvisoColumna icono={UserPlus} mensaje="Aquí aparecerán los pacientes que registres." enlace={{ href: '/pacientes/nuevo', texto: '+ Nuevo paciente' }} />
-    </div>
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Últimos pacientes registrados" />
+      <AvisoTarjeta icono={UserPlus} mensaje="Aquí aparecerán los pacientes que registres." enlace={{ href: '/pacientes/nuevo', texto: '+ Nuevo paciente' }} />
+    </section>
   )
 
   return (
-    <div>
+    <section className={TARJETA}>
       {/* ⚠️ SIN «VER TODOS», Y NO ES UN OLVIDO. Su destino natural sería
           `/expediente`, que la barra lateral sí le da a este rol como listado de
           pacientes; pero el encargo cierra la vista con «nada clínico, sin
           expediente» y «la única acción sobre un paciente es Agendar», y un
           enlace rotulado así en una tarjeta de paciente se lee como acceso al
           expediente clínico. El listado sigue a un clic, en el menú. */}
-      <EncabezadoColumna titulo="Últimos pacientes registrados" />
-
-      <div className="mt-[var(--sp-gap-tiles)] flex gap-[var(--sp-gap-tiles)] overflow-x-auto snap-x snap-mandatory sm:grid sm:grid-cols-2 sm:overflow-visible">
+      <CabeceraTarjeta titulo="Últimos pacientes registrados" />
+      <ul className="k-lista mt-1">
         {pacientes.map((p, i) => {
-          const iniciales = `${p.nombre[0] ?? ''}${p.apellidos[0] ?? ''}`.toUpperCase()
-          const color = PALETA_AVATAR[(ARRANQUE_AVATAR.atendidos + i) % PALETA_AVATAR.length]
+          const nombre = `${p.nombre} ${p.apellidos}`
           const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
           return (
-            <div
-              key={p.id}
-              className="w-[186px] shrink-0 snap-start sm:w-auto sm:shrink flex flex-col gap-[var(--sp-2)] rounded-[14px] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-pad-row-x)] py-[var(--sp-3)]"
-            >
-              <div className="flex items-center gap-[var(--sp-2-5)] min-w-0">
-                <span
-                  className="w-9 h-9 shrink-0 flex items-center justify-center rounded-[var(--sp-r-pill)] text-[length:var(--sp-fs-legal)] font-extrabold"
-                  style={{ background: color.bg, color: color.ink }}
-                >
-                  {iniciales || '?'}
+            <li key={p.id} className="flex min-h-14 items-center gap-3 py-2.5">
+              <Avatar texto={inicialesDe(p.nombre, p.apellidos)} indice={i} arranque={ARRANQUE_AVATAR.atendidos} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[15px] font-semibold leading-5 text-tinta">{nombre}</span>
+                {/* Edad y fecha de alta. NADA CLÍNICO: ni diagnóstico, ni
+                    motivo, ni última consulta — es la frontera del rol. */}
+                <span className="block truncate text-[13px] leading-[18px] text-tinta2">
+                  {edad !== null ? `${edad.textoElegante} · ` : ''}
+                  {p.created_at ? format(parseISO(p.created_at), 'd MMM yyyy', { locale: es }) : ''}
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-800)]">
-                    {p.nombre} {p.apellidos}
-                  </span>
-                  {/* Edad y fecha de alta. NADA CLÍNICO: ni diagnóstico, ni
-                      motivo, ni última consulta — es la frontera del rol. */}
-                  <span className="block truncate text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)]">
-                    {edad !== null ? `${edad.textoElegante} · ` : ''}
-                    {p.created_at ? format(parseISO(p.created_at), 'd MMM yyyy', { locale: es }) : ''}
-                  </span>
-                </span>
-              </div>
-
+              </span>
               {/* ⚠️ LA ÚNICA ACCIÓN SOBRE UN PACIENTE EN ESTA VISTA. No añadas
-                  expediente, receta ni nota: el rol no los tiene. Usa el enlace
-                  profundo del bloque 6, que abre el modal de alta de la agenda
-                  con este paciente ya puesto. */}
-              <div className="flex flex-wrap gap-[var(--sp-1-5)]">
-                <ChipAccion href={`/agenda?cita=nueva&paciente=${p.id}`} icono={CalendarPlus} texto="Agendar" />
-              </div>
-            </div>
+                  expediente, receta ni nota: el rol no los tiene. Abre el modal
+                  de alta de la agenda con este paciente ya puesto. */}
+              <ChipAccion href={`/agenda?cita=nueva&paciente=${p.id}`} icono={CalendarPlus} texto="Agendar" etiqueta={`Agendar cita a ${nombre}`} />
+            </li>
           )
         })}
-      </div>
-    </div>
+      </ul>
+    </section>
   )
 }

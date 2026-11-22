@@ -84,13 +84,26 @@ const asignacion = (id: string): string => sqlLocal(`select coalesce(google_asig
 const auditadas = (id: string): string =>
   sqlLocal(`select count(*) from public.audit_log where registro_id = :'id' and accion = 'cita_no_es_cita'`, { id })
 
+/* Rediseño B5 (CALMA §24): la primera cita va en la pieza principal, con sus acciones a la vista; las
+   demás son filas de «Después» que se tocan enteras y abren la hoja de acciones de la cita. */
 function proximas(page: Page): Locator {
-  return page.locator('section').filter({ has: page.getByRole('heading', { name: 'Próximas citas' }) })
+  return page.locator('[data-proximas-citas]')
 }
 
-/** El renglón de «Próximas citas» que lleva ese texto. */
+/** La cita de «Próximas citas» que lleva ese texto: la pieza principal o una fila. */
 function renglon(page: Page, texto: string): Locator {
-  return proximas(page).getByText(texto, { exact: true }).locator('xpath=ancestor::div[contains(@class, "border-t")][1]')
+  return proximas(page).getByText(texto, { exact: true }).locator('xpath=ancestor::*[@data-cita-fila][1]')
+}
+
+/** Dónde están las acciones de esa cita: la propia pieza principal, o la hoja que abre su fila. */
+async function accionesDe(page: Page, texto: string): Promise<Locator> {
+  const fila = renglon(page, texto)
+  const abre = fila.locator('[data-abre-hoja]')
+  if (await abre.count() === 0) return fila
+  await abre.click()
+  const hoja = page.getByRole('dialog', { name: texto })
+  await expect(hoja).toBeVisible()
+  return hoja
 }
 
 async function abrirDashboard(page: Page): Promise<void> {
@@ -100,18 +113,19 @@ async function abrirDashboard(page: Page): Promise<void> {
 }
 
 /* Tanda K, puntos 17 y 18: la palabra «Por ligar» es ahora el expediente tachado (nombre accesible
-   «Sin expediente») y el eslabón con su texto «Por enlace». */
+   «Sin expediente») y el eslabón con su texto «Por enlace». Rediseño B5: el expediente tachado lleva
+   además el texto a la vista (`[data-marca-sin-expediente]`). */
 test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de quien reservó, el expediente tachado y el eslabón; apagada, no', async ({ page, browser }) => {
   const nombre = tituloUnico('Lucía Reserva I3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
   interruptorAgenda('A', true)
   await abrirDashboard(page)
   await expect(renglon(page, nombre)).toBeVisible()
-  await expect(renglon(page, nombre).getByRole('img', { name: 'Sin expediente' })).toBeVisible()
+  await expect(renglon(page, nombre).locator('[data-marca-sin-expediente]')).toBeVisible()
   await expect(renglon(page, nombre).getByText('Por enlace', { exact: true })).toBeVisible()
   await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
     await abrirDashboard(p)
-    await expect(renglon(p, nombre).getByRole('img', { name: 'Sin expediente' })).toBeVisible()
+    await expect(renglon(p, nombre).locator('[data-marca-sin-expediente]')).toBeVisible()
   })
   interruptorAgenda('A', false)
   await abrirDashboard(page)
@@ -126,11 +140,11 @@ test('punto 10 · fila: la por asignar sale con el título de Google; «¿No es 
   filaGoogle(yaEvento, pronto(5), 'evento')
   await abrirDashboard(page)
   const fila = renglon(page, titulo)
-  await expect(fila.getByRole('img', { name: 'Sin expediente' })).toBeVisible()
+  await expect(fila.locator('[data-marca-sin-expediente]')).toBeVisible()
   await expect(fila.getByText('Por enlace', { exact: true })).toHaveCount(0)
   await expect(proximas(page).getByText(yaEvento)).toHaveCount(0)
   const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${id}/no-es-cita`) && r.request().method() === 'POST')
-  await fila.getByRole('button', { name: '¿No es una cita?' }).click()
+  await (await accionesDe(page, titulo)).getByRole('button', { name: '¿No es una cita?' }).click()
   expect((await post).status()).toBe(200)
   await expect(proximas(page).getByText(titulo)).toHaveCount(0)
   expect(asignacion(id)).toBe('evento')

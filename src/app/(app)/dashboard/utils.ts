@@ -78,3 +78,28 @@ export function formatCitaHora(start_time: string): string {
   const { dia, hora } = partesCitaHora(start_time)
   return `${dia} · ${hora}`
 }
+
+/**
+ * El chip de fecha de una cita (rediseño B5): mes abreviado y día, «nov» / «19»
+ * (el chip lo pasa a mayúsculas por CSS). Mismo huso que las de arriba, el del
+ * dispositivo. El punto que `es` pone a algunos meses abreviados se quita.
+ *
+ * ⚠️  Llama a `tzDispositivo()`: sólo desde componentes de cliente.
+ */
+export function chipFechaCita(start_time: string): { mes: string; dia: string } {
+  const tz = tzDispositivo()
+  return { mes: renderEnTZ(start_time, 'MMM', tz).replace('.', ''), dia: renderEnTZ(start_time, 'd', tz) }
+}
+
+/**
+ * La línea de cuándo de la hoja de acciones de la cita: «Jue 19 nov · 18:30 – 19:00».
+ *
+ * ⚠️  Llama a `tzDispositivo()`: sólo desde componentes de cliente.
+ */
+export function cuandoCita(start_time: string, end_time: string): string {
+  const tz = tzDispositivo()
+  const dia = renderEnTZ(start_time, 'EEE d MMM', tz).replace(/\./g, '')
+  const inicio = renderEnTZ(start_time, 'HH:mm', tz)
+  const fin = renderEnTZ(end_time, 'HH:mm', tz)
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} · ${inicio} – ${fin}`
+}

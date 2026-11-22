@@ -39,25 +39,71 @@ export function EncabezadoColumna({ titulo, enlace }: {
   )
 }
 
-/** Chip de acceso rápido al pie de una tarjeta de paciente. Siempre CREA. */
-export function ChipAccion({ href, icono: Icono, texto }: {
+/**
+ * Chip de acceso rápido de una fila de paciente. Siempre CREA. Rediseño B5:
+ * fondo `--sup2`, sin borde (maqueta `dashboard-final`). Sólo lo usa el
+ * dashboard.
+ */
+export function ChipAccion({ href, icono: Icono, texto, etiqueta }: {
   href: string
   icono: LucideIcon
   texto: string
+  /** Nombre accesible con el paciente («Receta de Paciente Prueba 03»), CALMA §30.8. */
+  etiqueta?: string
 }) {
   return (
     <Link
       href={href}
-      /* ⚠️ SIN PRECARGA, Y NO ES NEGOCIABLE AQUÍ. Cuatro tarjetas por dos chips
-         son ocho enlaces, más los cuatro de las tarjetas: doce. Cada `<Link>`
+      /* ⚠️ SIN PRECARGA, Y NO ES NEGOCIABLE AQUÍ. Cuatro filas por dos chips
+         son ocho enlaces, más los cuatro de las filas: doce. Cada `<Link>`
          con precarga cuesta 2 peticiones RSC y 2 invocaciones de lambda por
          carga del dashboard, se pulse o no (medido en producción). Son
          exactamente los que apagó `fcb2169`; encender uno revierte esa medida. */
       prefetch={false}
-      className="inline-flex items-center gap-[var(--sp-1-5)] rounded-[var(--sp-r-btn-sm)] border border-[color:var(--sp-line-control)] bg-[var(--sp-surface)] px-[10px] py-[5px] text-[length:var(--sp-fs-legal)] font-semibold text-[var(--sp-ink-600)] transition-colors hover:bg-[var(--sp-surface-muted)] hover:text-[var(--sp-primary-text)]"
+      aria-label={etiqueta}
+      className="k-b h-8 gap-1.5 rounded-[8px] bg-sup2 px-2.5 text-[13px] text-tinta ih:h-8 esc:h-8"
     >
-      <Icono size={13} /> {texto}
+      <Icono aria-hidden="true" className="size-3.5 text-enlace" /> {texto}
     </Link>
+  )
+}
+
+/**
+ * Cabecera de una tarjeta del dashboard (rediseño B5): título 17/700 y, si
+ * hay, su enlace en `--enlace`. NO sustituye a `EncabezadoColumna`, que siguen
+ * usando el expediente y el perfil con su aspecto de antes.
+ */
+export function CabeceraTarjeta({ titulo, enlace, children }: {
+  titulo: string
+  enlace?: { href: string; texto: string }
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
+      <h2 className="mr-auto text-[17px] font-bold leading-[22px] text-tinta">{titulo}</h2>
+      {children}
+      {enlace && <Link href={enlace.href} prefetch={false} className="k-b k-b-texto text-[14px]">{enlace.texto}</Link>}
+    </div>
+  )
+}
+
+/**
+ * Vacío y error dentro de una tarjeta del dashboard (rediseño B5): sin caja
+ * punteada; «Reintentar» tonal. NO sustituye a `AvisoColumna`.
+ */
+export function AvisoTarjeta({ icono: Icono, mensaje, onReintentar, enlace }: {
+  icono: LucideIcon
+  mensaje: string
+  onReintentar?: () => void
+  enlace?: { href: string; texto: string }
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-6">
+      <Icono aria-hidden="true" className="size-5 text-tinta3" />
+      <p className="text-center text-[14px] text-tinta2">{mensaje}</p>
+      {onReintentar && <button type="button" onClick={onReintentar} className="k-b k-b-tonal">Reintentar</button>}
+      {enlace && <Link href={enlace.href} prefetch={false} className="k-b k-b-texto text-[14px]">{enlace.texto}</Link>}
+    </div>
   )
 }
 
