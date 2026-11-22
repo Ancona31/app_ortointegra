@@ -10,7 +10,7 @@ import { calcularEdad, generateDocFileName } from '@/lib/patientUtils'
 import { buildNotaRenderData } from '@/lib/notaRenderData'
 import {
   ChevronLeft, Save, Loader2, RotateCcw, Printer, Eye, Pencil,
-  Pill, CheckCircle2, Check, PenLine, X, FileText,
+  Pill, Check, PenLine, X, FileText,
   Mic, Sparkles, AlertTriangle, Lock, FolderOpen,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -884,7 +884,7 @@ export default function NuevaNotaPage() {
        --anchor. */
     <div className="k-tarjeta space-y-4">
       <div className="flex items-center gap-2">
-        <span className="k-al-i m-0 h-8 w-8 [&_svg]:h-[18px] [&_svg]:w-[18px]" aria-hidden="true"><Check /></span>
+        <span className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--tonal)] text-[var(--enlace)]" aria-hidden="true"><Check size={18} /></span>
         <h2 className="k-t-tarjeta flex-1">Nota lista</h2>
         {modoNota === 'ia' ? (
           <span className="k-etq k-etq-tonal">
@@ -1200,8 +1200,8 @@ export default function NuevaNotaPage() {
             )}
             {/* ── La nota ── */}
             <div>
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-[13px] leading-[18px] text-tinta2">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <p className="min-w-[14rem] flex-1 text-[13px] leading-[18px] text-tinta2">
                   {modoEdicion ? 'Editando texto' : 'Vista previa — haz clic en Editar para modificar'}
                 </p>
                 <div className="flex flex-none items-center gap-3">
@@ -1757,23 +1757,21 @@ export default function NuevaNotaPage() {
                vivo — el querySelector de «Otros documentos» del Estado Éxito
                depende de él, y el selector queda justo debajo. */
             data-onboard={notaSaved ? 'panel-documentos' : undefined}
-            className={notaSaved
-              ? 'sp-card'
-              : 'k-tarjeta'}>
+            className="k-tarjeta">
 
             {notaSaved ? (
               /* Encabezado del Cierre: ABSORBE el banner verde en vez de
                  duplicar el mensaje. .sp-title-card y no .sp-title-page (ya lo
                  usa el H1 de la página) ni .sp-title-state (identidad del
                  Estado 4 del modal, que el médico acaba de ver).
-                 CheckCircle2 sin size ni color: .sp-icobox svg los fija. */
+                 Palomita en círculo verde suave, como «Nota guardada» del modal. */
               <div className="flex items-center gap-3 mb-4">
-                <div className="sp-icobox sp-icobox--sm sp-icobox--success">
-                  <CheckCircle2 />
-                </div>
+                <span className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[var(--ok-fondo)] text-[var(--ok-tinta)] [&_svg]:h-5 [&_svg]:w-5" aria-hidden="true">
+                  <Check />
+                </span>
                 <div>
-                  <h2 className="sp-title-card">Nota guardada</h2>
-                  <p className="sp-hint mt-0.5">Genera los documentos de esta consulta</p>
+                  <h2 className="k-t-tarjeta">Nota guardada</h2>
+                  <p className="mt-0.5 text-[13px] leading-[18px] text-tinta2">Genera los documentos de esta consulta</p>
                 </div>
               </div>
             ) : (
