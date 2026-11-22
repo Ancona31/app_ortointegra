@@ -746,3 +746,34 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
 * **Medidas:** 1280×800 con todo lleno y plegado, sin desplazar
   (`scrollHeight` 800 = alto visible); con la sección de piso abierta (5
   grupos, 8 renglones), 1097.
+
+### Recibo de honorarios y cotización compactos · notas (2026-11-22)
+
+* **Qué:** maqueta aprobada `honorarios.html` llevada a la app (`0aca1319`,
+  `a038130c`). Datos del documento en una fila (paciente, fecha y folio —que
+  sigue siendo de la base, «Se asigna al emitir», con su nota de prefijo—);
+  vigencia 15/30/60/90 como botones (sólo cotización). Un cobro por línea
+  (número, concepto, origen sólo en cotización, precio a la derecha con cifras
+  tabulares, ✕) con el teclado de la maqueta; la lógica en
+  `honorariosLineas.ts` (pruebas `honorariosLineas.test.ts`). Totales siempre
+  bajo las líneas. Seguro y notas sólo tras «＋» (o si ya traen datos). Forma
+  de pago y divisa con `OpcionesRapidas` (`obligatoria`: siempre con valor,
+  como su `<select>`). Origen y aseguradora con `CampoSugerido.tsx` (lista
+  `role="listbox"` `absolute` bajo el campo, sin portal ni datalist; mismo
+  componente en los cinco formatos: «Otra» es escribir el nombre). Estilos en
+  `spinus-tokens.css` §26.5 (`.sp-hon-*`; reusa `.sp-rx-*` y `.sp-int-op`).
+* **Lo que NO cambia:** `contenido` (mismas claves y tipos, comprobado en un
+  recibo y una cotización emitidos en local), cálculos, `aImporte` y el
+  formato de moneda, la validación (Paciente · Conceptos), «El precio debe ser
+  mayor a 0», la franja de lo conservado, el aviso de anticipo mayor que el
+  total, las plantillas (una plantilla de cotización con origen escrito a mano
+  se aplica y se vuelve a guardar idéntica), el pie, el error único y el modal.
+* **Decisiones:** el precio al salir del campo se ve como hoy (`String` del
+  número: «85000», no «85,000.00» de la maqueta), porque el encargo pedía no
+  tocar cómo se muestra; sin símbolo de moneda dentro del campo (la divisa va
+  en la cabecera de la columna y en el nombre accesible). El origen heredado
+  de una línea en blanco no cuenta como escrito. Bajo 380 de contenedor
+  (`ext`/`tel`) la cotización pone el concepto en el primer renglón y el origen
+  con el precio en el segundo; el recibo, concepto y precio en uno.
+* **Medidas:** 1280×800, cotización con 6 conceptos y 5 subtotales: el
+  contenido mide 1440 (no cabe sin desplazar; tampoco en la maqueta).
