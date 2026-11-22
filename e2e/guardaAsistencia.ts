@@ -33,7 +33,8 @@ export const ANOTACION_A_PROPOSITO = 'asistencia-a-proposito'
 /** Las citas que la ventana preguntaría al final del domingo de la semana en que arrancó la batería. */
 const SQL_CANDIDATAS = `
   select a.id || '|' || to_char(a.start_time at time zone :'zona', 'Dy DD Mon HH24:MI') || '|' || a.status
-         || '|' || coalesce(a.reserva_nombre, a.title, '') || '|' || to_char(a.created_at at time zone :'zona', 'HH24:MI:SS')
+         || '|' || coalesce(a.reserva_nombre, a.title, '')
+         || '|' || round(extract(epoch from greatest(a.created_at, a.updated_at)) * 1000)
   from public.appointments a
   where a.status in ('scheduled', 'confirmed') and not a.all_day
     and (a.paciente_id is not null or a.reserva_canal is not null)
@@ -58,12 +59,28 @@ function lunesSiguienteDe(ahora: Date): string {
   return `${d.toISOString().slice(0, 10)} 00:00`
 }
 
-interface Hallazgo { prueba: string; fila: string }
+/** `fila` acaba en el instante (ms) en que la cita se creó o se tocó por última vez. */
+interface Hallazgo { fila: string }
+interface Tramo { donde: string; desde: number; hasta: number }
+
+/**
+ * La prueba que corría cuando la cita se escribió. Se decide por la hora de la
+ * fila y no por «la prueba que acababa de terminar»: el aviso de fin de prueba
+ * llega al proceso principal con retraso y nombraría a la anterior.
+ */
+function pruebaDe(fila: string, tramos: Tramo[]): string {
+  const cuando = Number(fila.slice(fila.lastIndexOf('|') + 1))
+  const dentro = tramos.find(t => t.desde <= cuando && cuando <= t.hasta)
+  if (dentro) return dentro.donde
+  const antes = tramos.filter(t => t.hasta < cuando).pop()
+  return antes ? `entre pruebas, después de ${antes.donde}` : 'antes de la primera prueba'
+}
 
 export default class GuardaAsistencia implements Reporter {
   private readonly lunesSiguiente = lunesSiguienteDe(new Date())
   private conocidas: Set<string> | null = null
   private readonly hallazgos: Hallazgo[] = []
+  private readonly tramos: Tramo[] = []
 
   /** La línea base se toma al empezar la primera prueba: la semilla ya corrió. */
   onTestBegin(): void {
@@ -74,11 +91,15 @@ export default class GuardaAsistencia implements Reporter {
     if (this.conocidas === null) return
     const anotaciones = [...prueba.annotations, ...resultado.annotations]
     if (anotaciones.some(a => a.type === ANOTACION_A_PROPOSITO)) return
-    const donde = `${prueba.location.file.split('/').pop() ?? ''}:${prueba.location.line} › ${prueba.title}`
+    const desde = resultado.startTime.getTime()
+    this.tramos.push({
+      donde: `${prueba.location.file.split('/').pop() ?? ''}:${prueba.location.line} › ${prueba.title}`,
+      desde, hasta: desde + resultado.duration,
+    })
     for (const [id, fila] of consultar(this.lunesSiguiente)) {
       if (this.conocidas.has(id)) continue
       this.conocidas.add(id)
-      this.hallazgos.push({ prueba: donde, fila })
+      this.hallazgos.push({ fila })
     }
   }
 
@@ -88,8 +109,8 @@ export default class GuardaAsistencia implements Reporter {
       return undefined
     }
     console.error(`\nGuarda de asistencia: ${this.hallazgos.length} cita(s) dispararían «¿Asistió el paciente?» ` +
-      'al final de la semana (AG-DT-256). Cada una, con la prueba tras la que apareció:')
-    for (const h of this.hallazgos) console.error(`  ✘ ${h.prueba}\n      ${h.fila}`)
+      'al final de la semana (AG-DT-256). Cada una, con la prueba que corría cuando se escribió:')
+    for (const h of this.hallazgos) console.error(`  ✘ ${pruebaDe(h.fila, this.tramos)}\n      ${h.fila}`)
     return { status: 'failed' }
   }
 
