@@ -7,7 +7,8 @@ import { useProfile } from '@/hooks/useProfile'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente, Consulta, Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { AlertTriangle, Loader2, UserX } from 'lucide-react'
+import EstadoVacio from '@/components/ui/EstadoVacio'
 
 import CabeceraPaciente from '@/components/expediente/CabeceraPaciente'
 import PestanasExpediente, {
@@ -199,7 +200,9 @@ function ExpedientePacienteContent() {
     return <p className="k-t-sec py-12 text-center" aria-busy="true">Cargando expediente...</p>
   }
   if (!paciente) {
-    return <p className="k-t-sec py-12 text-center">Paciente no encontrado</p>
+    /* El vacío de página del catálogo (B12): las pantallas vecinas usan
+       EstadoVacio/EstadoError; aquí quedaba un párrafo suelto. Mismo texto. */
+    return <EstadoVacio icono={UserX} titulo="Paciente no encontrado" />
   }
 
   const cerrarEliminar = () => { if (!eliminandoPaciente) { setMostrarEliminarPaciente(false); setErrorEliminar('') } }

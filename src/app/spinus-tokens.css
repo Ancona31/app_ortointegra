@@ -998,7 +998,10 @@ a:hover { color: var(--sp-primary-active); }
 }
 .sp-chip:active { transform: scale(.97); }
 .sp-chip:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
-.sp-chip:hover { border-color: color-mix(in srgb, var(--accion) 30%, var(--borde)); background: var(--tonal); }
+/* B12: el hover no toca al elegido. Con más especificidad que `--selected`, le
+   ponía el fondo tonal con la letra blanca: el chip recién pulsado (el puntero
+   sigue encima) se quedaba sin texto legible (entrevista de nueva nota). */
+.sp-chip:hover:not(.sp-chip--selected, [aria-pressed="true"]) { border-color: color-mix(in srgb, var(--accion) 30%, var(--borde)); background: var(--tonal); }
 .sp-chip[aria-pressed="true"], .sp-chip--selected {
   background: var(--accion); border-color: var(--accion); color: var(--sobre-accion);
 }
