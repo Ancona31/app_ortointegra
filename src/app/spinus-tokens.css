@@ -3002,6 +3002,77 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > .sp-label-field { grid-column: 1; grid-row: 1 / span 4; padding-top: 11px; }
 }
 
+/* ── Firmado electrónico y foto de identificación (piel del kit) ───────────
+   El modo SIGUE tapando la pantalla entera (es su función, §2 de la guía 05);
+   lo nuevo es que respeta las franjas del aparato (`--it/--ir/--ib/--il`): en
+   `tel` la cabecera y «Salir» quedaban bajo la isla. Fondo `--fondo`, tarjetas
+   `--sup` sin borde, progreso en `--accion`.
+   ⚠️ EL LIENZO ES PAPEL: blanco y con sus marcas en grises LITERALES en los dos
+   temas, porque ese mapa de bits es el que se imprime (la tinta del trazo
+   también es literal, en el componente). Con tokens, en oscuro la línea y el
+   rótulo salían claros sobre blanco: invisibles. */
+.sp-firma-modo { background: var(--fondo); padding: var(--it) var(--ir) var(--ib) var(--il); }
+.sp-firma-head, .sp-firma-progress, .sp-firma-cuerpo { width: 100%; max-width: 672px; margin-inline: auto; }
+.sp-firma-head { gap: 8px; padding: 0 8px; border-bottom: 0; }
+.sp-firma-salir { width: var(--k-toque); height: var(--k-toque); border-radius: var(--r-pildora); color: var(--tinta2); }
+.sp-firma-salir:active { background: var(--sup2); }
+.sp-firma-titulo { font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); }
+@media (min-width: 380px) { .sp-firma-titulo { font-size: 17px; } }
+.sp-firma-head > .sp-badge {
+  height: 24px; padding: 0 10px; border: 0; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 600;
+}
+.sp-firma-progress { padding: 4px 16px 16px; }
+.sp-firma-progress .sp-progress__label { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .3px; color: var(--tinta2); }
+.sp-firma-progress .sp-progress__seg { background: var(--sup2); }
+.sp-firma-progress .sp-progress__seg--done { background: var(--accion); }
+.sp-firma-cuerpo { padding: 0 16px 16px; gap: 16px; }
+.sp-firma-quien .sp-label { font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .4px; color: var(--enlace); }
+.sp-firma-quien .sp-hint { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-firma-nombre { font-size: 22px; line-height: 28px; font-weight: 800; letter-spacing: -.3px; color: var(--tinta); }
+.sp-firma-girar { font-size: 13px; color: var(--tinta2); }
+.sp-firma-lienzo { background: #fff; border: 1px solid #d5dbe4; border-radius: var(--r-tarjeta); }
+.sp-firma-placeholder { font-size: 16px; color: #64748b; }
+.sp-firma-linea { border-top-color: #b4bfcd; }
+.sp-firma-rol { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .3px; color: #52627a; }
+.sp-firma-acciones > .sp-btn { min-height: 44px; }
+.sp-firma-resumen { gap: 0; background: var(--sup); border-radius: var(--r-tarjeta); padding: 0 16px; }
+.sp-firma-fila { min-height: 64px; padding: 10px 0; border: 0; border-radius: 0; background: transparent; }
+.sp-firma-fila + .sp-firma-fila { border-top: 1px solid var(--linea); }
+.sp-firma-fila-nombre { font-size: 15px; font-weight: 600; color: var(--tinta); }
+.sp-firma-fila .sp-hint { font-size: 13px; color: var(--tinta2); }
+.sp-firma-ico-vacio { background: var(--sup2); color: var(--tinta2); }
+.sp-idfoto-card { background: var(--sup); border: 0; border-radius: var(--r-tarjeta); padding: 16px; }
+.sp-idfoto-card > .sp-icobox { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-idfoto-controles > .sp-btn { min-height: 44px; }
+.sp-idfoto-cropper { border-radius: var(--r-tarjeta); }
+.sp-idfoto-pie { font-size: 13px; color: var(--tinta2); }
+
+/* ── Barra del editor del escrito (piel del kit) ──────────────────────────
+   Botones de icono en `--tinta2`, encendidos en el par tonal; sin franja gris
+   ni borde en «más»; los tres menús como capa `--sup` con la sombra de capas.
+   Mismas medidas (44) y el mismo reparto por contenedor. */
+.sp-ed-bar { padding: 6px 8px; background: transparent; border-bottom: 1px solid var(--linea); }
+.sp-ed-btn { border-radius: 10px; color: var(--tinta2); }
+.sp-ed-btn:hover { background: var(--sup2); }
+.sp-ed-btn[aria-pressed="true"], .sp-ed-btn[aria-expanded="true"] { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-ed-block > svg:last-child { color: var(--tinta3); }
+.sp-ed-more { border: 0; }
+.sp-ed-menu { border: 0; border-radius: 14px; background: var(--sup); box-shadow: var(--sombra-capa); padding: 6px; }
+.sp-ed-row { border-radius: 10px; font-size: 15px; color: var(--tinta); }
+.sp-ed-row > svg { color: var(--enlace); }
+.sp-ed-row:hover { background: var(--sup2); }
+.sp-ed-row[aria-checked="true"] { background: var(--tonal); color: var(--tonal-tinta); font-weight: 600; }
+.sp-ed-row__cue { color: var(--enlace); }
+.sp-ed-menuhead { border-bottom-color: var(--linea); }
+
+/* ── Indicaciones de piso (internamiento) ─────────────────────────────────
+   El grupo ya no es caja (arriba); su cabecera: nombre 15/600 en `--tinta` y
+   la cuenta como número plano. Lo demás (chips, zona punteada) es del kit. */
+.sp-doc-grupohead > .sp-label-field { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); }
+.sp-doc-grupocount { font-size: 12px; color: var(--tinta2); }
+.sp-doc-dashzone .sp-hint { color: var(--tinta2); }
+
 /* Panel «Gestionar plantillas»: la fila es tarjeta `--sup` sin borde (§3). */
 .sp-tpl-item { border-color: transparent; background: var(--sup); border-radius: var(--r-tarjeta); }
 
