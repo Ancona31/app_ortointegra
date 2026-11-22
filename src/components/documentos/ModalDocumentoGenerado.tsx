@@ -71,6 +71,12 @@ interface Props {
    * motivo a la vista, porque no hay nada que enviar.
    */
   documentoId?: string | null
+  /**
+   * El correo como PRIMERA salida y con el rótulo «Enviar copia al correo del
+   * paciente». Lo pide el consentimiento recién sellado: el médico siempre le
+   * manda la copia. El envío, el destinatario y el adjunto son los mismos.
+   */
+  correoPrimero?: boolean
 }
 
 /**
@@ -96,6 +102,7 @@ export default function ModalDocumentoGenerado({
   titulo,
   guardadoEnExpediente,
   documentoId = null,
+  correoPrimero = false,
 }: Props) {
   const [paso, setPaso] = useState<Paso>('listo')
   const [correoFicha, setCorreoFicha] = useState<string | null>(null)
@@ -634,30 +641,7 @@ export default function ModalDocumentoGenerado({
      y a la derecha. Ningún rótulo ni condición cambió. */
   const filaClase = 'k-fila gap-3 !min-h-12 disabled:cursor-not-allowed disabled:opacity-100'
   const iconoClase = 'h-5 w-5 flex-none text-enlace'
-  const pie = (
-    <div lang="es" className="px-5 pb-5 pt-1">
-      <div className="k-lista">
-        {pdfUrl ? (
-          <a href={pdfUrl} target="_blank" rel="noopener" className={filaClase}>
-            <Eye aria-hidden="true" className={iconoClase} />
-            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta">Visualizar</span></span>
-            <ChevronRight aria-hidden="true" className="k-fila-chev" />
-          </a>
-        ) : (
-          <button type="button" disabled className={filaClase}>
-            <Eye aria-hidden="true" className={`${iconoClase} opacity-50`} />
-            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta3">Visualizar</span></span>
-          </button>
-        )}
-
-        {/* Durante la captura y la confirmación se retira el botón de CORREO —el
-            panel trae el suyo y dos rótulos iguales harían dudar de cuál manda—
-            pero «Compartir»/«Descargar» se quedan: no compiten con nada y, sin
-            correo en la ficha, el modal abre ya con la captura desplegada. */}
-        {/* El correo manda el PDF GUARDADO —lo resuelve el servidor por id— y
-            compartir manda el que este modal tiene en memoria, que es el mismo
-            archivo. Lo deshabilitado se comunica con el estado del control y el
-            motivo a la vista; nunca apagando el texto. */}
+  const filaCorreo = (
         <div>
           {!enFlujoDeCaptura && (
             <button
@@ -686,7 +670,7 @@ export default function ModalDocumentoGenerado({
                     ? 'Comprobando correo…'
                     : paso === 'enviando'
                       ? 'Enviando…'
-                      : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
+                      : paso === 'enviado' ? 'Enviado' : correoPrimero ? 'Enviar copia al correo del paciente' : 'Enviar por correo'}
                 </span>
                 {/* El motivo, siempre a la vista. */}
                 {sinDocumento && <span className="k-fila-s">No quedó en el expediente</span>}
@@ -696,6 +680,34 @@ export default function ModalDocumentoGenerado({
           )}
           {panelDestinatario()}
         </div>
+  )
+
+  const pie = (
+    <div lang="es" className="px-5 pb-5 pt-1">
+      <div className="k-lista">
+        {correoPrimero && filaCorreo}
+        {pdfUrl ? (
+          <a href={pdfUrl} target="_blank" rel="noopener" className={filaClase}>
+            <Eye aria-hidden="true" className={iconoClase} />
+            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta">Visualizar</span></span>
+            <ChevronRight aria-hidden="true" className="k-fila-chev" />
+          </a>
+        ) : (
+          <button type="button" disabled className={filaClase}>
+            <Eye aria-hidden="true" className={`${iconoClase} opacity-50`} />
+            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta3">Visualizar</span></span>
+          </button>
+        )}
+
+        {/* Durante la captura y la confirmación se retira el botón de CORREO —el
+            panel trae el suyo y dos rótulos iguales harían dudar de cuál manda—
+            pero «Compartir»/«Descargar» se quedan: no compiten con nada y, sin
+            correo en la ficha, el modal abre ya con la captura desplegada. */}
+        {/* El correo manda el PDF GUARDADO —lo resuelve el servidor por id— y
+            compartir manda el que este modal tiene en memoria, que es el mismo
+            archivo. Lo deshabilitado se comunica con el estado del control y el
+            motivo a la vista; nunca apagando el texto. */}
+        {!correoPrimero && filaCorreo}
 
         {/* «Descargar» en todos los marcos (CALMA §23.2). Es UN ANCLA CON
             `download`, NO UN BOTÓN CON `onClick`: entre el toque y la descarga no

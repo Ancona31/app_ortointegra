@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { estadoBorrador } from '@/components/documentos/consentimientoEmbudo'
 import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import type { Documento } from '@/types'
 import { metaDe, tituloDe, folioVisible } from '@/lib/documentos/familias'
@@ -58,7 +59,10 @@ export default function VisorDocumento({ doc, acciones, onIrAArchivos }: {
   const esBorrador = doc.estado === 'borrador'
   /* «Emitido con firma manual» NO se rotula: es casi todo el acervo y
      etiquetarlo sería ruido. Solo hablan el borrador y el firmado. */
-  const chipEstado = esBorrador ? 'Borrador' : doc.estado === 'firmado' ? 'Firmado' : null
+  /* El consentimiento a medias dice qué le falta, como en el carril. */
+  const chipEstado = esBorrador
+    ? doc.tipo === 'consentimiento_informado' ? `Borrador · ${estadoBorrador(doc.contenido).etiqueta}` : 'Borrador'
+    : doc.estado === 'firmado' ? 'Firmado' : null
   /* Lo único del cuerpo que se promueve a la cabecera, porque cambia cómo se
      lee todo lo demás. Solo imagenología e internamiento lo tienen. */
   const urgente = contenido.urgente === true

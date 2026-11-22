@@ -1,10 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, Minus, X } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 import Portal from '@/components/ui/Portal'
 import CapturaIdentificacion from '@/components/documentos/CapturaIdentificacion'
+import BotonMantener from '@/components/documentos/BotonMantener'
 import {
   ANCHO_BITMAP,
   GROSOR_TRAZO,
@@ -100,15 +101,13 @@ const PASOS: readonly Paso[] = [
  * formulario y sin él no se abre el firmado— pero la regla se declara aquí en
  * vez de descansar en una validación que vive en otro archivo.
  *
- * ⚠ Y EL FAMILIAR TAMPOCO PUEDE FALTAR HOY, aunque este filtro no lo diga: su
- * nombre es obligatorio en el formulario —`faltantes` lo exige sin condición— y
- * `iniciarFirmado` no abre el modo con faltantes. Consecuencia directa: **su
- * firma es obligatoria en todo consentimiento**. Si algún día se quiere poder
- * emitir sin firma del familiar, lo que hay que soltar es esa obligatoriedad del
- * NOMBRE en el formulario; en cuanto el nombre pueda ir vacío, el familiar
- * desaparece del flujo solo, igual que un testigo, y aquí no hay que tocar nada.
+ * El familiar entra si tiene nombre. Su nombre es obligatorio SÓLO cuando el
+ * paciente no puede firmar («Familiar o representante» en «Quién firma»): ahí
+ * es quien consiente. (Aquí decía que era obligatorio siempre; dejó de serlo.)
+ *
+ * Exportada para que la revisión del formulario enseñe EXACTAMENTE este orden.
  */
-function firmantesDe(nombres: Record<RolFirmante, string>): Paso[] {
+export function firmantesDe(nombres: Record<RolFirmante, string>): Paso[] {
   return PASOS.filter(p => p.rol === 'paciente' || nombres[p.rol].trim() !== '')
 }
 
@@ -145,10 +144,12 @@ interface Props {
   sellando: boolean
   /** Mensaje del formulario cuando alguna de las tres operaciones falló. */
   errorSellado: string
+  /** Paciente, procedimiento y fecha del documento, a la vista del médico antes de sellar. */
+  datosClave?: readonly { etiqueta: string; valor: string }[]
 }
 
 export default function FirmadoConsentimiento({
-  nombres, documentoId, pacienteNoPuedeFirmar, onSalir, onSellar, sellando, errorSellado,
+  nombres, documentoId, pacienteNoPuedeFirmar, onSalir, onSellar, sellando, errorSellado, datosClave = [],
 }: Props) {
   const [paso, setPaso] = useState(0)
   const [desenlaces, setDesenlaces] = useState<Partial<Record<RolFirmante, Desenlace>>>({})
@@ -157,6 +158,15 @@ export default function FirmadoConsentimiento({
   const [errorTrazo, setErrorTrazo] = useState('')
   const [confirmarSellado, setConfirmarSellado] = useState(false)
   const [confirmarSalida, setConfirmarSalida] = useState(false)
+  /**
+   * El traspaso entre personas (maqueta aprobada). `pase`: tras resolver a un
+   * firmante, «Pase el dispositivo a…» antes del siguiente. `devuelto`: tras el
+   * último, «Devuelva el dispositivo al médico», y sólo un gesto del médico
+   * (mantener pulsado) enseña la revisión y «Sellar». No cambian el orden ni
+   * qué se guarda: sólo qué pantalla se ve entre paso y paso.
+   */
+  const [pase, setPase] = useState(false)
+  const [devuelto, setDevuelto] = useState(false)
   /**
    * La firma que ya se confirmó y está esperando la respuesta sobre su foto
    * (§6.1). Mientras vive, el lienzo deja el sitio a la captura: el trazo ya no
@@ -196,7 +206,13 @@ export default function FirmadoConsentimiento({
   /** El lienzo se APAGA —no se borra— cuando este paso es el de un paciente que no puede firmar. */
   const apagado = actual?.rol === 'paciente' && pacienteNoPuedeFirmar
 
-  /** La X y `Escape` son lo mismo: salir con firmas capturadas pide confirmación. */
+  /**
+   * Mientras el dispositivo lo tiene el paciente no hay nada del médico al
+   * alcance: ni la X ni `Escape`. Sólo «Médico: salir», mantenido.
+   */
+  const modoPaciente = !(enResumen && devuelto)
+
+  /** La X, `Escape` y «Médico: salir» son lo mismo: salir con firmas capturadas pide confirmación. */
   const intentarSalir = useCallback((): void => {
     if (sellando) return
     if (hayFirmas) setConfirmarSalida(true)
@@ -204,7 +220,7 @@ export default function FirmadoConsentimiento({
   }, [sellando, hayFirmas, onSalir])
 
   useEffect(() => {
-    const alTeclear = (e: KeyboardEvent) => { if (e.key === 'Escape') intentarSalir() }
+    const alTeclear = (e: KeyboardEvent) => { if (e.key === 'Escape' && !modoPaciente) intentarSalir() }
     window.addEventListener('keydown', alTeclear)
     // El modo tapa la pantalla entera: el scroll de detrás no debe seguir vivo.
     const previo = document.body.style.overflow
@@ -213,7 +229,7 @@ export default function FirmadoConsentimiento({
       window.removeEventListener('keydown', alTeclear)
       document.body.style.overflow = previo
     }
-  }, [intentarSalir])
+  }, [intentarSalir, modoPaciente])
 
   /** Guarda el desenlace y salta al siguiente paso sin resolver, o al resumen. */
   function resolver(rol: RolFirmante, desenlace: Desenlace): void {
@@ -225,6 +241,9 @@ export default function FirmadoConsentimiento({
     trazosRef.current = []
     const pendiente = firmantes.findIndex(p => siguientes[p.rol] === undefined)
     setPaso(pendiente === -1 ? firmantes.length : pendiente)
+    // Al siguiente, pasando el dispositivo; tras el último, de vuelta al médico.
+    setPase(pendiente !== -1)
+    setDevuelto(false)
   }
 
   /**
@@ -260,6 +279,8 @@ export default function FirmadoConsentimiento({
     setErrorTrazo('')
     setPendienteFoto(null)
     trazosRef.current = []
+    setPase(false)
+    setDevuelto(false)
     setPaso(firmantes.findIndex(p => p.rol === rol))
   }
 
@@ -310,63 +331,46 @@ export default function FirmadoConsentimiento({
      * Los tokens `--sp-*` viven en `:root`, así que no se pierde ninguno.
      */
     <Portal>
-      <div className="sp-firma-modo sp-push-forward" role="dialog" aria-modal="true"
+      <div className={`sp-firma-modo sp-push-forward${modoPaciente ? ' sp-firma-modo--pac' : ''}`} role="dialog" aria-modal="true"
         aria-label="Firmado electrónico">
 
-        {/* ── Cabecera (§3.1) ───────────────────────────────────────── */}
-        <header className="sp-firma-head">
-          <button type="button" onClick={intentarSalir} disabled={sellando}
-            className="sp-firma-salir" aria-label="Salir del firmado">
-            <X size={20} />
-          </button>
-          <h2 className="sp-title-card sp-firma-titulo">
-            {enResumen ? 'Revisión antes de sellar' : 'Firmado electrónico'}
-          </h2>
-          <span className="sp-badge">
-            <span className="sp-firma-long">
-              {enResumen
-                ? `${resueltos} de ${firmantes.length} resueltos`
-                : `Firmante ${paso + 1} de ${firmantes.length}`}
-            </span>
-            <span className="sp-firma-short">
-              {enResumen ? `${resueltos}/${firmantes.length}` : `${paso + 1}/${firmantes.length}`}
-            </span>
-          </span>
-        </header>
-
-        {/* ── Progreso (§3.2) ───────────────────────────────────────────
-            UN SEGMENTO POR FIRMANTE REAL, no cuatro fijos: los cuatro fijos
-            existían cuando se podía omitir dentro del flujo —omitir resolvía un
-            paso sin eliminarlo, y un progreso que encogía a media firma habría
-            mentido sobre cuánto quedaba—. Ahora quiénes firman se decide ANTES
-            de entrar, con los nombres, así que la cuenta ya no puede cambiar a
-            mitad de camino: enseñar cuatro cuando solo se piden dos sería la
-            mentira contraria. */}
-        <div className="sp-progress sp-firma-progress">
-          <span className="sp-progress__label">FIRMANTES</span>
-          <div className="sp-progress__track">
-            {firmantes.map((p, i) => (
-              <span key={p.rol}
-                className={`sp-progress__seg ${i <= paso ? 'sp-progress__seg--done' : ''}`} />
-            ))}
+        {modoPaciente ? (
+          /* Con el dispositivo en manos del paciente no hay X ni nada del
+             médico: sólo este botón pequeño, que exige MANTENER pulsado. Avisa
+             de que las firmas no se guardan, como la X de siempre. */
+          <div className="sp-firma-medico">
+            <BotonMantener texto="Médico: salir" onCumplido={intentarSalir} disabled={sellando} />
           </div>
-        </div>
+        ) : (
+          /* ── Cabecera del médico (§3.1), ya con el dispositivo de vuelta ── */
+          <header className="sp-firma-head">
+            <button type="button" onClick={intentarSalir} disabled={sellando}
+              className="sp-firma-salir" aria-label="Salir del firmado">
+              <X size={20} />
+            </button>
+            <h2 className="sp-title-card sp-firma-titulo">Revisión antes de sellar</h2>
+            <span className="sp-badge">
+              <span className="sp-firma-long">{`${resueltos} de ${firmantes.length} resueltos`}</span>
+              <span className="sp-firma-short">{`${resueltos}/${firmantes.length}`}</span>
+            </span>
+          </header>
+        )}
 
-        <div className="sp-firma-cuerpo">
-          {actual !== null ? (
+        <div className={`sp-firma-cuerpo${modoPaciente ? ' sp-firma-pac' : ''}`}>
+          {actual !== null && !pase ? (
             <>
-              {/* El rol y el nombre, a la vista: el paciente coge el dispositivo
-                  sin ningún contexto de lo que está pasando. */}
+              {/* El rol, «n de N» y el nombre, grandes: el paciente coge el
+                  dispositivo sin ningún contexto de lo que está pasando. */}
               <div className="sp-firma-quien">
-                <p className="sp-label">Firma de</p>
+                <p className="sp-firma-rolpaso">{actual.titulo} · {paso + 1} de {firmantes.length}</p>
                 <p className="sp-firma-nombre">{nombres[actual.rol].trim() || actual.titulo}</p>
-                <p className="sp-hint">{actual.titulo}</p>
+                {pendienteFoto === null && !apagado && (
+                  <p className="sp-firma-instr">Firme dentro del recuadro con el dedo.</p>
+                )}
               </div>
 
               {/* §6 · Con la firma ya confirmada, el lienzo deja el sitio a la
-                  pregunta de la foto. El trazo no se vuelve a enseñar: ya no se
-                  toca, y verlo invitaría a rehacerlo cuando lo que toca es
-                  responder si se anexa la identificación. */}
+                  pregunta de la identificación. El trazo no se vuelve a enseñar. */}
               {pendienteFoto !== null ? (
                 <CapturaIdentificacion
                   key={pendienteFoto.rol}
@@ -392,16 +396,15 @@ export default function FirmadoConsentimiento({
                 />
 
                 {/* §5.3 · El lienzo se apaga en vez de ocultarse: se ve que dejó de
-                    aplicar. Aquí estuvo la casilla que lo apagaba; ahora se declara
-                    en el formulario, que es donde puede exigir a tiempo el nombre
-                    del familiar. Este paso solo lo hace constar. */}
+                    aplicar. Se declara en el formulario («Quién firma»), que es
+                    donde puede exigir a tiempo el nombre del familiar. */}
                 {apagado && (
                   <p className="sp-banner sp-banner--warn">
                     <AlertTriangle size={17} />
                     <span>
-                      Declaraste que el paciente no puede firmar. Firma en su lugar el familiar
-                      responsable, que es quien consiente. Si el paciente sí puede firmar, sal y
-                      desmarca la casilla en el formulario.
+                      El paciente no puede firmar. Firma en su lugar el familiar responsable,
+                      que es quien consiente. Si el paciente sí puede firmar, el médico sale y lo
+                      cambia en «Quién firma».
                     </span>
                   </p>
                 )}
@@ -418,26 +421,37 @@ export default function FirmadoConsentimiento({
                       setErrorTrazo('')
                       trazosRef.current = []
                     }}
-                    className="sp-btn sp-btn--secondary"
-                    style={{ flex: '0 0 auto', whiteSpace: 'nowrap' }}>
-                    Borrar y repetir
+                    className="sp-btn sp-btn--secondary">
+                    Borrar
                   </button>
                   <button type="button" disabled={!tieneTrazo && !apagado}
-                    onClick={confirmarFirma} className="sp-btn sp-btn--primary" style={{ flex: 1 }}>
-                    {apagado ? 'Continuar sin firma del paciente' : 'Confirmar firma'}
+                    onClick={confirmarFirma} className="sp-btn sp-btn--primary">
+                    {apagado ? 'Continuar sin firma del paciente' : 'Listo'}
                   </button>
                 </div>
-
-                {/* Aquí vivía «Omitir este firmante» (§5.4). Se retiró: quien no
-                    tiene nombre no entra al flujo, así que dejar el nombre vacío ya
-                    es la forma de omitir a un testigo, y dos maneras de decir lo
-                    mismo es una de más. El paciente nunca lo tuvo: su ausencia se
-                    declara con la casilla, que dice algo distinto. */}
               </>)}
             </>
+          ) : actual !== null ? (
+            /* Entre una persona y la siguiente: que no firme quien no es. */
+            <div className="sp-firma-pase">
+              <p className="sp-firma-rolpaso">Gracias</p>
+              <p className="sp-firma-nombre">Pase el dispositivo a {nombres[actual.rol].trim() || actual.titulo}</p>
+              <p className="sp-firma-instr">{actual.titulo}</p>
+              <button type="button" onClick={() => setPase(false)} className="sp-btn sp-btn--primary sp-firma-grande">
+                {nombres[actual.rol].trim() ? `Soy ${nombres[actual.rol].trim().split(/\s+/)[0]}, continuar` : 'Continuar'}
+              </button>
+            </div>
+          ) : modoPaciente ? (
+            /* Tras el último: de vuelta al médico, y sólo con su gesto. */
+            <div className="sp-firma-pase">
+              <p className="sp-firma-rolpaso">Listo</p>
+              <p className="sp-firma-nombre">Gracias. Devuelva el dispositivo al médico</p>
+              <p className="sp-firma-instr">Sus firmas quedaron capturadas.</p>
+              <BotonMantener grande texto="Soy el médico" onCumplido={() => setDevuelto(true)} />
+            </div>
           ) : (
             <>
-              <p className="sp-hint">Revisa antes de imprimir. Puedes rehacer cualquier firma.</p>
+              <p className="sp-hint">Revisa antes de sellar. Puedes rehacer cualquier firma.</p>
 
               <div className="sp-firma-resumen">
                 {firmantes.map(p => (
@@ -447,14 +461,26 @@ export default function FirmadoConsentimiento({
                 ))}
               </div>
 
+              {datosClave.length > 0 && (
+                <dl className="sp-firma-datos">
+                  {datosClave.map(d => (
+                    <div key={d.etiqueta}><dt>{d.etiqueta}</dt><dd>{d.valor}</dd></div>
+                  ))}
+                  <div><dt>Al sellar</dt><dd>Se asigna el folio y ya no se puede editar.</dd></div>
+                </dl>
+              )}
+
               {errorSellado && <p className="sp-banner sp-banner--danger">{errorSellado}</p>}
 
-              <button type="button" onClick={() => setConfirmarSellado(true)} disabled={sellando}
-                className="sp-btn sp-btn--primary sp-btn--primary-block">
-                {sellando
-                  ? <><span className="sp-spinner" /> Sellando…</>
-                  : 'Imprimir consentimiento'}
-              </button>
+              <div className="sp-firma-sellopie">
+                <button type="button" onClick={intentarSalir} disabled={sellando} className="sp-btn sp-btn--ghost">
+                  Salir sin sellar
+                </button>
+                <button type="button" onClick={() => setConfirmarSellado(true)} disabled={sellando}
+                  className="sp-btn sp-btn--primary">
+                  {sellando ? <><span className="sp-spinner" /> Sellando…</> : 'Sellar e imprimir'}
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -769,7 +795,6 @@ interface FilaProps {
 function FilaResumen({ titulo, nombre, desenlace, deshabilitado, onRehacer }: FilaProps) {
   // Sin `Omitido`: ya no es un desenlace posible. Quien se omite no aparece en
   // esta lista porque nunca entró al flujo.
-  const firmo = desenlace?.tipo === 'firmo'
   // Los tres estados de §7.1. `sin foto` no es un reproche: la foto es cotejo y
   // se ofreció, así que su ausencia es un dato del expediente y se enseña.
   const estado = desenlace === undefined ? 'Pendiente'
@@ -778,16 +803,22 @@ function FilaResumen({ titulo, nombre, desenlace, deshabilitado, onRehacer }: Fi
         ? 'Firmó · con foto de identificación'
         : 'Firmó · sin foto'
     : 'No pudo firmar'
+  const quien = nombre.trim() || titulo
 
+  /* Una tarjeta por firmante con la miniatura de su firma (maqueta aprobada).
+     El fondo de la miniatura es el del lienzo, literal: la tinta es la que se
+     imprime y en oscuro no se vería sobre `--sup`. */
   return (
-    <div className="sp-row sp-firma-fila">
-      <span className={`sp-icobox sp-icobox--sm ${firmo ? 'sp-icobox--success' : 'sp-firma-ico-vacio'}`}>
-        {firmo ? <Check aria-hidden="true" /> : <Minus aria-hidden="true" />}
-      </span>
+    <div className="sp-firma-fm">
+      <div className="sp-firma-fm-img">
+        {desenlace?.tipo === 'firmo'
+          // eslint-disable-next-line @next/next/no-img-element -- data-URL de la firma, en memoria
+          ? <img src={desenlace.trazo} alt={`Firma de ${quien}`} />
+          : <span>{estado}</span>}
+      </div>
       <span className="sp-firma-fila-txt">
-        {/* Sin nombre capturado se muestra solo el rol (§7.1). */}
-        <span className="sp-firma-fila-nombre">{nombre.trim() || titulo}</span>
-        <span className="sp-hint">{estado}</span>
+        <span className="sp-firma-fila-nombre">{quien}</span>
+        <span className="sp-hint">{titulo} · {estado}</span>
       </span>
       <button type="button" onClick={onRehacer} disabled={deshabilitado}
         className="sp-btn sp-btn--compact">Rehacer</button>

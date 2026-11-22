@@ -7,6 +7,7 @@ import type { Documento } from '@/types'
 import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
 import { metaDe, tituloDe, TIPOS_DEL_CARRIL, type TipoDocumentoBD } from '@/lib/documentos/familias'
 import { TIPOS_DOCUMENTO } from '@/components/documentos/SelectorTipoDocumento'
+import { estadoBorrador } from '@/components/documentos/consentimientoEmbudo'
 
 /**
  * El listado de la pestaña, convertido en carril (§8 del spec).
@@ -46,7 +47,15 @@ function referenciaDe(doc: Documento): string {
 
 /** «Borrador» o «Urgente»: como mucho una etiqueta por fila (CALMA §3, §11). */
 function EtiquetaEstado({ doc }: { doc: Documento }) {
-  if (doc.estado === 'borrador') return <span className="k-etq k-etq-aviso">Borrador</span>
+  if (doc.estado === 'borrador') {
+    /* Un consentimiento a medias dice QUÉ le falta («Falta firmar», «Faltan 2
+       datos»), con la misma regla que su formulario: es lo que el médico viene
+       a retomar. Los demás borradores, como siempre. */
+    if (doc.tipo === 'consentimiento_informado') {
+      return <span className="k-etq k-etq-aviso">{estadoBorrador(doc.contenido).etiqueta}</span>
+    }
+    return <span className="k-etq k-etq-aviso">Borrador</span>
+  }
   if ((doc.contenido as Record<string, unknown> | null)?.urgente === true) return <span className="k-etq k-etq-mal">Urgente</span>
   return null
 }

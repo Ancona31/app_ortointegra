@@ -19,6 +19,8 @@ import { ChevronRight } from 'lucide-react'
 
 interface Props {
   id: string
+  /** Prefijo de los ids de cabecera y cuerpo. Internamiento por omisión; el consentimiento pasa el suyo. */
+  prefijo?: string
   numero: number
   titulo: string
   resumen: string
@@ -33,11 +35,12 @@ interface Props {
 
 export default function SeccionPaso(p: Props): ReactElement {
   const estado = p.abierta ? 'abierta' : p.falta ? 'falta' : p.completa ? 'completa' : 'vacia'
+  const pre = p.prefijo ?? 'internamiento'
   return (
     <section className="sp-int-sec" data-seccion={p.id} data-estado={estado}>
       <h2 className="sp-int-sec-h">
-        <button type="button" id={`internamiento-${p.id}-cabecera`} className="sp-int-sec-b"
-          aria-expanded={p.abierta} aria-controls={`internamiento-${p.id}-cuerpo`} onClick={p.onAlternar}>
+        <button type="button" id={`${pre}-${p.id}-cabecera`} className="sp-int-sec-b"
+          aria-expanded={p.abierta} aria-controls={`${pre}-${p.id}-cuerpo`} onClick={p.onAlternar}>
           <span className="sp-int-n" aria-hidden="true">{p.numero}</span>
           <span className="sp-int-t">{p.titulo}</span>
           {!p.abierta && <span className="sp-int-res">{p.resumen}</span>}
@@ -45,7 +48,7 @@ export default function SeccionPaso(p: Props): ReactElement {
         </button>
       </h2>
       {p.abierta && (
-        <div id={`internamiento-${p.id}-cuerpo`} role="region" aria-labelledby={`internamiento-${p.id}-cabecera`}
+        <div id={`${pre}-${p.id}-cuerpo`} role="region" aria-labelledby={`${pre}-${p.id}-cabecera`}
           className="sp-int-cuerpo" onKeyDown={p.onTeclaCuerpo}>
           {p.children}
         </div>
