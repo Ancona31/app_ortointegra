@@ -920,6 +920,13 @@ html[data-formato] body {
   line-height: calc(20 / 15);
 }
 
+/* El fondo de la app con navegación es `--fondo` del kit, el mismo que el
+   oscuro ya pinta (`html.dark body` de ThemeProvider). Antes quedaba el
+   `--background` de siempre (#f8fafc): las tarjetas `--sup` del rediseño se
+   leían sobre otro gris que el de las maquetas. Fuera de la app (login, landing,
+   reserva, lanzador) sigue `--background`. No toca el cromo ni la franja. */
+body:has(#barra-lateral) { background: var(--fondo); }
+
 /* ═══ CAMPOS A 16 PX EN TELÉFONO (ext/tel) ═════════════════════════════════
    Safari de iPhone amplía la página al enfocar un campo con letra menor de
    16 px, y no la devuelve. Fuera de capa a propósito: tiene que ganar a las
