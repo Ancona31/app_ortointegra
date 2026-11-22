@@ -120,6 +120,10 @@ function DocumentosPacienteContent() {
     const url = new URL(window.location.href)
     if (t) url.searchParams.set('tipo', t)
     else url.searchParams.delete('tipo')
+    /* El borrador que se retomaba ya no es el documento abierto: al cerrar tras
+       emitir (o al cambiar de tipo) `?borrador=` apuntaría a uno ya emitido
+       (CI-DT-14). */
+    url.searchParams.delete('borrador')
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
   // Los ocho reportan predicado: los siete del sistema de plantillas

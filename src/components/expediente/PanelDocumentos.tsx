@@ -460,7 +460,9 @@ export default function PanelDocumentos({
               },
               /* Solo consentimientos en borrador. En cualquier otro, no se dibuja. */
               seguirEditando: esBorrador && doc.tipo === 'consentimiento_informado'
-                ? () => router.push(`/expediente/${paciente.id}/documentos?tipo=consentimiento&doc=${doc.id}`)
+                /* `borrador=`, que es lo que lee la página (CI-DT-14): con `doc=`
+                   el borrador no se cargaba y salía el diálogo de «a medias». */
+                ? () => router.push(`/expediente/${paciente.id}/documentos?tipo=consentimiento&borrador=${doc.id}`)
                 : null,
             }}
           />
