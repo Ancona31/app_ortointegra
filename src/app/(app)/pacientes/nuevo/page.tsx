@@ -2,8 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ChevronDown, Save, Hash, Mail, Loader2 } from 'lucide-react'
+import {
+  ChevronLeft, ChevronDown, Hash, Mail, Loader2, UserPlus, UserRound, Phone, Ruler,
+  ClipboardList, ShieldCheck, AlertTriangle, type LucideIcon,
+} from 'lucide-react'
 import Link from 'next/link'
+import ModalShell from '@/components/ui/ModalShell'
 import { useProfile } from '@/hooks/useProfile'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
 import { secureStorage } from '@/lib/secureStorage'
@@ -22,8 +26,103 @@ type Medico = {
 
 const MEDICOS_CACHE_KEY = 'cache_medicos_clinica'
 
-const inputCls = 'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/30 focus:border-[#1e5fa8] focus:bg-white transition-all'
-const labelCls = 'block text-xs font-medium text-[#86868b] mb-1'
+/* ═══ Rediseño B6 (maqueta `final-form`, vista «nuevo»; CALMA §6, §12, §14,
+   §20, §23) ═══════════════════════════════════════════════════════════════
+   Grupos con rótulo en `--enlace` y una tarjeta-lista de filas «rótulo —
+   campo»: rótulo encima en `ext`/`tel`, a la izquierda en `ih`/`iv`/`esc`.
+   El campo no lleva caja: la fila entera se marca al enfocar. Columna
+   centrada de 680 (600 en `iv`). La MISMA pieza vive copiada en
+   `expediente/[id]/editar/page.tsx` (duplicar antes que abstraer, P4). */
+const campoCls = 'block w-full min-w-0 border-0 bg-transparent [html.dark_&&]:bg-transparent! p-0 text-[16px] leading-6 text-tinta outline-none placeholder:text-tinta3 ih:text-[15px] esc:text-[15px]'
+
+function Grupo({ icono: Icono, titulo, children }: { icono: LucideIcon; titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-2 px-5 text-[13px] leading-[18px] font-bold uppercase tracking-[.4px] text-enlace">
+        <Icono size={16} aria-hidden="true" />
+        {titulo}
+      </h2>
+      <div className="k-tarjeta k-lista">
+        <div className="k-lista">{children}</div>
+      </div>
+    </section>
+  )
+}
+
+interface FilaProps {
+  etiqueta: string
+  requerido?: boolean
+  ayuda?: string
+  error?: string | null
+  /** `label` asocia el rótulo con su campo; `div` para una fila sin campo. */
+  como?: 'label' | 'div'
+  children: React.ReactNode
+}
+
+const FILA = [
+  'grid gap-1 py-2.5',
+  'ih:grid-cols-[180px_minmax(0,1fr)] iv:grid-cols-[180px_minmax(0,1fr)] esc:grid-cols-[196px_minmax(0,1fr)]',
+  'ih:items-center iv:items-center esc:items-center ih:gap-x-4 iv:gap-x-4 esc:gap-x-4 ih:min-h-12 iv:min-h-12 esc:min-h-12',
+  'focus-within:rounded-[12px] focus-within:outline-2 focus-within:outline-solid focus-within:outline-offset-[6px] focus-within:outline-enlace',
+].join(' ')
+
+function Fila({ etiqueta, requerido, ayuda, error, como = 'label', children }: FilaProps) {
+  const Elemento = como
+  return (
+    <Elemento className={FILA}>
+      <span className="text-[13px] leading-[18px] text-tinta2 ih:text-[15px] iv:text-[15px] esc:text-[15px] ih:leading-5 iv:leading-5 esc:leading-5">
+        {etiqueta}{requerido && <span className="text-mal-tinta"> *</span>}
+      </span>
+      <span className="flex min-w-0 flex-col gap-1">
+        {children}
+        {error && <span className="k-campo-error">{error}</span>}
+        {ayuda && <span className="k-campo-ayuda">{ayuda}</span>}
+      </span>
+    </Elemento>
+  )
+}
+
+const SEXOS = [
+  { value: 'M', label: 'Masculino' },
+  { value: 'F', label: 'Femenino' },
+  { value: 'Otro', label: 'Otro' },
+] as const
+
+/* Sexo: el `<select>` de antes como segmentado (maqueta). Son radios de
+   verdad con `required`: el navegador sigue exigiéndolo al guardar. */
+function FilaSexo({ valor, onCambio }: { valor: string; onCambio: (v: string) => void }) {
+  return (
+    <div role="radiogroup" aria-labelledby="sexo-etiqueta" className={FILA}>
+      <span id="sexo-etiqueta" className="text-[13px] leading-[18px] text-tinta2 ih:text-[15px] iv:text-[15px] esc:text-[15px] ih:leading-5 iv:leading-5 esc:leading-5">
+        Sexo<span className="text-mal-tinta"> *</span>
+      </span>
+      <span className="k-seg w-full max-w-[300px]">
+        {SEXOS.map(s => (
+          <label key={s.value} className="k-seg-op flex-1 cursor-pointer has-[:checked]:bg-sup has-[:checked]:font-semibold has-[:checked]:text-tinta has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-enlace">
+            <input type="radio" name="sexo" value={s.value} checked={valor === s.value}
+              onChange={() => onCambio(s.value)} required className="sr-only" />
+            {s.label}
+          </label>
+        ))}
+      </span>
+    </div>
+  )
+}
+
+type AvisoDuplicado = { id: string; nombre: string; apellidos: string; numero_expediente: string | null; existingPatientIsMine: boolean }
+
+/* El mensaje de la alerta «Paciente duplicado»: los tres textos de siempre,
+   sin el «⚠️» del principio (el icono de la alerta ya lo dice). */
+function MensajeDuplicado({ d, esMedicoInvitado }: { d: AvisoDuplicado; esMedicoInvitado: boolean }) {
+  const exp = d.numero_expediente ? ` (Exp. #${d.numero_expediente})` : ''
+  if (d.existingPatientIsMine) {
+    return <p>Este paciente ya está en tu lista de pacientes: {d.nombre} {d.apellidos}{exp}</p>
+  }
+  if (esMedicoInvitado) {
+    return <p>Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {d.nombre} {d.apellidos}{exp}. ¿Deseas vincularlo a tus pacientes?</p>
+  }
+  return <p>Ya existe un paciente con los mismos datos: {d.nombre} {d.apellidos}{exp}. ¿Es el mismo paciente o una persona distinta?</p>
+}
 
 export default function NuevoPacientePage() {
   const router = useRouter()
@@ -197,243 +296,186 @@ export default function NuevoPacientePage() {
     }
   }
 
+  function cancelarDuplicado() {
+    setDuplicateWarning(null)
+    setVincularError(null)
+  }
+
+  const imc = calcularIMC()
+
   return (
-    <div className="max-w-xl mx-auto py-2 animate-slide-up">
+    <div className="mx-auto w-full max-w-[680px] iv:max-w-[600px] animate-slide-up">
 
-      {/* Header macOS */}
-      <div className="flex items-center gap-2 mb-5">
-        <Link href="/expediente" className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors">
-          <ArrowLeft size={16} strokeWidth={2.5} />
-          <span>Pacientes</span>
-        </Link>
-        <span className="text-slate-300 select-none">/</span>
-        <div>
-          <h1 className="text-sm font-semibold text-[#1d1d1f]">Nuevo paciente</h1>
-        </div>
-      </div>
+      {/* Cabecera compacta (CALMA §6, §20: «‹ Expediente») */}
+      <Link href="/expediente" className="k-b k-b-texto -ml-1 text-[13px] leading-[18px]">
+        <ChevronLeft size={16} strokeWidth={2.5} aria-hidden="true" />
+        <span>Expediente</span>
+      </Link>
+      <h1 className="k-t-pantalla mt-0.5">Nuevo paciente</h1>
 
-      {/* Aviso email */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl mb-3">
-        <Mail size={15} className="text-amber-500 flex-shrink-0" />
-        <p className="text-xs text-amber-700">
-          Para poder enviarle documentos al paciente, agrega su <strong>email</strong> en los datos adicionales
-        </p>
-      </div>
-
-      {/* Badge expediente */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-100 rounded-2xl mb-6">
-        <Hash size={15} className="text-blue-400 flex-shrink-0" />
-        <p className="text-xs text-blue-600">
-          El número de expediente se genera automáticamente al guardar
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="mt-5 space-y-6">
 
         {/* Asignación — solo secretaria */}
         {isSecretaria && (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-            <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Asignación</p>
-            <label className={labelCls}>Médico responsable <span className="text-red-400">*</span></label>
-            <select value={medicoSeleccionado} onChange={e => setMedicoSeleccionado(e.target.value)} required className={inputCls}>
-              <option value="">Seleccionar médico...</option>
-              {medicos.map(m => (
-                <option key={m.id} value={m.id}>
-                  {componerNombreMedicoCompleto(m)}{m.especialidad ? ` — ${m.especialidad}` : ''}
-                </option>
-              ))}
-            </select>
-            {medicos.length === 0 && (
-              <p className="text-[11px] text-amber-600 mt-2">
-                No hay médicos disponibles. Si estás sin conexión, conéctate al menos una vez para sincronizar la lista.
-              </p>
-            )}
-          </div>
+          <Grupo icono={UserPlus} titulo="Asignación">
+            <Fila etiqueta="Médico responsable" requerido>
+              <select value={medicoSeleccionado} onChange={e => setMedicoSeleccionado(e.target.value)} required className={campoCls}>
+                <option value="">Seleccionar médico...</option>
+                {medicos.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {componerNombreMedicoCompleto(m)}{m.especialidad ? ` — ${m.especialidad}` : ''}
+                  </option>
+                ))}
+              </select>
+              {medicos.length === 0 && (
+                <span className="text-[13px] leading-[18px] text-aviso-tinta">
+                  No hay médicos disponibles. Si estás sin conexión, conéctate al menos una vez para sincronizar la lista.
+                </span>
+              )}
+            </Fila>
+          </Grupo>
         )}
 
         {/* Datos esenciales */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">Datos del paciente</p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Nombre(s) <span className="text-red-400">*</span></label>
-              <input type="text" value={form.nombre || ''} onChange={e => set('nombre', e.target.value)}
-                placeholder="Juan Carlos" required className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Apellidos <span className="text-red-400">*</span></label>
-              <input type="text" value={form.apellidos || ''} onChange={e => set('apellidos', e.target.value)}
-                placeholder="García López" required className={inputCls} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>Fecha de nacimiento</label>
-              <input type="date" value={form.fecha_nacimiento || ''} onChange={e => set('fecha_nacimiento', e.target.value)}
-                min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Edad (opcional)</label>
-              <input
-                type="number"
-                min={0}
-                max={120}
-                value={edad}
-                onChange={e => setEdad(e.target.value)}
-                placeholder="Ej. 35"
-                className={inputCls}
-              />
-              <p className="text-xs text-slate-500 mt-1.5">Si no conoces la fecha exacta, ingresa solo la edad</p>
-            </div>
-            <div>
-              <label className={labelCls}>Sexo <span className="text-red-400">*</span></label>
-              <select value={form.sexo || ''} onChange={e => set('sexo', e.target.value)} required className={inputCls}>
-                <option value="">Seleccionar...</option>
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <Grupo icono={UserRound} titulo="Datos del paciente">
+          <Fila etiqueta="Nombre(s)" requerido>
+            <input type="text" value={form.nombre || ''} onChange={e => set('nombre', e.target.value)}
+              placeholder="Juan Carlos" required className={campoCls} />
+          </Fila>
+          <Fila etiqueta="Apellidos" requerido>
+            <input type="text" value={form.apellidos || ''} onChange={e => set('apellidos', e.target.value)}
+              placeholder="García López" required className={campoCls} />
+          </Fila>
+          <Fila etiqueta="Fecha de nacimiento">
+            <input type="date" value={form.fecha_nacimiento || ''} onChange={e => set('fecha_nacimiento', e.target.value)}
+              min={FECHA_MIN_NACIMIENTO} max={fechaHoyISO()} className={campoCls} />
+          </Fila>
+          <Fila etiqueta="Edad (opcional)" ayuda="Si no conoces la fecha exacta, ingresa solo la edad">
+            <input
+              type="number"
+              min={0}
+              max={120}
+              value={edad}
+              onChange={e => setEdad(e.target.value)}
+              placeholder="Ej. 35"
+              className={campoCls}
+            />
+          </Fila>
+          <FilaSexo valor={form.sexo || ''} onCambio={v => set('sexo', v)} />
+          <p className="flex items-center gap-2 py-3 text-[14px] leading-5 text-tinta2">
+            <Hash size={16} aria-hidden="true" className="flex-none text-enlace" />
+            El número de expediente se genera automáticamente al guardar
+          </p>
+        </Grupo>
 
         {/* Datos adicionales — colapsados */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="space-y-2">
           <button
             type="button"
             onClick={() => setExpandido(e => !e)}
-            className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+            aria-expanded={expandido}
+            className="k-tarjeta flex w-full items-center justify-between gap-3 py-3.5 text-left transition-opacity active:opacity-70"
           >
-            <div>
-              <p className="text-sm font-semibold text-[#1d1d1f]">Datos adicionales</p>
-              <p className="text-xs text-[#86868b] mt-0.5">Contacto, antropometría y antecedentes — puedes completarlos después</p>
-            </div>
-            <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`} />
+            <span className="min-w-0">
+              <span className="block text-[15px] leading-5 font-semibold text-tinta">Datos adicionales</span>
+              <span className="mt-0.5 block text-[13px] leading-[18px] text-tinta2">Contacto, antropometría y antecedentes — puedes completarlos después</span>
+            </span>
+            <ChevronDown size={18} aria-hidden="true" className={`flex-none text-tinta2 transition-transform duration-200 motion-reduce:transition-none ${expandido ? 'rotate-180' : ''}`} />
           </button>
-
-          {expandido && (
-            <div className="px-5 pb-5 space-y-5 border-t border-slate-100 pt-4">
-
-              {/* Contacto */}
-              <div>
-                <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Contacto</p>
-                <div className="space-y-3">
-                  <div>
-                    <label className={labelCls}>Teléfono</label>
-                    <input type="tel" inputMode="numeric" value={form.telefono || ''} onChange={e => set('telefono', formatearTelefono(e.target.value))}
-                      placeholder="999 123 4567" maxLength={12} className={inputCls} />
-                    {form.telefono && validarTelefono(form.telefono) && (
-                      <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <label className={`${labelCls} mb-0`}>Email</label>
-                      <span className="flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
-                        <Mail size={9} />
-                        Necesario para enviar documentos
-                      </span>
-                    </div>
-                    <input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)}
-                      placeholder="paciente@email.com" className={inputCls} />
-                    {form.email && validarEmail(form.email) && (
-                      <p className="text-[10px] text-red-500 mt-1">{validarEmail(form.email)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className={labelCls}>Dirección</label>
-                    <input type="text" value={form.direccion || ''} onChange={e => set('direccion', e.target.value)}
-                      placeholder="Calle, colonia, ciudad" className={inputCls} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Antropometría */}
-              <div>
-                <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Antropometría</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className={labelCls}>Peso (kg)</label>
-                    <input type="number" value={form.peso_kg || ''} onChange={e => set('peso_kg', e.target.value)}
-                      placeholder="70" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Talla (cm o m)</label>
-                    <input type="number" value={form.talla_cm || ''} onChange={e => set('talla_cm', e.target.value)}
-                      placeholder="170 ó 1.70" className={inputCls} />
-                  </div>
-                </div>
-                {calcularIMC() && (
-                  <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl">
-                    <p className="text-xs text-blue-700">IMC calculado: <strong>{calcularIMC()} kg/m²</strong></p>
-                  </div>
-                )}
-              </div>
-
-              {/* Antecedentes */}
-              <div>
-                <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-3">Antecedentes</p>
-                <div className="space-y-3">
-                  {[
-                    { key: 'alergias',             label: 'Alergias',                    placeholder: 'Medicamentos, alimentos...' },
-                    { key: 'ant_no_patologicos',    label: 'Antecedentes personales no patológicos', placeholder: 'Tabaquismo, alcoholismo, actividad física, alimentación...' },
-                    { key: 'ant_patologicos',       label: 'Antecedentes patológicos',    placeholder: 'DM2, HTA, hipotiroidismo...' },
-                    { key: 'ant_quirurgicos',       label: 'Antecedentes quirúrgicos',    placeholder: 'Cirugías previas...' },
-                    { key: 'ant_familiares',        label: 'Antecedentes familiares',     placeholder: 'Enfermedades relevantes en familia...' },
-                    { key: 'medicamentos_actuales', label: 'Medicamentos actuales',       placeholder: 'Lista de medicamentos...' },
-                  ].map(({ key, label, placeholder }) => (
-                    <div key={key}>
-                      <label className={labelCls}>{label}</label>
-                      <textarea value={form[key] || ''} onChange={e => set(key, e.target.value)}
-                        placeholder={placeholder} rows={2}
-                        className={`${inputCls} resize-none`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-            </div>
-          )}
+          {/* El aviso del email (antes, caja ámbar arriba del formulario). */}
+          <p className="flex items-start gap-2 px-5 text-[13px] leading-[18px] text-tinta2">
+            <Mail size={14} aria-hidden="true" className="mt-0.5 flex-none text-aviso-tinta" />
+            <span>Para poder enviarle documentos al paciente, agrega su <strong className="font-semibold text-tinta">email</strong> en los datos adicionales</span>
+          </p>
         </div>
 
-        {duplicateWarning && (
-          <div className="bg-amber-50 border border-amber-300 px-4 py-4 rounded-xl space-y-3">
-            {duplicateWarning.existingPatientIsMine ? (
-              <p className="text-sm text-amber-800 font-medium">
-                ⚠️ Este paciente ya está en tu lista de pacientes: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}
-              </p>
-            ) : esMedicoInvitado ? (
-              <p className="text-sm text-amber-800 font-medium">
-                ⚠️ Este paciente ya está registrado en tu clínica, pero no aparece en tu lista porque aún no es tu paciente: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Deseas vincularlo a tus pacientes?
-              </p>
-            ) : (
-              <p className="text-sm text-amber-800 font-medium">
-                ⚠️ Ya existe un paciente con los mismos datos: {duplicateWarning.nombre} {duplicateWarning.apellidos}
-                {duplicateWarning.numero_expediente ? ` (Exp. #${duplicateWarning.numero_expediente})` : ''}. ¿Es el mismo paciente o una persona distinta?
-              </p>
-            )}
-            {vincularError && <p className="text-xs text-red-600">{vincularError}</p>}
-            <div className="flex flex-col gap-2">
+        {expandido && (
+          <>
+            {/* Contacto */}
+            <Grupo icono={Phone} titulo="Contacto">
+              <Fila etiqueta="Teléfono" error={form.telefono ? validarTelefono(form.telefono) : null}>
+                <input type="tel" inputMode="numeric" value={form.telefono || ''} onChange={e => set('telefono', formatearTelefono(e.target.value))}
+                  placeholder="999 123 4567" maxLength={12} className={campoCls} />
+              </Fila>
+              <Fila etiqueta="Email" ayuda="Necesario para enviar documentos" error={form.email ? validarEmail(form.email) : null}>
+                <input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)}
+                  placeholder="paciente@email.com" className={campoCls} />
+              </Fila>
+              <Fila etiqueta="Dirección">
+                <input type="text" value={form.direccion || ''} onChange={e => set('direccion', e.target.value)}
+                  placeholder="Calle, colonia, ciudad" className={campoCls} />
+              </Fila>
+            </Grupo>
+
+            {/* Antropometría */}
+            <Grupo icono={Ruler} titulo="Antropometría">
+              <Fila etiqueta="Peso (kg)">
+                <input type="number" value={form.peso_kg || ''} onChange={e => set('peso_kg', e.target.value)}
+                  placeholder="70" className={campoCls} />
+              </Fila>
+              <Fila etiqueta="Talla (cm o m)">
+                <input type="number" value={form.talla_cm || ''} onChange={e => set('talla_cm', e.target.value)}
+                  placeholder="170 ó 1.70" className={campoCls} />
+              </Fila>
+              {imc && (
+                <Fila etiqueta="IMC calculado" como="div">
+                  <span className="k-etq k-etq-tonal self-start k-num">{imc} kg/m²</span>
+                </Fila>
+              )}
+            </Grupo>
+
+            {/* Antecedentes */}
+            <Grupo icono={ClipboardList} titulo="Antecedentes">
+              {[
+                { key: 'alergias',             label: 'Alergias',                    placeholder: 'Medicamentos, alimentos...' },
+                { key: 'ant_no_patologicos',    label: 'Antecedentes personales no patológicos', placeholder: 'Tabaquismo, alcoholismo, actividad física, alimentación...' },
+                { key: 'ant_patologicos',       label: 'Antecedentes patológicos',    placeholder: 'DM2, HTA, hipotiroidismo...' },
+                { key: 'ant_quirurgicos',       label: 'Antecedentes quirúrgicos',    placeholder: 'Cirugías previas...' },
+                { key: 'ant_familiares',        label: 'Antecedentes familiares',     placeholder: 'Enfermedades relevantes en familia...' },
+                { key: 'medicamentos_actuales', label: 'Medicamentos actuales',       placeholder: 'Lista de medicamentos...' },
+              ].map(({ key, label, placeholder }) => (
+                <Fila key={key} etiqueta={label}>
+                  <textarea value={form[key] || ''} onChange={e => set(key, e.target.value)}
+                    placeholder={placeholder} rows={2}
+                    className={`${campoCls} resize-none`} />
+                </Fila>
+              ))}
+            </Grupo>
+          </>
+        )}
+
+        {/* Paciente duplicado (CALMA §20, §23.7): alerta del catálogo, tres
+            botones apilados con el principal arriba. Mismos textos y acciones. */}
+        <ModalShell
+          open={!!duplicateWarning}
+          onClose={() => { if (!vinculando) cancelarDuplicado() }}
+          title="Paciente duplicado"
+          variante="alerta"
+          tono="avisar"
+          apilada
+          icon={<AlertTriangle aria-hidden="true" />}
+          footer={duplicateWarning && (
+            <>
               {duplicateWarning.existingPatientIsMine ? (
                 <button
                   type="button"
+                  data-principal
+                  autoFocus
                   onClick={() => router.push(isSecretaria ? '/expediente' : `/expediente/${duplicateWarning.id}`)}
-                  className="w-full px-3 py-2 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] transition-colors"
+                  className="k-b k-b-capa k-b-prim"
                 >
                   Ir a su expediente
                 </button>
               ) : (
                 <button
                   type="button"
+                  data-principal
+                  autoFocus
                   onClick={handleVincular}
                   disabled={vinculando}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-[#1e5fa8] rounded-xl hover:bg-[#1a3a5c] transition-colors disabled:opacity-60"
+                  className="k-b k-b-capa k-b-prim"
                 >
-                  {vinculando ? <><Loader2 size={14} className="animate-spin" /> Vinculando...</> : 'Es el mismo paciente'}
+                  {vinculando ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Vinculando...</> : 'Es el mismo paciente'}
                 </button>
               )}
               <button
@@ -447,51 +489,60 @@ export default function NuevoPacientePage() {
                   const formEl = document.querySelector('form')
                   if (formEl) formEl.requestSubmit()
                 }}
-                className="w-full px-3 py-2 text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-xl hover:bg-amber-50 transition-colors disabled:opacity-60"
+                className="k-b k-b-capa k-b-tonal"
               >
                 Es otra persona, crear de todos modos
               </button>
               <button
                 type="button"
                 disabled={vinculando}
-                onClick={() => { setDuplicateWarning(null); setVincularError(null) }}
-                className="w-full px-3 py-2 text-sm font-medium text-[#86868b] bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-60"
+                onClick={cancelarDuplicado}
+                className="k-b k-b-capa k-b-quieto"
               >
                 Cancelar
               </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        >
+          {duplicateWarning && <MensajeDuplicado d={duplicateWarning} esMedicoInvitado={esMedicoInvitado} />}
+          {vincularError && <p className="font-semibold text-mal-tinta">{vincularError}</p>}
+        </ModalShell>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
-        )}
-
-        {/* Consentimiento de privacidad — LFPDPPP Art. 9 */}
-        <label className="flex items-start gap-3 cursor-pointer py-2">
+        {/* Consentimiento de privacidad — LFPDPPP. Obligatorio antes de crear
+            (la comprobación vive en `handleSubmit`). Casilla a la derecha de
+            su texto (CALMA §20). */}
+        <label className="k-tarjeta flex cursor-pointer items-center gap-3 py-3.5">
+          <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-[10px] bg-tonal text-tonal-tinta">
+            <ShieldCheck size={16} />
+          </span>
+          <span className="min-w-0 flex-1 text-[15px] leading-5 text-tinta">
+            Paciente informado del{' '}
+            <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-enlace hover:underline">
+              aviso de privacidad
+            </a>
+            <span aria-hidden="true" className="text-mal-tinta"> *</span>
+          </span>
           <input
             type="checkbox"
             checked={consentimiento}
             onChange={e => setConsentimiento(e.target.checked)}
-            className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#1e5fa8] focus:ring-[#1e5fa8]/30"
+            className="h-[22px] w-[22px] flex-none cursor-pointer accent-[var(--accion)]"
           />
-          <span className="text-xs text-slate-500 leading-relaxed">
-            Paciente informado del{' '}
-            <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-[#1e5fa8] hover:underline font-medium">
-              aviso de privacidad
-            </a>
-          </span>
         </label>
 
-        {/* Acciones */}
-        <div className="flex gap-3 pb-8">
-          <Link href="/expediente"
-            className="flex-1 text-center px-4 py-3 bg-slate-50 border border-slate-200 text-[#86868b] rounded-xl text-sm font-medium hover:bg-white transition-all">
+        {/* Acciones: fijas al pie en `ext`/`tel` (sticky, no `fixed`: no toca
+            la franja); en ancho, el par a la derecha; en `iv`, centrado (§23.1). */}
+        <div className="flex flex-wrap gap-2.5 pt-1 pb-8 ih:justify-end esc:justify-end iv:justify-center ext:sticky tel:sticky ext:bottom-0 tel:bottom-0 ext:z-10 tel:z-10 ext:-mx-4 tel:-mx-4 ext:bg-fondo tel:bg-fondo ext:px-4 tel:px-4 ext:py-3 tel:py-3 ext:pb-[calc(var(--ib)+12px)] tel:pb-[calc(var(--ib)+12px)]">
+          {/* El error va DENTRO del pie: en `ext`/`tel` el pie queda fijo abajo
+              y el aviso se ve sin desplazar. */}
+          {error && (
+            <div role="alert" className="basis-full rounded-[12px] bg-mal-fondo px-4 py-3 text-[14px] leading-5 text-mal-tinta">{error}</div>
+          )}
+          <Link href="/expediente" className="k-b k-b-quieto ext:px-3">
             Cancelar
           </Link>
-          <button type="submit" disabled={loading || vinculando}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] active:scale-[0.98] transition-all disabled:opacity-60 shadow-sm">
-            {loading ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : <><Save size={15} /> Registrar e ir al expediente</>}
+          <button type="submit" disabled={loading || vinculando} className="k-b k-b-prim min-w-0 ext:flex-1 tel:flex-1 ext:h-auto ext:min-h-10 ext:whitespace-normal ext:px-2.5 ext:py-2 ext:text-[14px] ext:leading-[18px]">
+            {loading ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Guardando...</> : 'Registrar e ir al expediente'}
           </button>
         </div>
 

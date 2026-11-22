@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ChevronLeft, Loader2, UserRound, Phone, Ruler, ClipboardList, type LucideIcon } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { validarEmail, validarTelefono, formatearTelefono } from '@/lib/validaciones'
@@ -37,14 +37,102 @@ const campos: Campo[] = [
   { section: 'antecedentes', label: 'Medicamentos actuales', key: 'medicamentos_actuales', placeholder: 'Lista de medicamentos...' },
 ]
 
-const secciones = [
-  { key: 'personal',     label: 'Datos personales' },
-  { key: 'antro',        label: 'Antropometría' },
-  { key: 'contacto',     label: 'Contacto' },
-  { key: 'antecedentes', label: 'Antecedentes' },
+// Rediseño B6: el orden de las secciones es el de la maqueta `final-form`
+// (Contacto antes que Antropometría, como en «Nuevo paciente»).
+const secciones: { key: string; label: string; icono: LucideIcon }[] = [
+  { key: 'personal',     label: 'Datos personales', icono: UserRound },
+  { key: 'contacto',     label: 'Contacto',         icono: Phone },
+  { key: 'antro',        label: 'Antropometría',    icono: Ruler },
+  { key: 'antecedentes', label: 'Antecedentes',     icono: ClipboardList },
 ]
 
-const inputCls = 'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all'
+/* ═══ Rediseño B6 (maqueta `final-form`, vista «editar») ════════════════════
+   La MISMA pieza que `pacientes/nuevo/page.tsx` (grupo con rótulo + tarjeta-
+   lista de filas «rótulo — campo»), copiada a propósito (P4). Rótulo encima
+   en `ext`/`tel`, a la izquierda en `ih`/`iv`/`esc`; columna centrada. */
+const campoCls = 'block w-full min-w-0 border-0 bg-transparent [html.dark_&&]:bg-transparent! p-0 text-[16px] leading-6 text-tinta outline-none placeholder:text-tinta3 ih:text-[15px] esc:text-[15px]'
+
+const FILA = [
+  'grid gap-1 py-2.5',
+  'ih:grid-cols-[180px_minmax(0,1fr)] iv:grid-cols-[180px_minmax(0,1fr)] esc:grid-cols-[196px_minmax(0,1fr)]',
+  'ih:items-center iv:items-center esc:items-center ih:gap-x-4 iv:gap-x-4 esc:gap-x-4 ih:min-h-12 iv:min-h-12 esc:min-h-12',
+  'focus-within:rounded-[12px] focus-within:outline-2 focus-within:outline-solid focus-within:outline-offset-[6px] focus-within:outline-enlace',
+].join(' ')
+
+const ROTULO = 'text-[13px] leading-[18px] text-tinta2 ih:text-[15px] iv:text-[15px] esc:text-[15px] ih:leading-5 iv:leading-5 esc:leading-5'
+
+function Grupo({ icono: Icono, titulo, children }: { icono: LucideIcon; titulo: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="flex items-center gap-2 px-5 text-[13px] leading-[18px] font-bold uppercase tracking-[.4px] text-enlace">
+        <Icono size={16} aria-hidden="true" />
+        {titulo}
+      </h2>
+      <div className="k-tarjeta k-lista">
+        <div className="k-lista">{children}</div>
+      </div>
+    </section>
+  )
+}
+
+function Rotulo({ campo, id }: { campo: Campo; id?: string }) {
+  return (
+    <span id={id} className={ROTULO}>
+      {campo.label}{campo.required && <span className="text-mal-tinta"> *</span>}
+    </span>
+  )
+}
+
+/* Sexo: el `<select>` de antes como segmentado (maqueta). Radios de verdad con
+   `required`: el navegador sigue exigiéndolo al guardar. */
+function FilaOpciones({ campo, valor, onCambio }: { campo: Campo; valor: string; onCambio: (v: string) => void }) {
+  const id = `${campo.key}-etiqueta`
+  return (
+    <div role="radiogroup" aria-labelledby={id} className={FILA}>
+      <Rotulo campo={campo} id={id} />
+      <span className="k-seg w-full max-w-[300px]">
+        {(campo.options ?? []).map(o => (
+          <label key={o.value} className="k-seg-op flex-1 cursor-pointer has-[:checked]:bg-sup has-[:checked]:font-semibold has-[:checked]:text-tinta has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-enlace">
+            <input type="radio" name={campo.key} value={o.value} checked={valor === o.value}
+              onChange={() => onCambio(o.value)} required={campo.required} className="sr-only" />
+            {o.label}
+          </label>
+        ))}
+      </span>
+    </div>
+  )
+}
+
+/* Un campo de texto, fecha, número o área, con su error en línea y su nota. */
+function FilaCampo({ campo, valor, onCambio }: { campo: Campo; valor: string; onCambio: (v: string) => void }) {
+  const esArea = campo.key.includes('ant_') || campo.key === 'medicamentos_actuales'
+  const error = campo.key === 'telefono' && valor ? validarTelefono(valor)
+    : campo.key === 'email' && valor ? validarEmail(valor) : null
+  return (
+    <label className={FILA}>
+      <Rotulo campo={campo} />
+      <span className="flex min-w-0 flex-col gap-1">
+        {esArea ? (
+          <textarea value={valor} onChange={e => onCambio(e.target.value)} placeholder={campo.placeholder}
+            rows={2} className={`${campoCls} resize-none`} />
+        ) : (
+          <input
+            type={campo.type || 'text'}
+            inputMode={campo.type === 'tel' ? 'numeric' : undefined}
+            maxLength={campo.type === 'tel' ? 12 : undefined}
+            value={valor}
+            onChange={e => onCambio(campo.key === 'telefono' ? formatearTelefono(e.target.value) : e.target.value)}
+            placeholder={campo.placeholder}
+            required={campo.required}
+            className={campoCls}
+          />
+        )}
+        {error && <span className="k-campo-error">{error}</span>}
+        {campo.hint && <span className="k-campo-ayuda">{campo.hint}</span>}
+      </span>
+    </label>
+  )
+}
 
 export default function EditarPacientePage() {
   const { id } = useParams<{ id: string }>()
@@ -115,118 +203,59 @@ export default function EditarPacientePage() {
   }
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <Loader2 size={20} className="animate-spin text-slate-300" />
+    <div className="flex h-64 items-center justify-center" role="status" aria-label="Cargando">
+      <Loader2 size={20} className="animate-spin text-tinta3" aria-hidden="true" />
     </div>
   )
 
+  const imc = calcularIMC()
+
   return (
-    <div className="max-w-2xl mx-auto space-y-4 animate-slide-up">
+    <div className="mx-auto w-full max-w-[680px] iv:max-w-[600px] animate-slide-up">
 
-      {/* Header macOS */}
-      <div className="flex items-center gap-2">
-        <Link
-          href={`/expediente/${id}`}
-          className="flex items-center gap-1 text-[#1e5fa8] hover:text-[#1a3a5c] text-sm font-medium transition-colors"
-        >
-          <ArrowLeft size={16} strokeWidth={2.5} />
-          <span>Expediente</span>
-        </Link>
-        <span className="text-slate-300 select-none">/</span>
-        <h1 className="text-sm font-semibold text-[#1d1d1f]">Editar paciente</h1>
-      </div>
+      {/* Cabecera compacta (CALMA §6, §20: «‹ Expediente») */}
+      <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 text-[13px] leading-[18px]">
+        <ChevronLeft size={16} strokeWidth={2.5} aria-hidden="true" />
+        <span>Expediente</span>
+      </Link>
+      <h1 className="k-t-pantalla mt-0.5">Editar paciente</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {secciones.map(sec => {
-          const camposSec = campos.filter(c => c.section === sec.key)
-          return (
-            <div key={sec.key} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="px-5 pt-4 pb-1">
-                <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest">{sec.label}</p>
+      <form onSubmit={handleSubmit} className="mt-5 space-y-6">
+        {secciones.map(sec => (
+          <Grupo key={sec.key} icono={sec.icono} titulo={sec.label}>
+            {campos.filter(c => c.section === sec.key).map(campo => (
+              campo.options ? (
+                <FilaOpciones key={campo.key} campo={campo} valor={form[campo.key] || ''}
+                  onCambio={v => setForm({ ...form, [campo.key]: v })} />
+              ) : (
+                <FilaCampo key={campo.key} campo={campo} valor={form[campo.key] || ''}
+                  onCambio={v => setForm({ ...form, [campo.key]: v })} />
+              )
+            ))}
+            {sec.key === 'antro' && imc && (
+              <div className={FILA}>
+                <span className={ROTULO}>IMC calculado</span>
+                <span className="k-etq k-etq-tonal k-num justify-self-start">{imc} kg/m²</span>
               </div>
-              <div className="px-5 pb-5 pt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {camposSec.map(campo => (
-                  <div key={campo.key} className={campo.key.includes('ant_') || campo.key === 'medicamentos_actuales' || campo.key === 'alergias' || campo.key === 'direccion' ? 'sm:col-span-2' : ''}>
-                    <label className="block text-[11px] font-medium text-[#86868b] mb-1.5">
-                      {campo.label} {campo.required && <span style={{ color: '#EF5350' }}>*</span>}
-                    </label>
-                    {campo.options ? (
-                      <select
-                        value={form[campo.key] || ''}
-                        onChange={e => setForm({ ...form, [campo.key]: e.target.value })}
-                        required={campo.required}
-                        className={inputCls}
-                      >
-                        <option value="">Seleccionar...</option>
-                        {campo.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    ) : (campo.key.includes('ant_') || campo.key === 'medicamentos_actuales') ? (
-                      <textarea
-                        value={form[campo.key] || ''}
-                        onChange={e => setForm({ ...form, [campo.key]: e.target.value })}
-                        placeholder={campo.placeholder}
-                        rows={2}
-                        className={`${inputCls} resize-none`}
-                      />
-                    ) : (
-                      <>
-                      <input
-                        type={campo.type || 'text'}
-                        inputMode={campo.type === 'tel' ? 'numeric' : undefined}
-                        maxLength={campo.type === 'tel' ? 12 : undefined}
-                        value={form[campo.key] || ''}
-                        onChange={e => {
-                          const val = campo.key === 'telefono' ? formatearTelefono(e.target.value) : e.target.value
-                          setForm({ ...form, [campo.key]: val })
-                        }}
-                        placeholder={campo.placeholder}
-                        required={campo.required}
-                        className={inputCls}
-                      />
-                      {campo.key === 'telefono' && form.telefono && validarTelefono(form.telefono) && (
-                        <p className="text-[10px] text-red-500 mt-1">{validarTelefono(form.telefono)}</p>
-                      )}
-                      {campo.key === 'email' && form.email && validarEmail(form.email) && (
-                        <p className="text-[10px] text-red-500 mt-1">{validarEmail(form.email)}</p>
-                      )}
-                      {campo.hint && (
-                        <p className="text-xs text-slate-500 mt-1.5">{campo.hint}</p>
-                      )}
-                      </>
-                    )}
-                  </div>
-                ))}
-                {sec.key === 'antro' && calcularIMC() && (
-                  <div className="sm:col-span-2 bg-blue-50 border border-blue-100 rounded-xl px-4 py-2.5">
-                    <p className="text-xs text-blue-700">
-                      <span className="font-semibold">IMC calculado:</span> {calcularIMC()} kg/m²
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
+            )}
+          </Grupo>
+        ))}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm">{error}</div>
-        )}
-
-        <div className="flex gap-3 pb-6">
-          <Link
-            href={`/expediente/${id}`}
-            className="flex-1 text-center px-4 py-2.5 border border-slate-200 text-[#3d3d3f] rounded-xl text-sm font-medium hover:bg-slate-50 transition-colors"
-          >
+        {/* Acciones: fijas al pie en `ext`/`tel` (sticky, no `fixed`: no toca
+            la franja); en ancho, el par a la derecha; en `iv`, centrado (§23.1). */}
+        <div className="flex flex-wrap gap-2.5 pt-1 pb-8 ih:justify-end esc:justify-end iv:justify-center ext:sticky tel:sticky ext:bottom-0 tel:bottom-0 ext:z-10 tel:z-10 ext:-mx-4 tel:-mx-4 ext:bg-fondo tel:bg-fondo ext:px-4 tel:px-4 ext:py-3 tel:py-3 ext:pb-[calc(var(--ib)+12px)] tel:pb-[calc(var(--ib)+12px)]">
+          {/* El error va DENTRO del pie: en `ext`/`tel` el pie queda fijo abajo
+              y el aviso se ve sin desplazar. */}
+          {error && (
+            <div role="alert" className="basis-full rounded-[12px] bg-mal-fondo px-4 py-3 text-[14px] leading-5 text-mal-tinta">{error}</div>
+          )}
+          <Link href={`/expediente/${id}`} className="k-b k-b-quieto">
             Cancelar
           </Link>
-          <button
-            type="submit"
-            disabled={guardando}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1e5fa8] text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors disabled:opacity-50"
-          >
+          <button type="submit" disabled={guardando} className="k-b k-b-prim ext:flex-1 tel:flex-1">
             {guardando
-              ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
-              : <><Save size={14} /> Guardar cambios</>
+              ? <><Loader2 size={16} className="animate-spin" aria-hidden="true" /> Guardando...</>
+              : 'Guardar cambios'
             }
           </button>
         </div>
