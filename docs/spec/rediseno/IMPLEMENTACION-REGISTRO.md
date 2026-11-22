@@ -521,3 +521,86 @@ la rama ya integrada.
   * **Se aparta de la maqueta:** el orden de las columnas de ayuda; el Top 10
     de estadísticas en barras HTML (nombre y número a la vista) en vez de la
     gráfica.
+
+### Integración de pantallas (B12) · notas
+
+Hecha en tres tramos: dos agentes cerraron los pendientes de código (abajo) y el
+contenedor se reinició a mitad de la verificación; la verificación se rehízo
+entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
+(sábado noche en Mérida).
+
+* **Commits:** `24ca09ba` «Cerrar sesión» en Ajustes de Mi perfil (mismo
+  `useCierreSesion`, exportado; engrane del médico → `/perfil#perfil-sec-ajustes`;
+  la secretaria conserva el menú) · `4753b832` DashboardSkeleton con la retícula
+  de B5 · `cb6ab549` `.k-campo-sin-caja` central, aviso «info» sin interceptar
+  toques sobre capas, «‹ Expediente» parejo · `d3cfeec3` chip de médico a 12 px y
+  «···» de la lista con área propia · `92dcea67` fondo `--fondo` con navegación ·
+  `586b2829` «Paciente no encontrado» como EstadoVacio, chip elegido legible ·
+  `2e2c4373` `E2E_SIN_SEMILLA=1` · `c5cd590f` «Agregar suplemento» abre el
+  catálogo de nueve (sólo presentación: misma `toggleSup`, mismo contenido del
+  PDF) · `27279f4e` rejilla «Tipo de documento» y cabecera del formulario en
+  `@layer components` · `a289ce13` e2e del enlace profundo acotada al modal ·
+  `51637321` la fila de pestañas de Administración no salta (esc/ih) ·
+  `f0b9c5b3` los esqueletos de Administración llevan su fila de pestañas.
+* **Verde:** `npm run build` exit 0; `tsc` exit 0; eslint del repo
+  `✖ 148 problems (87 errors, 61 warnings)` (tope 89/66); vitest
+  `163 passed / 2425 passed`, sin TZ y con `TZ=UTC`.
+* **e2e** (los 105 archivos, todos los proyectos, en 6 tandas con la
+  `global-setup` normal: resiembra por tanda): **427 passed, 100 failed, 639
+  skipped/did not run** de 1 166 (B0: 290/180/654 de 1 124; los 42 nuevos son
+  `rediseno-formatos` en los cuatro proyectos del Duo, todos verdes). Por caso
+  contra B0: **ningún caso que pasaba falla por el rediseño.** 3 pasan→fallan:
+  `agenda-cancelar` «encendido…», clic interceptado por «¿Asistió el paciente?»
+  (AG-DT-256, la noche del sábado). 2 saltadas→fallan, de entorno:
+  `whatsapp-manual` «la lista de mañana» y `agenda-eleccion-i2` «Reagendar con
+  correo» (el `.env.local` no tiene `EMAIL_TRANSPORT=captura` ni
+  `RESERVA_AVISO_BORRADOR_LOCAL=1`; repetidas solas, fallan igual). ~127
+  fallaban o se saltaban en B0 y ahora pasan (la resiembra por tanda evita las
+  cascadas). Los fallos que quedan son los de B0: la ventana «¿Asistió?»,
+  `Falta RESERVA_SECRETO` de los ayudantes de e2e y `sin_enlace`.
+* **Capturas** de 28 rutas (admin), 13 (médico) y 12 (secretaria) × 5 formatos
+  (ext/ih con el viewport real) × 2 temas: 533, sin fallos. Sin desbordes
+  horizontales (salvo `/calculadoras-clinicas` en ext, fuera del rediseño), nada
+  fijo en el borde derecho en ext/ih, consola 0 con admin (con el médico: el 406
+  de abrir un paciente ajeno —RLS— y el 403 de RED-DT-19). `chk-app.js`: consola
+  0; bajo la franja ext 14 · tel 16 · ih 18 · iv 0 · esc 0 (B0 194/22/152/0/0);
+  texto < 12 fuera de la agenda sólo el «NOV» del chip de fecha (excepción
+  documentada). Las (a)/(i) de iv son las píldoras de B4 (40 px con `::after` de
+  44: falso positivo de la herramienta).
+* **Producción (v2 apagada):** dashboard y agenda v1, admin y secretaria, 5
+  formatos: 0 errores, la agenda v1 con su barra, leyenda y «Plegar menú».
+* **IA de nueva nota** (petición interceptada en el navegador, sin llamar al
+  servicio): redactando, entrevista, «Tu nota está lista» y «Ajusta el
+  contexto» bien en esc y tel.
+* **Reglas que B13 debe respetar** (además de las de B1–B4):
+  * El fondo de la app con navegación es `--fondo` (`body:has(#barra-lateral)`).
+  * Campo sin caja en oscuro: `.k-campo-sin-caja`, nunca otra copia de
+    `[html.dark_&&]:!bg-transparent`.
+  * La rejilla de tipos y la cabecera del formulario viven en
+    `@layer components`: una regla nueva que deba ganarles va en la misma capa
+    con más especificidad, no sin capa.
+  * Una pantalla con fila de pestañas compartida usa el MISMO contenedor en
+    todas sus pestañas y también en su esqueleto (lo que varía es el ancho del
+    contenido, no el de la fila).
+  * «Cerrar sesión» sólo con `useCierreSesion`; nada de copiar su lógica.
+  * Para correr e2e en la base compartida, `E2E_SIN_SEMILLA=1`.
+* **Para B15:** `dashboard/StatusChip.tsx` (sin importadores);
+  `fechaCitaCompacta` de `dashboard/utils.ts` (sólo la usan sus pruebas); la
+  variante `layout="grid"` de `labs/CardDocumento.tsx` (sólo se usa `list`);
+  `ayuda/DiagnosticoFormato.tsx` (temporal, ver la corrección de la sonda);
+  `layout/Breadcrumbs.tsx` (sin uso desde B8); en `PlanSuplementacionForm` el
+  comentario huérfano de `PropsTarjeta` y la rama de tarjeta sin elegir.
+* **Visto y abierto (no se tocó):**
+  * Nueva nota: la tira de signos vitales trunca sus rótulos en esc
+    («PRESIÓN ARTER…», «TEM…») y en ext («PA · MM…»), y la tarjeta «Cuéntame la
+    consulta» sigue en vez del campo único de la maqueta; los signos vitales no
+    se pliegan.
+  * `/expediente/[id]` carga con el texto «Cargando expediente...», sin
+    esqueleto; «Paciente no encontrado» no ofrece «‹ Expediente».
+  * Rótulos sobre el título distintos en pantallas hermanas: Estadísticas
+    «Clínica», Usuarios «Admin», Facturación «Cuenta»; el de `/documentos` en
+    `--enlace` y el resto en gris; «Nota de Consulta» con mayúscula frente a
+    «Nueva nota». Son textos: los decide el dueño.
+  * «‹ Expediente» desde documentos vuelve al Resumen, no a la pestaña
+    Documentos; `/suplementacion` no tiene «‹ Expediente».
+  * El enlace profundo `?documento=` no se probó: la semilla no tiene documentos.
