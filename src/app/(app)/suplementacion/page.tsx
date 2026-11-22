@@ -1,3 +1,6 @@
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
+
 const SUPLEMENTOS = [
   { nombre: 'Vitamina D3 + K2', fn: 'Mineralización ósea y prevención de calcificación de tejidos blandos', lab: 'Vitamina D < 40 ng/mL', prioridad: 'alta' },
   { nombre: 'Omega-3 EPA/DHA', fn: 'Resolución de inflamación crónica y viscosidad sinovial', lab: 'PCR-us > 1.0 mg/L o Triglicéridos > 100 mg/dL', prioridad: 'alta' },
@@ -37,7 +40,13 @@ export default function SuplementacionPage() {
   return (
     <div className="mx-auto w-full max-w-[1000px]">
       <div className="mb-5">
-        <h1 className="k-t-pantalla">Protocolo de Suplementación</h1>
+        {/* «‹ Expediente» como sus pantallas hermanas (CALMA §6, §20): se llega
+            desde el enlace «Suplementación» de la cabecera de `/expediente`. */}
+        <Link href="/expediente" prefetch={false} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
+          <ChevronLeft size={16} aria-hidden="true" />
+          Expediente
+        </Link>
+        <h1 className="k-t-pantalla mt-1">Protocolo de Suplementación</h1>
         <p className="k-t-sec mt-0.5">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
       </div>
 

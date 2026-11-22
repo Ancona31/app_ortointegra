@@ -162,9 +162,13 @@ function DocumentosPacienteContent() {
     /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
        la de 600 (§19). */
     <div lang="es" className="mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5">
-      {/* Cabecera: «‹ Expediente» (CALMA §6, §20), título y quién. */}
+      {/* Cabecera: «‹ Expediente» (CALMA §6, §20), título y quién. El regreso
+          va a la pestaña Documentos del expediente (`?tab=documentos`, clave de
+          `PestanasExpediente`), no al Resumen: se llega aquí desde «Nuevo
+          documento», «Crear documento» de esa pestaña, «Receta» del dashboard
+          o ⌘K, siempre con este mismo paciente. */}
       <header>
-        <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
+        <Link href={`/expediente/${id}?tab=documentos`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
           <ChevronLeft size={16} aria-hidden="true" />
           Expediente
         </Link>
