@@ -842,7 +842,9 @@ export default function ConsentimientoInformadoForm({
     let presionando = false
     const fuera = (t: EventTarget | null): boolean => t instanceof Element
       && !seccionesRef.current?.contains(t)
-      && !t.closest('[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"]')
+      // Abrir un menú («···») tampoco pliega: plegar cambia el alto, el
+      // desplazamiento se reajusta y el menú se cerraría al instante.
+      && !t.closest('[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"], [aria-haspopup]')
     const alBajar = (e: PointerEvent) => { presionando = true; abajoFuera = fuera(e.target) }
     const alSoltar = () => {
       presionando = false
@@ -1817,7 +1819,7 @@ export default function ConsentimientoInformadoForm({
           className="sp-btn sp-btn--ghost sp-ci-papel">
           {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
             : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-            : <><Printer size={17} aria-hidden="true" /> Imprimir para firmar en papel</>}
+            : <><Printer size={17} aria-hidden="true" /><span className="sp-ci-largo">Imprimir para firmar en papel</span><span className="sp-ci-corto">Imprimir en papel</span></>}
         </button>
         {/* Sin conexión no hay borrador que guardar (va a Supabase): no se
             enseña un botón que sólo puede fallar (CI-DT-17). */}
@@ -1868,7 +1870,7 @@ export default function ConsentimientoInformadoForm({
           className="sp-btn sp-btn--secondary sp-ci-papel">
           {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
             : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-            : <><Printer size={17} aria-hidden="true" /> Imprimir para firmar en papel</>}
+            : <><Printer size={17} aria-hidden="true" /><span className="sp-ci-largo">Imprimir para firmar en papel</span><span className="sp-ci-corto">Imprimir en papel</span></>}
         </button>
         {!offlineMode && (
           <button type="button" onClick={iniciarFirmado} disabled={imprimiendo || guardandoBorrador || perfilPendiente}

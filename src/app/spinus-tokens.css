@@ -3995,6 +3995,18 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
 .sp-doc-actions.sp-ci-pie > .sp-btn { flex: 0 0 auto; width: auto; white-space: nowrap; }
 .sp-doc-actions.sp-ci-pie > .sp-btn--primary { min-width: 104px; }
 .sp-ci-pie svg { flex: none; }
+/* Ancho (`ih`/`iv`/`esc`): las tres en un renglón dentro de la columna de 640. */
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions.sp-ci-pie > .sp-btn { padding-left: 14px; padding-right: 14px; }
+/* Los botones de texto del embudo, con el toque del formato (44 táctil, 36 ratón). */
+:is(.sp-ci-volver, .sp-ci-mas > .k-b, .sp-ci-den > .k-b, .sp-ci-offline > .k-b) { height: auto; min-height: var(--k-toque); }
+/* El rótulo corto de «Imprimir para firmar en papel» sólo donde el pie va a mitades. */
+.sp-ci-pie .sp-ci-corto { display: none; }
+@container docform (max-width: 559px) {
+  .sp-ci-pie .sp-ci-largo { display: none; }
+  .sp-ci-pie .sp-ci-corto { display: inline; }
+}
+/* «Rehacer» de cada firma, con el toque del formato. */
+.sp-firma-fm .sp-btn--compact { min-height: var(--k-toque); }
 /* Estrecho (`ext`/`tel`): el primario arriba a todo el ancho; las otras dos debajo, a mitades. */
 @container docform (max-width: 559px) {
   .sp-doc-actions.sp-ci-pie > .sp-btn { flex: 1 1 0; min-width: 0; padding-left: 10px; padding-right: 10px; white-space: normal; line-height: 18px; }
