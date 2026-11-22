@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { SESION } from './ayudas'
 
 /**
@@ -146,4 +146,113 @@ test('⌘K abre la paleta como diálogo con nombre, dentro del área de contenid
   expect(caja!.x + caja!.width).toBeLessThanOrEqual(ancho - f.right - CROMO[f.formato])
   await page.keyboard.press('Escape')
   await expect(paleta).toHaveCount(0)
+})
+
+/* ── La franja del Duo real toma el color de lo fijo que toca su borde ──────
+   iOS rellena la franja lateral (fuera del viewport) con el color de lo
+   `position: fixed` que toca ese borde; si no hay nada, el fondo de la página.
+   Con cualquier capa abierta, lo único fijo en el borde derecho debe seguir
+   siendo el cromo navy (riel en `ext`, barra en `ih`), y el cromo no se pulsa. */
+
+interface FijoAlBorde { clase: string; der: number }
+
+/** Lo `position: fixed` visible, fuera del cromo, cuyo borde derecho llega al del viewport. */
+async function fijosAlBorde(page: Page): Promise<FijoAlBorde[]> {
+  return page.evaluate(() => {
+    const cromo = document.querySelectorAll('.nav-riel, aside#barra-lateral')
+    return [...document.querySelectorAll('body *')].flatMap(e => {
+      const cs = getComputedStyle(e)
+      if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return []
+      if ([...cromo].some(c => c === e || c.contains(e))) return []
+      const r = e.getBoundingClientRect()
+      if (r.width < 1 || r.height < 1 || r.right < innerWidth - 0.5) return []
+      return [{ clase: `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 60)}`, der: r.right }]
+    })
+  })
+}
+
+/** ¿El cromo recibe el clic en su centro? (con una capa abierta, no debe). */
+async function cromoPulsable(page: Page, formato: 'ext' | 'ih'): Promise<boolean> {
+  return page.evaluate(sel => {
+    const c = document.querySelector(sel)
+    if (!c) return false
+    const r = c.getBoundingClientRect()
+    const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return !!e && c.contains(e)
+  }, formato === 'ext' ? '.nav-riel' : 'aside#barra-lateral')
+}
+
+async function sinFijosAlBorde(page: Page, formato: 'ext' | 'ih', capa: string): Promise<void> {
+  expect(await fijosAlBorde(page), `${capa}: nada fijo en el borde derecho salvo el cromo`).toEqual([])
+  expect(await cromoPulsable(page, formato), `${capa}: el cromo no se pulsa por detrás`).toBe(false)
+}
+
+/** En `ext`, la tarjeta mide 310 (sin la escala de entrada: `offsetWidth`) y va centrada entre el borde izquierdo y el riel. */
+async function enteraYCentrada(page: Page, tarjeta: Locator, capa: string): Promise<void> {
+  const m = await tarjeta.evaluate(e => {
+    const riel = document.querySelector('.nav-riel')!.getBoundingClientRect()
+    let x = 0
+    for (let n: HTMLElement | null = e as HTMLElement; n; n = n.offsetParent as HTMLElement | null) x += n.offsetLeft
+    return { ancho: (e as HTMLElement).offsetWidth, izq: x, hueco: riel.left - x - (e as HTMLElement).offsetWidth }
+  })
+  expect(m.ancho, `${capa}: cabe entera (310)`).toBe(310)
+  expect(Math.abs(m.izq - m.hueco), `${capa}: centrada entre el borde y el riel`).toBeLessThanOrEqual(1)
+}
+
+test('con «Más», alerta, ⌘K y consulta rápida abiertos, sólo el cromo toca el borde derecho', async ({ page }, info) => {
+  const f = franjasDe(info.project.name)!
+  await abrir(page, '/dashboard', info.project.name)
+  expect(await fijosAlBorde(page), 'sin capas').toEqual([])
+  expect(await cromoPulsable(page, f.formato), 'sin capas, el cromo se pulsa').toBe(true)
+
+  /* «Más» (sólo el riel lo tiene) y, desde él, la alerta de cambio de consultorio. */
+  if (f.formato === 'ext') {
+    await page.locator('.nav-riel').getByRole('button', { name: /^Más/ }).click()
+    const mas = page.getByRole('dialog', { name: 'Más' })
+    await expect(mas).toBeVisible()
+    await sinFijosAlBorde(page, f.formato, '«Más»')
+    await enteraYCentrada(page, mas, '«Más»')
+    /* La semilla da dos consultorios al administrador: el selector está. */
+    const fila = mas.getByRole('button', { name: /^Consultorio activo/ })
+    {
+      await fila.click()
+      await mas.locator('.nav-consultorio-opcion').filter({ hasNot: page.locator('svg') }).first().click()
+      const alerta = page.getByRole('dialog', { name: 'Cambiar consultorio activo' })
+      await expect(alerta).toBeVisible()
+      await sinFijosAlBorde(page, f.formato, 'alerta sobre «Más»')
+      await enteraYCentrada(page, alerta, 'alerta')
+      await alerta.getByRole('button', { name: 'Cancelar' }).click()
+      await expect(alerta).toHaveCount(0)
+    }
+    await page.keyboard.press('Escape')
+    await expect(mas).toHaveCount(0)
+  } else {
+    const boton = page.locator('aside#barra-lateral').getByRole('button', { name: /^Consultorio activo/ })
+    {
+      await boton.click()
+      await page.locator('aside#barra-lateral .nav-consultorio-opcion').filter({ hasNot: page.locator('svg') }).first().click()
+      const alerta = page.getByRole('dialog', { name: 'Cambiar consultorio activo' })
+      await expect(alerta).toBeVisible()
+      await sinFijosAlBorde(page, f.formato, 'alerta de consultorio')
+      await alerta.getByRole('button', { name: 'Cancelar' }).click()
+      await expect(alerta).toHaveCount(0)
+    }
+  }
+
+  const paleta = page.getByRole('dialog', { name: 'Buscar paciente o folio' })
+  await expect(async () => {
+    if (!(await paleta.isVisible())) await page.keyboard.press('Control+k')
+    await expect(paleta).toBeVisible({ timeout: 1000 })
+  }).toPass({ timeout: 10000 })
+  await sinFijosAlBorde(page, f.formato, '⌘K')
+  await page.keyboard.press('Escape')
+  await expect(paleta).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Nueva consulta' }).locator('visible=true').first().click()
+  const consulta = page.locator('.k-capa[data-modo="arriba"]')
+  await expect(consulta).toBeVisible()
+  await sinFijosAlBorde(page, f.formato, 'consulta rápida')
+  await page.keyboard.press('Escape')
+  await expect(consulta).toHaveCount(0)
+  expect(await cromoPulsable(page, f.formato), 'cerrado todo, el cromo vuelve a pulsarse').toBe(true)
 })

@@ -89,8 +89,9 @@ export default function OfflineAlert() {
         className="absolute inset-0 bg-[var(--velo)] [backdrop-filter:var(--velo-filtro)] [-webkit-backdrop-filter:var(--velo-filtro)] transition-opacity duration-[var(--dur-entra)] ease-[var(--resorte-entra)] starting:opacity-0 data-[sale]:opacity-0 data-[sale]:duration-[var(--dur-sale)]"
       />
       {/* El área de contenido es la de las capas (`--capa-*`, que leen los
-          `--cromo-*`): sin números de la navegación aquí. */}
-      <div className="absolute flex items-center justify-center top-[var(--capa-arr)] right-[var(--capa-der)] bottom-[var(--capa-abj)] left-[var(--capa-izq)]">
+          `--cromo-*`): sin números de la navegación aquí. Menos `--fijo-*`: en
+          `ext`/`ih` esta capa ya termina donde empieza el cromo (`globals.css`). */}
+      <div className="absolute flex items-center justify-center top-[var(--capa-arr)] right-[calc(var(--capa-der)_-_var(--fijo-der))] bottom-[var(--capa-abj)] left-[calc(var(--capa-izq)_-_var(--fijo-izq))]">
         <div
           ref={tarjeta}
           role="alertdialog"

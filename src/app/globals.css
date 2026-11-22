@@ -2677,6 +2677,47 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 @media (min-width: 1024px) { .nav-paleta { padding-left: calc(var(--cromo-barra) + 24px); padding-right: 24px; } }
 [data-formato="ext"] .nav-paleta { padding-right: calc(var(--cromo-riel) + var(--ir) + 8px); padding-left: calc(var(--il) + 8px); }
 [data-formato="ih"] .nav-paleta { padding-top: calc(var(--it) + 24px); padding-right: calc(var(--cromo-barra-ih) + var(--ir) + 24px); }
+
+/* ── En `ext` e `ih` NADA FIJO TOCA EL BORDE DEL LADO DE LA FRANJA SALVO EL CROMO ──
+   HECHO DEL APARATO (iPhone Duo, iOS 26/27): con la franja a un lado, iOS la
+   deja FUERA del viewport y la rellena con un color que muestrea de la página:
+   el fondo de body/html, salvo que un `position: fixed` toque ese borde, que
+   entonces manda. Con el riel navy pegado, la franja sale navy; un velo
+   translúcido a pantalla completa (`inset: 0` + desenfoque) la volvía blanca.
+   Por eso todas las capas y velos a pantalla completa terminan donde empieza el
+   cromo (`--fijo-der`/`--fijo-izq` = `--cromo-der`/`--cromo-izq`, espejados con
+   la franja a la izquierda) y el riel o la barra siguen a la vista, opacos.
+   Su relleno descuenta lo que ya no cubren (`--capa-*` se miden desde el borde
+   del viewport): la tarjeta queda centrada en el mismo sitio que antes.
+   ⚠️ SÓLO CON NAVEGACIÓN (`:has(#barra-lateral)`): en el lanzador el cromo
+   mide 0 y nada cambia. En `tel`, `iv`, `esc` y sin formato, `--fijo-*` valen 0
+   y estas reglas no aplican. Sin `:has()` se descartan enteras (como antes).
+   ⚠️ FUERA, A PROPÓSITO: `.sp-firma-modo` (la firma del paciente tapa la
+   pantalla ENTERA para que no llegue a la navegación: es su función). */
+:root { --fijo-der: 0px; --fijo-izq: 0px; }
+:root:is([data-formato="ext"], [data-formato="ih"]):has(#barra-lateral) { --fijo-der: var(--cromo-der); --fijo-izq: var(--cromo-izq); }
+:root:is([data-formato="ext"], [data-formato="ih"]):has(#barra-lateral)
+  :is(.k-capa, .nav-capa, .nav-paleta, .nav-cajon-velo, .ag-capa-velo, .ag-hoja, .fixed.inset-0) {
+  left: var(--fijo-izq); right: var(--fijo-der);
+}
+:root:is([data-formato="ext"], [data-formato="ih"]):has(#barra-lateral) :is(.k-capa, .nav-capa, .nav-paleta) {
+  padding-left: calc(var(--capa-izq) - var(--fijo-izq)); padding-right: calc(var(--capa-der) - var(--fijo-der));
+}
+/* En `ext` el área mide 382 − 60 = 322 y la tarjeta 310: con 8 por lado no
+   cabía (306). El margen cede lo justo (6) para que quepa entera y centrada;
+   si el área crece, vuelve a 8. */
+:root[data-formato="ext"]:has(#barra-lateral) :is(.k-capa, .nav-capa) {
+  --capa-holgura: clamp(0px, calc((100vw - var(--fijo-izq) - var(--fijo-der) - 310px) / 2), 8px);
+  padding-left: calc(var(--capa-izq) - var(--fijo-izq) - 8px + var(--capa-holgura));
+  padding-right: calc(var(--capa-der) - var(--fijo-der) - 8px + var(--capa-holgura));
+}
+/* Con una capa modal abierta, el cromo se ve pero no se pulsa: no se navega por
+   detrás de un modal. Sin opacidad (cambiaría el color que muestrea iOS). En
+   `ext` sólo el riel: la `.nav-barra` es allí el cajón, que va con su velo. */
+:root[data-formato="ext"]:has(.k-capa:not([data-fase="sale"]), .nav-capa[data-fase="entra"], .nav-paleta, .nav-cajon-velo, .ag-capa-velo, .fixed.inset-0:not(.k-capa)) .nav-riel,
+:root[data-formato="ih"]:has(.k-capa:not([data-fase="sale"]), .nav-capa[data-fase="entra"], .nav-paleta, .ag-capa-velo, .fixed.inset-0:not(.k-capa)) .nav-barra {
+  pointer-events: none;
+}
 .nav-paleta-tarjeta {
   position: relative; width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto;
   border-radius: 20px; background: var(--sup); color: var(--tinta); box-shadow: var(--sombra-capa);
