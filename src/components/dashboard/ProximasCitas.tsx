@@ -179,7 +179,10 @@ function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar, donde }: {
 }): ReactElement {
   const boton = ligar?.(cita, enCurso, alQuitar, donde) ?? null
   const ancho = donde === 'hoja' ? 'w-full k-b-capa' : 'flex-1 ih:flex-none iv:flex-none esc:flex-none'
-  return (
+  /* En la pieza principal, «¿No es una cita?» va SIEMPRE debajo del botón (una
+     columna): al lado, saltaba de línea o no según el ancho que quedara. */
+  const enColumna = donde === 'principal' && esPorAsignar(cita)
+  const contenido = (
     <>
       {boton ?? (
         <Link href="/agenda" prefetch={enCurso ? undefined : false} aria-label={`Ver «${cita.reserva_nombre ?? cita.title}» en la agenda`}
@@ -195,6 +198,9 @@ function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar, donde }: {
       )}
     </>
   )
+  return enColumna
+    ? <span className="flex w-full flex-col items-stretch gap-1 ih:w-auto iv:w-auto esc:w-auto">{contenido}</span>
+    : contenido
 }
 
 /**

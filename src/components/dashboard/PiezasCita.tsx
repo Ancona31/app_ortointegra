@@ -118,11 +118,19 @@ export function PiezaPrincipal({ cita, enCurso, acciones, className = '' }: {
           <span aria-hidden="true" className="size-2 rounded-full bg-accion" />En curso
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-4">
-        <div className="flex min-w-0 flex-1 basis-[240px] items-start gap-3">
+      {/* Una composición por FORMATO, nunca por contenido (ajuste del dueño):
+          en ih/iv/esc, una fila sin salto con las acciones ancladas a la
+          derecha; en ext/tel, las acciones siempre debajo y a todo el ancho.
+          Antes era una fila con `flex-wrap` y el bloque del nombre con
+          `basis-[240px]`: saltaba de línea cuando las acciones eran anchas
+          («Ligar paciente e iniciar consulta», casi siempre con el nombre corto
+          que se teclea al reservar) y quedaban abajo a la izquierda. */}
+      <div className="flex flex-col gap-4 ih:flex-row ih:items-center iv:flex-row iv:items-center esc:flex-row esc:items-center">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <FechaChip inicio={cita.start_time} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <p className="text-[20px] font-bold leading-[26px] text-tinta [overflow-wrap:anywhere]">{nombreDeCita(cita)}</p>
+            <p title={nombreDeCita(cita)} data-nombre-cita
+              className="line-clamp-2 text-[20px] font-bold leading-[26px] text-tinta [overflow-wrap:anywhere] ext:line-clamp-3">{nombreDeCita(cita)}</p>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <LineaHora cita={cita} />
               <IconoEstadoCita estado={estadoDe(cita.status)} texto="siempre" compacto />
@@ -130,7 +138,7 @@ export function PiezaPrincipal({ cita, enCurso, acciones, className = '' }: {
             <MarcasCita cita={cita} />
           </div>
         </div>
-        <div className="flex w-full flex-wrap items-center justify-end gap-2 ih:w-auto iv:w-auto esc:w-auto">{acciones}</div>
+        <div data-acciones-cita className="flex w-full items-center gap-2 ih:w-auto ih:shrink-0 iv:w-auto iv:shrink-0 esc:w-auto esc:shrink-0">{acciones}</div>
       </div>
     </section>
   )
