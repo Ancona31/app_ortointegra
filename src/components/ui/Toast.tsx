@@ -15,9 +15,10 @@ type ToastFn = {
 
 const ToastContext = createContext<ToastFn>({ success: () => {}, error: () => {}, info: () => {}, warning: () => {} })
 
-/* Duración de cada aviso. Sólo la advertencia se queda 8 s (PLAN B3); el resto,
-   4 s, como siempre. */
-const DURACION: Record<ToastType, number> = { success: 4000, info: 4000, error: 4000, warning: 8000 }
+/* Duración de cada aviso. La advertencia (PLAN B3) y el error (decisión del
+   dueño, ajustes del rediseño) se quedan 8 s: un error hay que poder leerlo
+   entero. Éxito e información, 4 s, como siempre. */
+const DURACION: Record<ToastType, number> = { success: 4000, info: 4000, error: 8000, warning: 8000 }
 
 /* Lo que tarda la salida (`--dur-sale`). El aviso sigue montado ese rato para
    que se vea salir por donde entró; luego se quita del estado. */
