@@ -485,6 +485,18 @@ export default function ConsentimientoInformadoForm({
     // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
     desactivado: !!offlineMode,
     onPanelChange: onPanelPlantillasChange,
+    // «Guardar borrador» también en el «···» de la cabecera (maqueta `docs-c`,
+    // vista 8): la misma función y las mismas condiciones que el botón del pie,
+    // que en ese caso la hoja esconde (`spinus-tokens.css` §26). La denegación
+    // no tiene borrador.
+    masOpciones: esDenegacion ? [] : [{
+      id: 'borrador',
+      texto: guardandoBorrador ? 'Guardando…' : 'Guardar borrador',
+      icono: <FileClock />,
+      deshabilitada: guardandoBorrador || imprimiendo || vacio,
+      detalle: vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined,
+      alElegir: () => void guardarBorrador(),
+    }],
     // El tipo elegido NO viaja en la plantilla, al revés que en Honorarios: allí
     // una plantilla de cotización lo es entera —vigencia y orígenes incluidos—,
     // y aquí las dos comparten lo único plantillable, que son lugar,
