@@ -117,6 +117,90 @@ export function DashboardSkeleton({ onBuscar }: {
   )
 }
 
+/* La cabecera del paciente en hueso: copia de la geometría de
+   `expediente/CabeceraPaciente.tsx` (alto de toque del «‹ Expediente», avatar
+   de 44, nombre 28, línea 18, y en esc los tres pares de 40 y las acciones a lo
+   ancho) y de los dos plegables de la ficha en esc (`PlegablesFicha`). */
+function CabeceraPacienteHueso() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 esc:gap-4">
+        <div className="flex h-[var(--k-toque)] items-center"><Skeleton className="h-3.5 w-[84px]" /></div>
+        <div className="flex items-start gap-3 esc:flex-col">
+          <Skeleton className="mt-0.5 h-11 w-11 shrink-0 rounded-full esc:mt-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex h-7 items-center iv:h-8"><Skeleton className="h-5 w-56 max-w-full" /></div>
+            <div className="mt-0.5 flex h-[18px] items-center"><Skeleton className="h-3 w-40 max-w-full" /></div>
+            {/* En ext «edad · sexo · Exp.» ocupa dos renglones (234 px de columna). */}
+            <div className="hidden h-[18px] items-center ext:flex"><Skeleton className="h-3 w-24" /></div>
+          </div>
+        </div>
+        <div className="hidden divide-y divide-linea border-y border-linea esc:block">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex h-10 items-center justify-between"><Skeleton className="h-3.5 w-20" /><Skeleton className="h-3.5 w-24" /></div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 esc:flex-col esc:items-stretch">
+          {/* En iv el «···» de 44 da su alto a la fila. */}
+          <Skeleton className="h-10 w-[145px] rounded-[var(--r-control)] ih:h-9 ih:w-[133px] esc:h-9 esc:w-full" />
+          <div className="flex h-9 w-[140px] items-center px-1 iv:h-11 esc:w-full"><Skeleton className="h-4 w-[120px]" /></div>
+        </div>
+      </div>
+      <div className="hidden divide-y divide-linea border-b border-linea esc:block">
+        {[1, 2].map(i => <div key={i} className="flex h-12 items-center"><Skeleton className="h-4 w-32" /></div>)}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * El expediente de un paciente mientras carga: lo usan `expediente/[id]/loading.tsx`
+ * (al llegar por navegación) y la propia página mientras lee la ficha.
+ *
+ * ⚠️ ES LA PÁGINA DE `expediente/[id]/page.tsx` REPETIDA EN HUESO —ficha a la
+ * izquierda en esc, una columna en el resto—, con las MISMAS clases de
+ * contenedor (`k-tabs`/`k-tab`, `k-tarjeta`, la retícula del Resumen) para
+ * que los altos salgan de las mismas reglas. Si allí cambia la retícula, el
+ * ancho máximo o el ritmo, cámbialo aquí: lo que se ve al terminar es un salto.
+ *
+ * El cuerpo es el del Resumen (la pestaña de entrada) en su propio estado de
+ * carga, sin rótulos: la pestaña que se abre la decide el `?tab=`.
+ */
+export function ExpedientePacienteSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-[1120px] esc:grid esc:grid-cols-[280px_minmax(0,1fr)] esc:items-start esc:gap-10"
+      role="status" aria-label="Cargando expediente" aria-busy="true">
+      <CabeceraPacienteHueso />
+      <div className="mt-5 min-w-0 esc:mt-0">
+        <div className="k-tabs" aria-hidden="true">
+          {['w-[48px]', 'w-[60px]', 'w-[76px]', 'w-[64px] esc:w-[148px]'].map(w => (
+            <span key={w} className="k-tab"><Skeleton className={`h-3.5 ${w}`} /></span>
+          ))}
+        </div>
+        <div className="mt-5 grid grid-cols-1 items-start gap-6 ih:grid-cols-2 ih:grid-rows-[auto_1fr] ih:gap-4 iv:grid-cols-2 iv:grid-rows-[auto_1fr] iv:gap-5 esc:mt-6 esc:gap-7">
+          <div className="k-tarjeta ih:col-start-1 ih:row-start-1 iv:col-start-1 iv:row-start-1">
+            <Skeleton className="h-[18px] w-1/3 rounded-[6px]" />
+            <Skeleton className="mt-2 h-[22px] w-2/3 rounded-[6px]" />
+            <Skeleton className="mt-4 h-[40px] rounded-[8px]" />
+          </div>
+          <div className="flex min-w-0 flex-col gap-3 ih:col-start-2 ih:row-span-2 ih:row-start-1 iv:col-start-2 iv:row-span-2 iv:row-start-1">
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-8 w-[330px] max-w-full rounded-[10px]" />
+            </div>
+            <div className="k-tarjeta k-lista">
+              <div className="flex flex-col gap-3 py-4">{[1, 2, 3].map(i => <Skeleton key={i} className="h-[44px] rounded-[8px]" />)}</div>
+            </div>
+          </div>
+          <div className="k-tarjeta k-lista esc:hidden ih:col-start-1 ih:row-start-2 iv:col-start-1 iv:row-start-2">
+            {[1, 2, 3, 4].map(i => <div key={i} className="flex h-[52px] items-center ih:h-12"><Skeleton className="h-4 w-40" /></div>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** Formulario de perfil */
 export function PerfilSkeleton() {
   /* Calca la forma real de Mi perfil tras el rediseño: contenedor de 960 px,
