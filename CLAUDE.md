@@ -1149,8 +1149,12 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   de pruebas»). Ni DELETE, ni TRUNCATE, ni `session_replication_role = replica`
   para saltarse `prevent_audit_delete`, en una base viva. *(Aclaración de Angel
   del 2026-11-19, vía el coordinador de M: «`supabase db reset --local` crea
-  una base de pruebas nueva; no es borrar auditoría». En M no se hizo: el
-  sistema de permisos de la sesión lo denegó. AG-DT-255.)*
+  una base de pruebas nueva; no es borrar auditoría». Durante la tanda el
+  sistema de permisos de la sesión lo denegó, pero el reinicio desde cero SÍ
+  se hizo en el cierre de M (2026-11-19: el primer intento dio
+  `LegacyDbSetupError` y el segundo, con `--debug`, salió bien) y otra vez el
+  2026-11-21 en el equipo nuevo, a la primera: 50 migraciones, la última
+  `20261125180000`. AG-DT-255; `GUIA_PRUEBAS_AGENDA_V2.md`, P5.)*
   Para contar auditoría, filtra por tus ids o por `created_at >=` una marca
   (`clock_timestamp()` antes de la acción), nunca por una ventana de minutos.
   Lo vigila `src/lib/tests/pruebasSinBorrarAuditoria.test.ts`; su única
