@@ -17,6 +17,7 @@ import SeccionPlegable from '@/components/documentos/SeccionPlegable'
 import FirmadoConsentimiento, { type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
 import type { IdentificacionImpresa } from '@/lib/pdf/ConsentimientoInformadoPdf'
 import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
+import { TEXTO_CASILLA_FOTOS } from '@/components/documentos/consentimientoEmbudo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
@@ -1584,9 +1585,8 @@ export default function ConsentimientoInformadoForm({
                   <input id="consentimiento-fotos" type="checkbox" className="sr-only"
                     checked={autorizaFotos} onChange={e => setAutorizaFotos(e.target.checked)} />
                   <span className="sp-check__box"><Check aria-hidden="true" /></span>
-                  <span className="sp-check__label">
-                    Autoriza su uso con fines educativos y de publicación académica
-                  </span>
+                  {/* El texto del PDF (CI-DT-4): la casilla prometía otra finalidad. */}
+                  <span className="sp-check__label">{TEXTO_CASILLA_FOTOS}</span>
                 </label>
               </div>
             </div>
