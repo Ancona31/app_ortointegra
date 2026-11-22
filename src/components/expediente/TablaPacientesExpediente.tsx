@@ -169,9 +169,8 @@ export function TablaPacientesExpediente({ pacientes, orden, direccion, onOrden,
                 {mostrarAcciones && (
                   /* `relative z-10` levanta esta celda sobre la capa del enlace:
                      sin esto el clic en el kebab navegaría al expediente. El
-                     botón es de `KebabAccionesPaciente` (fuera de B6): aquí sólo
-                     se le da el área mínima de `ih`/`esc` (36). */
-                  <td className="relative z-10 w-9 py-1.5 [&_button]:inline-flex [&_button]:min-h-9 [&_button]:min-w-9 iv:[&_button]:min-h-11 iv:[&_button]:min-w-11 [&_button]:items-center [&_button]:justify-center">
+                     botón (`KebabAccionesPaciente`) trae su área de toque. */
+                  <td className="relative z-10 w-9 py-1">
                     <KebabAccionesPaciente pacienteId={p.id} />
                   </td>
                 )}
