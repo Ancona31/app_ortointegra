@@ -1,0 +1,953 @@
+estado	tipo	esquema	clave	campo
+solo_b	columna	public	public.agenda_ajustes.agenda_v2_encendida	
+solo_b	columna	public	public.agenda_ajustes.anticipacion_min_horas	
+solo_b	columna	public	public.agenda_ajustes.candado_cancelaciones	
+solo_b	columna	public	public.agenda_ajustes.candado_citas_activas	
+solo_b	columna	public	public.agenda_ajustes.candado_reagendados	
+solo_b	columna	public	public.agenda_ajustes.candado_ventana_dias	
+solo_b	columna	public	public.agenda_ajustes.clinica_id	
+solo_b	columna	public	public.agenda_ajustes.correo_reserva_clinica	
+solo_b	columna	public	public.agenda_ajustes.created_at	
+solo_b	columna	public	public.agenda_ajustes.horizonte_dias	
+solo_b	columna	public	public.agenda_ajustes.id	
+solo_b	columna	public	public.agenda_ajustes.recordatorio_encendido	
+solo_b	columna	public	public.agenda_ajustes.recordatorio_horas	
+solo_b	columna	public	public.agenda_ajustes.updated_at	
+solo_b	columna	public	public.agenda_ajustes.vigencia_enlace_unico_dias	
+solo_b	columna	public	public.agenda_bloqueos.clinica_id	
+solo_b	columna	public	public.agenda_bloqueos.created_at	
+solo_b	columna	public	public.agenda_bloqueos.created_by	
+solo_b	columna	public	public.agenda_bloqueos.fin	
+solo_b	columna	public	public.agenda_bloqueos.gcal_calendar_id	
+solo_b	columna	public	public.agenda_bloqueos.gcal_etag	
+solo_b	columna	public	public.agenda_bloqueos.google_event_id	
+solo_b	columna	public	public.agenda_bloqueos.id	
+solo_b	columna	public	public.agenda_bloqueos.inicio	
+solo_b	columna	public	public.agenda_bloqueos.medico_id	
+solo_b	columna	public	public.agenda_bloqueos.motivo	
+solo_b	columna	public	public.agenda_bloqueos.todo_el_dia	
+solo_b	columna	public	public.agenda_bloqueos.updated_at	
+solo_b	columna	public	public.agenda_bloqueos.zona	
+solo_b	columna	public	public.appointments.cerrada_en	
+solo_b	columna	public	public.appointments.google_asignacion	
+solo_b	columna	public	public.appointments.reserva_aceptado_en	
+solo_b	columna	public	public.appointments.reserva_aviso_version	
+solo_b	columna	public	public.appointments.reserva_canal	
+solo_b	columna	public	public.appointments.reserva_correo	
+solo_b	columna	public	public.appointments.reserva_correo_hmac	
+solo_b	columna	public	public.appointments.reserva_enlace_id	
+solo_b	columna	public	public.appointments.reserva_historial_previo	
+solo_b	columna	public	public.appointments.reserva_nombre	
+solo_b	columna	public	public.appointments.reserva_reagendados	
+solo_b	columna	public	public.appointments.reserva_tel_hmac	
+solo_b	columna	public	public.appointments.reserva_telefono	
+solo_b	columna	public	public.appointments.sustituida_por	
+solo_b	columna	public	public.appointments.tipo_cita_id	
+solo_b	columna	public	public.appointments.tipo_cita_nombre	
+solo_b	columna	public	public.avisos_clinica.cita_id	
+solo_b	columna	public	public.avisos_clinica.clinica_id	
+solo_b	columna	public	public.avisos_clinica.creado_en	
+solo_b	columna	public	public.avisos_clinica.id	
+solo_b	columna	public	public.avisos_clinica.revisado_en	
+solo_b	columna	public	public.avisos_clinica.revisado_por	
+solo_b	columna	public	public.avisos_clinica.tipo	
+solo_b	columna	public	public.cita_confirmaciones.appointment_id	
+solo_b	columna	public	public.cita_confirmaciones.clinica_id	
+solo_b	columna	public	public.cita_confirmaciones.codigo_hash	
+solo_b	columna	public	public.cita_confirmaciones.creado_por	
+solo_b	columna	public	public.cita_confirmaciones.created_at	
+solo_b	columna	public	public.cita_confirmaciones.id	
+solo_b	columna	public	public.cita_confirmaciones.paciente_id	
+solo_b	columna	public	public.cita_confirmaciones.reserva_correo_hmac	
+solo_b	columna	public	public.cita_confirmaciones.respondido_en	
+solo_b	columna	public	public.cita_confirmaciones.respuesta	
+solo_b	columna	public	public.cita_confirmaciones.revocado_en	
+solo_b	columna	public	public.cita_correos.appointment_id	
+solo_b	columna	public	public.cita_correos.clinica_id	
+solo_b	columna	public	public.cita_correos.created_at	
+solo_b	columna	public	public.cita_correos.enviado_en	
+solo_b	columna	public	public.cita_correos.estado	
+solo_b	columna	public	public.cita_correos.id	
+solo_b	columna	public	public.cita_correos.inicio_cita	
+solo_b	columna	public	public.cita_correos.intentos	
+solo_b	columna	public	public.cita_correos.motivo	
+solo_b	columna	public	public.cita_correos.testigo	
+solo_b	columna	public	public.cita_correos.tipo	
+solo_b	columna	public	public.cita_correos.tomado_en	
+solo_b	columna	public	public.cita_correos.updated_at	
+solo_b	columna	public	public.cita_reagendos.cita_nueva_id	
+solo_b	columna	public	public.cita_reagendos.cita_origen_id	
+solo_b	columna	public	public.cita_reagendos.clinica_id	
+solo_b	columna	public	public.cita_reagendos.confirmacion_id	
+solo_b	columna	public	public.cita_reagendos.created_at	
+solo_b	columna	public	public.cita_reagendos.id	
+solo_b	columna	public	public.cita_reagendos.numero	
+solo_b	columna	public	public.clinicas.timezone	
+solo_b	columna	public	public.consultorios.horario_propio	
+solo_b	columna	public	public.consultorios.horario_revisado_en	
+solo_b	columna	public	public.gcal_movimientos_rechazados.cita_id	
+solo_b	columna	public	public.gcal_movimientos_rechazados.clinica_id	
+solo_b	columna	public	public.gcal_movimientos_rechazados.detectado_en	
+solo_b	columna	public	public.gcal_movimientos_rechazados.google_updated	
+solo_b	columna	public	public.gcal_movimientos_rechazados.id	
+solo_b	columna	public	public.gcal_sync_estado.calendar_id	
+solo_b	columna	public	public.gcal_sync_estado.candado	
+solo_b	columna	public	public.gcal_sync_estado.candado_hasta	
+solo_b	columna	public	public.gcal_sync_estado.clinica_id	
+solo_b	columna	public	public.gcal_sync_estado.completas	
+solo_b	columna	public	public.gcal_sync_estado.conexion_id	
+solo_b	columna	public	public.gcal_sync_estado.created_at	
+solo_b	columna	public	public.gcal_sync_estado.errores_seguidos	
+solo_b	columna	public	public.gcal_sync_estado.fase	
+solo_b	columna	public	public.gcal_sync_estado.id	
+solo_b	columna	public	public.gcal_sync_estado.page_token	
+solo_b	columna	public	public.gcal_sync_estado.sync_token	
+solo_b	columna	public	public.gcal_sync_estado.ultima_ok	
+solo_b	columna	public	public.gcal_sync_estado.ultimo_error	
+solo_b	columna	public	public.gcal_sync_estado.ultimo_intento	
+solo_b	columna	public	public.gcal_sync_estado.updated_at	
+solo_b	columna	public	public.gcal_sync_estado.ventana_desde	
+solo_b	columna	public	public.reserva_avisos.aprobado	
+solo_b	columna	public	public.reserva_avisos.aprobado_en	
+solo_b	columna	public	public.reserva_avisos.created_at	
+solo_b	columna	public	public.reserva_avisos.id	
+solo_b	columna	public	public.reserva_avisos.texto_sha256	
+solo_b	columna	public	public.reserva_avisos.version	
+solo_b	columna	public	public.reserva_contactos.bloqueado_en	
+solo_b	columna	public	public.reserva_contactos.bloqueado_por	
+solo_b	columna	public	public.reserva_contactos.clase	
+solo_b	columna	public	public.reserva_contactos.clave_hmac	
+solo_b	columna	public	public.reserva_contactos.clinica_id	
+solo_b	columna	public	public.reserva_contactos.created_at	
+solo_b	columna	public	public.reserva_contactos.id	
+solo_b	columna	public	public.reserva_contactos.medico_id	
+solo_b	columna	public	public.reserva_contactos.perdonado_en	
+solo_b	columna	public	public.reserva_contactos.perdonado_por	
+solo_b	columna	public	public.reserva_contactos.updated_at	
+solo_b	columna	public	public.reserva_empalmes_google.cita_otra_id	
+solo_b	columna	public	public.reserva_empalmes_google.cita_reserva_id	
+solo_b	columna	public	public.reserva_empalmes_google.clinica_id	
+solo_b	columna	public	public.reserva_empalmes_google.detectado_en	
+solo_b	columna	public	public.reserva_empalmes_google.id	
+solo_b	columna	public	public.reserva_enlaces.agotado_en	
+solo_b	columna	public	public.reserva_enlaces.caduca_en	
+solo_b	columna	public	public.reserva_enlaces.clase	
+solo_b	columna	public	public.reserva_enlaces.clinica_id	
+solo_b	columna	public	public.reserva_enlaces.codigo_hash	
+solo_b	columna	public	public.reserva_enlaces.correo	
+solo_b	columna	public	public.reserva_enlaces.correo_hmac	
+solo_b	columna	public	public.reserva_enlaces.created_at	
+solo_b	columna	public	public.reserva_enlaces.created_by	
+solo_b	columna	public	public.reserva_enlaces.etiqueta	
+solo_b	columna	public	public.reserva_enlaces.id	
+solo_b	columna	public	public.reserva_enlaces.intentos	
+solo_b	columna	public	public.reserva_enlaces.medico_id	
+solo_b	columna	public	public.reserva_enlaces.pausado_en	
+solo_b	columna	public	public.reserva_enlaces.revocado_en	
+solo_b	columna	public	public.reserva_enlaces.revocado_por	
+solo_b	columna	public	public.reserva_enlaces.updated_at	
+solo_b	columna	public	public.reserva_enlaces.usado_cita_id	
+solo_b	columna	public	public.reserva_enlaces.usado_en	
+solo_b	columna	public	public.reserva_enlaces.vigencia_dias	
+solo_b	columna	public	public.reserva_incidencias.anulada_en	
+solo_b	columna	public	public.reserva_incidencias.appointment_id	
+solo_b	columna	public	public.reserva_incidencias.clinica_id	
+solo_b	columna	public	public.reserva_incidencias.correo_hmac	
+solo_b	columna	public	public.reserva_incidencias.created_at	
+solo_b	columna	public	public.reserva_incidencias.id	
+solo_b	columna	public	public.reserva_incidencias.medico_id	
+solo_b	columna	public	public.reserva_incidencias.tel_hmac	
+solo_b	columna	public	public.reserva_incidencias.tipo	
+solo_b	columna	public	public.reserva_verificaciones.caduca_en	
+solo_b	columna	public	public.reserva_verificaciones.clinica_id	
+solo_b	columna	public	public.reserva_verificaciones.codigo_hmac	
+solo_b	columna	public	public.reserva_verificaciones.consumida_en	
+solo_b	columna	public	public.reserva_verificaciones.correo_hmac	
+solo_b	columna	public	public.reserva_verificaciones.created_at	
+solo_b	columna	public	public.reserva_verificaciones.enlace_id	
+solo_b	columna	public	public.reserva_verificaciones.ficha_caduca_en	
+solo_b	columna	public	public.reserva_verificaciones.ficha_hmac	
+solo_b	columna	public	public.reserva_verificaciones.id	
+solo_b	columna	public	public.reserva_verificaciones.intentos	
+solo_b	columna	public	public.reserva_verificaciones.verificado_en	
+solo_b	columna	public	public.tipos_cita.activo	
+solo_b	columna	public	public.tipos_cita.clinica_id	
+solo_b	columna	public	public.tipos_cita.color	
+solo_b	columna	public	public.tipos_cita.consultorio_id	
+solo_b	columna	public	public.tipos_cita.created_at	
+solo_b	columna	public	public.tipos_cita.duracion_min	
+solo_b	columna	public	public.tipos_cita.id	
+solo_b	columna	public	public.tipos_cita.medico_id	
+solo_b	columna	public	public.tipos_cita.nombre	
+solo_b	columna	public	public.tipos_cita.principal	
+solo_b	columna	public	public.tipos_cita.updated_at	
+solo_b	columna	respaldos	respaldos.consultorios_horario_20261119.clinica_id	
+solo_b	columna	respaldos	respaldos.consultorios_horario_20261119.horario	
+solo_b	columna	respaldos	respaldos.consultorios_horario_20261119.horario_propio	
+solo_b	columna	respaldos	respaldos.consultorios_horario_20261119.id	
+solo_b	columna	respaldos	respaldos.consultorios_horario_20261119.respaldado_en	
+solo_b	comentario	public	function public.agenda_restablecer_configuracion(pg_catalog.uuid,pg_catalog.uuid)	
+solo_b	comentario	public	function public.agenda_v2_encendida(pg_catalog.uuid)	
+solo_b	comentario	public	function public.aviso_clinica_de_confirmacion()	
+solo_b	comentario	public	function public.cita_asignacion_google()	
+solo_b	comentario	public	function public.cita_movimiento_google_registrar(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone)	
+solo_b	comentario	public	function public.cita_nombre_saludo(pg_catalog.uuid,pg_catalog.uuid)	
+solo_b	comentario	public	function public.cita_proteger_atendida()	
+solo_b	comentario	public	function public.cita_proteger_bloqueo()	
+solo_b	comentario	public	function public.cita_proteger_borrado()	
+solo_b	comentario	public	function public.cita_proteger_cierre()	
+solo_b	comentario	public	function public.cita_proteger_eleccion()	
+solo_b	comentario	public	function public.cita_proteger_reserva()	
+solo_b	comentario	public	function public.cita_reagendar_clinica(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)	
+solo_b	comentario	public	function public.cita_reagendar_oferta(pg_catalog.uuid,pg_catalog.text)	
+solo_b	comentario	public	function public.cita_recordatorios_pendientes(integer)	
+solo_b	comentario	public	function public.cita_rsvp_google(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text[])	
+solo_b	comentario	public	function public.cita_tiene_nota_ligada(pg_catalog.uuid,pg_catalog.uuid)	
+solo_b	comentario	public	function public.gcal_aplicar_evento(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,timestamp with time zone,pg_catalog.text,boolean,timestamp with time zone,timestamp with time zone,boolean,pg_catalog.text,boolean,pg_catalog.text,boolean)	
+solo_b	comentario	public	function public.gcal_bloqueo_aplicar(pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.uuid,pg_catalog.text,timestamp with time zone,boolean,timestamp with time zone,timestamp with time zone,pg_catalog.date,pg_catalog.date)	
+solo_b	comentario	public	function public.gcal_citas_por_evento(pg_catalog.uuid,pg_catalog.text[],pg_catalog.uuid[])	
+solo_b	comentario	public	function public.gcal_sync_clinica_habilitada(pg_catalog.uuid)	
+solo_b	comentario	public	function public.gcal_sync_frescura(pg_catalog.uuid)	
+solo_b	comentario	public	function public.log_cita_change()	
+solo_b	comentario	public	function public.prohibir_truncate()	
+solo_b	comentario	public	function public.proteger_reserva_enlaces()	
+solo_b	comentario	public	function public.rate_limit_espera(pg_catalog.text,integer,integer)	
+solo_b	comentario	public	function public.reagendar_por_enlace(pg_catalog.text,pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)	
+solo_b	comentario	public	function public.reserva_codigo_verificar(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)	
+solo_b	comentario	public	function public.reserva_contacto_estado(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text)	
+solo_b	comentario	public	function public.reserva_contexto(pg_catalog.text,pg_catalog.text,pg_catalog.text)	
+solo_b	comentario	public	function public.reserva_empalmes_registrar(pg_catalog.uuid,pg_catalog.uuid[])	
+solo_b	comentario	public	function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text)	
+solo_b	comentario	public	function public.reserva_espera_reenvio(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,integer)	
+solo_b	comentario	public	function public.reserva_ocupacion(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone)	
+solo_b	comentario	public	function public.reservar_por_enlace(pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)	
+solo_b	comentario	public	index public.idx_appointments_clinica_inicio	
+solo_b	comentario	public	index public.idx_appointments_clinica_medico_inicio	
+solo_b	comentario	public	table column public.agenda_ajustes.agenda_v2_encendida	
+solo_b	comentario	public	table column public.agenda_ajustes.candado_citas_activas	
+solo_b	comentario	public	table column public.agenda_ajustes.correo_reserva_clinica	
+solo_b	comentario	public	table column public.agenda_ajustes.recordatorio_encendido	
+solo_b	comentario	public	table column public.appointments.cerrada_en	
+solo_b	comentario	public	table column public.appointments.google_asignacion	
+solo_b	comentario	public	table column public.appointments.reserva_aceptado_en	
+solo_b	comentario	public	table column public.appointments.reserva_aviso_version	
+solo_b	comentario	public	table column public.appointments.reserva_canal	
+solo_b	comentario	public	table column public.appointments.reserva_correo	
+solo_b	comentario	public	table column public.appointments.reserva_correo_hmac	
+solo_b	comentario	public	table column public.appointments.reserva_enlace_id	
+solo_b	comentario	public	table column public.appointments.reserva_historial_previo	
+solo_b	comentario	public	table column public.appointments.reserva_nombre	
+solo_b	comentario	public	table column public.appointments.reserva_reagendados	
+solo_b	comentario	public	table column public.appointments.reserva_tel_hmac	
+solo_b	comentario	public	table column public.appointments.reserva_telefono	
+solo_b	comentario	public	table column public.appointments.sustituida_por	
+solo_b	comentario	public	table column public.appointments.tipo_cita_id	
+solo_b	comentario	public	table column public.appointments.tipo_cita_nombre	
+solo_b	comentario	public	table column public.cita_confirmaciones.paciente_id	
+solo_b	comentario	public	table column public.cita_confirmaciones.respuesta	
+solo_b	comentario	public	table column public.cita_correos.inicio_cita	
+solo_b	comentario	public	table column public.cita_correos.testigo	
+solo_b	comentario	public	table column public.clinicas.timezone	
+solo_b	comentario	public	table column public.consultorios.horario_propio	
+solo_b	comentario	public	table column public.consultorios.horario_revisado_en	
+solo_b	comentario	public	table column public.gcal_sync_estado.ventana_desde	
+solo_b	comentario	public	table column public.reserva_enlaces.agotado_en	
+solo_b	comentario	public	table column public.reserva_enlaces.correo	
+solo_b	comentario	public	table column public.reserva_enlaces.correo_hmac	
+solo_b	comentario	public	table column public.reserva_enlaces.intentos	
+solo_b	comentario	public	table column public.reserva_enlaces.pausado_en	
+solo_b	comentario	public	table column public.tipos_cita.consultorio_id	
+solo_b	comentario	public	table column public.tipos_cita.principal	
+solo_b	comentario	public	table public.agenda_ajustes	
+solo_b	comentario	public	table public.agenda_bloqueos	
+solo_b	comentario	public	table public.avisos_clinica	
+solo_b	comentario	public	table public.cita_confirmaciones	
+solo_b	comentario	public	table public.cita_correos	
+solo_b	comentario	public	table public.cita_reagendos	
+solo_b	comentario	public	table public.gcal_movimientos_rechazados	
+solo_b	comentario	public	table public.gcal_sync_estado	
+solo_b	comentario	public	table public.reserva_avisos	
+solo_b	comentario	public	table public.reserva_contactos	
+solo_b	comentario	public	table public.reserva_empalmes_google	
+solo_b	comentario	public	table public.reserva_enlaces	
+solo_b	comentario	public	table public.reserva_incidencias	
+solo_b	comentario	public	table public.tipos_cita	
+solo_b	comentario	respaldos	table respaldos.consultorios_horario_20261119	
+distinto	default_privileges	public	de postgres en public para tablas → anon	privilegios
+distinto	default_privileges	public	de postgres en public para tablas → authenticated	privilegios
+distinto	default_privileges	public	de postgres en public para tablas → service_role	privilegios
+solo_b	disparador	public	public.addendums.trg_addendums_sin_truncate	
+solo_b	disparador	public	public.agenda_ajustes.audit_agenda_ajustes	
+solo_b	disparador	public	public.agenda_ajustes.trg_agenda_ajustes_proteger	
+solo_b	disparador	public	public.agenda_bloqueos.audit_agenda_bloqueos	
+solo_b	disparador	public	public.agenda_bloqueos.trg_agenda_bloqueos_preparar	
+solo_b	disparador	public	public.appointments.audit_appointments	
+solo_b	disparador	public	public.appointments.audit_appointments_update	
+solo_b	disparador	public	public.appointments.trg_appointments_asignacion_google	
+solo_b	disparador	public	public.appointments.trg_appointments_aviso_clinica	
+solo_b	disparador	public	public.appointments.trg_appointments_horario_bloqueado	
+solo_b	disparador	public	public.appointments.trg_appointments_proteger_atendida	
+solo_b	disparador	public	public.appointments.trg_appointments_proteger_borrado	
+solo_b	disparador	public	public.appointments.trg_appointments_proteger_cierre	
+solo_b	disparador	public	public.appointments.trg_appointments_proteger_eleccion	
+solo_b	disparador	public	public.appointments.trg_appointments_proteger_reserva	
+solo_b	disparador	public	public.appointments.trg_appointments_reserva_incidencia	
+solo_b	disparador	public	public.appointments.trg_appointments_sin_truncate	
+solo_b	disparador	public	public.audit_log.prevent_audit_truncate	
+solo_b	disparador	public	public.avisos_clinica.audit_avisos_clinica	
+solo_b	disparador	public	public.avisos_clinica.trg_avisos_clinica_revisar	
+solo_b	disparador	public	public.calculadora_resultados.trg_calculadora_resultados_sin_truncate	
+solo_b	disparador	public	public.casos_clinicos.trg_casos_clinicos_sin_truncate	
+solo_b	disparador	public	public.casos_clinicos_recursos.trg_casos_clinicos_recursos_sin_truncate	
+solo_b	disparador	public	public.cita_confirmaciones.audit_cita_confirmaciones	
+solo_b	disparador	public	public.cita_confirmaciones.trg_cita_confirmaciones_aviso_clinica	
+solo_b	disparador	public	public.cita_confirmaciones.trg_cita_confirmaciones_aviso_confirmacion	
+solo_b	disparador	public	public.cita_correos.audit_cita_correos	
+solo_b	disparador	public	public.cita_reagendos.audit_cita_reagendos	
+solo_b	disparador	public	public.cita_reagendos.trg_cita_reagendos_aviso_clinica	
+solo_b	disparador	public	public.consultas.trg_consultas_sin_truncate	
+solo_b	disparador	public	public.documentos.trg_documentos_sin_truncate	
+solo_b	disparador	public	public.gcal_movimientos_rechazados.trg_gcal_movimientos_aviso_clinica	
+solo_b	disparador	public	public.mediciones_analitos.trg_mediciones_analitos_sin_truncate	
+solo_b	disparador	public	public.paciente_medico.trg_paciente_medico_sin_truncate	
+solo_b	disparador	public	public.pacientes.trg_pacientes_sin_truncate	
+solo_b	disparador	public	public.reserva_avisos.audit_reserva_avisos	
+solo_b	disparador	public	public.reserva_contactos.audit_reserva_contactos	
+solo_b	disparador	public	public.reserva_contactos.trg_reserva_contactos_proteger	
+solo_b	disparador	public	public.reserva_empalmes_google.trg_reserva_empalmes_aviso_clinica	
+solo_b	disparador	public	public.reserva_enlaces.audit_reserva_enlaces	
+solo_b	disparador	public	public.reserva_enlaces.trg_reserva_enlaces_proteger	
+solo_b	disparador	public	public.reserva_enlaces.trg_reserva_enlaces_unico	
+solo_b	disparador	public	public.solicitudes_arco.trg_solicitudes_arco_sin_truncate	
+solo_b	disparador	public	public.tipos_cita.audit_tipos_cita	
+solo_b	disparador	public	public.tipos_cita.trg_tipos_cita_consultorio	
+solo_b	disparador	public	public.tipos_cita.trg_tipos_cita_medico	
+solo_b	disparador	public	public.tipos_cita.trg_tipos_cita_updated_at	
+solo_b	funcion	public	public.agenda_bloqueo_preparar()	
+solo_b	funcion	public	public.agenda_restablecer_configuracion(p_clinica_id uuid, p_actor uuid)	
+solo_b	funcion	public	public.agenda_v2_encendida(p_clinica_id uuid)	
+solo_b	funcion	public	public.aviso_clinica_de_cita()	
+solo_b	funcion	public	public.aviso_clinica_de_confirmacion()	
+solo_b	funcion	public	public.aviso_clinica_de_empalme()	
+solo_b	funcion	public	public.aviso_clinica_de_movimiento_google()	
+solo_b	funcion	public	public.aviso_clinica_de_reagendo()	
+solo_b	funcion	public	public.aviso_clinica_de_respuesta()	
+solo_b	funcion	public	public.aviso_clinica_revisar()	
+solo_b	funcion	public	public.cita_asignacion_google()	
+solo_b	funcion	public	public.cita_confirmacion_coincide(p_enlace_paciente uuid, p_enlace_hmac text, p_cita_paciente uuid, p_cita_hmac text)	
+solo_b	funcion	public	public.cita_confirmacion_contexto(p_codigo_hash text)	
+solo_b	funcion	public	public.cita_confirmacion_emitir(p_clinica_id uuid, p_cita_id uuid, p_id uuid, p_codigo_hash text, p_creado_por uuid)	
+solo_b	funcion	public	public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text)	
+solo_b	funcion	public	public.cita_confirmacion_revocar(p_clinica_id uuid, p_cita_id uuid)	
+solo_b	funcion	public	public.cita_correo_marcar(p_clinica_id uuid, p_envio_id uuid, p_testigo uuid, p_estado text, p_motivo text)	
+solo_b	funcion	public	public.cita_correo_tomar(p_clinica_id uuid, p_cita_id uuid, p_tipo text, p_testigo uuid)	
+solo_b	funcion	public	public.cita_movimiento_google_registrar(p_clinica_id uuid, p_cita_id uuid, p_google_updated timestamp with time zone)	
+solo_b	funcion	public	public.cita_nombre_saludo(p_clinica_id uuid, p_cita_id uuid)	
+solo_b	funcion	public	public.cita_proteger_atendida()	
+solo_b	funcion	public	public.cita_proteger_bloqueo()	
+solo_b	funcion	public	public.cita_proteger_borrado()	
+solo_b	funcion	public	public.cita_proteger_cierre()	
+solo_b	funcion	public	public.cita_proteger_eleccion()	
+solo_b	funcion	public	public.cita_proteger_reserva()	
+solo_b	funcion	public	public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone)	
+solo_b	funcion	public	public.cita_reagendar_oferta(p_clinica_id uuid, p_codigo_hash text)	
+solo_b	funcion	public	public.cita_recordatorios_pendientes(p_limite integer)	
+solo_b	funcion	public	public.cita_rsvp_google(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_aceptaron text[])	
+solo_b	funcion	public	public.cita_tiene_nota_ligada(p_cita uuid, p_clinica uuid)	
+solo_b	funcion	public	public.gcal_aplicar_evento(p_clinica_id uuid, p_cita_id uuid, p_esperado_updated_at timestamp with time zone, p_calendar_id text, p_etag text, p_google_updated timestamp with time zone, p_vincular_evento text, p_desvincular boolean, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_title text, p_tocar_notas boolean, p_notas text, p_cancelar boolean)	
+solo_b	funcion	public	public.gcal_bloqueo_aplicar(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_bloqueo_id uuid, p_etag text, p_google_updated timestamp with time zone, p_borrar boolean, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_desde date, p_hasta date)	
+solo_b	funcion	public	public.gcal_citas_por_evento(p_clinica_id uuid, p_eventos text[], p_citas uuid[])	
+solo_b	funcion	public	public.gcal_importar_evento(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_etag text, p_google_updated timestamp with time zone, p_title text, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_timezone text, p_notas text, p_medico_id uuid)	
+solo_b	funcion	public	public.gcal_sync_avanzar(p_clinica_id uuid, p_candado uuid, p_page_token text, p_sync_token text, p_ventana_desde timestamp with time zone, p_lease_seg integer)	
+solo_b	funcion	public	public.gcal_sync_clinica_habilitada(p_clinica_id uuid)	
+solo_b	funcion	public	public.gcal_sync_clinicas_pendientes(p_limite integer)	
+solo_b	funcion	public	public.gcal_sync_frescura(p_clinica_id uuid)	
+solo_b	funcion	public	public.gcal_sync_reiniciar(p_clinica_id uuid, p_candado uuid)	
+solo_b	funcion	public	public.gcal_sync_soltar(p_clinica_id uuid, p_candado uuid, p_error text)	
+solo_b	funcion	public	public.gcal_sync_tomar(p_clinica_id uuid, p_conexion_id uuid, p_calendar_id text, p_lease_seg integer, p_min_intervalo_seg integer)	
+solo_b	funcion	public	public.log_cita_change()	
+solo_b	funcion	public	public.prohibir_truncate()	
+solo_b	funcion	public	public.proteger_agenda_ajustes()	
+solo_b	funcion	public	public.proteger_reserva_contactos()	
+solo_b	funcion	public	public.proteger_reserva_enlace_unico()	
+solo_b	funcion	public	public.proteger_reserva_enlaces()	
+solo_b	funcion	public	public.rate_limit_espera(p_ruta text, p_limite integer, p_ventana_seg integer)	
+solo_b	funcion	public	public.reagendar_por_enlace(p_confirmacion_hash text, p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid)	
+solo_b	funcion	public	public.reserva_codigo_emitir(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text)	
+solo_b	funcion	public	public.reserva_codigo_verificar(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text, p_ficha_hmac text)	
+solo_b	funcion	public	public.reserva_contacto_estado(p_clinica_id uuid, p_medico_id uuid, p_tel_hmac text, p_correo_hmac text)	
+solo_b	funcion	public	public.reserva_contacto_marcar(p_cita_id uuid, p_accion text)	
+solo_b	funcion	public	public.reserva_contactos_bloqueados()	
+solo_b	funcion	public	public.reserva_contexto(p_codigo_hash text, p_aviso_version text, p_aviso_sha256 text)	
+solo_b	funcion	public	public.reserva_empalmes_registrar(p_clinica_id uuid, p_citas uuid[])	
+solo_b	funcion	public	public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text, p_correo text, p_correo_hmac text)	
+solo_b	funcion	public	public.reserva_espera_reenvio(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_segundos integer)	
+solo_b	funcion	public	public.reserva_ocupacion(p_clinica_id uuid, p_enlace_id uuid, p_desde timestamp with time zone, p_hasta timestamp with time zone)	
+solo_b	funcion	public	public.reserva_registrar_incidencia()	
+solo_b	funcion	public	public.reservar_por_enlace(p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid)	
+solo_b	funcion	public	public.update_tipos_cita_updated_at()	
+solo_b	funcion	public	public.validar_tipo_cita_consultorio()	
+solo_b	funcion	public	public.validar_tipo_cita_medico()	
+solo_b	indice	public	public.agenda_ajustes_clinica_key	
+solo_b	indice	public	public.agenda_ajustes_pkey	
+solo_b	indice	public	public.agenda_bloqueos_evento_key	
+solo_b	indice	public	public.agenda_bloqueos_medico_fk_idx	
+solo_b	indice	public	public.agenda_bloqueos_medico_idx	
+solo_b	indice	public	public.agenda_bloqueos_pkey	
+solo_b	indice	public	public.avisos_clinica_clinica_idx	
+solo_b	indice	public	public.avisos_clinica_pendiente_key	
+solo_b	indice	public	public.avisos_clinica_pendientes_idx	
+solo_b	indice	public	public.avisos_clinica_pkey	
+solo_b	indice	public	public.cita_confirmaciones_cita	
+solo_b	indice	public	public.cita_confirmaciones_codigo_key	
+solo_b	indice	public	public.cita_confirmaciones_pkey	
+solo_b	indice	public	public.cita_confirmaciones_respuestas	
+solo_b	indice	public	public.cita_confirmaciones_vigente	
+solo_b	indice	public	public.cita_correos_clinica	
+solo_b	indice	public	public.cita_correos_llave_key	
+solo_b	indice	public	public.cita_correos_pkey	
+solo_b	indice	public	public.cita_reagendos_confirmacion	
+solo_b	indice	public	public.cita_reagendos_nueva_key	
+solo_b	indice	public	public.cita_reagendos_origen_key	
+solo_b	indice	public	public.cita_reagendos_pkey	
+solo_b	indice	public	public.gcal_movimientos_rechazados_clinica_idx	
+solo_b	indice	public	public.gcal_movimientos_rechazados_intento_key	
+solo_b	indice	public	public.gcal_movimientos_rechazados_pkey	
+solo_b	indice	public	public.gcal_sync_estado_clinica_key	
+solo_b	indice	public	public.gcal_sync_estado_pkey	
+solo_b	indice	public	public.idx_appointments_clinica_inicio	
+solo_b	indice	public	public.idx_appointments_clinica_medico_inicio	
+solo_b	indice	public	public.idx_appointments_reserva_correo	
+solo_b	indice	public	public.idx_appointments_reserva_enlace	
+solo_b	indice	public	public.idx_appointments_reserva_tel	
+solo_b	indice	public	public.idx_appointments_sustituida_por	
+solo_b	indice	public	public.idx_appointments_tipo_cita	
+solo_b	indice	public	public.reserva_avisos_id_key	
+solo_b	indice	public	public.reserva_avisos_pkey	
+solo_b	indice	public	public.reserva_contactos_clave_key	
+solo_b	indice	public	public.reserva_contactos_pkey	
+solo_b	indice	public	public.reserva_empalmes_google_clinica_idx	
+solo_b	indice	public	public.reserva_empalmes_google_par_key	
+solo_b	indice	public	public.reserva_empalmes_google_pkey	
+solo_b	indice	public	public.reserva_enlaces_codigo_key	
+solo_b	indice	public	public.reserva_enlaces_fijo_vigente	
+solo_b	indice	public	public.reserva_enlaces_id_clinica_key	
+solo_b	indice	public	public.reserva_enlaces_pkey	
+solo_b	indice	public	public.reserva_enlaces_por_medico	
+solo_b	indice	public	public.reserva_incidencias_cita	
+solo_b	indice	public	public.reserva_incidencias_correo	
+solo_b	indice	public	public.reserva_incidencias_pkey	
+solo_b	indice	public	public.reserva_incidencias_tel	
+solo_b	indice	public	public.reserva_verificaciones_busqueda	
+solo_b	indice	public	public.reserva_verificaciones_ficha_key	
+solo_b	indice	public	public.reserva_verificaciones_pkey	
+solo_b	indice	public	public.tipos_cita_consultorio	
+solo_b	indice	public	public.tipos_cita_id_clinica_key	
+solo_b	indice	public	public.tipos_cita_medico	
+solo_b	indice	public	public.tipos_cita_nombre_activo_unico	
+solo_b	indice	public	public.tipos_cita_pkey	
+solo_b	indice	public	public.tipos_cita_principal_unico	
+solo_b	indice	respaldos	respaldos.consultorios_horario_20261119_pkey	
+solo_b	permiso	public	columna public.agenda_bloqueos.clinica_id → authenticated	
+solo_b	permiso	public	columna public.agenda_bloqueos.fin → authenticated	
+solo_b	permiso	public	columna public.agenda_bloqueos.inicio → authenticated	
+solo_b	permiso	public	columna public.agenda_bloqueos.medico_id → authenticated	
+solo_b	permiso	public	columna public.agenda_bloqueos.motivo → authenticated	
+solo_b	permiso	public	columna public.agenda_bloqueos.todo_el_dia → authenticated	
+solo_b	permiso	public	columna public.agenda_bloqueos.zona → authenticated	
+solo_b	permiso	public	columna public.avisos_clinica.revisado_en → authenticated	
+solo_b	permiso	public	columna public.avisos_clinica.revisado_por → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.appointment_id → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.clinica_id → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.created_at → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.id → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.respondido_en → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.respuesta → authenticated	
+solo_b	permiso	public	columna public.cita_confirmaciones.revocado_en → authenticated	
+solo_b	permiso	public	columna public.cita_correos.appointment_id → authenticated	
+solo_b	permiso	public	columna public.cita_correos.clinica_id → authenticated	
+solo_b	permiso	public	columna public.cita_correos.enviado_en → authenticated	
+solo_b	permiso	public	columna public.cita_correos.estado → authenticated	
+solo_b	permiso	public	columna public.cita_correos.id → authenticated	
+solo_b	permiso	public	columna public.cita_correos.inicio_cita → authenticated	
+solo_b	permiso	public	columna public.cita_correos.tipo → authenticated	
+solo_b	permiso	public	columna public.cita_reagendos.cita_nueva_id → authenticated	
+solo_b	permiso	public	columna public.cita_reagendos.cita_origen_id → authenticated	
+solo_b	permiso	public	columna public.cita_reagendos.clinica_id → authenticated	
+solo_b	permiso	public	columna public.cita_reagendos.created_at → authenticated	
+solo_b	permiso	public	columna public.cita_reagendos.id → authenticated	
+solo_b	permiso	public	columna public.cita_reagendos.numero → authenticated	
+solo_b	permiso	public	funcion public.agenda_bloqueo_preparar() → anon	
+solo_b	permiso	public	funcion public.agenda_bloqueo_preparar() → authenticated	
+solo_b	permiso	public	funcion public.agenda_bloqueo_preparar() → postgres	
+solo_b	permiso	public	funcion public.agenda_bloqueo_preparar() → service_role	
+solo_b	permiso	public	funcion public.agenda_restablecer_configuracion(p_clinica_id uuid, p_actor uuid) → postgres	
+solo_b	permiso	public	funcion public.agenda_restablecer_configuracion(p_clinica_id uuid, p_actor uuid) → service_role	
+solo_b	permiso	public	funcion public.agenda_v2_encendida(p_clinica_id uuid) → authenticated	
+solo_b	permiso	public	funcion public.agenda_v2_encendida(p_clinica_id uuid) → postgres	
+solo_b	permiso	public	funcion public.agenda_v2_encendida(p_clinica_id uuid) → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_de_cita() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_de_cita() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_de_cita() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_de_cita() → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_de_confirmacion() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_de_confirmacion() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_de_confirmacion() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_de_confirmacion() → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_de_empalme() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_de_empalme() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_de_empalme() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_de_empalme() → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_de_movimiento_google() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_de_movimiento_google() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_de_movimiento_google() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_de_movimiento_google() → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_de_reagendo() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_de_reagendo() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_de_reagendo() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_de_reagendo() → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_de_respuesta() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_de_respuesta() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_de_respuesta() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_de_respuesta() → service_role	
+solo_b	permiso	public	funcion public.aviso_clinica_revisar() → anon	
+solo_b	permiso	public	funcion public.aviso_clinica_revisar() → authenticated	
+solo_b	permiso	public	funcion public.aviso_clinica_revisar() → postgres	
+solo_b	permiso	public	funcion public.aviso_clinica_revisar() → service_role	
+solo_b	permiso	public	funcion public.cita_asignacion_google() → anon	
+solo_b	permiso	public	funcion public.cita_asignacion_google() → authenticated	
+solo_b	permiso	public	funcion public.cita_asignacion_google() → postgres	
+solo_b	permiso	public	funcion public.cita_asignacion_google() → service_role	
+solo_b	permiso	public	funcion public.cita_confirmacion_coincide(p_enlace_paciente uuid, p_enlace_hmac text, p_cita_paciente uuid, p_cita_hmac text) → anon	
+solo_b	permiso	public	funcion public.cita_confirmacion_coincide(p_enlace_paciente uuid, p_enlace_hmac text, p_cita_paciente uuid, p_cita_hmac text) → authenticated	
+solo_b	permiso	public	funcion public.cita_confirmacion_coincide(p_enlace_paciente uuid, p_enlace_hmac text, p_cita_paciente uuid, p_cita_hmac text) → postgres	
+solo_b	permiso	public	funcion public.cita_confirmacion_coincide(p_enlace_paciente uuid, p_enlace_hmac text, p_cita_paciente uuid, p_cita_hmac text) → service_role	
+solo_b	permiso	public	funcion public.cita_confirmacion_contexto(p_codigo_hash text) → postgres	
+solo_b	permiso	public	funcion public.cita_confirmacion_contexto(p_codigo_hash text) → service_role	
+solo_b	permiso	public	funcion public.cita_confirmacion_emitir(p_clinica_id uuid, p_cita_id uuid, p_id uuid, p_codigo_hash text, p_creado_por uuid) → postgres	
+solo_b	permiso	public	funcion public.cita_confirmacion_emitir(p_clinica_id uuid, p_cita_id uuid, p_id uuid, p_codigo_hash text, p_creado_por uuid) → service_role	
+solo_b	permiso	public	funcion public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text) → postgres	
+solo_b	permiso	public	funcion public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text) → service_role	
+solo_b	permiso	public	funcion public.cita_confirmacion_revocar(p_clinica_id uuid, p_cita_id uuid) → postgres	
+solo_b	permiso	public	funcion public.cita_confirmacion_revocar(p_clinica_id uuid, p_cita_id uuid) → service_role	
+solo_b	permiso	public	funcion public.cita_correo_marcar(p_clinica_id uuid, p_envio_id uuid, p_testigo uuid, p_estado text, p_motivo text) → postgres	
+solo_b	permiso	public	funcion public.cita_correo_marcar(p_clinica_id uuid, p_envio_id uuid, p_testigo uuid, p_estado text, p_motivo text) → service_role	
+solo_b	permiso	public	funcion public.cita_correo_tomar(p_clinica_id uuid, p_cita_id uuid, p_tipo text, p_testigo uuid) → postgres	
+solo_b	permiso	public	funcion public.cita_correo_tomar(p_clinica_id uuid, p_cita_id uuid, p_tipo text, p_testigo uuid) → service_role	
+solo_b	permiso	public	funcion public.cita_movimiento_google_registrar(p_clinica_id uuid, p_cita_id uuid, p_google_updated timestamp with time zone) → postgres	
+solo_b	permiso	public	funcion public.cita_movimiento_google_registrar(p_clinica_id uuid, p_cita_id uuid, p_google_updated timestamp with time zone) → service_role	
+solo_b	permiso	public	funcion public.cita_nombre_saludo(p_clinica_id uuid, p_cita_id uuid) → postgres	
+solo_b	permiso	public	funcion public.cita_nombre_saludo(p_clinica_id uuid, p_cita_id uuid) → service_role	
+solo_b	permiso	public	funcion public.cita_proteger_atendida() → anon	
+solo_b	permiso	public	funcion public.cita_proteger_atendida() → authenticated	
+solo_b	permiso	public	funcion public.cita_proteger_atendida() → postgres	
+solo_b	permiso	public	funcion public.cita_proteger_atendida() → service_role	
+solo_b	permiso	public	funcion public.cita_proteger_bloqueo() → anon	
+solo_b	permiso	public	funcion public.cita_proteger_bloqueo() → authenticated	
+solo_b	permiso	public	funcion public.cita_proteger_bloqueo() → postgres	
+solo_b	permiso	public	funcion public.cita_proteger_bloqueo() → service_role	
+solo_b	permiso	public	funcion public.cita_proteger_borrado() → anon	
+solo_b	permiso	public	funcion public.cita_proteger_borrado() → authenticated	
+solo_b	permiso	public	funcion public.cita_proteger_borrado() → postgres	
+solo_b	permiso	public	funcion public.cita_proteger_borrado() → service_role	
+solo_b	permiso	public	funcion public.cita_proteger_cierre() → anon	
+solo_b	permiso	public	funcion public.cita_proteger_cierre() → authenticated	
+solo_b	permiso	public	funcion public.cita_proteger_cierre() → postgres	
+solo_b	permiso	public	funcion public.cita_proteger_cierre() → service_role	
+solo_b	permiso	public	funcion public.cita_proteger_eleccion() → anon	
+solo_b	permiso	public	funcion public.cita_proteger_eleccion() → authenticated	
+solo_b	permiso	public	funcion public.cita_proteger_eleccion() → postgres	
+solo_b	permiso	public	funcion public.cita_proteger_eleccion() → service_role	
+solo_b	permiso	public	funcion public.cita_proteger_reserva() → anon	
+solo_b	permiso	public	funcion public.cita_proteger_reserva() → authenticated	
+solo_b	permiso	public	funcion public.cita_proteger_reserva() → postgres	
+solo_b	permiso	public	funcion public.cita_proteger_reserva() → service_role	
+solo_b	permiso	public	funcion public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone) → postgres	
+solo_b	permiso	public	funcion public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone) → service_role	
+solo_b	permiso	public	funcion public.cita_reagendar_oferta(p_clinica_id uuid, p_codigo_hash text) → postgres	
+solo_b	permiso	public	funcion public.cita_reagendar_oferta(p_clinica_id uuid, p_codigo_hash text) → service_role	
+solo_b	permiso	public	funcion public.cita_recordatorios_pendientes(p_limite integer) → postgres	
+solo_b	permiso	public	funcion public.cita_recordatorios_pendientes(p_limite integer) → service_role	
+solo_b	permiso	public	funcion public.cita_rsvp_google(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_aceptaron text[]) → postgres	
+solo_b	permiso	public	funcion public.cita_rsvp_google(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_aceptaron text[]) → service_role	
+solo_b	permiso	public	funcion public.cita_tiene_nota_ligada(p_cita uuid, p_clinica uuid) → authenticated	
+solo_b	permiso	public	funcion public.cita_tiene_nota_ligada(p_cita uuid, p_clinica uuid) → postgres	
+solo_b	permiso	public	funcion public.cita_tiene_nota_ligada(p_cita uuid, p_clinica uuid) → service_role	
+solo_b	permiso	public	funcion public.gcal_aplicar_evento(p_clinica_id uuid, p_cita_id uuid, p_esperado_updated_at timestamp with time zone, p_calendar_id text, p_etag text, p_google_updated timestamp with time zone, p_vincular_evento text, p_desvincular boolean, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_title text, p_tocar_notas boolean, p_notas text, p_cancelar boolean) → postgres	
+solo_b	permiso	public	funcion public.gcal_aplicar_evento(p_clinica_id uuid, p_cita_id uuid, p_esperado_updated_at timestamp with time zone, p_calendar_id text, p_etag text, p_google_updated timestamp with time zone, p_vincular_evento text, p_desvincular boolean, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_title text, p_tocar_notas boolean, p_notas text, p_cancelar boolean) → service_role	
+solo_b	permiso	public	funcion public.gcal_bloqueo_aplicar(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_bloqueo_id uuid, p_etag text, p_google_updated timestamp with time zone, p_borrar boolean, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_desde date, p_hasta date) → postgres	
+solo_b	permiso	public	funcion public.gcal_bloqueo_aplicar(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_bloqueo_id uuid, p_etag text, p_google_updated timestamp with time zone, p_borrar boolean, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_desde date, p_hasta date) → service_role	
+solo_b	permiso	public	funcion public.gcal_citas_por_evento(p_clinica_id uuid, p_eventos text[], p_citas uuid[]) → postgres	
+solo_b	permiso	public	funcion public.gcal_citas_por_evento(p_clinica_id uuid, p_eventos text[], p_citas uuid[]) → service_role	
+solo_b	permiso	public	funcion public.gcal_importar_evento(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_etag text, p_google_updated timestamp with time zone, p_title text, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_timezone text, p_notas text, p_medico_id uuid) → postgres	
+solo_b	permiso	public	funcion public.gcal_importar_evento(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_etag text, p_google_updated timestamp with time zone, p_title text, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_timezone text, p_notas text, p_medico_id uuid) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_avanzar(p_clinica_id uuid, p_candado uuid, p_page_token text, p_sync_token text, p_ventana_desde timestamp with time zone, p_lease_seg integer) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_avanzar(p_clinica_id uuid, p_candado uuid, p_page_token text, p_sync_token text, p_ventana_desde timestamp with time zone, p_lease_seg integer) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_clinica_habilitada(p_clinica_id uuid) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_clinica_habilitada(p_clinica_id uuid) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_clinicas_pendientes(p_limite integer) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_clinicas_pendientes(p_limite integer) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_frescura(p_clinica_id uuid) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_frescura(p_clinica_id uuid) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_reiniciar(p_clinica_id uuid, p_candado uuid) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_reiniciar(p_clinica_id uuid, p_candado uuid) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_soltar(p_clinica_id uuid, p_candado uuid, p_error text) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_soltar(p_clinica_id uuid, p_candado uuid, p_error text) → service_role	
+solo_b	permiso	public	funcion public.gcal_sync_tomar(p_clinica_id uuid, p_conexion_id uuid, p_calendar_id text, p_lease_seg integer, p_min_intervalo_seg integer) → postgres	
+solo_b	permiso	public	funcion public.gcal_sync_tomar(p_clinica_id uuid, p_conexion_id uuid, p_calendar_id text, p_lease_seg integer, p_min_intervalo_seg integer) → service_role	
+solo_b	permiso	public	funcion public.log_cita_change() → anon	
+solo_b	permiso	public	funcion public.log_cita_change() → authenticated	
+solo_b	permiso	public	funcion public.log_cita_change() → postgres	
+solo_b	permiso	public	funcion public.log_cita_change() → service_role	
+solo_b	permiso	public	funcion public.prohibir_truncate() → anon	
+solo_b	permiso	public	funcion public.prohibir_truncate() → authenticated	
+solo_b	permiso	public	funcion public.prohibir_truncate() → postgres	
+solo_b	permiso	public	funcion public.prohibir_truncate() → service_role	
+solo_b	permiso	public	funcion public.proteger_agenda_ajustes() → anon	
+solo_b	permiso	public	funcion public.proteger_agenda_ajustes() → authenticated	
+solo_b	permiso	public	funcion public.proteger_agenda_ajustes() → postgres	
+solo_b	permiso	public	funcion public.proteger_agenda_ajustes() → service_role	
+solo_b	permiso	public	funcion public.proteger_reserva_contactos() → anon	
+solo_b	permiso	public	funcion public.proteger_reserva_contactos() → authenticated	
+solo_b	permiso	public	funcion public.proteger_reserva_contactos() → postgres	
+solo_b	permiso	public	funcion public.proteger_reserva_contactos() → service_role	
+solo_b	permiso	public	funcion public.proteger_reserva_enlace_unico() → anon	
+solo_b	permiso	public	funcion public.proteger_reserva_enlace_unico() → authenticated	
+solo_b	permiso	public	funcion public.proteger_reserva_enlace_unico() → postgres	
+solo_b	permiso	public	funcion public.proteger_reserva_enlace_unico() → service_role	
+solo_b	permiso	public	funcion public.proteger_reserva_enlaces() → anon	
+solo_b	permiso	public	funcion public.proteger_reserva_enlaces() → authenticated	
+solo_b	permiso	public	funcion public.proteger_reserva_enlaces() → postgres	
+solo_b	permiso	public	funcion public.proteger_reserva_enlaces() → service_role	
+solo_b	permiso	public	funcion public.rate_limit_espera(p_ruta text, p_limite integer, p_ventana_seg integer) → postgres	
+solo_b	permiso	public	funcion public.rate_limit_espera(p_ruta text, p_limite integer, p_ventana_seg integer) → service_role	
+solo_b	permiso	public	funcion public.reagendar_por_enlace(p_confirmacion_hash text, p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid) → postgres	
+solo_b	permiso	public	funcion public.reagendar_por_enlace(p_confirmacion_hash text, p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid) → service_role	
+solo_b	permiso	public	funcion public.reserva_codigo_emitir(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text) → postgres	
+solo_b	permiso	public	funcion public.reserva_codigo_emitir(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text) → service_role	
+solo_b	permiso	public	funcion public.reserva_codigo_verificar(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text, p_ficha_hmac text) → postgres	
+solo_b	permiso	public	funcion public.reserva_codigo_verificar(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text, p_ficha_hmac text) → service_role	
+solo_b	permiso	public	funcion public.reserva_contacto_estado(p_clinica_id uuid, p_medico_id uuid, p_tel_hmac text, p_correo_hmac text) → authenticated	
+solo_b	permiso	public	funcion public.reserva_contacto_estado(p_clinica_id uuid, p_medico_id uuid, p_tel_hmac text, p_correo_hmac text) → postgres	
+solo_b	permiso	public	funcion public.reserva_contacto_estado(p_clinica_id uuid, p_medico_id uuid, p_tel_hmac text, p_correo_hmac text) → service_role	
+solo_b	permiso	public	funcion public.reserva_contacto_marcar(p_cita_id uuid, p_accion text) → authenticated	
+solo_b	permiso	public	funcion public.reserva_contacto_marcar(p_cita_id uuid, p_accion text) → postgres	
+solo_b	permiso	public	funcion public.reserva_contactos_bloqueados() → authenticated	
+solo_b	permiso	public	funcion public.reserva_contactos_bloqueados() → postgres	
+solo_b	permiso	public	funcion public.reserva_contexto(p_codigo_hash text, p_aviso_version text, p_aviso_sha256 text) → postgres	
+solo_b	permiso	public	funcion public.reserva_contexto(p_codigo_hash text, p_aviso_version text, p_aviso_sha256 text) → service_role	
+solo_b	permiso	public	funcion public.reserva_empalmes_registrar(p_clinica_id uuid, p_citas uuid[]) → postgres	
+solo_b	permiso	public	funcion public.reserva_empalmes_registrar(p_clinica_id uuid, p_citas uuid[]) → service_role	
+solo_b	permiso	public	funcion public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text, p_correo text, p_correo_hmac text) → postgres	
+solo_b	permiso	public	funcion public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text, p_correo text, p_correo_hmac text) → service_role	
+solo_b	permiso	public	funcion public.reserva_espera_reenvio(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_segundos integer) → postgres	
+solo_b	permiso	public	funcion public.reserva_espera_reenvio(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_segundos integer) → service_role	
+solo_b	permiso	public	funcion public.reserva_ocupacion(p_clinica_id uuid, p_enlace_id uuid, p_desde timestamp with time zone, p_hasta timestamp with time zone) → postgres	
+solo_b	permiso	public	funcion public.reserva_ocupacion(p_clinica_id uuid, p_enlace_id uuid, p_desde timestamp with time zone, p_hasta timestamp with time zone) → service_role	
+solo_b	permiso	public	funcion public.reserva_registrar_incidencia() → anon	
+solo_b	permiso	public	funcion public.reserva_registrar_incidencia() → authenticated	
+solo_b	permiso	public	funcion public.reserva_registrar_incidencia() → postgres	
+solo_b	permiso	public	funcion public.reserva_registrar_incidencia() → service_role	
+solo_b	permiso	public	funcion public.reservar_por_enlace(p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid) → postgres	
+solo_b	permiso	public	funcion public.reservar_por_enlace(p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid) → service_role	
+solo_b	permiso	public	funcion public.update_tipos_cita_updated_at() → anon	
+solo_b	permiso	public	funcion public.update_tipos_cita_updated_at() → authenticated	
+solo_b	permiso	public	funcion public.update_tipos_cita_updated_at() → postgres	
+solo_b	permiso	public	funcion public.update_tipos_cita_updated_at() → service_role	
+solo_b	permiso	public	funcion public.validar_tipo_cita_consultorio() → anon	
+solo_b	permiso	public	funcion public.validar_tipo_cita_consultorio() → authenticated	
+solo_b	permiso	public	funcion public.validar_tipo_cita_consultorio() → postgres	
+solo_b	permiso	public	funcion public.validar_tipo_cita_consultorio() → service_role	
+solo_b	permiso	public	funcion public.validar_tipo_cita_medico() → anon	
+solo_b	permiso	public	funcion public.validar_tipo_cita_medico() → authenticated	
+solo_b	permiso	public	funcion public.validar_tipo_cita_medico() → postgres	
+solo_b	permiso	public	funcion public.validar_tipo_cita_medico() → service_role	
+distinto	permiso	public	tabla public.addendums → anon	privilegios
+distinto	permiso	public	tabla public.addendums → authenticated	privilegios
+distinto	permiso	public	tabla public.addendums → service_role	privilegios
+solo_b	permiso	public	tabla public.agenda_ajustes → authenticated	
+solo_b	permiso	public	tabla public.agenda_ajustes → postgres	
+solo_b	permiso	public	tabla public.agenda_ajustes → service_role	
+solo_b	permiso	public	tabla public.agenda_bloqueos → authenticated	
+solo_b	permiso	public	tabla public.agenda_bloqueos → postgres	
+solo_b	permiso	public	tabla public.agenda_bloqueos → service_role	
+distinto	permiso	public	tabla public.analitos_catalogo → anon	privilegios
+distinto	permiso	public	tabla public.analitos_catalogo → authenticated	privilegios
+distinto	permiso	public	tabla public.analitos_catalogo → service_role	privilegios
+distinto	permiso	public	tabla public.appointments → anon	privilegios
+distinto	permiso	public	tabla public.appointments → authenticated	privilegios
+distinto	permiso	public	tabla public.appointments → service_role	privilegios
+distinto	permiso	public	tabla public.audit_log → anon	privilegios
+distinto	permiso	public	tabla public.audit_log → authenticated	privilegios
+distinto	permiso	public	tabla public.audit_log → service_role	privilegios
+solo_b	permiso	public	tabla public.avisos_clinica → authenticated	
+solo_b	permiso	public	tabla public.avisos_clinica → postgres	
+distinto	permiso	public	tabla public.calculadora_resultados → anon	privilegios
+distinto	permiso	public	tabla public.calculadora_resultados → authenticated	privilegios
+distinto	permiso	public	tabla public.calculadora_resultados → service_role	privilegios
+distinto	permiso	public	tabla public.casos_clinicos → anon	privilegios
+distinto	permiso	public	tabla public.casos_clinicos → authenticated	privilegios
+distinto	permiso	public	tabla public.casos_clinicos → service_role	privilegios
+distinto	permiso	public	tabla public.casos_clinicos_recursos → anon	privilegios
+distinto	permiso	public	tabla public.casos_clinicos_recursos → authenticated	privilegios
+distinto	permiso	public	tabla public.casos_clinicos_recursos → service_role	privilegios
+distinto	permiso	public	tabla public.cat_cie10 → anon	privilegios
+distinto	permiso	public	tabla public.cat_cie10 → authenticated	privilegios
+distinto	permiso	public	tabla public.cat_cie10 → service_role	privilegios
+solo_b	permiso	public	tabla public.cita_confirmaciones → postgres	
+solo_b	permiso	public	tabla public.cita_confirmaciones → service_role	
+solo_b	permiso	public	tabla public.cita_correos → postgres	
+solo_b	permiso	public	tabla public.cita_correos → service_role	
+solo_b	permiso	public	tabla public.cita_reagendos → postgres	
+solo_b	permiso	public	tabla public.cita_reagendos → service_role	
+distinto	permiso	public	tabla public.clinica_conexiones_google → anon	privilegios
+distinto	permiso	public	tabla public.clinica_conexiones_google → service_role	privilegios
+distinto	permiso	public	tabla public.clinicas → anon	privilegios
+distinto	permiso	public	tabla public.clinicas → authenticated	privilegios
+distinto	permiso	public	tabla public.clinicas → service_role	privilegios
+distinto	permiso	public	tabla public.consultas → anon	privilegios
+distinto	permiso	public	tabla public.consultas → authenticated	privilegios
+distinto	permiso	public	tabla public.consultas → service_role	privilegios
+distinto	permiso	public	tabla public.consultorios → anon	privilegios
+distinto	permiso	public	tabla public.consultorios → authenticated	privilegios
+distinto	permiso	public	tabla public.consultorios → service_role	privilegios
+distinto	permiso	public	tabla public.documentos → anon	privilegios
+distinto	permiso	public	tabla public.documentos → authenticated	privilegios
+distinto	permiso	public	tabla public.documentos → service_role	privilegios
+distinto	permiso	public	tabla public.firmas_documento → anon	privilegios
+distinto	permiso	public	tabla public.firmas_documento → service_role	privilegios
+distinto	permiso	public	tabla public.folios_contador → anon	privilegios
+distinto	permiso	public	tabla public.folios_contador → authenticated	privilegios
+distinto	permiso	public	tabla public.folios_contador → service_role	privilegios
+solo_b	permiso	public	tabla public.gcal_movimientos_rechazados → postgres	
+solo_b	permiso	public	tabla public.gcal_movimientos_rechazados → service_role	
+solo_b	permiso	public	tabla public.gcal_sync_estado → postgres	
+solo_b	permiso	public	tabla public.gcal_sync_estado → service_role	
+distinto	permiso	public	tabla public.google_tokens → anon	privilegios
+distinto	permiso	public	tabla public.google_tokens → authenticated	privilegios
+distinto	permiso	public	tabla public.google_tokens → service_role	privilegios
+distinto	permiso	public	tabla public.invitaciones → anon	privilegios
+distinto	permiso	public	tabla public.invitaciones → authenticated	privilegios
+distinto	permiso	public	tabla public.invitaciones → service_role	privilegios
+distinto	permiso	public	tabla public.ip_rate_limits → anon	privilegios
+distinto	permiso	public	tabla public.ip_rate_limits → authenticated	privilegios
+distinto	permiso	public	tabla public.ip_rate_limits → service_role	privilegios
+distinto	permiso	public	tabla public.medicamentos → anon	privilegios
+distinto	permiso	public	tabla public.medicamentos → authenticated	privilegios
+distinto	permiso	public	tabla public.medicamentos → service_role	privilegios
+distinto	permiso	public	tabla public.mediciones_analitos → anon	privilegios
+distinto	permiso	public	tabla public.mediciones_analitos → authenticated	privilegios
+distinto	permiso	public	tabla public.mediciones_analitos → service_role	privilegios
+distinto	permiso	public	tabla public.paciente_medico → anon	privilegios
+distinto	permiso	public	tabla public.paciente_medico → authenticated	privilegios
+distinto	permiso	public	tabla public.paciente_medico → service_role	privilegios
+distinto	permiso	public	tabla public.pacientes → anon	privilegios
+distinto	permiso	public	tabla public.pacientes → authenticated	privilegios
+distinto	permiso	public	tabla public.pacientes → service_role	privilegios
+distinto	permiso	public	tabla public.pdf_jobs → anon	privilegios
+distinto	permiso	public	tabla public.pdf_jobs → authenticated	privilegios
+distinto	permiso	public	tabla public.pdf_jobs → service_role	privilegios
+distinto	permiso	public	tabla public.plantillas_documento → anon	privilegios
+distinto	permiso	public	tabla public.plantillas_documento → authenticated	privilegios
+distinto	permiso	public	tabla public.plantillas_documento → service_role	privilegios
+distinto	permiso	public	tabla public.plantillas_honorarios → anon	privilegios
+distinto	permiso	public	tabla public.plantillas_honorarios → authenticated	privilegios
+distinto	permiso	public	tabla public.plantillas_honorarios → service_role	privilegios
+distinto	permiso	public	tabla public.profiles → anon	privilegios
+distinto	permiso	public	tabla public.profiles → authenticated	privilegios
+distinto	permiso	public	tabla public.profiles → service_role	privilegios
+distinto	permiso	public	tabla public.rate_limits → anon	privilegios
+distinto	permiso	public	tabla public.rate_limits → authenticated	privilegios
+distinto	permiso	public	tabla public.rate_limits → service_role	privilegios
+solo_b	permiso	public	tabla public.reserva_avisos → authenticated	
+solo_b	permiso	public	tabla public.reserva_avisos → postgres	
+solo_b	permiso	public	tabla public.reserva_avisos → service_role	
+solo_b	permiso	public	tabla public.reserva_contactos → authenticated	
+solo_b	permiso	public	tabla public.reserva_contactos → postgres	
+solo_b	permiso	public	tabla public.reserva_contactos → service_role	
+solo_b	permiso	public	tabla public.reserva_empalmes_google → authenticated	
+solo_b	permiso	public	tabla public.reserva_empalmes_google → postgres	
+solo_b	permiso	public	tabla public.reserva_empalmes_google → service_role	
+solo_b	permiso	public	tabla public.reserva_enlaces → authenticated	
+solo_b	permiso	public	tabla public.reserva_enlaces → postgres	
+solo_b	permiso	public	tabla public.reserva_enlaces → service_role	
+solo_b	permiso	public	tabla public.reserva_incidencias → authenticated	
+solo_b	permiso	public	tabla public.reserva_incidencias → postgres	
+solo_b	permiso	public	tabla public.reserva_incidencias → service_role	
+solo_b	permiso	public	tabla public.reserva_verificaciones → postgres	
+solo_b	permiso	public	tabla public.reserva_verificaciones → service_role	
+distinto	permiso	public	tabla public.solicitudes_arco → anon	privilegios
+distinto	permiso	public	tabla public.solicitudes_arco → authenticated	privilegios
+distinto	permiso	public	tabla public.solicitudes_arco → service_role	privilegios
+distinto	permiso	public	tabla public.stripe_webhook_events → anon	privilegios
+distinto	permiso	public	tabla public.stripe_webhook_events → authenticated	privilegios
+distinto	permiso	public	tabla public.stripe_webhook_events → service_role	privilegios
+solo_b	permiso	public	tabla public.tipos_cita → authenticated	
+solo_b	permiso	public	tabla public.tipos_cita → postgres	
+solo_b	permiso	public	tabla public.tipos_cita → service_role	
+solo_b	permiso	respaldos	tabla respaldos.consultorios_horario_20261119 → postgres	
+solo_b	policy	public	public.agenda_ajustes.agenda_ajustes_insert	
+solo_b	policy	public	public.agenda_ajustes.agenda_ajustes_select	
+solo_b	policy	public	public.agenda_ajustes.agenda_ajustes_update	
+solo_b	policy	public	public.agenda_bloqueos.agenda_bloqueos_delete	
+solo_b	policy	public	public.agenda_bloqueos.agenda_bloqueos_insert	
+solo_b	policy	public	public.agenda_bloqueos.agenda_bloqueos_select	
+solo_b	policy	public	public.agenda_bloqueos.agenda_bloqueos_update	
+solo_b	policy	public	public.avisos_clinica.avisos_clinica_select	
+solo_b	policy	public	public.avisos_clinica.avisos_clinica_update	
+solo_b	policy	public	public.cita_confirmaciones.cita_confirmaciones_select	
+solo_b	policy	public	public.cita_correos.cita_correos_select	
+solo_b	policy	public	public.cita_reagendos.cita_reagendos_select	
+solo_b	policy	public	public.reserva_avisos.reserva_avisos_select	
+solo_b	policy	public	public.reserva_contactos.reserva_contactos_insert	
+solo_b	policy	public	public.reserva_contactos.reserva_contactos_select	
+solo_b	policy	public	public.reserva_contactos.reserva_contactos_update	
+solo_b	policy	public	public.reserva_empalmes_google.reserva_empalmes_google_select	
+solo_b	policy	public	public.reserva_enlaces.reserva_enlaces_select	
+solo_b	policy	public	public.reserva_enlaces.reserva_enlaces_update	
+solo_b	policy	public	public.reserva_incidencias.reserva_incidencias_select	
+solo_b	policy	public	public.tipos_cita.tipos_cita_insert	
+solo_b	policy	public	public.tipos_cita.tipos_cita_select	
+solo_b	policy	public	public.tipos_cita.tipos_cita_update	
+distinto	publicacion_tabla	public	supabase_realtime ← public.appointments	columnas
+solo_b	relacion	public	public.agenda_ajustes	
+solo_b	relacion	public	public.agenda_bloqueos	
+solo_b	relacion	public	public.avisos_clinica	
+solo_b	relacion	public	public.cita_confirmaciones	
+solo_b	relacion	public	public.cita_correos	
+solo_b	relacion	public	public.cita_reagendos	
+solo_b	relacion	public	public.gcal_movimientos_rechazados	
+solo_b	relacion	public	public.gcal_sync_estado	
+solo_b	relacion	public	public.reserva_avisos	
+solo_b	relacion	public	public.reserva_contactos	
+solo_b	relacion	public	public.reserva_empalmes_google	
+solo_b	relacion	public	public.reserva_enlaces	
+solo_b	relacion	public	public.reserva_incidencias	
+solo_b	relacion	public	public.reserva_verificaciones	
+solo_b	relacion	public	public.tipos_cita	
+solo_b	relacion	respaldos	respaldos.consultorios_horario_20261119	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_anticipacion_rango	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_candado_rango	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_clinica_id_fkey	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_clinica_key	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_horizonte_rango	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_pkey	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_recordatorio_rango	
+solo_b	restriccion	public	public.agenda_ajustes.agenda_ajustes_vigencia_rango	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_clinica_id_fkey	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_gcal_check	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_medico_id_fkey	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_minuto_check	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_motivo_check	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_pkey	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_puntas_check	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_todo_el_dia_check	
+solo_b	restriccion	public	public.agenda_bloqueos.agenda_bloqueos_zona_check	
+solo_b	restriccion	public	public.appointments.appointments_cierre_check	
+solo_b	restriccion	public	public.appointments.appointments_google_asignacion_check	
+solo_b	restriccion	public	public.appointments.appointments_reserva_aviso_fkey	
+solo_b	restriccion	public	public.appointments.appointments_reserva_check	
+solo_b	restriccion	public	public.appointments.appointments_reserva_enlace_fkey	
+solo_b	restriccion	public	public.appointments.appointments_reserva_reagendados_check	
+solo_b	restriccion	public	public.appointments.appointments_sustituida_por_fkey	
+solo_b	restriccion	public	public.appointments.appointments_tipo_cita_fkey	
+solo_b	restriccion	public	public.appointments.appointments_tipo_cita_snapshot_check	
+solo_b	restriccion	public	public.avisos_clinica.avisos_clinica_clinica_id_fkey	
+solo_b	restriccion	public	public.avisos_clinica.avisos_clinica_pkey	
+solo_b	restriccion	public	public.avisos_clinica.avisos_clinica_revisado_check	
+solo_b	restriccion	public	public.avisos_clinica.avisos_clinica_tipo_check	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_cita_fkey	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_clinica_fkey	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_codigo_check	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_codigo_key	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_creado_por_fkey	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_hmac_check	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_pkey	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_respuesta_check	
+solo_b	restriccion	public	public.cita_confirmaciones.cita_confirmaciones_vinculo_check	
+solo_b	restriccion	public	public.cita_correos.cita_correos_cita_fkey	
+solo_b	restriccion	public	public.cita_correos.cita_correos_clinica_fkey	
+solo_b	restriccion	public	public.cita_correos.cita_correos_coherencia_check	
+solo_b	restriccion	public	public.cita_correos.cita_correos_estado_check	
+solo_b	restriccion	public	public.cita_correos.cita_correos_intentos_check	
+solo_b	restriccion	public	public.cita_correos.cita_correos_llave_key	
+solo_b	restriccion	public	public.cita_correos.cita_correos_motivo_check	
+solo_b	restriccion	public	public.cita_correos.cita_correos_pkey	
+solo_b	restriccion	public	public.cita_correos.cita_correos_tipo_check	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_clinica_fkey	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_confirmacion_fkey	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_distintas_check	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_nueva_fkey	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_nueva_key	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_numero_check	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_origen_fkey	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_origen_key	
+solo_b	restriccion	public	public.cita_reagendos.cita_reagendos_pkey	
+solo_b	restriccion	public	public.gcal_movimientos_rechazados.gcal_movimientos_rechazados_clinica_id_fkey	
+solo_b	restriccion	public	public.gcal_movimientos_rechazados.gcal_movimientos_rechazados_intento_key	
+solo_b	restriccion	public	public.gcal_movimientos_rechazados.gcal_movimientos_rechazados_pkey	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_candado_par	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_clinica_id_fkey	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_clinica_key	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_contadores	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_error_corto	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_fase_check	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_incremental_con_token	
+solo_b	restriccion	public	public.gcal_sync_estado.gcal_sync_estado_pkey	
+solo_b	restriccion	public	public.reserva_avisos.reserva_avisos_aprobado_check	
+solo_b	restriccion	public	public.reserva_avisos.reserva_avisos_id_key	
+solo_b	restriccion	public	public.reserva_avisos.reserva_avisos_pkey	
+solo_b	restriccion	public	public.reserva_avisos.reserva_avisos_sha_check	
+solo_b	restriccion	public	public.reserva_avisos.reserva_avisos_version_check	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_bloqueado_por_fkey	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_clase_check	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_clave_key	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_clinica_fkey	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_hmac_check	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_medico_fkey	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_perdonado_por_fkey	
+solo_b	restriccion	public	public.reserva_contactos.reserva_contactos_pkey	
+solo_b	restriccion	public	public.reserva_empalmes_google.reserva_empalmes_google_clinica_id_fkey	
+solo_b	restriccion	public	public.reserva_empalmes_google.reserva_empalmes_google_distintas	
+solo_b	restriccion	public	public.reserva_empalmes_google.reserva_empalmes_google_par_key	
+solo_b	restriccion	public	public.reserva_empalmes_google.reserva_empalmes_google_pkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_clase_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_clinica_id_fkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_codigo_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_codigo_key	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_correo_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_created_by_fkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_etiqueta_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_id_clinica_key	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_intentos_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_medico_id_fkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_pausado_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_pkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_revocado_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_revocado_por_fkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_usado_cita_fkey	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_uso_check	
+solo_b	restriccion	public	public.reserva_enlaces.reserva_enlaces_vigencia_check	
+solo_b	restriccion	public	public.reserva_incidencias.reserva_incidencias_cita_fkey	
+solo_b	restriccion	public	public.reserva_incidencias.reserva_incidencias_clinica_fkey	
+solo_b	restriccion	public	public.reserva_incidencias.reserva_incidencias_hmac_check	
+solo_b	restriccion	public	public.reserva_incidencias.reserva_incidencias_medico_fkey	
+solo_b	restriccion	public	public.reserva_incidencias.reserva_incidencias_pkey	
+solo_b	restriccion	public	public.reserva_incidencias.reserva_incidencias_tipo_check	
+solo_b	restriccion	public	public.reserva_verificaciones.reserva_verificaciones_enlace_fkey	
+solo_b	restriccion	public	public.reserva_verificaciones.reserva_verificaciones_estado_check	
+solo_b	restriccion	public	public.reserva_verificaciones.reserva_verificaciones_ficha_key	
+solo_b	restriccion	public	public.reserva_verificaciones.reserva_verificaciones_hmac_check	
+solo_b	restriccion	public	public.reserva_verificaciones.reserva_verificaciones_intentos_check	
+solo_b	restriccion	public	public.reserva_verificaciones.reserva_verificaciones_pkey	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_clinica_id_fkey	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_color_check	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_consultorio_check	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_consultorio_id_fkey	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_duracion_check	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_id_clinica_key	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_medico_id_fkey	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_nombre_check	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_pkey	
+solo_b	restriccion	public	public.tipos_cita.tipos_cita_principal_check	
+solo_b	restriccion	respaldos	respaldos.consultorios_horario_20261119.consultorios_horario_20261119_pkey	
