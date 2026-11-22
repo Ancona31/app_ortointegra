@@ -408,3 +408,46 @@ Reconstruido del código y de `git log` en la integración.
   comprueba además que el riel/la barra llegan al borde (de la franja o del
   viewport) con su ancho. La bisagra de `ih` (x 455–496) se mantiene: con la
   franja a la derecha y fuera, el viewport empieza en el x 0 de la pantalla.
+
+### La franja del Duo real con capas abiertas · notas
+
+* **Hecho observado en el aparato (iPhone Duo, iOS 26/27):** con la franja a
+  un lado (`ext` y `ih`) iOS la deja fuera del viewport y la rellena con un
+  color que muestrea de la página: el fondo de body/html, salvo que un
+  `position: fixed` toque ese borde, que entonces manda. Con el riel navy
+  pegado salía navy; al abrir «Más» o cualquier capa con velo
+  `fixed; inset: 0` translúcido + desenfoque, salía clara.
+* **⚠️ REGLA NUEVA (B5–B13 la respetan):** en `ext` e `ih` **nada fijo toca el
+  borde del lado de la franja salvo el cromo navy opaco** (riel en `ext`, barra
+  en `ih`, los dos a sangre de arriba abajo, sin transparencia ni desenfoque).
+  Toda capa o velo nuevo a pantalla completa usa `.k-capa` (o lleva
+  `fixed inset-0`) y la regla central de `globals.css` lo acaba en
+  `--fijo-der`/`--fijo-izq` (= `--cromo-der`/`--cromo-izq` en `ext`/`ih` con
+  navegación; 0 en el resto). Algo fijo que llegue al borde por otro camino
+  (`inset-inline: 0`, `right: 0`, un `style` en línea) tiene que ir a esa
+  regla. Lo vigila la e2e de `rediseno-formatos` («sólo el cromo toca el borde
+  derecho»).
+* **Cubierto por la regla central:** `.k-capa` (ModalShell —alertas,
+  SelectorTipoDocumento, BloqueoFeatureModal—, CapaMenu, QuickPatientModal,
+  ConsultaRapidaModal), `.nav-capa` («Más»), `.nav-paleta` (⌘K),
+  `.nav-cajon-velo`, `.ag-capa-velo`, `.ag-hoja` y todo `.fixed.inset-0`
+  (modales de la agenda, OfflineAlert, filtros del expediente, admin). El
+  relleno de `.k-capa`, `.nav-capa` y `.nav-paleta` descuenta el cromo: la
+  tarjeta queda donde estaba. OfflineAlert resta `--fijo-*` en su caja interior
+  (único cambio fuera del CSS). El Toast nunca tocó el borde (`--capa-der`).
+* **Fuera, a propósito:** `.sp-firma-modo` (la firma del paciente tapa la
+  pantalla entera para que no alcance la navegación: es su función; con él
+  abierto la franja será de su fondo). Las `.ag-capa` ancladas las coloca
+  `posicionCapa` dentro de la ventana con margen: no tocan el borde, pero
+  pueden caer encima del riel (B13).
+* **Cromo inerte con una capa abierta:** `pointer-events: none` sobre el riel
+  (`ext`) o la barra (`ih`) mientras hay una capa modal; sin opacidad. Tab:
+  ModalShell (y CapaMenu) atrapan el foco; «Más» (`MenuMas`) y ⌘K **no** lo
+  atrapan (ya era así detrás del velo): con Tab se puede llegar al cromo. No se
+  añadió JS.
+* **310 en `ext`:** el área mide 382 − 60 = 322 y con 8 por lado la tarjeta se
+  quedaba en 306. El margen horizontal de las capas cede a 6 en `ext`
+  (`--capa-holgura`, vuelve a 8 si el área crece); «Más» y la alerta miden 310
+  y van centradas (e2e).
+* En `tel`, `iv`, `esc`, sin formato y en el lanzador nada cambia (sonda de las
+  capturas: en `tel`/`esc` las capas siguen a pantalla completa).
