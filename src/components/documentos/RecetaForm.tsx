@@ -310,9 +310,16 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   const agregarRef = useRef<HTMLButtonElement>(null)
   const indiceDe = (clave: number): number => pistas.findIndex(p => p.clave === clave)
 
-  /** Enfoca un campo de un medicamento ya pintado y lo acerca (teclado en pantalla). */
+  /**
+   * Enfoca un campo de un medicamento ya pintado y lo acerca al borde de
+   * arriba, para que el teclado en pantalla no lo tape. En `tel`/`iv` el
+   * encabezado fundido flota SOBRE el scroller: el margen es el relleno de
+   * arriba del contenido (`.app-contenido`), que ya lo descuenta.
+   */
   function enfocarCampo(clave: number, campo: CampoMed) {
-    enfocarYAcercar(elementoDe(listaRef.current, clave, campo))
+    const contenido = formRef.current?.closest<HTMLElement>('.app-contenido')
+    const margen = contenido ? parseFloat(getComputedStyle(contenido).paddingTop) || 24 : 24
+    enfocarYAcercar(elementoDe(listaRef.current, clave, campo), Math.max(24, margen))
   }
 
   /** El abierto, si está totalmente vacío y no es el único: al plegarse se quita. */

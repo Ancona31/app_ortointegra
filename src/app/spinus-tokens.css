@@ -3259,8 +3259,12 @@ html.dark {
 .sp-rx-linea:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
 .sp-rx-linea-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sp-rx-linea-1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
-.sp-rx-com { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); overflow-wrap: anywhere; }
-.sp-rx-det { font-size: 13px; line-height: 18px; color: var(--tinta2); overflow-wrap: anywhere; }
+/* Dos renglones como mucho: comercial + detalle en el primero (el detalle se
+   recorta antes que el comercial), indicaciones recortadas en el segundo. */
+.sp-rx-linea-1 { flex-wrap: nowrap; }
+.sp-rx-com, .sp-rx-det { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-rx-com { flex: 0 0 auto; max-width: 75%; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); }
+.sp-rx-det { flex: 0 1 auto; font-size: 13px; line-height: 18px; color: var(--tinta2); }
 .sp-rx-ind { font-size: 13px; line-height: 18px; color: var(--tinta2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Etiqueta de vía: familia de color (Oral azul tonal, IM ámbar, IV violeta,
@@ -3301,7 +3305,7 @@ html.dark {
 .sp-rx-campo--texto > .sp-rx-rot { padding-top: 13px; }
 :where([data-formato="ih"], [data-formato="esc"]) .sp-rx-campo--texto > .sp-rx-rot { padding-top: 11px; }
 .sp-rx-rot {
-  flex: none; width: 104px; font-size: 12px; line-height: 16px; font-weight: 600;
+  flex: none; width: 108px; font-size: 12px; line-height: 16px; font-weight: 600;
   letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
 }
 .sp-rx-fi {
@@ -3368,6 +3372,7 @@ html.dark {
 
 /* «Agregar medicamento»: uno, al final; el atajo sólo donde hay teclado. */
 .sp-rx-agregar { margin-top: 8px; }
+.sp-rx-agregar-b { height: var(--k-toque); }
 .sp-rx-atajo { display: none; gap: 2px; margin-left: 4px; }
 :where([data-formato="ih"], [data-formato="esc"]) .sp-rx-atajo { display: inline-flex; }
 .sp-rx-atajo > kbd {
@@ -3379,7 +3384,7 @@ html.dark {
    fichas en una fila que se desplaza, «Agregar» a todo el ancho. */
 @container docform (max-width: 559px) {
   .sp-rx-par { grid-template-columns: minmax(0, 1fr); }
-  .sp-rx-rot { width: 92px; }
+  .sp-rx-rot { width: 104px; letter-spacing: .02em; }
   .sp-rx-viafila > .sp-rx-rot { width: 100%; padding-left: 0; }
   .sp-rx-viabtn { padding: 0 16px; }
   .sp-rx-fichas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
@@ -3388,7 +3393,7 @@ html.dark {
   .sp-rx-ficha > span { height: 36px; }
   .sp-rx-ed { padding: 10px 14px 12px; }
   .sp-rx-linea { padding: 12px 14px; }
-  .sp-rx-agregar-b { width: 100%; height: 44px; }
+  .sp-rx-agregar-b { width: 100%; }
 }
 
 /* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con

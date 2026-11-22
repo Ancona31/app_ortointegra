@@ -6961,3 +6961,19 @@ No es del rediseño: ni la página ni la ruta cambian desde `951e31b3`. (En las
 capturas de B4 se atribuyó a `/api/me/clinica`; esa ruta responde 200 a los
 tres roles.) Arreglo natural: no pedir la ruta sin `isAdmin`, en el bloque de
 la página o aparte.
+
+### RED-DT-20 — 92 filas del catálogo de medicamentos sin vía, por validar
+
+**Estado:** 🟡 abierta, decisión del dueño · **Archivos:** `src/data/medicamentos.ts`
+(receta compacta, 2026-11-22)
+
+La receta compacta rellena la vía desde el catálogo SÓLO cuando la presentación
+o el nombre la dicen. Quedan sin vía (la elige el médico) los inyectables que no
+dicen IM o IV aunque la dosis sugerida lo mencione (Rocephin, Keral inyectable,
+Dexametasona…), las jeringas precargadas (ácido hialurónico intraarticular,
+Prolia SC), las plumas, el vial de Xgeva, los parches de acción local
+(lidocaína, diclofenaco, capsaicina), las gotas de vitamina D, el aplicador
+bucal de Actiq y el PRP. La lista entera, con el motivo de cada una, se entregó
+como `catalogo-vias.tsv`. Si el dueño fija alguna, va en su fila (`via:`) y la
+prueba `recetaCompacta.test.ts` exige que un inyectable con vía la diga en su
+presentación o nombre: habría que ajustar esa regla a la vez.

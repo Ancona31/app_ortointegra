@@ -604,3 +604,41 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   * «‹ Expediente» desde documentos vuelve al Resumen, no a la pestaña
     Documentos; `/suplementacion` no tiene «‹ Expediente».
   * El enlace profundo `?documento=` no se probó: la semilla no tiene documentos.
+
+### Receta compacta · notas (2026-11-22)
+
+* **Qué es:** el formulario de receta de la maqueta aprobada por el dueño
+  (`receta-compacta.html`): un medicamento abierto y los demás plegados a una
+  línea (número, comercial, presentación · genérico, indicaciones recortadas,
+  vía en color sin leyenda). Piezas: `LineaMedicamento`, `MedicamentoReceta`,
+  `BuscadorMedicamento`, `SelectorVia` y la lógica pura `recetaCompacta.ts`
+  (con `src/lib/tests/recetaCompacta.test.ts`); estilos en
+  `spinus-tokens.css` §26.1 (`.sp-rx-*`, tokens `--via-iv-*` y `--via-sc-*`).
+* **Cambios de COMPORTAMIENTO, todos por decisión del dueño** (excepción
+  aprobada a «sólo estética»):
+  * la vía nace vacía y es obligatoria (antes «Oral» por defecto); el catálogo
+    la rellena cuando su presentación o su nombre la dicen
+    (`MedicamentoDB.via`, 247 de 339 filas; las dudosas quedan sin vía, ver
+    RED-DT-20);
+  * un medicamento con algo escrito y a medias bloquea la impresión, se abre y
+    se dice qué le falta (antes se descartaba en silencio);
+  * aviso suave que NO bloquea si a las indicaciones les falta frecuencia o
+    duración («Revisar» / «Imprimir así»; heurística `sinPauta`);
+  * se pliega al tocar o enfocar fuera; vacío y no único, se quita;
+  * «Agregar medicamento» es uno, al final, más Ctrl/⌘+Enter (antes uno por
+    bloque); el nuevo va al final;
+  * la «dosis sugerida» del catálogo es ficha insertable (antes una pista), y
+    hay fichas de frases frecuentes;
+  * una fila de plantilla SIN la clave `via_administracion` se aplica sin vía
+    (antes se rellenaba «Oral»): no se inventa una vía; las plantillas
+    guardadas por el formulario siempre la llevan.
+* **Lo que NO cambia:** las claves de `contenido` y las seis de cada
+  medicamento (comprobado sobre filas emitidas en local), el PDF, el flujo de
+  imprimir/guardar/plantillas/descarga, la precarga desde la nota («Oral») y
+  el búnker (sin red: el buscador es local).
+* `ComboEscribible` filtra sin acentos (afecta a sus cuatro consumidores).
+* Se retiró la ayuda «Del catálogo · editable» bajo el genérico (la maqueta no
+  la lleva).
+* Reglas para el siguiente: la lista del buscador va DENTRO del medicamento
+  (no en portal) para que tocarla no cuente como «salir»; plegar con el
+  puntero se hace al soltar y en `setTimeout`, nunca en `pointerdown`.
