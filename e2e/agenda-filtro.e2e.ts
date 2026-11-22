@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { irAAgenda, soloEscritorio, SESION, selectFiltroMedico } from './ayudas'
+import { irAAgenda, soloEscritorio, SESION, selectFiltroMedico, ventanasDeLaSemilla, esUnaDeEstasVentanas } from './ayudas'
 
 // El `<select>` sin nombre del toolbar de escritorio; en `telefono` el
 // filtro es otro control (`getByLabel('Filtrar por médico')`, cubierto en
@@ -63,7 +63,12 @@ test.describe('filtro de médico — admin.a', () => {
     // «Todos» de esta semana no está en la caché de rangos (la semilla del
     // admin es con su propio filtro), así que tiene que salir una petición, y
     // sin `medico_id`.
-    const siguientePeticion = page.waitForRequest(r => r.url().includes('/api/appointments?') && r.method() === 'GET', { timeout: 5000 })
+    /* Se espera la petición de LA SEMANA VISIBLE, no «la siguiente que salga»: la precarga de las
+       semanas vecinas del filtro anterior puede seguir saliendo (con su `medico_id`, y es correcto)
+       y la prueba la tomaba por la del botón (falló 2 veces en el equipo nuevo, 2026-11-21). */
+    const [, semanaVisible] = ventanasDeLaSemilla()
+    const siguientePeticion = page.waitForRequest(r => r.url().includes('/api/appointments?') && r.method() === 'GET'
+      && esUnaDeEstasVentanas(r.url(), [semanaVisible]), { timeout: 5000 })
     await page.getByRole('button', { name: 'Ver todos los médicos' }).click()
     const peticion = await siguientePeticion
     expect(new URL(peticion.url()).searchParams.get('medico_id')).toBeNull()
