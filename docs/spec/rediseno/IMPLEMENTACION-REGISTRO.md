@@ -715,3 +715,34 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   EXACTAMENTE el mismo texto; si no, se abre en «Otro» con sus cuatro
   cadenas intactas. Riesgo aceptado: una plantilla vieja «Tomografía (TAC)»
   se reconoce y ahora pide el contraste antes de imprimir.
+
+### Solicitud de internamiento compacta · notas (2026-11-22)
+
+* **Qué:** maqueta aprobada `internamiento.html` llevada a la app
+  (`5e2fe0c9`, `facbce2c`). Cinco secciones numeradas (`SeccionPaso.tsx`,
+  controlada; `SeccionPlegable` sigue intacta para el consentimiento), UNA
+  abierta y las demás en una línea con su resumen (verde completa; rojo
+  «Falta …» tras intentar imprimir). Tab en el último control abre la
+  siguiente con el foco en su primer campo; tocar o enfocar fuera pliega
+  (la escucha de la receta, sin comerse el clic; capas con `role` fuera).
+  Tipo y ASA en `OpcionesRapidas.tsx` (radiogroup, flechas mueven el foco,
+  segundo toque deselecciona). Requerimientos en `MenuRequerimientos.tsx`
+  (menú `role="menu"` con casillas y «Otro»; fichas sólo de lo elegido).
+  `IndicacionesPiso.tsx` es ahora la hoja de órdenes (cuatro grupos fijos
+  siempre; Enter, Tab, Retroceso, ↑/↓, pegar varias líneas, «Otro grupo» con
+  nombre editable sin repetir). Lógica pura en `internamientoCompacto.ts`
+  (pruebas `internamientoCompacto.test.ts`); estilos en `spinus-tokens.css`
+  §26.4 (`.sp-int-*`, reusa `.sp-rx-campo/-rot/-fi/-ta/-par` de 26.1).
+* **Lo que NO cambia:** las claves y tipos de `contenido` (comprobado en una
+  fila emitida en local), `indicacionesPiso` (misma cadena para el PDF), las
+  claves de la plantilla, los valores guardados de tipo y ASA, la validación
+  (Paciente · Hospital · Diagnóstico principal · Fecha de ingreso; ahora abre
+  la sección del faltante), «Marcar como URGENTE», la fecha del documento, el
+  pie, el error único y el modal posterior.
+* **Diferencias de forma guardada, menores:** un grupo fijo «encendido» y
+  vacío ya no puede existir, así que ni se guarda en `indicacionesGrupos` ni
+  en la plantilla; los renglones vacíos tampoco. «Otro» requerimiento sigue
+  siendo UNA cadena: Enter en el campo la sustituye.
+* **Medidas:** 1280×800 con todo lleno y plegado, sin desplazar
+  (`scrollHeight` 800 = alto visible); con la sección de piso abierta (5
+  grupos, 8 renglones), 1097.
