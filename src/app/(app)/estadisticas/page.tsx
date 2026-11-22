@@ -213,7 +213,7 @@ export default function EstadisticasPage() {
 
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <p className="k-t-rotulo">Clínica</p>
+          <p className="k-t-rotulo">Administración</p>
           <h1 className="k-t-pantalla mt-0.5">Estadísticas clínicas</h1>
         </div>
         <button type="button" onClick={() => cargar(true)} disabled={refreshing} className="k-b k-b-tonal">

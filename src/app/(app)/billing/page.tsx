@@ -133,7 +133,7 @@ function BillingContent() {
       <PestanasAdministracion />
 
       <div>
-        <p className="k-t-rotulo">Cuenta</p>
+        <p className="k-t-rotulo">Administración</p>
         <h1 className="k-t-pantalla mt-0.5">Facturación</h1>
         <p className="k-t-sec mt-0.5">Gestiona tu suscripción y plan</p>
       </div>

@@ -222,7 +222,7 @@ export default function AdminUsuariosPage() {
       <PestanasAdministracion />
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <p className="k-t-rotulo">Admin</p>
+          <p className="k-t-rotulo">Administración</p>
           <h1 className="k-t-pantalla mt-0.5">Usuarios</h1>
           <p className="k-t-sec mt-0.5">Invita a tu equipo y administra los accesos</p>
         </div>
