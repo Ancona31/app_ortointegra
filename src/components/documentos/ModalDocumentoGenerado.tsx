@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertTriangle, Check, Download, Eye, Loader2, Mail, Share2 } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Download, Eye, Loader2, Mail, Share2 } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
 
 /**
@@ -426,26 +426,25 @@ export default function ModalDocumentoGenerado({
     }
   }, [pdfUrl])
 
+  /* Cabecera de la capa (rediseño B9, maqueta `docs-a` «gen»): icono en un
+     círculo de 48 —verde si quedó en el expediente, ámbar si no—, el título
+     centrado y una línea. El aviso de «no quedó en el expediente» va como texto
+     en `--mal-tinta`, justificado, y no como banda (CALMA §3, §12). */
   const cuerpo = (
-    <div className="px-4 md:px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+    <div lang="es" className="flex flex-col items-center gap-2 px-5 pb-2 pt-6 text-center">
       {guardadoEnExpediente ? (
-        <div className="sp-medal">
-          {/* Check y NO CheckCircle2 — ver la nota en nueva-nota/page.tsx:1342:
-              el segundo renderiza dos paths y el arco queda partido bajo el
-              stroke-dasharray con que .sp-medal__core dibuja el trazo. */}
-          <div className="sp-medal__core"><Check /></div>
+        <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-ok-fondo text-ok-tinta">
+          {/* Check y NO CheckCircle2: el segundo renderiza dos paths. */}
+          <Check size={26} aria-hidden="true" />
         </div>
       ) : (
-        <div
-          className="w-[70px] h-[70px] rounded-full flex items-center justify-center"
-          style={{ background: 'var(--sp-warn-bg-badge)' }}
-        >
-          <AlertTriangle size={32} style={{ color: 'var(--sp-warn)' }} />
+        <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-aviso-fondo text-aviso-tinta">
+          <AlertTriangle size={26} aria-hidden="true" />
         </div>
       )}
 
       {/* Verbatim: el participio viene ya en `titulo`. Ver su prop. */}
-      <h3 className="sp-title-state">{titulo}</h3>
+      <h3 className="k-t-tarjeta text-center">{titulo}</h3>
 
       {/* La confirmación NO afirma "quedó en el expediente": PlanSuplementacion
           no inserta fila cuando no hay pacienteId, y ahí la frase sería falsa.
@@ -453,18 +452,15 @@ export default function ModalDocumentoGenerado({
           única afirmación sobre el expediente es la negativa, que es la que el
           médico necesita ver. */}
       {guardadoEnExpediente ? (
-        <p className="sp-body max-w-xs">
+        <p className="k-t-sec max-w-xs">
           Ya puedes abrirlo para revisarlo o imprimirlo.
         </p>
       ) : (
-        <div className="sp-banner sp-banner--warn w-full text-left">
-          <AlertTriangle size={18} />
-          <span>
-            El documento está listo y puedes abrirlo e imprimirlo ahora, pero no
-            se pudo guardar en el expediente: no va a aparecer en la lista de
-            documentos del paciente.
-          </span>
-        </div>
+        <p role="status" className="w-full text-[13px] leading-[18px] text-mal-tinta [hyphens:auto] [text-align:justify] [text-align-last:center]">
+          El documento está listo y puedes abrirlo e imprimirlo ahora, pero no
+          se pudo guardar en el expediente: no va a aparecer en la lista de
+          documentos del paciente.
+        </p>
       )}
     </div>
   )
@@ -496,8 +492,8 @@ export default function ModalDocumentoGenerado({
 
     if (paso === 'pidiendo') {
       return (
-        <div className="sp-banner w-full text-left" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-          <label htmlFor="mdg-correo" className="sp-label-field">
+        <div className="flex w-full flex-col gap-2 rounded-[var(--r-control)] bg-sup2 p-3 text-left">
+          <label htmlFor="mdg-correo" className="k-etiqueta">
             {correoFicha === null
               ? 'Este paciente no tiene correo en su ficha. Escríbelo aquí:'
               : 'Correo solo para este envío (la ficha no se toca):'}
@@ -512,14 +508,14 @@ export default function ModalDocumentoGenerado({
             value={escrito}
             onChange={e => setEscrito(e.target.value)}
             placeholder="nombre@correo.com"
-            className="sp-input"
+            className="k-campo bg-sup"
           />
-          <div className="sp-grid-actions">
+          <div className="flex flex-row-reverse flex-wrap gap-2">
             <button
               type="button"
               onClick={() => setPaso('confirmando')}
               disabled={!escritoValido}
-              className="sp-btn sp-btn--primary"
+              className="k-b k-b-prim"
             >
               Enviar por correo
             </button>
@@ -534,7 +530,7 @@ export default function ModalDocumentoGenerado({
                    partida, no a un estado de fallo. */
                 setPaso('listo')
               }}
-              className="sp-btn sp-btn--ghost"
+              className="k-b k-b-quieto bg-sup"
             >
               Cancelar
             </button>
@@ -545,29 +541,24 @@ export default function ModalDocumentoGenerado({
 
     if (paso === 'confirmando') {
       return (
-        <div className="sp-banner sp-banner--warn w-full text-left" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
-          <span className="sp-label-field">Va a enviar el documento a esta dirección escrita a mano:</span>
-          <span
-            style={{
-              fontSize: '17px', fontWeight: 700, color: 'var(--sp-text-strong)',
-              wordBreak: 'break-all', userSelect: 'all', lineHeight: 1.3,
-            }}
-          >
+        <div className="flex w-full flex-col gap-2.5 rounded-[var(--r-control)] bg-aviso-fondo p-3 text-left text-tinta">
+          <span className="k-etiqueta text-aviso-tinta">Va a enviar el documento a esta dirección escrita a mano:</span>
+          <span className="select-all break-all text-[17px] font-bold leading-[1.3] text-tinta">
             {escrito.trim()}
           </span>
-          <span style={{ fontSize: '12px', lineHeight: 1.5 }}>
+          <span className="text-[13px] leading-[18px]">
             Compruébala letra por letra. El archivo lleva datos clínicos dentro y un correo
             enviado no se puede recuperar.
           </span>
-          <div className="sp-grid-actions">
+          <div className="flex flex-row-reverse flex-wrap gap-2">
             <button
               type="button"
               onClick={() => void enviarPorCorreo(escrito.trim())}
-              className="sp-btn sp-btn--primary"
+              className="k-b k-b-prim"
             >
               Sí, enviar ahí
             </button>
-            <button type="button" onClick={() => setPaso('pidiendo')} className="sp-btn sp-btn--ghost">
+            <button type="button" onClick={() => setPaso('pidiendo')} className="k-b k-b-quieto bg-sup">
               Corregir
             </button>
           </div>
@@ -578,7 +569,7 @@ export default function ModalDocumentoGenerado({
     if (paso === 'enviado') {
       return (
         <div className="w-full space-y-2">
-          <p className="sp-body text-center" style={{ fontSize: '12px' }} aria-live="polite">
+          <p className="text-center text-[13px] leading-[18px] text-tinta2" aria-live="polite">
             Enviado{enviadoA !== '' ? ` a ${enviadoA}` : ''} con el PDF adjunto. Si no aparece,
             pídele que revise su carpeta de <strong>spam o correo no deseado</strong>.
           </p>
@@ -587,23 +578,23 @@ export default function ModalDocumentoGenerado({
               pregunta DESPUÉS y no antes: nada de lo que se conteste aquí
               cambia lo que acaba de salir. */}
           {ofrecerGuardar && (
-            <div className="sp-banner w-full text-left" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-              <span style={{ fontSize: '13px' }}>
+            <div className="flex w-full flex-col gap-2 rounded-[var(--r-control)] bg-sup2 p-3 text-left text-tinta">
+              <span className="text-[13px] leading-[18px]">
                 ¿Guardas <strong>{enviadoA}</strong> en la ficha del paciente para la próxima vez?
               </span>
-              <div className="sp-grid-actions">
+              <div className="flex flex-row-reverse flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void guardarEnFicha()}
                   disabled={guardando}
-                  className="sp-btn sp-btn--primary"
+                  className="k-b k-b-prim"
                 >
                   {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando…</> : 'Guardar en la ficha'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setOfrecerGuardar(false)}
-                  className="sp-btn sp-btn--ghost"
+                  className="k-b k-b-quieto bg-sup"
                 >
                   No, gracias
                 </button>
@@ -612,7 +603,7 @@ export default function ModalDocumentoGenerado({
           )}
 
           {avisoGuardado !== '' && (
-            <p className="sp-hint text-center" aria-live="polite">{avisoGuardado}</p>
+            <p className="text-center text-[13px] leading-[18px] text-tinta2" aria-live="polite">{avisoGuardado}</p>
           )}
         </div>
       )
@@ -622,14 +613,13 @@ export default function ModalDocumentoGenerado({
        escotilla para usar otra dirección sin tocar la ficha. */
     if (correoFicha === null) return null
     return (
-      <div className="w-full text-left" style={{ fontSize: '12px', lineHeight: 1.5 }}>
-        <span style={{ color: 'var(--sp-text-muted)' }}>Se enviará a </span>
-        <strong style={{ color: 'var(--sp-text-strong)', wordBreak: 'break-all' }}>{correoFicha}</strong>
+      <div className="w-full pb-2 pl-8 text-left text-[13px] leading-[18px]">
+        <span className="text-tinta2">Se enviará a </span>
+        <strong className="break-all font-semibold text-tinta">{correoFicha}</strong>
         <button
           type="button"
           onClick={() => { setEscrito(''); setErrorEnvio(''); setPaso('pidiendo') }}
-          className="sp-link-alt"
-          style={{ display: 'block', marginTop: '2px' }}
+          className="k-b k-b-tonal mt-2 h-8 whitespace-normal text-[13px]"
         >
           Usar otro correo solo para este envío
         </button>
@@ -639,55 +629,43 @@ export default function ModalDocumentoGenerado({
 
   const enFlujoDeCaptura = paso === 'pidiendo' || paso === 'confirmando'
 
+  /* Las salidas como FILAS de una lista (rediseño B9, maqueta `docs-a` «gen»):
+     icono de 20 en `--enlace`, rótulo, y «›». «Cerrar» es el único botón, quieto
+     y a la derecha. Ningún rótulo ni condición cambió. */
+  const filaClase = 'k-fila gap-3 !min-h-12 disabled:cursor-not-allowed disabled:opacity-100'
+  const iconoClase = 'h-5 w-5 flex-none text-enlace'
   const pie = (
-    <div className="p-4 md:px-6 space-y-2.5">
-      {pdfUrl ? (
-        <a
-          href={pdfUrl}
-          target="_blank"
-          rel="noopener"
-          className="sp-btn sp-btn--primary sp-btn--primary-block sp-btn--reward"
-        >
-          <Eye size={17} /> Visualizar
-        </a>
-      ) : (
-        <button
-          type="button"
-          disabled
-          className="sp-btn sp-btn--primary sp-btn--primary-block"
-        >
-          <Eye size={17} /> Visualizar
-        </button>
-      )}
-
-      <div className="mt-2 pt-3 border-t border-[var(--sp-line-divider)] space-y-2.5">
-        {panelDestinatario()}
+    <div lang="es" className="px-5 pb-5 pt-1">
+      <div className="k-lista">
+        {pdfUrl ? (
+          <a href={pdfUrl} target="_blank" rel="noopener" className={filaClase}>
+            <Eye aria-hidden="true" className={iconoClase} />
+            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta">Visualizar</span></span>
+            <ChevronRight aria-hidden="true" className="k-fila-chev" />
+          </a>
+        ) : (
+          <button type="button" disabled className={filaClase}>
+            <Eye aria-hidden="true" className={`${iconoClase} opacity-50`} />
+            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta3">Visualizar</span></span>
+          </button>
+        )}
 
         {/* Durante la captura y la confirmación se retira el botón de CORREO —el
             panel trae el suyo y dos rótulos iguales harían dudar de cuál manda—
-            pero «Compartir» se queda: no compite con nada y, sin correo en la
-            ficha, el modal abre ya con la captura desplegada, así que esconder
-            la rejilla entera lo dejaría inalcanzable. */}
-        {/* Las dos salidas del documento que no son «Visualizar». El correo manda
-            el PDF GUARDADO —lo resuelve el servidor por id— y compartir manda el
-            que este modal tiene en memoria, que es el mismo archivo.
-
-            A OPACIDAD PLENA cuando alguno esté apagado, igual que el botón de
-            Google en /login: lo deshabilitado se comunica con el estado del
-            control, el relleno y el cursor — nunca apagando el texto, porque
-            entonces el médico no puede leer QUÉ es lo que no puede usar. */}
-        <div className="sp-grid-actions">
-            {!enFlujoDeCaptura && (
+            pero «Compartir»/«Descargar» se quedan: no compiten con nada y, sin
+            correo en la ficha, el modal abre ya con la captura desplegada. */}
+        {/* El correo manda el PDF GUARDADO —lo resuelve el servidor por id— y
+            compartir manda el que este modal tiene en memoria, que es el mismo
+            archivo. Lo deshabilitado se comunica con el estado del control y el
+            motivo a la vista; nunca apagando el texto. */}
+        <div>
+          {!enFlujoDeCaptura && (
             <button
               type="button"
               /* ⚠️ ENVÍA. No pregunta, no despliega: el destinatario ya está
-                 resuelto y a la vista desde que se abrió el modal, así que un
-                 toque en un botón que dice «Enviar por correo» tiene que
-                 enviar. Aquí hubo un primer toque que solo resolvía, y eran dos
-                 toques para una acción.
-                 Sin correo en la ficha no se llega a pulsar esto: el modal ya
-                 abrió con la captura desplegada. La rama queda por si la
-                 consulta falló y no se sabe qué hay. */
+                 resuelto y a la vista desde que se abrió el modal. Sin correo en
+                 la ficha no se llega a pulsar esto: el modal ya abrió con la
+                 captura desplegada. La rama queda por si la consulta falló. */
               onClick={() => {
                 if (correoFicha !== null) void enviarPorCorreo(null)
                 else { setEscrito(''); setErrorEnvio(''); setPaso('pidiendo') }
@@ -695,94 +673,82 @@ export default function ModalDocumentoGenerado({
               disabled={sinDocumento || paso === 'consultando' || paso === 'enviando' || paso === 'enviado'}
               aria-disabled={sinDocumento || undefined}
               aria-busy={paso === 'consultando' || paso === 'enviando'}
-              className={`sp-btn sp-btn--tertiary${sinDocumento ? ' cursor-not-allowed' : ''}`}
-              style={{ flexDirection: 'column', gap: '7px' }}
+              className={filaClase}
             >
               {/* La espera se cuenta EN EL BOTÓN, que es donde está mirando quien
-                  acaba de pulsarlo, y con el control ya deshabilitado: entre el
-                  toque y saber si hay correo hay un viaje al servidor, y sin
-                  esto el modal parece no haberse enterado. */}
-              <span className="inline-flex items-center gap-2">
-                {paso === 'consultando' || paso === 'enviando'
-                  ? <Loader2 size={17} className="animate-spin" />
-                  : paso === 'enviado' ? <Check size={17} /> : <Mail size={17} />}
-                {paso === 'consultando'
-                  ? 'Comprobando correo…'
-                  : paso === 'enviando'
-                    ? 'Enviando…'
-                    : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
+                  acaba de pulsarlo. */}
+              {paso === 'consultando' || paso === 'enviando'
+                ? <Loader2 aria-hidden="true" className={`${iconoClase} animate-spin motion-reduce:animate-none`} />
+                : paso === 'enviado' ? <Check aria-hidden="true" className="h-5 w-5 flex-none text-ok-tinta" /> : <Mail aria-hidden="true" className={iconoClase} />}
+              <span className="k-fila-t">
+                <span className={`text-[15px] leading-5 ${sinDocumento ? 'text-tinta2' : 'text-tinta'}`}>
+                  {paso === 'consultando'
+                    ? 'Comprobando correo…'
+                    : paso === 'enviando'
+                      ? 'Enviando…'
+                      : paso === 'enviado' ? 'Enviado' : 'Enviar por correo'}
+                </span>
+                {/* El motivo, siempre a la vista. */}
+                {sinDocumento && <span className="k-fila-s">No quedó en el expediente</span>}
               </span>
-              {/* El motivo, siempre a la vista: un botón apagado sin explicación
-                  deja al médico buscando qué le falta. */}
-              {sinDocumento && (
-                <span className="sp-badge sp-badge--deferred">No quedó en el expediente</span>
-              )}
+              {!sinDocumento && paso !== 'enviado' && <ChevronRight aria-hidden="true" className="k-fila-chev" />}
             </button>
-            )}
-
-            {/* ⚠️ AQUÍ ESTUVO EL BOTÓN DE WHATSAPP CON SU «PRÓXIMAMENTE», que
-                esperaba a una integración con su API. Lo sustituye la hoja de
-                compartir del sistema, que en un teléfono lista WhatsApp entre
-                las opciones y de paso Signal, Telegram, AirDrop o lo que el
-                médico tenga — sin integrar ninguna.
-
-                DOS BOTONES Y NO UNO CON DOS COMPORTAMIENTOS: el rótulo dice
-                exactamente lo que va a pasar. Donde no hay hoja de compartir
-                —Firefox de escritorio es el caso vivo— se descarga el PDF, que
-                es lo que ese usuario haría después de todas formas. Esconderlo
-                dejaría un hueco en la rejilla y una acción menos sin explicar.
-                El `gridColumn` cubre el caso en que es el único de la fila. */}
-            {puedeCompartir ? (
-              <button
-                type="button"
-                onClick={compartir}
-                disabled={!archivo || compartiendo}
-                aria-busy={compartiendo}
-                className="sp-btn sp-btn--tertiary"
-                style={{ gridColumn: enFlujoDeCaptura ? '1 / -1' : undefined }}
-              >
-                {compartiendo ? <Loader2 size={17} className="animate-spin" /> : <Share2 size={17} />}
-                {compartiendo ? 'Compartiendo…' : 'Compartir'}
-              </button>
-            ) : (
-              /* ⚠️ UN ANCLA CON `download`, NO UN BOTÓN CON `onClick`: entre el
-                 toque y la descarga no puede quedar ninguna asincronía, igual
-                 que en «Visualizar». El `href` ya está resuelto desde el primer
-                 render (ver `pdfUrl`). Y va como HERMANO del botón de correo,
-                 nunca dentro de él: un ancla dentro de un `button` es marcado
-                 inválido y el navegador la desanida por su cuenta. */
-              <a
-                href={pdfUrl ?? undefined}
-                download={nombreArchivo}
-                onClick={() => auditar('descargar_documento')}
-                className="sp-btn sp-btn--tertiary"
-                style={{ gridColumn: enFlujoDeCaptura ? '1 / -1' : undefined }}
-              >
-                <Download size={17} /> Descargar
-              </a>
-            )}
+          )}
+          {panelDestinatario()}
         </div>
 
-        {avisoCompartir !== '' && (
-          <p className="sp-hint text-center" aria-live="polite">{avisoCompartir}</p>
-        )}
+        {/* «Descargar» en todos los marcos (CALMA §23.2). Es UN ANCLA CON
+            `download`, NO UN BOTÓN CON `onClick`: entre el toque y la descarga no
+            puede quedar ninguna asincronía, igual que en «Visualizar». */}
+        <a
+          href={pdfUrl ?? undefined}
+          download={nombreArchivo}
+          onClick={() => auditar('descargar_documento')}
+          className={filaClase}
+        >
+          <Download aria-hidden="true" className={iconoClase} />
+          <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta">Descargar</span></span>
+          <ChevronRight aria-hidden="true" className="k-fila-chev" />
+        </a>
 
-        {errorEnvio !== '' && (
-          <p className="sp-banner sp-banner--danger" role="alert">
-            <AlertTriangle size={17} />
-            <span>{errorEnvio}</span>
-          </p>
+        {/* ⚠️ «COMPARTIR» SE QUEDA DONDE EL NAVEGADOR LO ADMITE, AUNQUE §23.2 DIGA
+            «NADA DE COMPARTIR»: quitarlo pierde la hoja del sistema (WhatsApp,
+            AirDrop…) en el teléfono, y el plan no deja perder funciones. Queda
+            reportado al orquestador (B9). Sustituye a la vieja ventanilla de
+            WhatsApp con su «Próximamente». */}
+        {puedeCompartir && (
+          <button
+            type="button"
+            onClick={compartir}
+            disabled={!archivo || compartiendo}
+            aria-busy={compartiendo}
+            className={filaClase}
+          >
+            {compartiendo
+              ? <Loader2 aria-hidden="true" className={`${iconoClase} animate-spin motion-reduce:animate-none`} />
+              : <Share2 aria-hidden="true" className={iconoClase} />}
+            <span className="k-fila-t"><span className="text-[15px] leading-5 text-tinta">{compartiendo ? 'Compartiendo…' : 'Compartir'}</span></span>
+            <ChevronRight aria-hidden="true" className="k-fila-chev" />
+          </button>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onClose}
-        className="sp-btn sp-btn--ghost"
-        style={{ width: '100%' }}
-      >
-        Cerrar
-      </button>
+      {avisoCompartir !== '' && (
+        <p className="mt-2 text-center text-[13px] leading-[18px] text-tinta2" aria-live="polite">{avisoCompartir}</p>
+      )}
+
+      {errorEnvio !== '' && (
+        <p className="mt-2 flex items-start gap-2 rounded-[var(--r-control)] bg-mal-fondo p-3 text-left text-[13px] leading-[18px] text-mal-tinta" role="alert">
+          <AlertTriangle size={16} aria-hidden="true" className="mt-px flex-none" />
+          <span>{errorEnvio}</span>
+        </p>
+      )}
+
+      <div className="mt-4 flex justify-end">
+        <button type="button" onClick={onClose} className="k-b k-b-capa k-b-quieto min-w-[104px]">
+          Cerrar
+        </button>
+      </div>
     </div>
   )
 
