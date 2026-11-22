@@ -184,7 +184,10 @@ export default function ConsultaDetallePage() {
     <div lang="es" className="mx-auto w-full max-w-[720px] space-y-5 iv:max-w-[600px]">
 
       <header>
-        <Link href={`/expediente/${id}`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] max-w-full text-[13px]">
+        {/* Vuelve a la pestaña Consultas con ESTA nota abierta (decisión del
+            dueño), no al Resumen. Mismas claves que `PestanasExpediente` y que
+            «Leer nota»: `?tab=consultas&consulta=<id>`. */}
+        <Link href={`/expediente/${id}?tab=consultas&consulta=${consultaId}`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] max-w-full text-[13px]">
           <ChevronLeft size={16} aria-hidden="true" />
           <span className="truncate">{paciente.nombre} {paciente.apellidos}</span>
         </Link>
