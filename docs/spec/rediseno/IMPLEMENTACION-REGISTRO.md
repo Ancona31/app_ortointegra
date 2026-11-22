@@ -814,3 +814,28 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   corrigió (`presionando`, `[aria-haspopup]`); internamiento queda pendiente.
 * **Pendiente:** lista global de pendientes en `/documentos` (CI-DT-15, consulta
   nueva); `SeccionPlegable.tsx` quedó sin consumidores (no se borró).
+
+### Escrito médico: la hoja · notas (2026-11-22)
+
+* **Qué:** maqueta aprobada `escrito.html` llevada a la app (§26.7, `.sp-esc-*`).
+  Hoja de alto medido (`--esc-alto`: área de contenido menos su relleno y el
+  pie de acciones; con teclado, `visualViewport`), `sticky` y pegada arriba al
+  entrar a escribir; SOLO `.sp-esc-cuerpo` se desplaza (medido en esc, iPad
+  1024×768 y 768×1024, tel, ext-real e ih: `top` de título y barra iguales
+  antes y después de desplazar). Datos en una línea («Paciente · fecha ·
+  Cambiar»), título como título, «＋ Título del pie», contador de palabras y
+  bloques. Barra nueva en `EditorEscrito.tsx` (kit `k-b-icono`/`k-seg`; reparto
+  por el contenedor `escrito`: una fila ≥ 760, dos renglones 560–759, «⋯» < 560
+  y sangrías al «⋯» < 400). En esc la columna del escrito crece a 880.
+* **Pegado:** `src/lib/documentos/pegadoEscrito.ts` (pruebas
+  `pegadoEscrito.test.ts`): Markdown en texto plano → formato real; tablas →
+  renglones; h4–h6 → Subtítulo. Ctrl/⌘+Mayús+V sigue sin formato (comprobado
+  con el portapapeles real).
+* **PDF v2:** subtítulo 11/15 en tinta plena, sublistas, `start`, ítems de dos
+  párrafos, cita con párrafos separados y marcas en títulos (`cuerpoEscrito.ts`
+  + `formatos/EscritoMedico.tsx`). La negrita sigue en 500 (no hay cara más
+  gruesa de la familia del cuerpo registrada). v1 y el camino legacy, intactos.
+* **Visor:** `.tiptap-viewer` con la jerarquía del editor; `blockquote` y
+  `start` en la lista blanca.
+* **Sin uso tras el cambio (no se borró):** las reglas `.sp-ed-bar/-btn/-block/
+  -select/-more/-n2/-n3/-m2/-m3` de `spinus-tokens.css`.
