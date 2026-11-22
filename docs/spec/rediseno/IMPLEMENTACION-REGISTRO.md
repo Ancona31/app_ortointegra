@@ -136,14 +136,14 @@ hallazgos de las 25 rutas, claro + oscuro:
 | B4 | Navegación por dispositivo | hecho (con defectos que cerró la integración) | 1aa24407, 9c329f53, 884f3e5a, eef2cb16, 6f3bc6e0 | ok | ver integración | 2391/2391 | 35 pasan, 4 fallan (ver notas) | 3 roles × 5 formatos |
 | — | Integración B1–B4 | hecho | ver «Integración B1–B4» | ok | 89/66 | 2391/2391 (sin TZ y UTC) | ver «Integración B1–B4» | 3 roles × 5 formatos × 2 temas |
 | — | ⛔ Parada temprana (push 1) | | | | | | | |
-| B5 | Dashboard | | | | | | | |
-| B6 | Pacientes: lista, nuevo, editar, alta | | | | | | | |
-| B7 | Expediente y laboratorios | | | | | | | |
-| B8 | Nueva nota y nota de consulta | | | | | | | |
-| B9 | Documentos | | | | | | | |
-| B10 | Cuenta y administración | | | | | | | |
-| B11 | Ayuda, estadísticas, suplementación | | | | | | | |
-| B12 | Integración de pantallas (push 2) | | | | | | | |
+| B5 | Dashboard | hecho | 3239f161 (fusión 1b604d62) | ver B12 | ver B12 | ver B12 | ver B12 | ver «B5–B11 · notas» |
+| B6 | Pacientes: lista, nuevo, editar, alta | hecho | 278a5815, 2c0d70f2 (fusión e9848d9f) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
+| B7 | Expediente y laboratorios | hecho | 837621ac, 454acc68 (fusión 1719a918, con B8) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
+| B8 | Nueva nota y nota de consulta | hecho | 7b4ed2ff (fusión 1719a918, con B7) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
+| B9 | Documentos | hecho en dos partes | parte 1: 796cd631, 0490d40a, e00eeb10, 181d9ec2, cdfe51bb (fusión 0d0c3a37) · parte 2 (B9b): 61566877, a45329fa, cbdff187, 6fa35647 (fusión 54e4856d) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
+| B10 | Cuenta y administración | hecho | 7776920c, ff66a83e, d5b84ac4, 0f1299cc (fusión 2b2baf0d) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
+| B11 | Ayuda, estadísticas, suplementación | hecho | 21b45d15, e8a78684, d930489e (fusión c8486fe3) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
+| B12 | Integración de pantallas (push 2) | hecho (verificación tras el reinicio del contenedor) | 24ca09ba … a289ce13 y los de la verificación (ver «Integración de pantallas (B12) · notas») | ok | 87/61 | 2425/2425 (sin TZ y UTC) | ver notas | 3 roles × 5 formatos × 2 temas |
 | B13 | Agenda (AG0–AG10) | | | | | | | |
 | B14 | Retirada del lanzador `/inicio` | | | | | | | |
 | B15 | Limpieza final y QA (push 4) | | | | | | | |
@@ -451,3 +451,73 @@ Reconstruido del código y de `git log` en la integración.
   y van centradas (e2e).
 * En `tel`, `iv`, `esc`, sin formato y en el lanzador nada cambia (sonda de las
   capturas: en `tel`/`esc` las capas siguen a pantalla completa).
+
+### B5–B11 · notas (oleada de pantallas)
+
+Reconstruido en B12 del código y de `git log` (los informes de los agentes se
+perdieron con el reinicio del contenedor). Las cifras de build, lint, unitarias
+y e2e de cada bloque no se conservan: las válidas son las de B12, medidas sobre
+la rama ya integrada.
+
+* **B5 · Dashboard** (`3239f161`). Pieza principal «Lo que sigue» con la cita en
+  curso o la siguiente; «Después» con filas enteras que abren la hoja de acciones
+  de la cita (ModalShell); `IconoEstadoCita`, `MarcaOrigen`, «Sin expediente» a la
+  vista; «Ligar paciente e iniciar consulta» con eslabón (sólo las etiquetas del
+  dashboard; `VentanaLigarCita` queda para AG7); leyenda tras «Estados»; «Hoy»
+  fundida en la cabecera (tira sólo en iv); secretaria con filas «Ver cita» y
+  conteos como mosaicos. e2e `agenda-i3`, `agenda-j3`, `agenda-k5` al día con
+  los rótulos nuevos.
+  * **De la maqueta, NO dibujado (pide datos que no hay):** el avance «4 de 6»,
+    «14 consultas esta semana», «Plan VIP», los conteos de sala y la marca de
+    Google en las citas ya ligadas.
+* **B6 · Pacientes** (`278a5815`, `2c0d70f2`). Título «Expediente»; buscador,
+  «Ordenado por» (menú del catálogo) y «Filtros» (§30.3: hoja con borrador en
+  ext/tel, capa de aplicación inmediata en ih/iv/esc); tabla en ih/iv/esc con la
+  edad bajo el nombre en ih/iv, lista en ext/tel; cabe sin desplazamiento
+  horizontal en ih (cierra el abierto de la integración B1–B4). Nuevo/editar:
+  filas «rótulo — campo», «‹ Expediente», alerta «Paciente duplicado» de tres
+  botones, consentimiento con la casilla a la derecha, pie fijo.
+  * **Se aparta de la maqueta:** Sexo como segmentado con radios `required`;
+    «Filtros» en esc como tarjeta con velo (no panel lateral); el error del
+    formulario en línea dentro del pie.
+* **B7 · Expediente y laboratorios** (`837621ac`, `454acc68`). En esc ficha a la
+  izquierda y pestañas a la derecha; «···» «Acciones del paciente» con Editar,
+  Exportar y «Eliminar paciente» en alerta destructiva; `.k-tabs` con conteo
+  plano; resumen con plegables (§30.4); línea de tiempo con icono de tipo en
+  color; analitos con los encabezados de §23.6; archivos clínicos como lista;
+  `SelectorSegmentado` pasa a `.k-seg` (ya no anima `left/width`); gráfica en
+  `--accion`.
+  * **Se aparta de la maqueta:** las acciones del paciente van al «···» también
+    fuera de esc; los signos vitales no se pliegan.
+* **B8 · Nueva nota y nota de consulta** (`7b4ed2ff`). «‹ <paciente>» en vez de
+  las migas (Breadcrumbs queda sin uso), título «Nueva nota», alergia como
+  etiqueta, «La nota aparecerá aquí» en esc, «Revisar» y «Guardar nota» parejos;
+  nota de consulta en columna centrada, «Nota manual/IA», «Nota sellada»,
+  addendum con `.k-campo`, sigue inmutable. `CuerpoNota` justificado con
+  `hyphens` y `lang="es"`.
+* **B9 · Documentos**, parte 1 (`796cd631`, `0490d40a`, `e00eeb10`, `181d9ec2`,
+  `cdfe51bb`) y parte 2 / B9b (`61566877`, `a45329fa`, `cbdff187`, `6fa35647`).
+  `/documentos` en columna de 640; un solo mensaje al fallar el guardado (alerta
+  «No se pudo guardar»/«Aceptar») en los 8 formularios; modal posterior con
+  «Descargar» en todos los marcos; plantillas con alertas del catálogo; piel de
+  §26 en los formularios (sólo CSS, nombres y orden de campos intactos); cabecera
+  del formulario con el tipo y «Cambiar», «···» (CapaMenu) con borrador,
+  plantillas y vaciar; firmado dentro de las franjas, lienzo siempre papel.
+  * **Se aparta de la maqueta:** «Compartir» se queda donde el navegador lo
+    admite (quitarlo pierde la hoja del sistema); la plantilla se elige con el
+    desplegable nativo; la casilla «urgente» de las solicitudes se conserva; la
+    cabecera de la entrada dice «Documentos».
+* **B10 · Cuenta** (`7776920c`, `ff66a83e`, `d5b84ac4`, `0f1299cc`). Mi perfil
+  con filas, identidad a la derecha en esc, paletas con vista previa, grupo
+  «Ajustes» (Modo oscuro, Aviso de Privacidad; «Cerrar sesión» llegó en B12),
+  «Editar consultorio» como capa; Usuarios con «Invitar», «Tu equipo» y el vacío
+  «Todavía no hay nadie en tu equipo»; Facturación con barras de uso en `scaleX`
+  y textos §23.10; asistente de perfil de 7 pasos. Sin cambios de Stripe.
+* **B11 · Lectura** (`21b45d15`, `e8a78684`, `d930489e`). Estadísticas con
+  `EstadoError` + «Reintentar» (arreglo: sin red se quedaba en el esqueleto);
+  ayuda en columna de 680 + apoyo de 296 en esc, acordeón con `hidden` y
+  `@starting-style` (ya no anima `max-height`); suplementación en rejilla de 2
+  desde ih.
+  * **Se aparta de la maqueta:** el orden de las columnas de ayuda; el Top 10
+    de estadísticas en barras HTML (nombre y número a la vista) en vez de la
+    gráfica.
