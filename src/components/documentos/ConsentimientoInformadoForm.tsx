@@ -1001,7 +1001,7 @@ export default function ConsentimientoInformadoForm({
   }
 
   async function guardarBorrador(): Promise<void> {
-    if (guardandoBorrador || imprimiendo) return
+    if (guardandoBorrador || imprimiendo || offlineMode) return
     // Guardar sin resolver el que ya había crearía el segundo borrador que la
     // regla prohíbe. Cerrar el diálogo no es responderlo.
     if (!borradorId && borradorPrevio) { setDialogoPrevio(true); return }
@@ -1035,7 +1035,7 @@ export default function ConsentimientoInformadoForm({
    * documento al que le faltan campos.
    */
   async function iniciarFirmado(): Promise<void> {
-    if (guardandoBorrador || imprimiendo || firmando) return
+    if (guardandoBorrador || imprimiendo || firmando || offlineMode) return
     if (faltantes.length > 0) {
       setIntentado(true)
       irA(faltantes[0].clave)
@@ -1819,11 +1819,15 @@ export default function ConsentimientoInformadoForm({
             : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
             : <><Printer size={17} aria-hidden="true" /> Imprimir para firmar en papel</>}
         </button>
-        <button type="button" onClick={guardarBorrador} disabled={guardandoBorrador || imprimiendo || vacio}
-          title={vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined}
-          className="sp-btn sp-btn--secondary sp-ci-borrador">
-          {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
-        </button>
+        {/* Sin conexión no hay borrador que guardar (va a Supabase): no se
+            enseña un botón que sólo puede fallar (CI-DT-17). */}
+        {!offlineMode && (
+          <button type="button" onClick={guardarBorrador} disabled={guardandoBorrador || imprimiendo || vacio}
+            title={vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined}
+            className="sp-btn sp-btn--secondary sp-ci-borrador">
+            {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
+          </button>
+        )}
         {/* No se apaga por faltantes: un botón gris no enseña qué falta. Al
             pulsar con faltantes no avanza y lleva al primero. */}
         <button type="button" onClick={revisar} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
@@ -1831,31 +1835,47 @@ export default function ConsentimientoInformadoForm({
           <PenLine size={18} aria-hidden="true" /> Revisar y firmar
         </button>
       </div>
+      {/* El búnker no tiene «···»: la denegación se ofrece aquí, y se dice por
+          qué no hay borrador ni firmado en el dispositivo. */}
+      {offlineMode && (
+        <div className="sp-ci-offline">
+          <p className="sp-ci-ayuda">Sin conexión: se imprime para firmarse a mano. El borrador y el firmado en el dispositivo necesitan red.</p>
+          <button type="button" onClick={() => setTipoDoc('denegacion')} className="k-b k-b-texto">
+            <ShieldOff aria-hidden="true" /> Emitir denegación…
+          </button>
+        </div>
+      )}
     </>
   )
 
   const vistaRevision = (
     <>
       <RevisionConsentimiento filas={filasRevision} firmantes={firmantesRevision}
-        conDispositivo aviso={avisoRevision}
+        conDispositivo={!offlineMode} aviso={avisoRevision}
         onVolver={() => { setEtapa('captura'); setAvisoRevision('') }}
         onEditarFirmantes={() => { setEtapa('captura'); setAvisoRevision(''); setTimeout(() => abrir('fir'), 0) }} />
       {avisos}
       <div className="sp-doc-actions sp-ci-pie">
-        <button type="button" onClick={guardarBorrador} disabled={guardandoBorrador || imprimiendo || vacio}
-          className="sp-btn sp-btn--ghost sp-ci-borrador">
-          {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
-        </button>
+        {/* Sin conexión ni borrador ni firmado en el dispositivo (CI-DT-17):
+            los dos llaman a Supabase. «Imprimir para firmar en papel», como hoy. */}
+        {!offlineMode && (
+          <button type="button" onClick={guardarBorrador} disabled={guardandoBorrador || imprimiendo || vacio}
+            className="sp-btn sp-btn--ghost sp-ci-borrador">
+            {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
+          </button>
+        )}
         <button type="button" onClick={pedirPapel} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
           className="sp-btn sp-btn--secondary sp-ci-papel">
           {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
             : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
             : <><Printer size={17} aria-hidden="true" /> Imprimir para firmar en papel</>}
         </button>
-        <button type="button" onClick={iniciarFirmado} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
-          className="sp-btn sp-btn--primary sp-ci-firmar">
-          <PenLine size={18} aria-hidden="true" /> Firmar en este dispositivo
-        </button>
+        {!offlineMode && (
+          <button type="button" onClick={iniciarFirmado} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+            className="sp-btn sp-btn--primary sp-ci-firmar">
+            <PenLine size={18} aria-hidden="true" /> Firmar en este dispositivo
+          </button>
+        )}
       </div>
     </>
   )

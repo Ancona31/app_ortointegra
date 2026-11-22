@@ -4036,6 +4036,8 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
   .sp-ci-dl-f { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .sp-ci-dl, .sp-ci-orden { padding-inline: 14px; }
 }
+.sp-ci-offline { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.sp-ci-offline svg { width: 16px; height: 16px; }
 .sp-ci-den { flex-wrap: wrap; }
 .sp-ci-den > span { flex: 1 1 220px; }
 .sp-ci-previo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
