@@ -642,3 +642,30 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
 * Reglas para el siguiente: la lista del buscador va DENTRO del medicamento
   (no en portal) para que tocarla no cuente como «salir»; plegar con el
   puntero se hace al soltar y en `setTimeout`, nunca en `pointerdown`.
+
+### Solicitud de laboratorio rápida · notas (2026-11-22)
+
+* **Qué es:** la solicitud de laboratorio de la maqueta aprobada por el dueño
+  (`laboratorio-rapido.html`): UN buscador (`BuscadorEstudio`) que añade con
+  Enter y queda vacío y con el foco; lo pedido como fichas con ✕ y
+  «Solicitados · N» (`FichasEstudios`: `PedidosLab`, `FrecuentesLab`); «Ver el
+  catálogo por categoría» plegado con casillas y «n de total»
+  (`CatalogoEstudios`); lógica pura en `estudiosPedidos.ts` (prueba
+  `src/lib/tests/estudiosPedidos.test.ts`); estilos en `spinus-tokens.css`
+  §26.2 (`.sp-lab-*`, reusa `.sp-rx-fi`, `.sp-rx-lista`, `.sp-rx-op`,
+  `.sp-rx-campo`).
+* `estudiosLab.ts` exporta `CATEGORIAS_LAB` (24 secciones) y `ESTUDIOS_LAB`
+  se deriva de ella: mismo contenido y orden.
+* **Cambios de COMPORTAMIENTO (excepción del dueño):** ya no hay renglones con
+  combo ni «Agregar»; sin duplicados (sin acentos ni mayúsculas); las diez
+  frecuentes piden el NOMBRE DEL CATÁLOGO («TP» → «Tiempo de Protrombina (TP /
+  INR)»…). Una plantilla o borrador con el texto viejo se aplica tal cual y su
+  ficha no se enciende (aceptado). Sin reordenar (el orden no importa).
+* **Lo que NO cambia:** `contenido` (paciente, diagnostico, estudios como
+  lista de cadenas, notas, fecha; comprobado en filas emitidas en local), el
+  PDF, plantillas, validación «Falta 1 campo: Estudios» (ahora lleva el foco
+  al buscador), error único y modal posterior. El búnker: todo local.
+* Lo escrito en el buscador sin añadir no cuenta para «formulario vacío».
+* Con 15 estudios el formulario NO cabe en 1280×800: la página desplaza 1392
+  sobre 800 (sólo el formulario mide 1142). Lo que sobra es la columna de
+  640 px, la cabecera y la tarjeta de plantillas, fuera de este formulario.
