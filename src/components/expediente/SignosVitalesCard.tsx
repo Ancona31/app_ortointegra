@@ -224,10 +224,10 @@ export default function SignosVitalesCard({ value, onChange, errores }: SignosVi
         className="sv-boton k-pulsable group block w-full text-left"
       >
         <span className="mb-2.5 flex min-h-[28px] items-center gap-2">
-          <span className="inline-flex size-7 flex-none items-center justify-center rounded-full bg-tonal text-enlace" aria-hidden="true">
+          <span className="inline-flex size-7 flex-none items-center justify-center rounded-full bg-tonal text-enlace ext:hidden" aria-hidden="true">
             <HeartPulse size={16} strokeWidth={2.2} />
           </span>
-          <span className="text-[15px] font-semibold leading-5 text-tinta">Signos vitales</span>
+          <span className="whitespace-nowrap text-[15px] font-semibold leading-5 text-tinta">Signos vitales</span>
           <Etiqueta estados={estados} conErrores={err.size > 0} />
           <span className="ml-auto flex flex-none items-center gap-0.5 text-[14px] font-semibold leading-5 text-enlace">
             {vacio && 'Capturar'}

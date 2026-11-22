@@ -1250,7 +1250,7 @@ export default function NuevaNotaPage() {
                       onChange={e => setRespuestasEntrevista(prev => ({ ...prev, [preg.id]: e.target.value }))}
                       placeholder="Escribe tu respuesta..."
                       aria-label={preg.pregunta}
-                      className="k-campo h-10 bg-sup text-[15px] ext:h-11 ext:text-[16px] tel:h-11 tel:text-[16px]" />
+                      className="k-campo h-11 bg-sup text-[16px] ih:h-10 ih:text-[15px] esc:h-10 esc:text-[15px]" />
                   </div>
                   )
                 })}
@@ -1600,7 +1600,7 @@ export default function NuevaNotaPage() {
                   onChange={e => update('motivo_consulta', e.target.value)}
                   disabled={generando}
                   placeholder="Ej.: Paciente con dolor lumbar de 2 semanas tras cargar peso, sin irradiación, Lasègue negativo, fuerza y reflejos normales. Indico naproxeno 500 mg cada 12 h por 7 días, ejercicios de McKenzie, cita en 2 semanas."
-                  rows={10}
+                  rows={6}
                   className="k-campo-sin-caja block min-h-[180px] w-full resize-none border-0 bg-transparent p-0 text-[17px] leading-[26px] text-tinta outline-none [hyphens:auto] [text-align:justify] placeholder:text-tinta3 placeholder:opacity-80 focus-visible:outline-none disabled:text-tinta2 esc:min-h-[150px]"
                 />
                 {/* Dictado por voz: aún no existe; el botón lo anuncia. Redondo y
@@ -1874,7 +1874,7 @@ export default function NuevaNotaPage() {
                  usa el H1 de la página) ni .sp-title-state (identidad del
                  Estado 4 del modal, que el médico acaba de ver).
                  Palomita en círculo verde suave, como «Nota guardada» del modal. */
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3">
                 <span className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[var(--ok-fondo)] text-[var(--ok-tinta)] [&_svg]:h-5 [&_svg]:w-5" aria-hidden="true">
                   <Check />
                 </span>
