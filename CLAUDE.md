@@ -249,8 +249,8 @@ Estas versiones están elegidas conscientemente. NO actualizar sin discusión:
 
 **Regla de actualización:** NO usar versiones de herramientas con menos de 1
 semana en el wild. Regla específica para herramientas que tocan datos médicos
-de producción (Supabase CLI, Docker). Ver `LOCAL_DEV.md` (pendiente de crear)
-para procedimiento de actualización.
+de producción (Supabase CLI, Docker). Ver `LOCAL_DEV.md` para procedimiento de
+actualización.
 
 ### Docker Desktop
 
@@ -258,15 +258,20 @@ para procedimiento de actualización.
 - Debe estar corriendo antes de cualquier comando `supabase start` o `supabase db pull`
 - Validación rápida desde WSL: `docker --version` debe responder sin errores
 
-### Estado actual de Supabase local (2026-05-04)
+### Estado actual de Supabase local (2026-11-22)
 
-**Pendiente de configurar:**
-- `supabase init` — crear `config.toml` y `seed.sql` (cuidando NO sobrescribir `baseline/` ni `migrations/`)
-- `supabase start` — levantar Postgres + Auth + Storage local en Docker
-- `supabase db pull` — replicar schema de prod a local (Session pooler IPv4)
-- `seed.sql` — crear cuentas representativas de cada caso (free virgen, free degradada, individual, premium VIP, premium cancelado, etc.)
+> Sustituye a la lista «Pendiente de configurar» del 2026-05-04, que ya no era
+> cierta.
 
-**Connection string para `db pull`** (Session pooler, IPv4):
+- Existe `supabase/config.toml` y el stack local (Postgres + Auth + Storage en
+  Docker) se levanta con la CLI 2.117.0.
+- `supabase/migrations/` tiene 50 migraciones; `supabase db reset --local` las
+  aplica todas (procedimiento: `GUIA_PRUEBAS_AGENDA_V2.md`, P5).
+- No hay `supabase/seed.sql`: los datos de prueba de la agenda los siembra
+  `scripts/agenda-semilla.ts`.
+
+**Connection string de producción** (Session pooler, IPv4; sólo para Angel, en
+su terminal: ver «🗃️ Base de datos»):
 - Host: `aws-0-us-west-2.pooler.supabase.com`
 - Port: 5432
 - User: `postgres.qpnegmmpneseirfyplbf`
@@ -382,13 +387,31 @@ del médico logueado). Origen: sección 1 de `PLAN_LANDING_SPINUS.md`.
 * `src/lib/supabase/` — cliente Supabase
 * `public/` — assets estáticos
 * `public/bunker/` — (futuro) app estática del búnker offline
-* Las migraciones SQL van en archivos separados con prefijo `supabase_migration_`
+* Las migraciones SQL van en `supabase/migrations/`, un archivo por migración con la fecha delante (las recientes, `AAAAMMDDhhmmss_nombre.sql`). Los viejos `supabase_migration_*.sql` de la raíz están archivados en `supabase/archivo-migraciones-historicas/raiz/` y no se imitan
 
 ---
 
 ## 🗃️ Base de datos
 
-* NUNCA ejecutes migraciones SQL directamente. Genera el archivo SQL y yo lo ejecuto manualmente en Supabase
+* **Cómo llega una migración a producción (flujo vigente desde 2026-11-22;
+  sustituye a «genera el archivo SQL y yo lo ejecuto manualmente en
+  Supabase», de antes de que Angel usara la CLI):**
+  1. se clona con la CLI la **ESTRUCTURA** de producción, sin datos (la
+     «foto»);
+  2. se aplican sobre ese clon las migraciones nuevas;
+  3. se prueba la app sobre ese clon;
+  4. se audita;
+  5. si todo pasa, se aplica a producción con la CLI.
+* **Nada se aplica a producción sin las cuatro cosas:** el ensayo sobre el clon
+  de estructura, la auditoría global (`supabase/AUDITORIA-MIGRACIONES.md`), las
+  consultas de conteo de sólo lectura corridas por Angel, y la **ORDEN
+  EXPLÍCITA** de Angel.
+* **Quien aplica a producción es Angel, con la CLI, en su terminal.** Claude
+  nunca tiene ni pide la contraseña ni la cadena de conexión con credenciales,
+  ni las guarda en archivos ni en registros. Nunca corre por su cuenta
+  `supabase link`, `db push` ni nada con `--linked`.
+* **En LOCAL sí** se aplican migraciones y se reinicia la base
+  (`supabase db reset --local`; siempre `--local`).
 * NUNCA hagas DELETE de datos en producción
 * Toda tabla nueva con datos de pacientes DEBE tener RLS activado
 * Toda foreign key a pacientes DEBE ser `ON DELETE RESTRICT`
