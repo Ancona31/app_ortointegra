@@ -470,15 +470,16 @@ migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
 Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-260.
 
-**Estado:** el código y las 43 migraciones (`20261111120000` a
-`20261124160000`: las 16 del cierre, las 4 de las correcciones de seguridad,
-las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de
-la tanda I, las 3 de la tanda J, las 3 de la tanda K y las 3 de la tanda L; 48
-con las 5 de `main`) están en `feature/agenda-v2`,
-probados sólo en local. Desde la tanda M hay además una migración que **no es
-de la agenda**, `20261125170000_audit_log_sin_truncate.sql`: se aplica sola y
-puede ir antes que todas. Y una de la agenda, de la integración M,
-`20261125180000_agenda_m_saludo_recordatorio.sql` (50 en total). En producción no hay nada
+**Estado:** el código y las migraciones de la agenda están en `feature/agenda-v2`,
+probados sólo en local. Las 44 migraciones del proyecto (`20261111120000` a
+`20261124160000` y `20261125180000`) se **fundieron el 2026-11-22 en seis**,
+`20261201120000` a `20261201170000`, que van en orden de nombre (F1 → F5a →
+F3 → F2 → F4 → F5b); las originales siguen en el tag `fusion-originales`
+(`mejora_agendaV2.md` §7.1; mapa, notas y diferencias en `supabase/fusion/`).
+Hay además dos que **no son de la agenda**,
+`20261125170000_audit_log_sin_truncate.sql` y
+`20261126120000_public_sin_truncate.sql`: se aplican solas y pueden ir antes que
+todas (13 en total con las 5 de `main`). En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
 
 **Reglas que un editor futuro no debe romper:**
@@ -514,7 +515,7 @@ aplicado ni encendido hasta que Angel lo haga (§7).
   `clinica_tiene_acceso()` y `clinica_no_suspendida()`. Si cambias la FORMA
   de cualquiera de las dos (plpgsql, varias sentencias, `get_clinica_id()` sin
   `public.`), la sincronización con Google se detiene, cerrada (P0001), hasta
-  revisar C1. E1 y E6 exigen además el md5 de `clinica_no_suspendida()`.
+  revisar la puerta (F2, `20261201150000`). F4 (`20261201160000`) exige además el md5 de `clinica_no_suspendida()`.
   Ninguna migración de v2 modifica esas dos funciones ni ninguna policy
   existente, y no se añade otra puerta RESTRICTIVE: `tipos_cita` y
   `agenda_ajustes` no la llevan, a propósito.
@@ -526,12 +527,12 @@ aplicado ni encendido hasta que Angel lo haga (§7).
   RESTRICT, y la API traduce el 23503 a 409. No las cambies a CASCADE. Además
   la **base** lo rechaza aunque se salte la API: el disparador
   `trg_appointments_proteger_borrado` (`cita_proteger_borrado()`,
-  `20261117120000`) da 42501 a todo rol salvo `postgres`/`supabase_admin`,
+  `20261201170000`) da 42501 a todo rol salvo `postgres`/`supabase_admin`,
   **también a `service_role`**. Un borrado de citas del servidor con v2
   encendida falla; quien limpie citas (semilla, scripts) borra antes la fila de
   `agenda_ajustes` o lo hace como `postgres`.
 * **Las columnas `reserva_*` de `appointments` sólo las escribe el servidor**
-  (`trg_appointments_proteger_reserva`, `20261117121000`): para todo rol que no
+  (`trg_appointments_proteger_reserva`, `20261201170000`): para todo rol que no
   sea `service_role`/`postgres`/`supabase_admin`, al crear van todas NULL
   (`reserva_reagendados` 0) y al editar no cambian, salvo vaciar
   `reserva_telefono`/`reserva_correo`. El disparador lista las columnas **por
@@ -541,7 +542,7 @@ aplicado ni encendido hasta que Angel lo haga (§7).
   INVOKER y las llama `service_role`; una SECURITY DEFINER de `postgres` se
   saltaría el disparador sin que nadie lo note.
 * **El candado automático decide por el correo verificado; el teléfono, sólo
-  por el bloqueo manual** (`20261117130000`, decisión de Angel). «Una cita
+  por el bloqueo manual** (`20261201140000`, decisión de Angel). «Una cita
   activa», cancelaciones, inasistencias y el bloqueo automático cuentan por
   `correo_hmac`; el teléfono no bloquea solo. En el enlace fijo la ficha del
   correo se comprueba antes de leer nada de la persona, para que la respuesta
@@ -558,8 +559,9 @@ aplicado ni encendido hasta que Angel lo haga (§7).
   garantía de que el hash lo calculó el servidor es que sólo el servidor
   inserte.
 * **Quien reemplace `proteger_reserva_enlaces()` parte del cuerpo de
-  `20261117122000`** (md5 de `prosrc` `acd4128b…`), no del de D1: el de D1
-  deja insertar a la sesión.
+  `20261201140000`** (F3; md5 de `prosrc` `acd4128b…`, el de antes de la fusión,
+  que el post-vuelo de F3 exige), no del de D1: el de D1 deja insertar a la
+  sesión.
 * **Correo:** todo el de la agenda pasa por `src/lib/correo/transporte.ts`
   (`EMAIL_TRANSPORT`; `captura` → Mailpit en local). No llames a Resend directo
   desde código nuevo (AG-DT-16).
@@ -641,7 +643,7 @@ el conjunto pasa a 24 del proyecto).** Además de lo de arriba:
   no dice «Recordatorio» ni «mañana». No metas palabras de uno en el cuerpo
   común.
 * **La duración de la consulta es un tipo de cita** `principal` del médico; la
-  de un consultorio, otro principal con `consultorio_id` (`20261119120000`).
+  de un consultorio, otro principal con `consultorio_id` (`20261201120000`).
   Qué tipos valen en un consultorio lo decide `tiposDelConsultorio`
   (`src/lib/agenda/tiposPorConsultorio.ts`), UNA regla para la página de
   reserva (en el servidor, `tiposPorConsultorio`), `/turnos`, el POST, el modal
@@ -649,7 +651,7 @@ el conjunto pasa a 24 del proyecto).** Además de lo de arriba:
   tipo: no la llames sin filtrar antes. A la página pública no viajan
   `principal` ni `consultorio_id`.
 * **`tipos_cita_insert` y `tipos_cita_update` dejan al médico crear, cambiar y
-  archivar SUS tipos** (`20261119120000`, `20261119121000`; decisión de Angel),
+  archivar SUS tipos** (`20261201120000`; decisión de Angel),
   sin reasignarlos (WITH CHECK = USING); el administrador, como en B6; la
   secretaria, nada. Archivar es UPDATE: no hay DELETE en `tipos_cita` y no debe
   haberlo.
@@ -679,7 +681,7 @@ el conjunto pasa a 24 del proyecto).** Además de lo de arriba:
   los consultorios» (`etiquetaCompactar(vista, agendaV2)`).
 * **`clinicas.horario_consulta` no se borra ni se cambia** (spinus-consola): con
   la v2 sólo lo heredan los consultorios con `horario_propio = false`. La
-  migración `20261119130000` copió una vez el de la clínica a cada consultorio
+  migración `20261201120000` (F1) copia una vez el de la clínica a cada consultorio
   sin horario propio, con respaldo en `respaldos.consultorios_horario_20261119`
   (esquema sin privilegios para `anon`, `authenticated` ni `service_role`).
   La configuración con la v2 no tiene «Horario de la clínica»; el engrane
@@ -691,7 +693,7 @@ el conjunto pasa a 24 del proyecto).** Además de lo de arriba:
   secretaria: todos; médico: los suyos), sólo con la v2.
 * **El correo de confirmación de Spinus** (`POST /api/agenda/correo`,
   `confirmacionCita.ts`) va por `cita_correo_tomar` con `tipo:
-  'confirmacion'` (`20261119140000`): el destinatario lo da la base, una por
+  'confirmacion'` (`20261201160000`): el destinatario lo da la base, una por
   hora de inicio, y no quita el recordatorio. Lo manda cualquier rol que vea la
   cita (decisión de Angel). La regla de cuándo se ofrece es `motivoSinCorreo`
   (`whatsappCita.ts`), la misma en la ruta y en los botones.
@@ -731,7 +733,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   `BotonVolver`, en el pie de cada paso después del primero**; lo escrito vive en `useReserva`
   (`borrador`), la casilla del aviso vuelve desmarcada a propósito. No vuelvas a un enlace arriba.
 * **El correo es obligatorio en el enlace FIJO** (esquema y `reservar_por_enlace`), que además lo
-  verifica con código. **El único lo admite vacío** (tanda I, `20261121120000`): sin correo no hay
+  verifica con código. **El único lo admite vacío** (tanda I; hoy en `20261201140000`): sin correo no hay
   comprobante ni recordatorio, pero sí el aviso a la clínica. (Sustituye a «obligatorio en los dos».)
 * **La configuración va en pestañas** (`MenuConfiguracion.tsx`, patrón APG): abre en «Primeros pasos» mientras falte
   algo y si no en la primera; todos los paneles montados, sólo uno visible. Un enlace interno a otra sección va con
@@ -740,11 +742,11 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **Los botones de la configuración llevan borde y fondo en reposo** (`clasesConfig.ts`, tokens `--ag-control-*`,
   borde ≥ 3:1 en claro y oscuro). No vuelvas a un botón sin borde ni a un botón con aspecto de enlace.
 * **El recordatorio automático tiene su interruptor por clínica, APAGADO de fábrica**
-  (`agenda_ajustes.recordatorio_encendido`, `20261120120000`). La tarea lista con `cita_recordatorios_pendientes`
-  (la de E4 + el interruptor); sin la migración no existe y no se manda nada. No vuelvas a llamar a
-  `cita_correos_pendientes`. El comprobante, el código de la reserva y la confirmación manual NO dependen de él.
+  (`agenda_ajustes.recordatorio_encendido`, `20261201120000`). La tarea lista con `cita_recordatorios_pendientes`
+  (`20261201160000`; la de E4 + el interruptor); sin la migración no existe y no se manda nada. No vuelvas a crear
+  ni a llamar a `cita_correos_pendientes` (la de E4 sin el interruptor; se retiró en la fusión). El comprobante, el código de la reserva y la confirmación manual NO dependen de él.
 * **«Restablecer configuración de la agenda»** (`POST /api/agenda/restablecer` → `agenda_restablecer_configuracion`,
-  `20261120121000`, sólo service_role, INVOKER): sólo el administrador, con «RESTABLECER» escrito. Respalda el horario
+  `20261201120000`, sólo service_role, INVOKER): sólo el administrador, con «RESTABLECER» escrito. Respalda el horario
   de cada consultorio en `audit_log` ('agenda_horario_restablecido') antes de dejarlo en el horario de partida de la v2
   (el de la clínica COPIADO y con `horario_propio = true`, la herencia de G4: la única fuente sigue siendo el
   consultorio; integración de la tanda H, decisión pendiente de Angel); archiva tipos (nunca borra) y revoca enlaces vigentes. No toca citas, pacientes, auditoría ni
@@ -779,7 +781,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **Una cita atendida con nota clínica ligada no cambia de estado ni se borra
   (siempre) y no se mueve (con la v2) — también en la BASE**
   (`trg_appointments_proteger_atendida` → `cita_proteger_atendida()`,
-  `20261120130000`; cierra AG-DT-61 para las citas con nota). 42501 a todo rol salvo
+  `20261201170000`; cierra AG-DT-61 para las citas con nota). 42501 a todo rol salvo
   `postgres`/`supabase_admin`, **también a `service_role`**. Médico, consultorio,
   notas y Google siguen editables. La nota se mira con `cita_tiene_nota_ligada()`
   (DEFINER, sólo booleano, sólo de la clínica de quien llama, sin `anon`), porque la
@@ -806,12 +808,15 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   apagado no sale ninguno y la prueba pasaría sin probar nada
   (`confirmacion-enlace` «lista A 4») o fallaría (`husos-dos-consultorios`).
 * **Al fusionar con `feature/limites-ajustables`, la lista del caso 3 de
-  `p1_permisos_funciones.sql` es de 51 funciones** (tras la tanda K: las 47 de J
+  `p1_permisos_funciones.sql` es de 49 funciones** (tras la tanda K: las 47 de J
   más `gcal_bloqueo_aplicar`, `rate_limit_espera` y `reserva_espera_reenvio`;
   y desde la integración M, `cita_nombre_saludo(uuid,uuid)`, sólo `service_role`;
+  tras la fusión del 2026-11-22, sin las tres retiradas, `cita_correos_pendientes(integer)`,
+  `reserva_enlace_emitir` de 7 argumentos y `reserva_enlace_regenerar_fijo(uuid,uuid,text)`,
+  y con `agenda_v2_encendida(uuid)`, sin `anon`;
   `agenda_bloqueo_preparar()`, `cita_proteger_cierre()` y las demás de
   disparador tienen los tres roles y NO entran), escrita entera en
-  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §13.5. Las pruebas SQL que llamen
+  `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` §13.5 (la de antes de la fusión). Las pruebas SQL que llamen
   a una función de `pg_temp` como otro rol le dan GRANT explícito: con P1 nacen
   sin EXECUTE a PUBLIC.
 * **Cada migración nueva añade su fila a la tabla de migraciones de
@@ -838,7 +843,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   actualizador de `setState`: el actualizador puede correr en el render, con
   `currentTarget` ya en `null` («Algo salió mal» al reabrir «Ir a una fecha»).
 * **Una cita reservada por enlace que no ha pasado tiene candado**
-  (`cita_proteger_eleccion`, `20261121121000`): médico, consultorio, día y hora
+  (`cita_proteger_eleccion`, `20261201170000`): médico, consultorio, día y hora
   no se cambian por PUT, arrastre, PostgREST ni Google. Consultorio, día y hora,
   sólo con «Reagendar» (`POST /api/appointments/[id]/reagendar` →
   `cita_reagendar_clinica`), que avisa al paciente. El médico, nunca. No relajes
@@ -850,7 +855,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   (`cabeceraFrom` en `src/lib/correo/transporte.ts`); el aviso a la clínica sale
   como «Spinus» (`remitente: ''`). El nombre pasa siempre por `nombreRemitente`:
   nunca concatenes un nombre sin sanear en la cabecera `From`.
-* **«Por asignar» es `appointments.google_asignacion`** (`20261121130000`):
+* **«Por asignar» es `appointments.google_asignacion`** (`20261201150000`):
   `'por_asignar'` lo pone SÓLO `cita_asignacion_google` al importar el sondeo
   (`service_role` + `spinus.via = 'google'`); `'evento'`, la ruta
   `POST /api/appointments/[id]/no-es-cita`; no se vuelve de `'evento'` a
@@ -869,7 +874,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   `useEscudoTrasRegistro`; en los diálogos, `dentroDeDialogos: true`.
 * **Una cita ATENDIDA con nota ligada no cambia de estado NI de fecha/hora, con
   la v2 encendida o APAGADA** (`vetoPorNotaLigada` + `cita_proteger_atendida`,
-  `20261121140000`). El PUT traduce su 42501 (`HINT_ATENDIDA_CON_NOTA`) a 409
+  `20261201170000`). El PUT traduce su 42501 (`HINT_ATENDIDA_CON_NOTA`) a 409
   `nota_ligada`. (Amplía la línea de H5: «no se mueve (con la v2)».)
 * `consultorios.horario_revisado_en`: NULL = «por revisar» en «Primeros pasos».
   La pone el PATCH de consultorios con la v2 (confirmar o guardar
@@ -881,12 +886,12 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   e2e que siembre una agendada de hace más de 48 h y abra la agenda v2 cierra la
   ventana (`decidirDespues` de `e2e/interaccionesAyudas.ts`).
 * **Cancelada cerrada:** `appointments.cerrada_en` + `sustituida_por` (FK
-  RESTRICT), sólo `service_role` (`cita_proteger_cierre`, `20261121142000`),
+  RESTRICT), sólo `service_role` (`cita_proteger_cierre`, `20261201170000`),
   sólo sobre una cancelada y con una sustituta viva de la misma clínica; no se
   reabre. La agenda (`consultaCitas`), el tiempo real y el buscador no la pintan;
   NO se borra. `POST /api/appointments` con `sustituye_a` (v2) la cierra en la
   misma petición.
-* **Avisos de la clínica (`avisos_clinica`, `20261121150000`):** sólo los
+* **Avisos de la clínica (`avisos_clinica`, `20261201160000`):** sólo los
   escriben los disparadores `aviso_clinica_de_*` (DEFINER, dueño postgres); el
   personal sólo marca revisado, y un revisado no se reabre. Para mostrarlos en
   otra página: `useAvisosClinica()` sin `datos` + `<ListaAvisos>` sin `alAbrir`
@@ -922,18 +927,20 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   DESPUÉS del contador no puede lanzar una excepción provocable por quien
   reserva: desharía el conteo. Por eso `client_id_en_uso` se comprueba antes y
   el INSERT de la cita va en su propio `BEGIN … EXCEPTION WHEN unique_violation`
-  (`20261122120100`): no lo «simplifiques» quitando el bloque (el EXISTS no ve
+  (`20261201140000`): no lo «simplifiques» quitando el bloque (el EXISTS no ve
   las transacciones sin confirmar; escenario 5 de `reserva-carrera.sh`).
 * **`proteger_reserva_enlace_unico()`** guarda las columnas del único (correo
   inmutable; intentos sólo hacia arriba y sólo por `service_role`).
-  `proteger_reserva_enlaces()` sigue intacto (md5 `acd4128b`, lo exigen
-  pre-vuelos).
-* **`reserva_enlace_emitir` tiene dos firmas:** la de 7 argumentos se conserva
-  por compatibilidad durante el despliegue (AG-DT-137). La ruta usa la de 9 y,
+  `proteger_reserva_enlaces()` sigue intacto (md5 `acd4128b`, lo exige el
+  post-vuelo de F3).
+* **`reserva_enlace_emitir` tenía dos firmas:** la de 7 argumentos se conservaba
+  por compatibilidad durante el despliegue (AG-DT-137) y se retiró en la fusión
+  (el conjunto fundido trae siempre la de 9). La ruta usa la de 9 y,
   si falta (PGRST202) y el único va SIN correo, cae en la de 7; con correo, no
   emite. La lista reintenta sin `agotado_en` si la columna no existe (42703).
   No quites esa tolerancia mientras la migración de J2 no esté en producción
-  (integración J, `7a1e831`).
+  (integración J, `7a1e831`); con el conjunto fundido la caída a la de 7 es rama
+  muerta, y quitarla lo decide Angel.
 * **«Ligar e iniciar consulta» es UNA ventana** (`VentanaLigarCita.tsx`, J3),
   siempre con `next/dynamic` desde sus tres sitios: la fila de «Próximas citas»
   del dashboard del médico, la acción `ligar` de la tarjeta y el aviso de la
@@ -951,7 +958,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   fallo NO, o la clínica entera deja de sincronizar.
 * **Aviso `google_movimiento_rechazado`:** uno por intento = (cita, `updated` del
   evento). Lo escribe `cita_movimiento_google_registrar` (sólo `service_role`,
-  `20261122140000`); pulsarlo abre la tarjeta con «Reagendar» de principal
+  `20261201150000`); pulsarlo abre la tarjeta con «Reagendar» de principal
   (`destacar`). `leerAvisosClinica` pide sólo los tipos conocidos y salta fila a
   fila el que no conoce: así una migración que añade un tipo puede ir antes que
   su código. No vuelvas a validar la lista entera de una vez.
@@ -995,9 +1002,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   - ~~En Spinus no impide agendar: pregunta «Este horario está bloqueado.
     ¿Agendar de todos modos?»~~ **Sustituido por el bloqueo total de L1**
     (abajo): ya no se pregunta en ningún camino.
-* **Las funciones de la reserva van en cuerpos completos** (integración K): K1
-  (`20261123120000`) y K3 (`20261123140000`) dejaron de sustituir fragmentos.
-  El orden es fijo, K1 → K3: K3 sin K1 aborta, y K1 después de K3 también. Quien
+* **Las funciones de la reserva van en cuerpos completos** (integración K): hoy
+  en F3 (`20261201140000`), y `reagendar_por_enlace` y `cita_reagendar_oferta` en
+  F4 (`20261201160000`). El orden es fijo, F5a → F3: F3 sin F5a aborta. Quien
   vuelva a pegar `reservar_por_enlace`, `reserva_ocupacion`, `reserva_contexto`,
   `reagendar_por_enlace`, `cita_reagendar_oferta` o `reserva_codigo_emitir`
   parte del cuerpo vigente y conserva el `OR EXISTS … agenda_bloqueos`, el `NOT
@@ -1062,7 +1069,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 
 **Tanda L (2026-11-19, ramas L1-L5; 3 migraciones, el conjunto pasa a 48):**
 
-* **El bloqueo es TOTAL (L1, `20261124120000`).** Con la v2, nada entra ni se
+* **El bloqueo es TOTAL (L1, `20261201170000`).** Con la v2, nada entra ni se
   mueve a un bloqueo de su médico: ni citas ni eventos sin paciente, tampoco con
   «Reagendar». Lo garantiza la base: el disparador
   `trg_appointments_horario_bloqueado` (`cita_proteger_bloqueo()`, INVOKER),
@@ -1091,7 +1098,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   **no lo importes en estático** desde `AgendaCliente`, bajaría con la v2
   apagada (regla de J1; lo cuenta `agenda-j1-engrane`).
 * **Una cancelada se «elimina» CERRÁNDOLA, nunca borrándola** (L2,
-  `20261124130000`). `POST /api/appointments/[id]/quitar` pone `cerrada_en` sin
+  `20261201170000`). `POST /api/appointments/[id]/quitar` pone `cerrada_en` sin
   sustituta, con `createAdminClient()` filtrado por `clinica_id`, y audita
   `cita_quitada_de_agenda`. Cerrada CON sustituta = se reasignó o se le dio otra
   cita; SIN sustituta = «Eliminar cita». Las dos se ocultan igual
@@ -1130,7 +1137,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   línea: el fragmento de «Continuar mi reserva» lleva el código.
 * **Sólo `correoConfirmacion` saluda** («Hola, <nombre>:», escapado). El
   recordatorio y el aviso de cambio comparten cuerpo y no saludan.
-* **Aviso `confirmacion_paciente` (L5, `20261124160000`):** lo escribe el
+* **Aviso `confirmacion_paciente` (L5, `20261201160000`):** lo escribe el
   disparador `trg_cita_confirmaciones_aviso_confirmacion` sobre
   `cita_confirmaciones` (UPDATE OF `respuesta`, `respondido_en`), o sea sólo
   cuando confirma el paciente por su enlace; el personal y Google no escriben
@@ -1145,8 +1152,10 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **La lista del caso 3 de `p1_permisos_funciones.sql` sigue en 50:**
   `cita_proteger_bloqueo()` y `aviso_clinica_de_confirmacion()` se conceden a
   los tres roles y NO entran.
-* **No vuelvas a correr J4 (`20261122140000`) después de L5:** su pre-vuelo
-  admite 5 o 6 tipos de aviso y ahora hay 7 (aborta limpio, AG-DT-229).
+* ~~**No vuelvas a correr J4 (`20261122140000`) después de L5:** su pre-vuelo
+  admite 5 o 6 tipos de aviso y ahora hay 7 (aborta limpio, AG-DT-229).~~ Sin
+  objeto desde la fusión: J4 y L5 están en F4 (`20261201160000`), cuyo CHECK
+  nace con los 7 tipos.
 
 **Tanda M (2026-11-19, ramas M1-M5; la integración añade dos migraciones):**
 
