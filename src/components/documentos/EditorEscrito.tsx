@@ -78,6 +78,8 @@ interface Control {
   deshabilitado?: boolean
   /** En el contenedor estrecho baja al «⋯». */
   estrecho?: boolean
+  /** Sólo en el MUY estrecho (`ext`, < 400) baja al «⋯». */
+  muyEstrecho?: boolean
   /** Filete antes del control: separa los grupos. */
   grupo?: boolean
   accion: () => void
@@ -137,8 +139,8 @@ export default function EditorEscrito({ editor }: Props) {
     { clave: 'underline', nombre: 'Subrayado', titulo: 'Subrayado (Ctrl+U)', Icono: Underline, activo: !!editor?.isActive('underline'), accion: () => c()?.toggleUnderline().run() },
     { clave: 'ul', nombre: 'Viñetas', titulo: 'Viñetas (Ctrl+Mayús+8)', Icono: List, grupo: true, activo: !!editor?.isActive('bulletList'), accion: () => c()?.toggleBulletList().run() },
     { clave: 'ol', nombre: 'Lista numerada', titulo: 'Lista numerada (Ctrl+Mayús+7)', Icono: ListOrdered, activo: !!editor?.isActive('orderedList'), accion: () => c()?.toggleOrderedList().run() },
-    { clave: 'sink', nombre: 'Aumentar sangría', titulo: 'Aumentar sangría (Tab)', Icono: IndentIncrease, deshabilitado: !editor?.can().sinkListItem('listItem'), accion: () => c()?.sinkListItem('listItem').run() },
-    { clave: 'lift', nombre: 'Reducir sangría', titulo: 'Reducir sangría (Mayús+Tab)', Icono: IndentDecrease, deshabilitado: !editor?.can().liftListItem('listItem'), accion: () => c()?.liftListItem('listItem').run() },
+    { clave: 'sink', nombre: 'Aumentar sangría', titulo: 'Aumentar sangría (Tab)', Icono: IndentIncrease, muyEstrecho: true, deshabilitado: !editor?.can().sinkListItem('listItem'), accion: () => c()?.sinkListItem('listItem').run() },
+    { clave: 'lift', nombre: 'Reducir sangría', titulo: 'Reducir sangría (Mayús+Tab)', Icono: IndentDecrease, muyEstrecho: true, deshabilitado: !editor?.can().liftListItem('listItem'), accion: () => c()?.liftListItem('listItem').run() },
     // La alineación no ejecuta: abre su hoja. Lo gobierna `pulsar`.
     { clave: 'align', nombre: 'Alineación', titulo: `Alineación: ${alineacion.nombre}`, Icono: alineacion.Icono, grupo: true, estrecho: true, accion: () => {} },
     { clave: 'quote', nombre: 'Cita', titulo: 'Cita (Ctrl+Mayús+B)', Icono: Quote, estrecho: true, activo: !!editor?.isActive('blockquote'), accion: () => c()?.toggleBlockquote().run() },
@@ -192,8 +194,8 @@ export default function EditorEscrito({ editor }: Props) {
         {menu === 'mas' && (
           <div className="sp-ed-menu" role="menu">
             {/* Con el nombre escrito: en un menú no hay que adivinar un glifo. */}
-            {CONTROLES.filter(ctl => ctl.estrecho).map(ctl => (
-              <button key={ctl.clave} type="button" className="sp-ed-row"
+            {CONTROLES.filter(ctl => ctl.estrecho || ctl.muyEstrecho).map(ctl => (
+              <button key={ctl.clave} type="button" className={`sp-ed-row${ctl.muyEstrecho ? ' sp-esc-solo-xs' : ''}`}
                 role={ctl.activo === undefined ? 'menuitem' : 'menuitemcheckbox'}
                 aria-checked={ctl.activo} disabled={ctl.deshabilitado}
                 aria-haspopup={ctl.clave === 'align' ? 'menu' : undefined}
@@ -260,7 +262,7 @@ function BotonBarra({ ctl, menu, onPulsar, sinRobarFoco }: {
     <>
       {ctl.grupo && <span className={`sp-esc-sep${ctl.estrecho ? ' sp-esc-ocu' : ''}`} aria-hidden="true" />}
       <button type="button"
-        className={`k-b k-b-icono sp-esc-btn${ctl.estrecho ? ' sp-esc-ocu' : ''}`}
+        className={`k-b k-b-icono sp-esc-btn${ctl.estrecho ? ' sp-esc-ocu' : ''}${ctl.muyEstrecho ? ' sp-esc-ocu-xs' : ''}`}
         title={ctl.titulo}
         aria-label={esAlign ? ctl.titulo : ctl.nombre}
         aria-pressed={ctl.activo}

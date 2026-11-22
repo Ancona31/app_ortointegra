@@ -4131,6 +4131,9 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
   color: var(--tinta2); font: inherit; font-size: 13px; line-height: 18px; text-align: left; cursor: pointer;
 }
 .sp-esc-meta > b { color: var(--tinta); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-esc-meta > span { white-space: nowrap; }
+.sp-esc-meta > b { flex: 0 1 auto; min-width: 8ch; }
+.sp-esc-meta > span:nth-of-type(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sp-esc-cambiar { margin-left: auto; color: var(--enlace); font-weight: 600; }
 .sp-esc-meta:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
 @media (hover: hover) { .sp-esc-meta:hover { background: var(--sup2); } }
@@ -4154,7 +4157,7 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
 .sp-esc-fin { flex: 1 0 0; }
 .sp-esc-bloque { margin: 0 2px; }
 .sp-esc-bloque .k-seg-op { padding: 0 10px; font-size: 13px; }
-.sp-esc-bar .sp-esc-solo-estrecho { display: none; }
+.sp-esc-bar .sp-esc-solo-estrecho, .sp-esc-bar .sp-esc-solo-xs { display: none; }
 .sp-esc-menu-align { right: auto; left: 50%; transform: translateX(-50%); }
 .sp-esc-ayuda { width: min(340px, calc(100% - 16px)); padding: 12px 14px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
 .sp-esc-ayuda-t { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--tinta); }
@@ -4196,6 +4199,16 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
   .sp-esc-titulo { font-size: 20px; line-height: 26px; padding: 12px 14px 4px; }
   .sp-esc-datos { grid-template-columns: minmax(0, 1fr); }
   .sp-esc-cuerpo .sp-ed-prose { padding: 12px 14px; }
+}
+/* Muy estrecho (`ext`, < 400): las sangrías también al «⋯» y el «?» al segundo
+   renglón, para que la barra quede en dos. */
+@container escrito (max-width: 399px) {
+  .sp-esc-bar .sp-esc-ocu-xs { display: none; }
+  .sp-esc-bar .sp-esc-solo-xs { display: flex; }
+  .sp-esc-bar > [aria-label="Atajos de escritura"] { order: 6; }
+  .sp-esc-bar > .sp-esc-bloque { flex: 0 1 auto; }
+  .sp-esc-bloque .k-seg-op { flex: none; padding: 0 5px; font-size: 12.5px; }
+  .sp-esc-bar { padding-inline: 4px; column-gap: 0; }
 }
 html.dark .sp-esc-titulo { background-color: transparent !important; border-color: transparent !important; }
 
