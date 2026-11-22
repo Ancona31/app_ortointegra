@@ -36,10 +36,25 @@ Esto no cambia entre auditorías, por eso vive aquí en vez de repetirse cada ve
 - **Postgres gestionado por Supabase.**
 - **RLS activa en todas las tablas.** Cualquier objeto nuevo nace expuesto a
   PostgREST salvo que se diga lo contrario.
-- **No hay base de staging.** No existe el ensayo previo: lo que se pega es lo
-  que corre en producción, a la primera.
-- **Se aplica a mano**, pegando el archivo completo en el **SQL Editor de
-  Supabase**. Esto tiene consecuencias concretas (ver dimensiones 2, 5 y 6).
+- **Dónde se ensaya (desde 2026-11-22; sustituye a «no hay base de staging, no
+  existe el ensayo previo»).** Hay dos sitios, y una migración pasa por los dos
+  antes de producción:
+  - el **stack local de Supabase en Docker**, con la CLI 2.117.0
+    (`supabase db reset --local` aplica todo `supabase/migrations/` desde
+    cero);
+  - desde esta fase, un **clon de la ESTRUCTURA de producción, sin datos** (la
+    «foto»), sobre el que se aplica el conjunto antes de producción.
+
+  El clon no tiene datos: lo que dependa de filas reales (dimensiones 7, 8 y 9)
+  se responde con las consultas de conteo de sólo lectura que corre Angel en
+  producción, no con el ensayo.
+- **Cómo se aplica.** Hasta 2026-11 se pegaba el archivo completo en el **SQL
+  Editor de Supabase**, y las dimensiones 2, 5, 6 y 18 se escribieron para ese
+  método: siguen valiendo para todo lo que se pegue ahí y para los archivos ya
+  aplicados así. Desde esta fase lo aplica **Angel con la CLI, en su terminal**
+  (`CLAUDE.md`, «🗃️ Base de datos»). Cómo envuelve la CLI cada archivo en una
+  transacción y qué muestra de su salida no se da por sabido: se comprueba en
+  el ensayo y en su documentación (dimensión 13).
 - **El volumen actual de datos es pequeño**, pero el archivo queda como
   **artefacto de registro** en `supabase/migrations/` y puede **replayearse**
   sobre bases con muchos más datos —o sobre una base recién creada desde
@@ -129,6 +144,14 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
    recuperan, cómo. Y sobre todo: **qué habría que hacer antes** (respaldo,
    tabla espejo, `CREATE TABLE ... AS SELECT`) para poder revertir. Si la
    respuesta es «no se puede revertir», eso es un hallazgo, no un detalle.
+
+   **Reversa escrita y ensayada (añadido 2026-11-22).** Además de los datos,
+   la migración tiene que traer el **script que la deshace** (los `DROP`,
+   `ALTER` y restauraciones de cuerpos anteriores, en orden inverso), y ese
+   script se **corre en el ensayo** (sección 2): aplicar, deshacer y volver a
+   aplicar sobre el clon. Una reversa que sólo se leyó no cuenta: se escribe
+   para el día en que algo falla en producción, que es el peor día para
+   descubrir que no corre.
 
 8. **Validación de constraints contra datos existentes.** Todo `NOT NULL`,
    `CHECK`, `UNIQUE` o `FOREIGN KEY` nuevo se valida contra lo que ya hay. ¿Hay
@@ -275,6 +298,74 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
     del archivo: va al pre-vuelo, que es donde puede además abortar
     (dimensión 4).
 
+> **Dimensiones 19 a 25: añadidas el 2026-11-22 por orden de Angel**, en la
+> fase de dejar la agenda v2 lista para producción. La de «reversa» que pidió
+> no tiene número propio: se solapaba con la 7 y la amplió.
+
+19. **Recursión de RLS.** Ninguna policy sobre una tabla consulta esa misma
+    tabla, ni directamente ni a través de una función `SECURITY INVOKER` o de
+    una vista que la lea. Postgres no lo valida al hacer `CREATE POLICY`: truena
+    en tiempo de ejecución, con `infinite recursion detected in policy`, en la
+    primera escritura real. *Nació aquí:* el incidente del 2026-05-04
+    (`CLAUDE.md`, «Incidentes resueltos»): un `count(*)` de `pacientes` dentro
+    del `WITH CHECK` de una policy de `pacientes` dejó a los médicos sin poder
+    crear pacientes un día entero. Lo que haga falta saber de la misma tabla va
+    en una columna declarativa de la tabla padre (`clinicas`).
+
+20. **Permisos de fábrica.** Supabase concede por omisión privilegios a `anon`,
+    `authenticated` y `service_role` sobre los objetos nuevos de `public`
+    (tablas, secuencias, funciones). Por cada objeto que la migración cree, hay
+    que listar desde el catálogo qué recibió cada uno de los tres
+    (`relacl`/`proacl`, `has_table_privilege`, `has_function_privilege`) y
+    quitar en el mismo archivo lo que sobre, **TRUNCATE incluido**: TRUNCATE no
+    pasa por la RLS ni por los disparadores de fila. Que la RLS esté activa no
+    contesta esta pregunta: la RLS filtra filas, no quita privilegios. Es
+    distinta de la 10 (qué datos de otra clínica quedan alcanzables) y de la 11
+    (quién es dueño): ésta es qué puede hacer cada rol con el objeto.
+
+21. **Rendimiento.** Costo de cada disparador por cada fila escrita (las
+    consultas que hace dentro, y si se dispara en columnas que no le importan),
+    y de cada policy por cada fila leída (subconsultas y funciones que se
+    evalúan fila a fila). Para cada consulta nueva —en policies, funciones y
+    disparadores— qué índice usa; si no lo hay, decirlo. Hoy los volúmenes son
+    pequeños y nada se nota; por eso se pregunta en el papel y no en el
+    reloj (sección 2: el archivo puede replayearse sobre bases mucho mayores).
+    Es distinta de la 6, que mira bloqueos, no costo.
+
+22. **El conjunto.** Cuando se aplican varias migraciones juntas, auditarlas
+    también como conjunto: el orden entre ellas (qué exige que otra haya
+    corrido antes, y qué aborta si el orden se invierte) y las **funciones que
+    una crea y otra reescribe** —con `CREATE OR REPLACE`, la última gana
+    entera: lo que la primera añadió y la segunda no copió desaparece sin
+    error—. Por cada función tocada por más de una migración del conjunto, el
+    cuerpo final se compara con lo que cada una pretendía dejar. Una migración
+    que pasa sola no prueba que el conjunto pase.
+
+23. **Una prueba automática por migración.** Cada migración trae al menos una
+    prueba que se corre sola (`supabase/pruebas-sql/` o la batería del
+    proyecto) y que falla si la migración no está o se deshace. Sin ella, la
+    siguiente migración que la reescriba (dimensión 22) la rompe sin que nadie
+    se entere. La auditoría dice cuál es esa prueba y si se corrió en el ensayo.
+
+24. **Toda función `SECURITY DEFINER` fija su `search_path` y no es ejecutable
+    por PUBLIC.** Sin `SET search_path` en la propia función, quien la llama
+    puede anteponer un esquema suyo y hacer que resuelva nombres a objetos que
+    él controla, con los privilegios del dueño. Y en Postgres una función nace
+    con `EXECUTE` para PUBLIC salvo que los privilegios por omisión digan otra
+    cosa (`ALTER DEFAULT PRIVILEGES`; no se supone en ninguno de los dos
+    sentidos): si PUBLIC la puede ejecutar, se revoca (`REVOKE EXECUTE … FROM
+    PUBLIC`) y se concede sólo a los roles que la llaman. Comprobar en `pg_proc`
+    (`proconfig`, `proacl`), no en el texto del archivo. Complementa a la 17,
+    que pregunta por dónde más se llega a la tabla; ésta, si la puerta misma
+    está bien cerrada.
+
+25. **Quien audita no es quien escribió, y lo corregido se vuelve a auditar.**
+    La auditoría la hace alguien (persona o agente) que no escribió la
+    migración, y se dice quién fue. Si el auditor corrige el archivo, el
+    archivo corregido es una migración nueva para esta lista: lo audita otro,
+    entero, no sólo el renglón cambiado. Quien escribe tiende a leer lo que
+    quiso poner, y quien corrige, a dar por buena su propia corrección.
+
 ---
 
 ## 5. Formato de respuesta
@@ -314,6 +405,15 @@ La lista tiene que mejorar con cada auditoría.
 ---
 
 ## 7. Después de aplicar
+
+> **«Aplicada», en esta sección y en todo el proyecto, quiere decir aplicada en
+> PRODUCCIÓN** (aclarado el 2026-11-22). Correr en el stack local o en el clon de
+> estructura (sección 2) no la convierte en aplicada: una migración que sólo
+> corrió ahí todavía se puede reescribir, fundir con otras o retirar, y las
+> reglas de abajo sobre la región editable no le aplican. Por eso las
+> migraciones de la agenda v2, que sólo corrieron en local, se funden en la
+> fase de dejarla lista para producción. Desde que corre en producción, todo lo
+> de esta sección vale entero.
 
 El último paso de aplicar una migración es **actualizar su línea `-- ESTADO:` con
 la fecha real, y commitearla**. Un archivo cuya cabecera diga «PENDIENTE DE

@@ -10,6 +10,12 @@
 
 ## 1. Plataforma actual
 
+> **Nota del 2026-11-22:** desde el 2026-11-21 el equipo es **Ubuntu 26.04
+> nativo, sin WSL ni Windows**, con **Docker Engine 29.1.3** (no Docker
+> Desktop), y el repo es un clon normal en `~/proyectos/app_ortointegra-agenda`.
+> Lo que sigue sobre WSL, Docker Desktop y `/home/ancoa/…` describe el equipo
+> anterior.
+
 ### Setup oficial (a partir del 2026-05-04)
 
 - **Host:** Windows 11
@@ -59,22 +65,14 @@ discusión explícita.**
 | Node.js         | 24.x           | Alineado con `engines` de Vercel runtime        |
 | npm             | 11.x           | Bundled con Node 24                             |
 | Docker Desktop  | 29.4.1         | Última estable al momento del setup             |
-| Supabase CLI    | 2.95.4 ⚠️       | Estable con varias semanas en el wild           |
+| Supabase CLI    | 2.117.0        | Lee `supabase/config.toml` (con `[local_smtp]`); usada en todos los reinicios locales de la agenda, del 2026-09-16 al 2026-11-22 |
 | WSL Ubuntu      | 24.04 LTS      | Última LTS soportada                            |
 
-> ⚠️ **EL PIN DE LA CLI DE SUPABASE ESTÁ DESFASADO Y EL PROPIO REPO LO
-> DEMUESTRA (2026-09-16).** La 2.95.4 **no puede leer `supabase/config.toml`**:
-> aborta con `failed to parse config: 'config.config' has invalid keys:
-> local_smtp`. `[local_smtp]` es el nombre nuevo de lo que antes era
-> `[inbucket]`, así que ese archivo lo escribió una CLI posterior. Comprobado al
-> parar y levantar el stack local en B5-bis; hubo que usar **2.117.0**, que sí
-> lo entiende.
->
-> Mientras esta nota siga aquí, **el número de la tabla no es operable**: quien
-> necesite `supabase stop/start` tiene que usar una versión que lea el archivo.
-> Falta decidir cuál se fija, y fijarla **en los dos sitios a la vez**
-> (`CLAUDE.md` y `LOCAL_DEV.md`), con la regla de la semana en el wild aplicada
-> a esa versión y no a la vieja.
+> **CLI de Supabase: fijada en 2.117.0 (2026-11-22), aquí y en `CLAUDE.md`.**
+> Se usa como `npx --yes supabase@2.117.0`. Sustituye a la 2.95.4, que no lee
+> `supabase/config.toml`: aborta con `failed to parse config: 'config.config'
+> has invalid keys: local_smtp` (comprobado en B5-bis, 2026-09-16). Si cambias
+> el número, cámbialo en los dos sitios a la vez.
 
 ### Regla de actualización
 
@@ -96,6 +94,14 @@ proyecto médico son inaceptables.
 ---
 
 ## 3. Estrategia de trabajo con base de datos
+
+> **Superado el 2026-11-22.** Esta sección y la 4 describen el flujo de mayo de
+> 2026. Hoy hay stack local de Supabase en Docker (`supabase/config.toml`, CLI
+> 2.117.0, `supabase db reset --local`) y el camino a producción es otro: clon
+> de la estructura de producción sin datos, ensayo, auditoría, conteos de Angel
+> y su orden explícita, y Angel aplica con la CLI en su terminal. La regla
+> vigente está en `CLAUDE.md`, «🗃️ Base de datos»; donde esta sección la
+> contradiga, manda aquélla. Se conserva como historia.
 
 ### Decisión maestra: trabajo directo en producción
 
@@ -258,6 +264,9 @@ explícitamente si hay cambios de schema/code o no.
 |-------------------------|-------------------------------------------------|
 | `supabase/baseline/`    | Snapshot histórica del schema al 2026-04-26     |
 | `supabase/migrations/`  | Migraciones aplicadas a producción              |
+
+> **Ya no es cierto (2026-11-22):** `supabase/config.toml` existe y el stack
+> local se usa; ver la nota de la sección 3.
 
 **IMPORTANTE:** `supabase/` NO contiene `config.toml`, `.gitignore`
 ni `.temp/`. Estos archivos los crea `supabase init` para uso del

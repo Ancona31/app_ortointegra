@@ -205,6 +205,12 @@ Corolarios que cuestan caro si se olvidan:
 
 ### Plataforma actual: Linux vía WSL 2
 
+> **Nota del 2026-11-22:** desde el 2026-11-21 el equipo es **Ubuntu 26.04
+> nativo, sin WSL ni Windows**, con **Docker Engine 29.1.3** (no Docker
+> Desktop), y el repo es un clon normal en `~/proyectos/app_ortointegra-agenda`.
+> Lo que sigue sobre WSL, Docker Desktop y las rutas `/home/ancoa/…` describe
+> el equipo anterior. Detalle práctico: `GUIA_PRUEBAS_AGENDA_V2.md`, §1.1.
+
 **Cambio realizado el 2026-05-04:** El proyecto migró de desarrollo nativo
 en Windows a desarrollo en Linux vía WSL 2. Razones:
 
@@ -230,27 +236,19 @@ Estas versiones están elegidas conscientemente. NO actualizar sin discusión:
 | Node.js | 24.x | Alineado con `engines` de Vercel runtime |
 | npm | 11.x | Bundled con Node 24 |
 | Docker Desktop | 29.4.1 | Última estable al momento del setup |
-| Supabase CLI | 2.95.4 ⚠️ | Estable con varias semanas en el wild |
+| Supabase CLI | 2.117.0 | Lee `supabase/config.toml` (con `[local_smtp]`); usada en todos los reinicios locales de la agenda, del 2026-09-16 al 2026-11-22 |
 | WSL Ubuntu | 24.04 LTS | Última LTS soportada |
 
-> ⚠️ **EL PIN DE LA CLI DE SUPABASE ESTÁ DESFASADO Y EL PROPIO REPO LO
-> DEMUESTRA (2026-09-16).** La 2.95.4 **no puede leer `supabase/config.toml`**:
-> aborta con `failed to parse config: 'config.config' has invalid keys:
-> local_smtp`. `[local_smtp]` es el nombre nuevo de lo que antes era
-> `[inbucket]`, así que ese archivo lo escribió una CLI posterior. Comprobado al
-> parar y levantar el stack local en B5-bis; hubo que usar **2.117.0**, que sí
-> lo entiende.
->
-> Mientras esta nota siga aquí, **el número de la tabla no es operable**: quien
-> necesite `supabase stop/start` tiene que usar una versión que lea el archivo.
-> Falta decidir cuál se fija, y fijarla **en los dos sitios a la vez**
-> (`CLAUDE.md` y `LOCAL_DEV.md`), con la regla de la semana en el wild aplicada
-> a esa versión y no a la vieja.
+> **CLI de Supabase: fijada en 2.117.0 (2026-11-22), aquí y en `LOCAL_DEV.md`.**
+> Se usa como `npx --yes supabase@2.117.0`. Sustituye a la 2.95.4, que no lee
+> `supabase/config.toml`: aborta con `failed to parse config: 'config.config'
+> has invalid keys: local_smtp` (comprobado en B5-bis, 2026-09-16). Si cambias
+> el número, cámbialo en los dos sitios a la vez.
 
 **Regla de actualización:** NO usar versiones de herramientas con menos de 1
 semana en el wild. Regla específica para herramientas que tocan datos médicos
-de producción (Supabase CLI, Docker). Ver `LOCAL_DEV.md` (pendiente de crear)
-para procedimiento de actualización.
+de producción (Supabase CLI, Docker). Ver `LOCAL_DEV.md` para procedimiento de
+actualización.
 
 ### Docker Desktop
 
@@ -258,15 +256,20 @@ para procedimiento de actualización.
 - Debe estar corriendo antes de cualquier comando `supabase start` o `supabase db pull`
 - Validación rápida desde WSL: `docker --version` debe responder sin errores
 
-### Estado actual de Supabase local (2026-05-04)
+### Estado actual de Supabase local (2026-11-22)
 
-**Pendiente de configurar:**
-- `supabase init` — crear `config.toml` y `seed.sql` (cuidando NO sobrescribir `baseline/` ni `migrations/`)
-- `supabase start` — levantar Postgres + Auth + Storage local en Docker
-- `supabase db pull` — replicar schema de prod a local (Session pooler IPv4)
-- `seed.sql` — crear cuentas representativas de cada caso (free virgen, free degradada, individual, premium VIP, premium cancelado, etc.)
+> Sustituye a la lista «Pendiente de configurar» del 2026-05-04, que ya no era
+> cierta.
 
-**Connection string para `db pull`** (Session pooler, IPv4):
+- Existe `supabase/config.toml` y el stack local (Postgres + Auth + Storage en
+  Docker) se levanta con la CLI 2.117.0.
+- `supabase/migrations/` tiene 50 migraciones; `supabase db reset --local` las
+  aplica todas (procedimiento: `GUIA_PRUEBAS_AGENDA_V2.md`, P5).
+- No hay `supabase/seed.sql`: los datos de prueba de la agenda los siembra
+  `scripts/agenda-semilla.ts`.
+
+**Connection string de producción** (Session pooler, IPv4; sólo para Angel, en
+su terminal: ver «🗃️ Base de datos»):
 - Host: `aws-0-us-west-2.pooler.supabase.com`
 - Port: 5432
 - User: `postgres.qpnegmmpneseirfyplbf`
@@ -382,13 +385,31 @@ del médico logueado). Origen: sección 1 de `PLAN_LANDING_SPINUS.md`.
 * `src/lib/supabase/` — cliente Supabase
 * `public/` — assets estáticos
 * `public/bunker/` — (futuro) app estática del búnker offline
-* Las migraciones SQL van en archivos separados con prefijo `supabase_migration_`
+* Las migraciones SQL van en `supabase/migrations/`, un archivo por migración con la fecha delante (las recientes, `AAAAMMDDhhmmss_nombre.sql`). Los viejos `supabase_migration_*.sql` de la raíz están archivados en `supabase/archivo-migraciones-historicas/raiz/` y no se imitan
 
 ---
 
 ## 🗃️ Base de datos
 
-* NUNCA ejecutes migraciones SQL directamente. Genera el archivo SQL y yo lo ejecuto manualmente en Supabase
+* **Cómo llega una migración a producción (flujo vigente desde 2026-11-22;
+  sustituye a «genera el archivo SQL y yo lo ejecuto manualmente en
+  Supabase», de antes de que Angel usara la CLI):**
+  1. se clona con la CLI la **ESTRUCTURA** de producción, sin datos (la
+     «foto»);
+  2. se aplican sobre ese clon las migraciones nuevas;
+  3. se prueba la app sobre ese clon;
+  4. se audita;
+  5. si todo pasa, se aplica a producción con la CLI.
+* **Nada se aplica a producción sin las cuatro cosas:** el ensayo sobre el clon
+  de estructura, la auditoría global (`supabase/AUDITORIA-MIGRACIONES.md`), las
+  consultas de conteo de sólo lectura corridas por Angel, y la **ORDEN
+  EXPLÍCITA** de Angel.
+* **Quien aplica a producción es Angel, con la CLI, en su terminal.** Claude
+  nunca tiene ni pide la contraseña ni la cadena de conexión con credenciales,
+  ni las guarda en archivos ni en registros. Nunca corre por su cuenta
+  `supabase link`, `db push` ni nada con `--linked`.
+* **En LOCAL sí** se aplican migraciones y se reinicia la base
+  (`supabase db reset --local`; siempre `--local`).
 * NUNCA hagas DELETE de datos en producción
 * Toda tabla nueva con datos de pacientes DEBE tener RLS activado
 * Toda foreign key a pacientes DEBE ser `ON DELETE RESTRICT`
@@ -1134,8 +1155,12 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   de pruebas»). Ni DELETE, ni TRUNCATE, ni `session_replication_role = replica`
   para saltarse `prevent_audit_delete`, en una base viva. *(Aclaración de Angel
   del 2026-11-19, vía el coordinador de M: «`supabase db reset --local` crea
-  una base de pruebas nueva; no es borrar auditoría». En M no se hizo: el
-  sistema de permisos de la sesión lo denegó. AG-DT-255.)*
+  una base de pruebas nueva; no es borrar auditoría». Durante la tanda el
+  sistema de permisos de la sesión lo denegó, pero el reinicio desde cero SÍ
+  se hizo en el cierre de M (2026-11-19: el primer intento dio
+  `LegacyDbSetupError` y el segundo, con `--debug`, salió bien) y otra vez el
+  2026-11-21 en el equipo nuevo, a la primera: 50 migraciones, la última
+  `20261125180000`. AG-DT-255; `GUIA_PRUEBAS_AGENDA_V2.md`, P5.)*
   Para contar auditoría, filtra por tus ids o por `created_at >=` una marca
   (`clock_timestamp()` antes de la acción), nunca por una ventana de minutos.
   Lo vigila `src/lib/tests/pruebasSinBorrarAuditoria.test.ts`; su única
