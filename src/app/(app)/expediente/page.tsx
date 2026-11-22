@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, Stethoscope, ArrowUp, ArrowDown, ListFilter } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import {
+  Plus, Search, Stethoscope, ArrowUp, ArrowDown, SlidersHorizontal, SearchX,
+  ArrowDownAZ, UserRound, Hash, Clock, CalendarDays,
+} from 'lucide-react'
 import Link from 'next/link'
 import { calcularEdad } from '@/lib/patientUtils'
 import { renderEnTZ, TZ_CLINICA } from '@/lib/dates'
@@ -11,9 +15,27 @@ import { fetchPacientesExpediente, type PacienteExpediente, type OrdenColumna, t
 import { ListaChipsMedicos } from '@/components/expediente/ChipMedico'
 import { TablaPacientesExpediente } from '@/components/expediente/TablaPacientesExpediente'
 import { SheetFiltrosExpediente } from '@/components/expediente/SheetFiltrosExpediente'
+import CapaMenu, { type OpcionMenu } from '@/components/ui/CapaMenu'
+import ModalShell from '@/components/ui/ModalShell'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import EstadoError from '@/components/ui/EstadoError'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useProfile } from '@/hooks/useProfile'
 import { isMedicoInvitado } from '@/lib/permissions'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
+import { leerFormato } from '@/lib/formatoPantalla'
+
+/* ═══ /expediente — rediseño B6 (maqueta `final-lista`; CALMA §15, §17, §23.5,
+   §30.3) ═══════════════════════════════════════════════════════════════════
+   Todo por formato con CSS (`ext:` … `esc:`), nada en el primer render:
+     ext / tel      lista en una tarjeta; «+ Paciente» en `ext` (§17)
+     ih / iv / esc  tabla (`TablaPacientesExpediente`)
+   La barra es buscador + «Ordenado por» (menú del catálogo con los 6 criterios
+   y la flecha de dirección aparte) + «Filtros». «Filtros» abre, según el
+   formato que se LEE AL PULSAR, la hoja de `ext`/`tel` (borrador + «Ver
+   resultados», como siempre) o la capa de `ih`/`iv`/`esc` (aplicación
+   inmediata, como los filtros de escritorio de antes). Ninguna función cambia
+   de lógica: sólo de sitio. */
 
 const AVATAR_COLORS = [
   'bg-violet-100 text-violet-700',
@@ -32,18 +54,253 @@ const ETIQUETA_ORDEN: Record<OrdenColumna, string> = {
   medico: 'Médico',
 }
 
+const ICONO_ORDEN: Record<OrdenColumna, React.ReactNode> = {
+  apellidos: <ArrowDownAZ aria-hidden="true" />,
+  nombre: <UserRound aria-hidden="true" />,
+  numero_expediente: <Hash aria-hidden="true" />,
+  fecha_nacimiento: <Clock aria-hidden="true" />,
+  created_at: <CalendarDays aria-hidden="true" />,
+  medico: <Stethoscope aria-hidden="true" />,
+}
+
+const COLUMNAS_ORDEN: OrdenColumna[] = ['apellidos', 'nombre', 'numero_expediente', 'fecha_nacimiento', 'created_at', 'medico']
+
 function PacienteSkeleton() {
   return (
-    <div className="flex items-center justify-between px-5 py-4 animate-pulse">
-      <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-xl bg-slate-100" />
-        <div className="space-y-2">
-          <div className="h-3 w-36 bg-slate-100 rounded-full" />
-          <div className="h-2.5 w-24 bg-slate-100 rounded-full" />
+    <div className="flex items-center gap-3 py-3">
+      <Skeleton className="h-9 w-9 rounded-full" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-3.5 w-40" />
+        <Skeleton className="h-3 w-28" />
+      </div>
+      <Skeleton className="h-3 w-16" />
+    </div>
+  )
+}
+
+function CabeceraLista({ total, mostrarSuplementacion, interceptIfBlocked }: {
+  total: number | null
+  mostrarSuplementacion: boolean
+  interceptIfBlocked: (e: React.MouseEvent) => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="k-t-pantalla">Expediente</h1>
+        {total !== null && (
+          <p className="k-t-sec mt-0.5">
+            {total} paciente{total !== 1 ? 's' : ''} registrado{total !== 1 ? 's' : ''}
+          </p>
+        )}
+        {/* B4 del rediseño: la entrada a Suplementación. Colgaba del grupo
+            «Pacientes» de la barra lateral, que la navegación plana quitó
+            (CALMA §28: «Suplementación sigue dentro de Expediente»). Sólo
+            médicos, como en la barra de antes. Va bajo el título y no junto
+            al botón: en `ext` (322 de ancho) empujaba el botón bajo el riel. */}
+        {mostrarSuplementacion && (
+          <Link href="/suplementacion" prefetch={false} className="k-b k-b-texto -ml-1 mt-1">
+            Suplementación
+          </Link>
+        )}
+      </div>
+      {/* Único botón relleno de la pantalla. En `ext`, «+ Paciente» (CALMA
+          §17); el nombre accesible es el rótulo completo de hoy. */}
+      <Link
+        href="/pacientes/nuevo"
+        data-onboard="nuevo-paciente-exp"
+        onClick={interceptIfBlocked}
+        aria-label="Nuevo paciente"
+        className="k-b k-b-prim mt-0.5"
+      >
+        <Plus size={16} strokeWidth={2.5} aria-hidden="true" className="hidden ext:block" />
+        <span className="hidden ext:inline">Paciente</span>
+        <span className="ext:hidden">Nuevo paciente</span>
+      </Link>
+    </div>
+  )
+}
+
+interface BarraProps {
+  busqueda: string
+  onBusqueda: (v: string) => void
+  orden: OrdenColumna
+  direccion: OrdenDireccion
+  onOrden: (col: OrdenColumna) => void
+  onDireccion: () => void
+  hayFiltrosActivos: boolean
+  onFiltros: () => void
+}
+
+function BarraLista({ busqueda, onBusqueda, orden, direccion, onOrden, onDireccion, hayFiltrosActivos, onFiltros }: BarraProps) {
+  return (
+    <div className="flex flex-col gap-2 ih:flex-row iv:flex-row esc:flex-row ih:items-center iv:items-center esc:items-center ih:gap-4 iv:gap-4 esc:gap-4">
+      <div className="relative min-w-0 flex-1 ih:max-w-[300px] iv:max-w-[300px] esc:max-w-[340px]">
+        <Search size={18} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tinta2" />
+        <input
+          type="text"
+          placeholder="Buscar por nombre o apellido..."
+          aria-label="Buscar por nombre o apellido"
+          value={busqueda}
+          onChange={e => onBusqueda(e.target.value)}
+          className="k-campo pl-10"
+        />
+      </div>
+      <div className="flex min-w-0 items-center justify-between gap-3 ih:ml-auto iv:ml-auto esc:ml-auto ih:justify-end iv:justify-end esc:justify-end">
+        <SelectorOrden orden={orden} direccion={direccion} onOrden={onOrden} onDireccion={onDireccion} />
+        <button type="button" onClick={onFiltros} className="k-b k-b-texto ih:-order-1 iv:-order-1 esc:-order-1">
+          <SlidersHorizontal size={16} aria-hidden="true" />
+          Filtros
+          {hayFiltrosActivos && (
+            <>
+              <span aria-hidden="true" className="absolute -right-1 top-1 h-2 w-2 rounded-full bg-accion ring-2 ring-fondo" />
+              <span className="sr-only"> (activos)</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* «Ordenado por X» abre el menú de los 6 criterios (el select de escritorio de
+   antes). La flecha, aparte, alterna la dirección (el botón ↑/↓ de antes).
+   Elegir el criterio vigente no hace nada, como el select. */
+function SelectorOrden({ orden, direccion, onOrden, onDireccion }: {
+  orden: OrdenColumna
+  direccion: OrdenDireccion
+  onOrden: (col: OrdenColumna) => void
+  onDireccion: () => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const ancla = useRef<HTMLButtonElement>(null)
+  const opciones: OpcionMenu[] = COLUMNAS_ORDEN.map(col => ({
+    id: col,
+    texto: ETIQUETA_ORDEN[col],
+    icono: ICONO_ORDEN[col],
+    marcada: col === orden,
+    alElegir: () => { if (col !== orden) onOrden(col) },
+  }))
+  const asc = direccion === 'asc'
+  return (
+    <div className="flex min-w-0 items-center text-[14px] leading-5">
+      <span className="mr-1 whitespace-nowrap text-tinta2 ext:hidden ih:hidden iv:hidden">Ordenado por</span>
+      <button
+        ref={ancla}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        aria-label={`Ordenar por: ${ETIQUETA_ORDEN[orden]}`}
+        onClick={() => setAbierto(a => !a)}
+        className="k-b k-b-texto min-w-0 text-[14px]"
+      >
+        <span className="truncate">{ETIQUETA_ORDEN[orden]}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onDireccion}
+        aria-label={asc ? 'Orden ascendente' : 'Orden descendente'}
+        title={asc ? 'Ascendente' : 'Descendente'}
+        className="k-b k-b-texto w-7 px-0"
+      >
+        {asc ? <ArrowUp size={16} aria-hidden="true" /> : <ArrowDown size={16} aria-hidden="true" />}
+      </button>
+      <CapaMenu abierto={abierto} alCerrar={() => setAbierto(false)} ancla={ancla} titulo="Ordenar por" opciones={opciones} seleccion />
+    </div>
+  )
+}
+
+interface PanelFiltrosProps {
+  open: boolean
+  onClose: () => void
+  medicoId: string
+  fechaDesde: string
+  fechaHasta: string
+  medicos: MedicoOpcion[]
+  ocultarTodosMedicos: boolean
+  onMedico: (id: string) => void
+  onDesde: (v: string) => void
+  onHasta: (v: string) => void
+}
+
+/* Los filtros de escritorio de antes (aplicación inmediata), en una capa del
+   catálogo para `ih`, `iv` y `esc` (maqueta: «Filtros», CALMA §30.3). */
+function PanelFiltros({ open, onClose, medicoId, fechaDesde, fechaHasta, medicos, ocultarTodosMedicos, onMedico, onDesde, onHasta }: PanelFiltrosProps) {
+  return (
+    <ModalShell open={open} onClose={onClose} title="Filtros" maxWidth="max-w-[360px]">
+      <div className="space-y-4 px-5 pt-1 pb-5">
+        <label className="k-campo-g">
+          <span className="k-etiqueta">Médico</span>
+          <select value={medicoId} onChange={e => onMedico(e.target.value)} className="k-campo">
+            {!ocultarTodosMedicos && <option value="">Todos los médicos</option>}
+            {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
+          </select>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="k-campo-g">
+            <span className="k-etiqueta">Ingreso desde</span>
+            <input type="date" value={fechaDesde} onChange={e => onDesde(e.target.value)} className="k-campo" />
+          </label>
+          <label className="k-campo-g">
+            <span className="k-etiqueta">hasta</span>
+            <input type="date" value={fechaHasta} onChange={e => onHasta(e.target.value)} className="k-campo" />
+          </label>
         </div>
       </div>
-      <div className="h-5 w-16 bg-slate-100 rounded-full" />
-    </div>
+    </ModalShell>
+  )
+}
+
+/* Fila de la lista de `ext`/`tel`. Mismo enlace-que-cubre-la-fila que la
+   tarjeta de antes: el ::after se estira sobre la fila (de ahí su `relative`)
+   para que Next precargue el expediente. Los médicos siguen a la vista (la
+   maqueta los pasaba a la hoja de acciones, que es de `KebabAccionesPaciente`
+   y no existe para la secretaria). */
+function FilaMovil({ p, i, orden, mostrarAcciones }: { p: PacienteExpediente; i: number; orden: OrdenColumna; mostrarAcciones: boolean }) {
+  const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
+  const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
+  const nombre = 'block truncate text-[15px] leading-5 font-semibold text-tinta'
+  const fuerte = (activa: boolean) => (activa ? 'font-semibold text-tinta' : '')
+  return (
+    <li className={`relative flex items-start gap-3 py-3 ext:gap-2.5 ${mostrarAcciones ? 'pr-5' : ''}`}>
+      <div className={`k-avatar mt-0.5 ext:h-8 ext:w-8 ext:text-[12px] ${AVATAR_COLORS[i % AVATAR_COLORS.length]}`} aria-hidden="true">
+        {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
+      </div>
+      <div className="min-w-0 flex-1 space-y-0.5">
+        {mostrarAcciones ? (
+          <Link href={`/expediente/${p.id}`}
+            className={`${nombre} after:absolute after:inset-0 after:rounded-[var(--r-control)] after:content-[''] focus-visible:outline-none focus-visible:after:outline-[3px] focus-visible:after:outline-solid focus-visible:after:outline-enlace`}>
+            {p.nombre} {p.apellidos}
+          </Link>
+        ) : (
+          <p className={nombre}>{p.nombre} {p.apellidos}</p>
+        )}
+        <p className="text-[13px] leading-[18px] text-tinta2">
+          {edad !== null ? `${edad.textoElegante} · ` : ''}
+          {/* En `ext` (166 px de texto) el sexo va en inicial, como en la
+              maqueta; el lector de pantalla sigue oyendo la palabra entera. */}
+          {p.sexo === 'M' || p.sexo === 'F' ? (
+            <><span aria-hidden="true" className="hidden ext:inline">{p.sexo}</span><span className="ext:sr-only">{sexoLabel}</span></>
+          ) : sexoLabel}
+          {' · '}<span className={`k-num whitespace-nowrap ${fuerte(orden === 'numero_expediente')}`}>{p.numero_expediente || '—'}</span>
+        </p>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-[18px] text-tinta2">
+          {/* `TZ_CLINICA`, no el huso del dispositivo: el ingreso es un dato de
+              expediente —hermano de la fecha de apertura de la hoja frontal—,
+              no una hora de cita. Ver LA REGLA en `@/lib/dates`. */}
+          <span className={fuerte(orden === 'created_at')}>
+            Ingreso {p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy', TZ_CLINICA) : '—'}
+          </span>
+          <ListaChipsMedicos medicos={p.medicos} />
+        </div>
+      </div>
+      {mostrarAcciones && (
+        /* Sobre la capa del enlace: el kebab no debe navegar. Área de 44, que
+           sobresale al relleno de la tarjeta para no robar ancho al texto. */
+        <div className="absolute -right-3 top-1.5 z-10 [&_button]:inline-flex [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:items-center [&_button]:justify-center">
+          <KebabAccionesPaciente pacienteId={p.id} />
+        </div>
+      )}
+    </li>
   )
 }
 
@@ -62,6 +319,8 @@ export default function ExpedientePage() {
   const [fechaHasta, setFechaHasta] = useState<string>('')
   const [medicos, setMedicos] = useState<MedicoOpcion[]>([])
   const [sheetAbierto, setSheetAbierto] = useState(false)
+  const [panelAbierto, setPanelAbierto] = useState(false)
+  const router = useRouter()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { state: subState, openBloqueoModal } = useSubscriptionGate()
   const { profile, isSecretary } = useProfile()
@@ -76,6 +335,21 @@ export default function ExpedientePage() {
       e.preventDefault()
       openBloqueoModal()
     }
+  }
+
+  // El enlace del estado vacío es un botón del catálogo (`EstadoVacio`): hace
+  // lo mismo que el <Link> de antes con su intercept.
+  function irANuevoPaciente() {
+    if (subState.isBlocked) openBloqueoModal()
+    else router.push('/pacientes/nuevo')
+  }
+
+  // «Filtros»: la hoja con borrador en `ext`/`tel`; la capa de aplicación
+  // inmediata en el resto. El formato se lee al pulsar, nunca al pintar.
+  function abrirFiltros() {
+    const f = leerFormato()
+    if (f === 'ext' || f === 'tel' || f === 'desconocido') setSheetAbierto(true)
+    else setPanelAbierto(true)
   }
 
   async function cargar(
@@ -206,261 +480,64 @@ export default function ExpedientePage() {
     return () => { cancelado = true }
   }, [profile])
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-4 animate-slide-up">
-
-      {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Clínica</p>
-          <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Expediente Clínico</h1>
-          {total !== null && (
-            <p className="text-sm text-[#86868b] mt-0.5">
-              {total} paciente{total !== 1 ? 's' : ''} registrado{total !== 1 ? 's' : ''}
-            </p>
-          )}
-          {/* B4 del rediseño: la entrada a Suplementación. Colgaba del grupo
-              «Pacientes» de la barra lateral, que la navegación plana quitó
-              (CALMA §28: «Suplementación sigue dentro de Expediente»). Sólo
-              médicos, como en la barra de antes. Va bajo el título y no junto
-              al botón: en `ext` (322 de ancho) empujaba el botón bajo el riel. */}
-          {!isSecretary && (
-            <Link href="/suplementacion" prefetch={false}
-              className="mt-1 inline-flex min-h-11 items-center text-[15px] font-semibold text-enlace">
-              Suplementación
-            </Link>
-          )}
-        </div>
-        <Link
-          href="/pacientes/nuevo"
-          data-onboard="nuevo-paciente-exp"
-          onClick={interceptIfBlocked}
-          className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors shadow-sm"
-        >
-          <Plus size={15} strokeWidth={2.5} /> Nuevo paciente
-        </Link>
-      </div>
-
-      {/* Barra: buscador (siempre visible) + filtros avanzados (solo desktop) */}
-      <div className="flex flex-col md:flex-row md:items-end gap-2">
-        {/* Buscador (siempre visible) + botón embudo (solo móvil) */}
-        <div className="flex items-center gap-2 flex-1">
-          <div className="relative flex-1">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#86868b]" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o apellido..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setSheetAbierto(true)}
-            aria-label="Filtrar y ordenar"
-            className="md:hidden relative flex-shrink-0 p-2.5 bg-white border border-slate-200 rounded-xl text-[#86868b] hover:text-[#1e5fa8] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 transition-all shadow-sm"
-          >
-            <ListFilter size={18} />
-            {hayFiltrosActivos && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#1e5fa8] rounded-full ring-2 ring-white" />}
+  const filtrosProps = { medicoId, fechaDesde, fechaHasta, medicos, ocultarTodosMedicos: isMedicoInvitado(profile) }
+  const pieLista = (
+    <>
+      {hayMas && (
+        <div className="flex justify-center border-t border-linea py-2">
+          <button onClick={cargarMas} disabled={loading} className="k-b k-b-texto">
+            {loading ? 'Cargando...' : 'Cargar más pacientes'}
           </button>
         </div>
+      )}
+      {error && pacientes.length > 0 && (
+        <p role="alert" className="pb-3 text-center text-[13px] leading-[18px] text-mal-tinta">{error}</p>
+      )}
+    </>
+  )
 
-        {/* Filtros avanzados — solo desktop (md+). En móvil se ocultan para no
-            desbordar; se expondrán en sub-fase 5. */}
-        <div className="hidden md:flex md:items-end gap-2">
-          <div>
-            <label className="block text-[11px] text-[#86868b] mb-1">Médico</label>
-            <select
-              value={medicoId}
-              onChange={e => cambiarMedico(e.target.value)}
-              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-            >
-              {!isMedicoInvitado(profile) && <option value="">Todos los médicos</option>}
-              {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] text-[#86868b] mb-1">Ingreso desde</label>
-            <input
-              type="date"
-              value={fechaDesde}
-              onChange={e => cambiarFechaDesde(e.target.value)}
-              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-[#86868b] mb-1">hasta</label>
-            <input
-              type="date"
-              value={fechaHasta}
-              onChange={e => cambiarFechaHasta(e.target.value)}
-              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] text-[#86868b] mb-1">Ordenar por</label>
-            <select
-              value={orden}
-              onChange={e => cambiarOrden(e.target.value as OrdenColumna)}
-              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-            >
-              <option value="apellidos">Apellido</option>
-              <option value="nombre">Nombre</option>
-              <option value="numero_expediente">Expediente</option>
-              <option value="fecha_nacimiento">F. nacimiento</option>
-              <option value="created_at">F. ingreso</option>
-              <option value="medico">Médico</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[11px] text-[#86868b] mb-1">&nbsp;</label>
-            <button
-              type="button"
-              onClick={cambiarDireccion}
-              aria-label={direccion === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
-              title={direccion === 'asc' ? 'Ascendente' : 'Descendente'}
-              className="py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-[#86868b] hover:text-[#1e5fa8] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-            >
-              {direccion === 'asc' ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
-            </button>
-          </div>
-        </div>
-      </div>
+  return (
+    <div className="mx-auto max-w-6xl space-y-5 animate-slide-up">
+      <CabeceraLista total={total} mostrarSuplementacion={!isSecretary} interceptIfBlocked={interceptIfBlocked} />
+
+      <BarraLista
+        busqueda={busqueda} onBusqueda={setBusqueda}
+        orden={orden} direccion={direccion} onOrden={cambiarOrden} onDireccion={cambiarDireccion}
+        hayFiltrosActivos={hayFiltrosActivos} onFiltros={abrirFiltros}
+      />
 
       {/* Lista */}
       {loading && pacientes.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
-          <div className="divide-y divide-slate-100">
+        <div className="k-tarjeta k-lista" aria-busy="true">
+          <div className="k-lista">
             {[1,2,3,4,5].map(i => <PacienteSkeleton key={i} />)}
           </div>
         </div>
       ) : error && pacientes.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center mx-auto mb-4">
-            <Stethoscope size={24} className="text-rose-300" />
-          </div>
-          <p className="text-sm font-medium text-[#3d3d3f]">No se pudo cargar la lista</p>
-          <p className="text-xs text-[#86868b] mt-1 mb-4">{error}</p>
-          <button onClick={() => cargar(busqueda, pagina, false)} className="text-sm text-[#1e5fa8] font-medium hover:underline">
-            Reintentar
-          </button>
+        <div className="k-tarjeta">
+          <EstadoError titulo="No se pudo cargar la lista" mensaje={error} alReintentar={() => cargar(busqueda, pagina, false)} />
         </div>
       ) : pacientes.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-            <Stethoscope size={24} className="text-slate-300" />
-          </div>
-          <p className="text-sm font-medium text-[#3d3d3f]">No se encontraron pacientes</p>
-          <p className="text-xs text-[#86868b] mt-1 mb-4">
-            {busqueda ? 'Intenta con otro nombre' : 'Registra tu primer paciente'}
-          </p>
-          {!busqueda && (
-            <Link href="/pacientes/nuevo" onClick={interceptIfBlocked} className="text-sm text-[#1e5fa8] font-medium hover:underline">
-              + Nuevo paciente
-            </Link>
-          )}
-        </div>
+        <EstadoVacio
+          icono={busqueda ? SearchX : Stethoscope}
+          titulo="No se encontraron pacientes"
+          descripcion={busqueda ? 'Intenta con otro nombre' : 'Registra tu primer paciente'}
+          accion={busqueda ? undefined : { etiqueta: '+ Nuevo paciente', alPulsar: irANuevoPaciente }}
+        />
       ) : (
         <>
-          {/* DESKTOP: tabla dentro de bloque blanco */}
-          <div className="hidden md:block bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm">
+          {/* `ih`, `iv`, `esc`: tabla. `ext`, `tel` (y sin formato): lista. Sólo CSS. */}
+          <div className="hidden k-tarjeta k-lista ih:block iv:block esc:block ih:px-4">
             <TablaPacientesExpediente pacientes={pacientes} orden={orden} direccion={direccion} onOrden={cambiarOrden} mostrarAcciones={mostrarAcciones} />
-            {hayMas && (
-              <div className="px-5 py-3.5 border-t border-slate-100 text-center">
-                <button onClick={cargarMas} disabled={loading} className="text-sm text-[#1e5fa8] hover:text-[#1a3a5c] font-medium disabled:opacity-40 transition-colors">
-                  {loading ? 'Cargando...' : 'Cargar más pacientes'}
-                </button>
-              </div>
-            )}
-            {error && pacientes.length > 0 && (
-              <div className="px-5 pb-3.5 text-center">
-                <p className="text-xs text-rose-600">{error}</p>
-              </div>
-            )}
+            {pieLista}
           </div>
-
-          {/* MÓVIL: resumen + tarjetas individuales */}
-          <div className="md:hidden space-y-3">
-            <div className="flex items-center gap-1.5 px-1 text-[11px] text-[#86868b]">
-              {direccion === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              <span>Ordenado por <span className="font-semibold text-[#3d3d3f]">{ETIQUETA_ORDEN[orden]}</span> · {direccion === 'asc' ? 'Asc.' : 'Desc.'}</span>
-            </div>
-
-            {pacientes.map((p, i) => {
-              const edad = p.fecha_nacimiento ? calcularEdad(p.fecha_nacimiento) : null
-              const avatarColor = AVATAR_COLORS[i % AVATAR_COLORS.length]
-              const sexoLabel = p.sexo === 'M' ? 'Masculino' : p.sexo === 'F' ? 'Femenino' : 'Otro'
-              return (
-                <div key={p.id} className="relative bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColor}`}>
-                        {p.nombre.charAt(0)}{p.apellidos.charAt(0)}
-                      </div>
-                      <div className="min-w-0">
-                        {/* Mismo enlace-que-cubre-la-tarjeta que en la tabla:
-                            el ::after se estira sobre la card (de ahí su
-                            `relative`) para que Next precargue el expediente. */}
-                        {mostrarAcciones ? (
-                          <Link
-                            href={`/expediente/${p.id}`}
-                            className="block text-sm font-semibold text-[#1d1d1f] truncate rounded after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e5fa8]"
-                          >
-                            {p.nombre} {p.apellidos}
-                          </Link>
-                        ) : (
-                          <p className="text-sm font-semibold text-[#1d1d1f] truncate">
-                            {p.nombre} {p.apellidos}
-                          </p>
-                        )}
-                        <p className="text-[11px] text-[#86868b] mt-0.5">
-                          {edad !== null ? `${edad.textoElegante} · ` : ''}{sexoLabel}
-                        </p>
-                      </div>
-                    </div>
-                    {mostrarAcciones && (
-                      /* Sobre la capa del enlace: el kebab no debe navegar. */
-                      <div className="relative z-10 flex-shrink-0">
-                        <KebabAccionesPaciente pacienteId={p.id} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 pl-[3.375rem] space-y-1.5">
-                    <div className="flex items-baseline gap-2 text-[12px]">
-                      <span className="text-[#86868b] w-20 flex-shrink-0">Expediente</span>
-                      <span className="text-[#3d3d3f] font-medium">{p.numero_expediente || '—'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[12px]">
-                      <span className="text-[#86868b] w-20 flex-shrink-0">Médicos</span>
-                      <span className="min-w-0"><ListaChipsMedicos medicos={p.medicos} /></span>
-                    </div>
-                    <div className="flex items-baseline gap-2 text-[12px]">
-                      <span className="text-[#86868b] w-20 flex-shrink-0">Ingreso</span>
-                      {/* `TZ_CLINICA`, no el huso del dispositivo: el ingreso es un
-                          dato de expediente —hermano de la fecha de apertura de la
-                          hoja frontal—, no una hora de cita. Ver LA REGLA en
-                          `@/lib/dates`. */}
-                      <span className="text-[#3d3d3f] font-medium">{p.created_at ? renderEnTZ(p.created_at, 'd MMM yyyy', TZ_CLINICA) : '—'}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-
-            {hayMas && (
-              <div className="text-center pt-1">
-                <button onClick={cargarMas} disabled={loading} className="text-sm text-[#1e5fa8] hover:text-[#1a3a5c] font-medium disabled:opacity-40 transition-colors">
-                  {loading ? 'Cargando...' : 'Cargar más pacientes'}
-                </button>
-              </div>
-            )}
-            {error && pacientes.length > 0 && (
-              <div className="text-center">
-                <p className="text-xs text-rose-600">{error}</p>
-              </div>
-            )}
+          <div className="k-tarjeta k-lista ih:hidden iv:hidden esc:hidden">
+            <ul className="k-lista">
+              {pacientes.map((p, i) => (
+                <FilaMovil key={p.id} p={p} i={i} orden={orden} mostrarAcciones={mostrarAcciones} />
+              ))}
+            </ul>
+            {pieLista}
           </div>
         </>
       )}
@@ -477,6 +554,10 @@ export default function ExpedientePage() {
         ocultarTodosMedicos={ocultarTodosMedicos}
         medicoPorDefecto={medicoPorDefecto}
         onAplicar={aplicarFiltrosSheet}
+      />
+      <PanelFiltros
+        open={panelAbierto} onClose={() => setPanelAbierto(false)} {...filtrosProps}
+        onMedico={cambiarMedico} onDesde={cambiarFechaDesde} onHasta={cambiarFechaHasta}
       />
     </div>
   )

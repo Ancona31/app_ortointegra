@@ -1,13 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { X, ArrowUp, ArrowDown } from 'lucide-react'
-import Portal from '@/components/ui/Portal'
+import { useState } from 'react'
+import { ArrowUp, ArrowDown } from 'lucide-react'
+import ModalShell from '@/components/ui/ModalShell'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { OrdenColumna, OrdenDireccion, MedicoOpcion } from '@/lib/expediente/fetchPacientes'
 
-let sheetStack = 0
-let prevBodyOverflow = ''
+/* Rediseño B6 (maqueta `final-lista`, «hoja-filtros»): la hoja de filtros de
+   `ext`/`tel` es ahora una capa del catálogo (`ModalShell`): hoja arrastrable
+   en `tel`, tarjeta centrada en `ext` (CALMA §26). La capa pone el velo, Esc,
+   el foco atrapado, el bloqueo del desplazamiento y la salida animada; aquí
+   sólo queda el BORRADOR, que se promueve con «Ver resultados» en una sola
+   recarga (como siempre). En `ih`/`iv`/`esc` la página abre otra capa, con
+   los filtros de aplicación inmediata de escritorio. */
 
 const OPCIONES_ORDEN: { valor: OrdenColumna; etiqueta: string }[] = [
   { valor: 'apellidos', etiqueta: 'Apellido' },
@@ -16,6 +21,13 @@ const OPCIONES_ORDEN: { valor: OrdenColumna; etiqueta: string }[] = [
   { valor: 'fecha_nacimiento', etiqueta: 'Edad' },
   { valor: 'numero_expediente', etiqueta: 'N.º de expediente' },
 ]
+
+/* Píldora de opción: contorno fino en reposo, tonal elegida (CALMA §11). */
+function clasePildora(activa: boolean): string {
+  return `k-b h-9 px-3 text-[14px] rounded-full ${activa
+    ? 'bg-tonal text-tonal-tinta font-semibold'
+    : 'font-normal text-tinta shadow-[inset_0_0_0_1px_var(--borde)]'}`
+}
 
 interface Props {
   open: boolean
@@ -50,72 +62,25 @@ export function SheetFiltrosExpediente({
   medicoPorDefecto,
   onAplicar,
 }: Props) {
-  const [montado, setMontado] = useState(false)
-  const [cerrando, setCerrando] = useState(false)
-  const cerrarTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const [bMedico, setBMedico] = useState(medicoId)
   const [bDesde, setBDesde] = useState(fechaDesde)
   const [bHasta, setBHasta] = useState(fechaHasta)
   const [bOrden, setBOrden] = useState<OrdenColumna>(orden)
   const [bDireccion, setBDireccion] = useState<OrdenDireccion>(direccion)
 
-  const onCloseRef = useRef(onClose)
-  useEffect(() => { onCloseRef.current = onClose }, [onClose])
-
-  // Dispara la animación de salida y, tras 300ms, desmonta + notifica al padre.
-  function iniciarCierre() {
-    if (cerrando) return
-    setCerrando(true)
-    if (cerrarTimerRef.current) clearTimeout(cerrarTimerRef.current)
-    cerrarTimerRef.current = setTimeout(() => {
-      setMontado(false)
-      setCerrando(false)
-      onCloseRef.current()
-    }, 300)
-  }
-
-  // Apertura/cierre gobernado por la prop open.
-  useEffect(() => {
+  // Al abrir, el borrador parte de los filtros vigentes. Se ajusta DURANTE el
+  // render (el patrón de React para reaccionar a una prop), no en un efecto.
+  const [abiertoPrevio, setAbiertoPrevio] = useState(open)
+  if (abiertoPrevio !== open) {
+    setAbiertoPrevio(open)
     if (open) {
-      if (cerrarTimerRef.current) { clearTimeout(cerrarTimerRef.current); cerrarTimerRef.current = null }
-      setCerrando(false)
-      setMontado(true)
       setBMedico(medicoId)
       setBDesde(fechaDesde)
       setBHasta(fechaHasta)
       setBOrden(orden)
       setBDireccion(direccion)
-    } else if (montado && !cerrando) {
-      iniciarCierre()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
-
-  // Lock de scroll + Escape, mientras el sheet esté montado.
-  useEffect(() => {
-    if (!montado) return
-    sheetStack += 1
-    if (sheetStack === 1) {
-      prevBodyOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-    }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') iniciarCierre()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      sheetStack -= 1
-      if (sheetStack === 0) document.body.style.overflow = prevBodyOverflow
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [montado])
-
-  // Limpieza del timer al desmontar.
-  useEffect(() => {
-    return () => { if (cerrarTimerRef.current) clearTimeout(cerrarTimerRef.current) }
-  }, [])
+  }
 
   function limpiar() {
     setBMedico(medicoPorDefecto)
@@ -133,152 +98,63 @@ export function SheetFiltrosExpediente({
       orden: bOrden,
       direccion: bDireccion,
     })
-    iniciarCierre()
+    onClose()
   }
 
-  if (!montado) return null
+  const pie = (
+    <div className="flex gap-2.5 px-5 pt-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] [&>.k-b]:flex-1">
+      <button type="button" onClick={limpiar} className="k-b k-b-capa k-b-tonal">
+        Limpiar
+      </button>
+      <button type="button" onClick={verResultados} className="k-b k-b-capa k-b-prim">
+        Ver resultados
+      </button>
+    </div>
+  )
 
   return (
-    <Portal>
-      <div className="fixed inset-0 z-50 flex items-end justify-center">
-        <div
-          onClick={iniciarCierre}
-          style={cerrando ? { animationFillMode: 'forwards' } : undefined}
-          className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${cerrando ? 'animate-[fadeOut_0.3s_ease-out]' : 'animate-fade-in'}`}
-        />
-        <div
-          style={cerrando ? { animationFillMode: 'forwards' } : undefined}
-          className={`relative w-full max-w-lg bg-white rounded-t-2xl shadow-2xl max-h-[85vh] flex flex-col ${
-            cerrando
-              ? 'animate-[slideDownSheet_0.3s_cubic-bezier(0.32,0.72,0,1)]'
-              : 'animate-[slideUpSheet_0.3s_cubic-bezier(0.32,0.72,0,1)]'
-          }`}
-        >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
-            <h2 className="text-base font-bold text-[#1d1d1f]">Filtrar y ordenar</h2>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={limpiar}
-                className="text-sm text-[#86868b] hover:text-[#1e5fa8] font-medium px-2 py-1 rounded-lg transition-colors"
-              >
-                Limpiar
-              </button>
-              <button
-                type="button"
-                onClick={iniciarCierre}
-                aria-label="Cerrar"
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-[#86868b] transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
+    <ModalShell open={open} onClose={onClose} title="Filtrar y ordenar" maxWidth="max-w-lg" footer={pie}>
+      <div className="space-y-5 px-5 pt-1 pb-5">
+        <label className="k-campo-g">
+          <span className="k-etiqueta">Médico</span>
+          <select value={bMedico} onChange={e => setBMedico(e.target.value)} className="k-campo">
+            {!ocultarTodosMedicos && <option value="">Todos los médicos</option>}
+            {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
+          </select>
+        </label>
+
+        <fieldset className="k-campo-g">
+          <legend className="k-etiqueta mb-1">Fecha de ingreso</legend>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="date" value={bDesde} onChange={e => setBDesde(e.target.value)} aria-label="Ingreso desde" className="k-campo" />
+            <input type="date" value={bHasta} onChange={e => setBHasta(e.target.value)} aria-label="Ingreso hasta" className="k-campo" />
           </div>
+        </fieldset>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wide mb-1.5">Médico</label>
-              <select
-                value={bMedico}
-                onChange={e => setBMedico(e.target.value)}
-                className="w-full py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-              >
-                {!ocultarTodosMedicos && <option value="">Todos los médicos</option>}
-                {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wide mb-1.5">Fecha de ingreso</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={bDesde}
-                  onChange={e => setBDesde(e.target.value)}
-                  className="flex-1 min-w-0 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-                />
-                <span className="text-[#86868b] text-sm flex-shrink-0">—</span>
-                <input
-                  type="date"
-                  value={bHasta}
-                  onChange={e => setBHasta(e.target.value)}
-                  className="flex-1 min-w-0 py-2.5 px-3 bg-white border border-slate-200 rounded-xl text-sm text-[#1d1d1f] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 transition-all shadow-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wide mb-1.5">Ordenar por</label>
-              <div className="flex flex-wrap gap-2">
-                {OPCIONES_ORDEN.map(op => {
-                  const activo = bOrden === op.valor
-                  return (
-                    <button
-                      key={op.valor}
-                      type="button"
-                      onClick={() => setBOrden(op.valor)}
-                      className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
-                        activo
-                          ? 'bg-[#1e5fa8] text-white border-[#1e5fa8]'
-                          : 'bg-white text-[#3d3d3f] border-slate-200 hover:border-[#1e5fa8]/40'
-                      }`}
-                    >
-                      {op.etiqueta}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-[#86868b] uppercase tracking-wide mb-1.5">Dirección</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setBDireccion('asc')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                    bDireccion === 'asc'
-                      ? 'bg-[#1e5fa8]/10 text-[#1e5fa8] border-[#1e5fa8]/40'
-                      : 'bg-white text-[#3d3d3f] border-slate-200 hover:border-[#1e5fa8]/40'
-                  }`}
-                >
-                  <ArrowUp size={15} /> Ascendente
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setBDireccion('desc')}
-                  className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                    bDireccion === 'desc'
-                      ? 'bg-[#1e5fa8]/10 text-[#1e5fa8] border-[#1e5fa8]/40'
-                      : 'bg-white text-[#3d3d3f] border-slate-200 hover:border-[#1e5fa8]/40'
-                  }`}
-                >
-                  <ArrowDown size={15} /> Descendente
-                </button>
-              </div>
-            </div>
+        <fieldset>
+          <legend className="k-etiqueta mb-2">Ordenar por</legend>
+          <div className="flex flex-wrap gap-2">
+            {OPCIONES_ORDEN.map(op => (
+              <button key={op.valor} type="button" aria-pressed={bOrden === op.valor}
+                onClick={() => setBOrden(op.valor)} className={clasePildora(bOrden === op.valor)}>
+                {op.etiqueta}
+              </button>
+            ))}
           </div>
+        </fieldset>
 
-          {/* ⚠️ EL RELLENO DE ABAJO LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 ·
-              paso 10). Esta hoja va anclada al borde inferior de la pantalla, y
-              desde que el viewport es `viewport-fit=cover` ese borde es el
-              FÍSICO: «Ver resultados» —el único botón que la cierra aplicando
-              los filtros— quedaba a medias bajo la barra de gestos.
-              El 1rem de `py-4` no se toca: se suma. Donde el sistema no se
-              superpone, `env()` vale 0 y esto es el `py-4` de siempre.
-              ⚠️ ARRIBA NO HACE FALTA: la hoja mide como mucho `85vh` desde
-              abajo, así que su borde superior nunca llega a la muesca. */}
-          <div className="px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] border-t border-slate-100 flex-shrink-0">
-            <button
-              type="button"
-              onClick={verResultados}
-              className="w-full py-3 bg-[#1e5fa8] text-white rounded-xl text-sm font-semibold hover:bg-[#1a3a5c] transition-colors shadow-sm"
-            >
-              Ver resultados
+        <fieldset>
+          <legend className="k-etiqueta mb-2">Dirección</legend>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" aria-pressed={bDireccion === 'asc'} onClick={() => setBDireccion('asc')} className={clasePildora(bDireccion === 'asc')}>
+              <ArrowUp size={15} aria-hidden="true" /> Ascendente
+            </button>
+            <button type="button" aria-pressed={bDireccion === 'desc'} onClick={() => setBDireccion('desc')} className={clasePildora(bDireccion === 'desc')}>
+              <ArrowDown size={15} aria-hidden="true" /> Descendente
             </button>
           </div>
-        </div>
+        </fieldset>
       </div>
-    </Portal>
+    </ModalShell>
   )
 }
