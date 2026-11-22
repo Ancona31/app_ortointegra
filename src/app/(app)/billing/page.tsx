@@ -108,7 +108,10 @@ function BillingContent() {
     }
   }
 
-  if (loading || loadingProfile) return <BillingSkeleton />
+  /* B12: las pestañas también al cargar, en el mismo sitio que la página. */
+  if (loading || loadingProfile) return (
+    <div className="mx-auto max-w-6xl"><PestanasAdministracion /><BillingSkeleton /></div>
+  )
 
   if (!clinica) return null
 

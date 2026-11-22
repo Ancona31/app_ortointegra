@@ -189,7 +189,9 @@ export default function AdminUsuariosPage() {
   }
 
   if (loadingProfile || loading) return (
-    <div className="mx-auto max-w-[760px]" aria-busy="true">
+    /* B12: las pestañas también al cargar, en el mismo sitio que la página. */
+    <div className="mx-auto max-w-6xl [&>*:not(nav)]:max-w-[760px]" aria-busy="true">
+      <PestanasAdministracion />
       <div className="k-tarjeta flex flex-col gap-4">
         {[1, 2, 3].map(i => (
           <div key={i} className="flex items-center gap-3">

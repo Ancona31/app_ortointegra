@@ -146,10 +146,13 @@ function DistribucionEdad({ datos }: { datos: Datos['distribucionEdad'] }) {
   )
 }
 
-/* Primera carga: la forma de la página (maqueta, estado «cargando»). */
+/* Primera carga: la forma de la página (maqueta, estado «cargando»). Con la
+   fila de pestañas de verdad (B12): sin ella, el contenido saltaba 60 px al
+   llegar los datos y la navegación de Administración no existía al cargar. */
 function EsqueletoEstadisticas() {
   return (
     <div aria-busy="true" className="mx-auto max-w-6xl">
+      <PestanasAdministracion />
       <Skeleton className="h-8 w-56" />
       <div className="mt-6 grid grid-cols-1 gap-3 ih:grid-cols-2 iv:grid-cols-2 esc:grid-cols-2 esc:gap-4">
         <Skeleton className="col-span-full h-[280px] rounded-[20px]" />
