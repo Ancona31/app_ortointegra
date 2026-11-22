@@ -25,6 +25,7 @@ import LineaSuplemento from '@/components/documentos/LineaSuplemento'
 import SuplementoAbierto from '@/components/documentos/SuplementoAbierto'
 import type { OpcionSuplemento } from '@/components/documentos/BuscadorSuplemento'
 import { filaQueSobra, pesoNumerico, textoCalculo } from '@/components/documentos/suplementosCompacto'
+import { escucharSalida } from '@/components/documentos/salidaPlegable'
 
 type Presentacion = {
   tipo: string      // 'cápsula' | 'tableta' | 'cucharada' | 'scoop'
@@ -456,38 +457,9 @@ export default function PlanSuplementacionForm({ pacienteInicial = '', diagnosti
   }
   const plegarRef = useRef(plegar)
   useEffect(() => { plegarRef.current = plegar })
-  /*
-   * Escucha de «salir del suplemento» (la misma de la receta). Con el puntero
-   * se pliega al SOLTAR y con un `setTimeout`: plegar cambia el alto de la
-   * página, y hacerlo en el `pointerdown` movería el destino antes del
-   * `mouseup`. Un desplazamiento con el dedo termina en `pointercancel` y no
-   * pliega. Con el teclado (Tab que sale), en el `focusin`. Las capas
-   * (diálogos, alertas, listas, menús) no cuentan como fuera.
-   */
-  useEffect(() => {
-    let abajoFuera = false
-    const fuera = (t: EventTarget | null): boolean => t instanceof Element
-      && !listaRef.current?.contains(t) && !accionesRef.current?.contains(t)
-      && !t.closest('[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"]')
-    const alBajar = (e: PointerEvent) => { abajoFuera = fuera(e.target) }
-    const alSoltar = () => {
-      if (!abajoFuera) return
-      abajoFuera = false
-      setTimeout(() => plegarRef.current(), 0)
-    }
-    const alCancelar = () => { abajoFuera = false }
-    const alEnfocar = (e: FocusEvent) => { if (!abajoFuera && fuera(e.target)) plegarRef.current() }
-    document.addEventListener('pointerdown', alBajar, true)
-    document.addEventListener('pointerup', alSoltar, true)
-    document.addEventListener('pointercancel', alCancelar, true)
-    document.addEventListener('focusin', alEnfocar)
-    return () => {
-      document.removeEventListener('pointerdown', alBajar, true)
-      document.removeEventListener('pointerup', alSoltar, true)
-      document.removeEventListener('pointercancel', alCancelar, true)
-      document.removeEventListener('focusin', alEnfocar)
-    }
-  }, [])
+  /* «Plegado al salir»: la escucha compartida (`salidaPlegable.ts`, con la
+     causa del defecto del texto de una casilla). */
+  useEffect(() => escucharSalida(el => !!(listaRef.current?.contains(el) || accionesRef.current?.contains(el)), () => plegarRef.current()), [])
 
   /** «Agregar suplemento» y Ctrl/⌘+Enter: pliega la abierta y abre el buscador al final. */
   function agregar() {

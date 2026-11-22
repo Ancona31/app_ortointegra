@@ -29,6 +29,7 @@ import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/do
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
+import { escucharSalida } from '@/components/documentos/salidaPlegable'
 
 /**
  * Consentimiento informado — GUIA_FORM_CONSENTIMIENTO.md — y su contrario, la
@@ -826,45 +827,10 @@ export default function ConsentimientoInformadoForm({
   const plegarRef = useRef(plegar)
   useEffect(() => { plegarRef.current = plegar })
 
-  /*
-   * La escucha de «salir» de la receta y del internamiento: con el puntero se
-   * pliega al SOLTAR (plegar cambia el alto y en el `pointerdown` movería el
-   * destino del clic); un desplazamiento termina en `pointercancel` y no pliega;
-   * con el teclado, en el `focusin`. Las capas (diálogos, menús) no cuentan.
-   */
-  useEffect(() => {
-    let abajoFuera = false
-    // ⚠️ Mientras el puntero está pulsado, el `focusin` no decide nada. Pulsar
-    // un `<label>` (la casilla de fotografías) no enfoca la casilla hasta el
-    // clic: en el `pointerdown` el foco va al ancestro enfocable más cercano,
-    // que es el panel del selector de tipo (`tabIndex=-1`), FUERA del bloque, y
-    // eso plegaba el bloque antes de que la casilla llegara a marcarse.
-    let presionando = false
-    const fuera = (t: EventTarget | null): boolean => t instanceof Element
-      && !seccionesRef.current?.contains(t)
-      // Abrir un menú («···») tampoco pliega: plegar cambia el alto, el
-      // desplazamiento se reajusta y el menú se cerraría al instante.
-      && !t.closest('[role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"], [aria-haspopup]')
-    const alBajar = (e: PointerEvent) => { presionando = true; abajoFuera = fuera(e.target) }
-    const alSoltar = () => {
-      presionando = false
-      if (!abajoFuera) return
-      abajoFuera = false
-      setTimeout(() => plegarRef.current(), 0)
-    }
-    const alCancelar = () => { presionando = false; abajoFuera = false }
-    const alEnfocar = (e: FocusEvent) => { if (!presionando && fuera(e.target)) plegarRef.current() }
-    document.addEventListener('pointerdown', alBajar, true)
-    document.addEventListener('pointerup', alSoltar, true)
-    document.addEventListener('pointercancel', alCancelar, true)
-    document.addEventListener('focusin', alEnfocar)
-    return () => {
-      document.removeEventListener('pointerdown', alBajar, true)
-      document.removeEventListener('pointerup', alSoltar, true)
-      document.removeEventListener('pointercancel', alCancelar, true)
-      document.removeEventListener('focusin', alEnfocar)
-    }
-  }, [])
+  /* «Plegado al salir»: la escucha compartida (`salidaPlegable.ts`). El
+     arreglo del `<label>` que nació aquí —mientras el puntero está pulsado el
+     `focusin` no decide— ahora vale para los cinco formularios. */
+  useEffect(() => escucharSalida(el => !!seccionesRef.current?.contains(el), () => plegarRef.current()), [])
 
   // La sección abierta es una línea que crece, sin tirador.
   useLayoutEffect(() => {
