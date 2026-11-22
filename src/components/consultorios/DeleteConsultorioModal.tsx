@@ -47,59 +47,62 @@ export default function DeleteConsultorioModal({
     onEditarEnLugar()
   }
 
+  /* Rediseño B10: alerta destructiva del catálogo (CALMA §13). Son TRES
+     salidas con los rótulos de hoy, así que van apiladas con el principal
+     («Sí, borrar») arriba (§23.3). El foco entra en «Cancelar»: la alerta
+     destruye (capas-a, vista 1). */
   return (
     <ModalShell
       open={open}
       onClose={deleting ? () => {} : onClose}
       title="Borrar consultorio"
       subtitle={consultorio.nombre}
-      icon={<Trash2 size={18} className="text-red-600" />}
-      iconBg="bg-red-50"
-      maxWidth="max-w-md"
+      icon={<Trash2 aria-hidden="true" />}
+      variante="alerta"
+      tono="destruir"
+      apilada
       footer={
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 px-5 py-3.5">
-          <button
-            type="button"
-            onClick={deleting ? undefined : onClose}
-            disabled={deleting}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Cancelar
-          </button>
+        <>
           <button
             type="button"
             onClick={handleEditarEnLugar}
             disabled={deleting}
-            className="px-4 py-2.5 rounded-xl text-sm font-medium text-[var(--cp)] bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="k-b k-b-capa k-b-tonal"
           >
             Editar en lugar
           </button>
           <button
             type="button"
+            autoFocus
+            onClick={deleting ? undefined : onClose}
+            disabled={deleting}
+            className="k-b k-b-capa k-b-quieto"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            data-principal
             onClick={handleDelete}
             disabled={deleting}
-            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="k-b k-b-capa k-b-mal"
           >
             {deleting ? 'Borrando…' : 'Sí, borrar'}
           </button>
-        </div>
+        </>
       }
     >
-      <div className="px-5 py-5 space-y-3">
-        <p className="text-sm text-slate-700">
-          ¿Estás seguro de que quieres borrar este consultorio?
-        </p>
-        <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 space-y-1">
-          <p className="text-sm font-semibold text-slate-900">{consultorio.nombre}</p>
-          <p className="text-xs text-slate-500">{consultorio.direccion}</p>
-          {consultorio.telefono && (
-            <p className="text-xs text-slate-500">{consultorio.telefono}</p>
-          )}
-        </div>
-        <p className="text-xs text-slate-500">
-          Las citas y consultas pasadas se conservan, pero el consultorio ya no estará disponible para nuevas citas. Esta acción no es reversible desde la app.
-        </p>
+      <p>¿Estás seguro de que quieres borrar este consultorio?</p>
+      <div className="rounded-[12px] bg-fondo px-4 py-3 text-left" style={{ textAlignLast: 'left' }}>
+        <p className="text-[15px] font-semibold leading-5 text-tinta">{consultorio.nombre}</p>
+        <p className="text-[13px] leading-[18px] text-tinta2">{consultorio.direccion}</p>
+        {consultorio.telefono && (
+          <p className="text-[13px] leading-[18px] text-tinta2">{consultorio.telefono}</p>
+        )}
       </div>
+      <p>
+        Las citas y consultas pasadas se conservan, pero el consultorio ya no estará disponible para nuevas citas. Esta acción no es reversible desde la app.
+      </p>
     </ModalShell>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { Loader2, RefreshCw, LogIn, LogOut, WifiOff } from 'lucide-react'
-import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
+import { Loader2, RefreshCw, LogIn, LogOut } from 'lucide-react'
+import EstadoError from '@/components/ui/EstadoError'
 import { GoogleGIcon } from '@/components/perfil/piezasDatos'
 
 /**
@@ -70,7 +70,7 @@ export default function PanelGoogleCalendar({
       <Card>
         <Cabecera
           apoyo="Comprobando la conexión…"
-          chip={<span className="skeleton h-[28px] w-[112px] rounded-[var(--sp-r-pill)]" />}
+          chip={<span className="skeleton h-6 w-[104px] rounded-full" />}
         />
       </Card>
     )
@@ -83,10 +83,10 @@ export default function PanelGoogleCalendar({
           apoyo="No se pudo comprobar la conexión."
           chip={<Chip tono="warn" texto="Sin respuesta" />}
         />
-        <AvisoColumna
-          icono={WifiOff}
+        <EstadoError
+          variante="tarjeta"
           mensaje="Google no respondió. Tu conexión sigue guardada; no hace falta que la rehagas."
-          onReintentar={onReintentar}
+          alReintentar={onReintentar}
         />
       </Card>
     )
@@ -96,7 +96,7 @@ export default function PanelGoogleCalendar({
 
   return (
     <>
-      <Card protagonista={conectado}>
+      <Card>
         <Cabecera
           apoyo={conectado
             ? 'Sincronización activa — las citas se crean automáticamente.'
@@ -106,12 +106,12 @@ export default function PanelGoogleCalendar({
             : <Chip tono="neutro" texto="Sin conectar" />}
         />
 
-        <div className="flex flex-col gap-[var(--sp-2-5)]">
+        <div className="flex flex-col">
           <FilaDato etiqueta="Calendario" valor={conectado ? nombreCalendario : null} />
           <FilaDato etiqueta="Cuenta de Google" valor={conectado ? cuentaEmail : null} />
           {/* La nota se conserva en los DOS estados, como pide el spec: es la
               que evita el soporte por confusión de cuentas. */}
-          <p className="sp-hint">
+          <p className="pt-1 text-[13px] leading-[18px] text-tinta2">
             Puede ser una cuenta distinta a la que usas para entrar en Spinus.
           </p>
         </div>
@@ -149,24 +149,21 @@ export default function PanelGoogleCalendar({
         {/* El aviso del redirect va DENTRO de la card y sin tocar los botones:
             el spec pide conservar «Conectar» cuando la conexión falló. */}
         {aviso && (
-          <p
-            className="rounded-[var(--sp-r-note)] px-[var(--sp-4)] py-[var(--sp-3)] text-[length:var(--sp-fs-hint)] leading-[var(--sp-lh-body)] text-[var(--sp-danger-ink)]"
-            style={{ background: 'var(--sp-danger-bg)', border: 'var(--sp-bw-hair) solid var(--sp-danger-border)' }}
-          >
+          <p role="alert" className="rounded-[12px] bg-mal-fondo px-4 py-3 text-[14px] leading-5 text-mal-tinta">
             {aviso}
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-[var(--sp-gap-item)] max-sm:flex-col max-sm:items-stretch">
+        <div className="flex flex-wrap items-center gap-2">
           {conectado ? (
             <>
               <button
                 type="button"
                 onClick={onRecrear}
                 disabled={recreando || desconectando}
-                className="sp-btn sp-btn--secondary disabled:cursor-not-allowed disabled:opacity-40"
+                className="k-b k-b-tonal"
               >
-                {recreando ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                {recreando ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : <RefreshCw size={16} aria-hidden="true" />}
                 Recrear calendario
               </button>
 
@@ -178,33 +175,25 @@ export default function PanelGoogleCalendar({
                 type="button"
                 onClick={onDesconectar}
                 disabled={desconectando || recreando}
-                className="sp-btn disabled:cursor-not-allowed disabled:opacity-40"
-                style={{
-                  background: 'transparent',
-                  color: 'var(--sp-danger)',
-                  border: 'var(--sp-bw-hair) solid var(--sp-danger-border)',
-                  fontSize: 'var(--sp-fs-btn-sm)',
-                  fontWeight: 'var(--sp-fw-semi)',
-                  padding: '13px 24px',
-                }}
+                className="k-b k-b-texto px-3 text-[14px] text-mal-tinta"
               >
-                {desconectando ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
+                {desconectando ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : <LogOut size={16} aria-hidden="true" />}
                 Desconectar
               </button>
             </>
           ) : (
             /* Un solo botón. Ni «Recrear» ni «Desconectar» ni la nota de
                desconexión: no hay nada que recrear ni que desconectar. */
-            <a href="/api/google/connect" className="sp-btn sp-btn--primary max-sm:justify-center">
-              <LogIn size={16} /> Conectar
+            <a href="/api/google/connect" className="k-b k-b-prim">
+              <LogIn size={16} aria-hidden="true" /> Conectar
             </a>
           )}
         </div>
       </Card>
 
       {conectado && (
-        <section className="sp-card">
-          <p className="sp-hint">
+        <section>
+          <p className="px-1 text-[13px] leading-[18px] text-tinta2">
             Al desconectar, las citas dejan de escribirse en Google. Las que ya se crearon se quedan
             en tu calendario.
           </p>
@@ -216,89 +205,58 @@ export default function PanelGoogleCalendar({
 
 /* ── Piezas ──────────────────────────────────────────────────────────────── */
 
-function Card({ children, protagonista }: { children: React.ReactNode; protagonista?: boolean }) {
-  return (
-    <section className={`${protagonista ? 'sp-card sp-card--hero' : 'sp-card'} flex flex-col gap-[var(--sp-4-5)]`}>
-      {children}
-    </section>
-  )
+function Card({ children }: { children: React.ReactNode }) {
+  return <section className="k-tarjeta flex flex-col gap-4 esc:p-5">{children}</section>
 }
 
 function Cabecera({ apoyo, chip }: { apoyo: string; chip?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-[var(--sp-3)]">
-      <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--sp-r-icon-lg)] bg-[var(--sp-surface-muted)]">
-        <GoogleGIcon size={26} />
+    <div className="flex flex-wrap items-center gap-3">
+      <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-sup2">
+        <GoogleGIcon size={22} />
       </span>
-      <div className="min-w-0 flex-1">
-        <h2 className="text-[length:var(--sp-fs-modal)] font-bold text-[var(--sp-ink-800)]">Google Calendar</h2>
-        <p className="sp-hint mt-[var(--sp-gap-title-sub)]">{apoyo}</p>
+      <div className="min-w-0 flex-1 basis-[160px]">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <h2 className="k-t-tarjeta">Google Calendar</h2>
+          {chip}
+        </div>
+        <p className="k-t-sec mt-0.5">{apoyo}</p>
       </div>
-      {chip && <div className="shrink-0">{chip}</div>}
     </div>
   )
 }
 
 /**
- * ⚠️ ES HERMANO DEL CHIP DE `piezasDatos.tsx`, NO EL MISMO. Aquél es el vistazo
- * compacto de la pestaña Datos (relleno 5×12, punto 7 px); éste es el de la card
- * protagonista y el anexo del spec le da otra medida (6×13, punto 8, texto 13).
- * Se duplican a propósito, como manda el proyecto con dos consumidores. LO QUE
- * NO PUEDE DIVERGIR es la regla de arriba: el invitado se resuelve antes de
- * mirar el estado, y ahí no hay chip que enseñar. Si tocas uno, mira el otro.
- *
- * «Sin conectar» va en tinta SECUNDARIA sobre superficie neutra, nunca en
- * terciaria: sobre ese gris no llega al contraste mínimo (spec §5).
+ * ⚠️ ES HERMANO DEL CHIP DE `piezasDatos.tsx`. LO QUE NO PUEDE DIVERGIR es la
+ * regla: el invitado se resuelve antes de mirar el estado, y ahí no hay chip.
+ * «Sin conectar» va en tinta SECUNDARIA, nunca en terciaria (contraste).
  */
 function Chip({ tono, texto }: { tono: 'ok' | 'warn' | 'neutro'; texto: string }) {
-  const pinta = tono === 'ok'
-    ? { fondo: 'var(--sp-success-bg)', tinta: 'var(--sp-success)', punto: 'var(--sp-success-dot)' }
-    : tono === 'warn'
-      ? { fondo: 'var(--sp-warn-bg)', tinta: 'var(--sp-warn)', punto: 'var(--sp-warn-dot)' }
-      : { fondo: 'var(--sp-surface-muted)', tinta: 'var(--sp-ink-500)', punto: 'var(--sp-ink-350)' }
-
-  return (
-    <span
-      className="inline-flex items-center gap-[var(--sp-2)] whitespace-nowrap rounded-[var(--sp-r-pill)] px-[13px] py-[6px] text-[length:var(--sp-fs-meta)] font-bold"
-      style={{ background: pinta.fondo, color: pinta.tinta }}
-    >
-      <span className="h-[8px] w-[8px] rounded-[var(--sp-r-pill)]" style={{ background: pinta.punto }} />
-      {texto}
-    </span>
-  )
+  const clase = tono === 'ok' ? 'k-etq-ok' : tono === 'warn' ? 'k-etq-aviso' : 'bg-sup2 text-tinta2'
+  return <span className={`k-etq ${clase}`}>{texto}</span>
 }
 
 /** Fila de dato. Sin valor pinta una raya larga, como pide el spec. */
 function FilaDato({ etiqueta, valor }: { etiqueta: string; valor: string | null }) {
   return (
-    <div
-      className="flex flex-wrap items-baseline justify-between gap-x-[var(--sp-4)] gap-y-[var(--sp-1)] pt-[var(--sp-2-5)]"
-      style={{ borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' }}
-    >
-      <p className="text-[length:var(--sp-fs-label-sm)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-        {etiqueta}
-      </p>
-      <p className="min-w-0 truncate text-[length:var(--sp-fs-body-sm)] font-semibold text-[var(--sp-ink-700)]">
-        {valor || '—'}
-      </p>
+    <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-0.5 border-t border-linea py-2">
+      <p className="text-[13px] leading-[18px] text-tinta2">{etiqueta}</p>
+      <p className="min-w-0 truncate text-[15px] font-semibold leading-5 text-tinta">{valor || '—'}</p>
     </div>
   )
 }
 
 function Bloque({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-[var(--sp-r-card-inner)] bg-[var(--sp-surface-muted)] px-[var(--sp-4-5)] py-[var(--sp-4)]">
-      <p className="text-[length:var(--sp-fs-meta)] leading-[var(--sp-lh-note)] text-[var(--sp-ink-700)]">
-        {children}
-      </p>
+    <div className="rounded-[12px] bg-fondo px-4 py-3">
+      <p className="text-[14px] leading-5 text-tinta">{children}</p>
     </div>
   )
 }
 
 function Fuerte({ children }: { children: React.ReactNode }) {
-  return <strong className="font-bold text-[var(--sp-ink-800)]">{children}</strong>
+  return <strong className="font-semibold text-tinta">{children}</strong>
 }
-
 /**
  * Cómo se nombra la cuenta. Con correo se nombra; sin él se dice «tu cuenta de
  * Google», que es exactamente lo que la nota decía antes de que este dato
