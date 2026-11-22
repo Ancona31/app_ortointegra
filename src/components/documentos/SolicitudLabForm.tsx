@@ -7,40 +7,29 @@ import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { Plus, Trash2, AlertTriangle, FlaskConical } from 'lucide-react'
+import { AlertTriangle, FlaskConical } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
-import ComboEscribible from '@/components/documentos/ComboEscribible'
+import BuscadorEstudio from '@/components/documentos/BuscadorEstudio'
+import { FrecuentesLab, PedidosLab } from '@/components/documentos/FichasEstudios'
+import CatalogoEstudios from '@/components/documentos/CatalogoEstudios'
+import { anadirEstudio, alternarEstudio, quitarEstudio } from '@/components/documentos/estudiosPedidos'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
-import { ESTUDIOS_LAB } from '@/lib/estudiosLab'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
 
-/**
- * Diez cadenas fijas, sin identificador ni versión: la comparación con la lista
- * es de texto exacto. Si una cambia, las plantillas guardadas dejan de encender
- * ese chip pero el estudio sigue en la lista — ni el panel ni el formulario
- * pueden asumir que un estudio guardado tiene chip. Consecuencia declarada.
- */
-const ESTUDIOS_PRESET = [
-  'Biometría Hemática',
-  'Glucosa',
-  'Urea',
-  'Creatinina',
-  'Examen General de Orina',
-  'TP',
-  'TPT',
-  'Perfil Tiroideo Completo',
-  'Urocultivo',
-  'Cultivo de Secreción',
-] as const
+/* Las diez fichas de «Frecuentes» viven en `FRECUENTES_LAB`
+   (`estudiosPedidos.ts`): rótulo corto, pero piden el nombre del catálogo. Una
+   plantilla o un borrador con el texto viejo («Biometría Hemática», «TP»…) se
+   aplica tal cual y su ficha no se enciende — consecuencia aceptada, explicada
+   allí. */
 
 const FECHA_MIN = '1900-01-01'
 
@@ -50,7 +39,7 @@ const FECHA_MIN = '1900-01-01'
  * se editan, porque llegaron solos.
  */
 function isFormEmpty(
-  estudios: string[], notas: string,
+  estudios: readonly string[], notas: string,
   paciente: string, pacienteInicial: string,
   diagnostico: string, diagnosticoInicial: string,
 ): boolean {
@@ -147,7 +136,11 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
   const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
-  const [estudios, setEstudios] = useState<string[]>([''])
+  // Lo pedido, en orden de alta y sin huecos: ya no hay renglones vacíos que
+  // rellenar, así que la lista sólo tiene estudios.
+  const [estudios, setEstudios] = useState<readonly string[]>([])
+  // El último añadido, para su animación de entrada (sólo pantalla).
+  const [ultimo, setUltimo] = useState<string | null>(null)
   const [notas, setNotas] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
   const [errorAbierto, setErrorAbierto] = useState(false)
@@ -160,6 +153,15 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
   const formRef = useRef<HTMLDivElement>(null)
   const pacienteRef = useRef<HTMLInputElement>(null)
+  const buscadorRef = useRef<HTMLInputElement>(null)
+  const notasRef = useRef<HTMLTextAreaElement>(null)
+  // Las notas son una línea que crece con lo escrito, sin tirador.
+  useLayoutEffect(() => {
+    const t = notasRef.current
+    if (!t) return
+    t.style.height = 'auto'
+    t.style.height = `${t.scrollHeight}px`
+  }, [notas])
 
   /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
      que el compilador impide que diverja de su firma.
@@ -192,7 +194,8 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       const guardados = Array.isArray(c.estudios)
         ? c.estudios.filter((e): e is string => typeof e === 'string' && e.trim() !== '')
         : []
-      setEstudios(guardados.length > 0 ? guardados : [''])
+      setEstudios(guardados)
+      setUltimo(null)
       setNotas(typeof c.notas === 'string' ? c.notas : '')
     },
   })
@@ -204,16 +207,20 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
 
-  function addEstudio() { setEstudios([...estudios, '']) }
-  function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
-  function updateEstudio(i: number, val: string) { setEstudios(estudios.map((e, idx) => idx === i ? val : e)) }
-
-  // L-01: una sola fuente de verdad. El chip no guarda estado — lo inserta o lo
-  // retira de `estudios`, y su encendido se deriva de ahí. Dos arrays divergen
-  // siempre.
-  function togglePreset(preset: string) {
-    if (estudios.includes(preset)) setEstudios(estudios.filter(e => e !== preset))
-    else setEstudios([...estudios.filter(e => e.trim() !== ''), preset])
+  // L-01: una sola fuente de verdad. Ni las fichas de frecuentes ni las
+  // casillas del catálogo guardan estado: insertan o retiran de `estudios`, y
+  // su encendido se deriva de ahí. Sin duplicados (sin acentos ni mayúsculas).
+  function anadir(estudio: string) {
+    const nueva = anadirEstudio(estudios, estudio)
+    if (nueva === estudios) return
+    setEstudios(nueva)
+    setUltimo(nueva[nueva.length - 1])
+  }
+  function quitar(estudio: string) { setEstudios(quitarEstudio(estudios, estudio)); setUltimo(null) }
+  function alternar(estudio: string) {
+    const nueva = alternarEstudio(estudios, estudio)
+    setUltimo(nueva.length > estudios.length ? nueva[nueva.length - 1] : null)
+    setEstudios(nueva)
   }
 
   // ── Validación (§3.8) ───────────────────────────────────────────
@@ -230,7 +237,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
 
   function irA(clave: string) {
     if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
-    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>('#laboratorio-estudio-0') ?? null)
+    enfocarYAcercar(buscadorRef.current)
   }
 
   async function imprimir() {
@@ -427,7 +434,6 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
   }
 
   const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
-  const conNumeral = estudios.length >= 2
 
   return (
     <div ref={formRef} className="sp-doc-form">
@@ -469,75 +475,39 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
         </div>
       </section>
 
-      <section className="sp-card sp-doc-card">
+      {/* Solicitud rápida (maqueta `laboratorio-rapido.html`, aprobada por el
+          dueño): UN buscador que añade con Enter y se queda listo para el
+          siguiente, lo pedido como fichas, frecuentes que se encienden y
+          apagan, y el catálogo por categoría plegado aparte. Todo local, sin
+          red (lo comparte el búnker). */}
+      <section className="sp-card sp-doc-card sp-lab">
         <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Estudios frecuentes</h2>
+          <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
+          <h2 className="sp-label">Estudios</h2>
         </div>
-        <div className="sp-doc-cardbody">
-          <div className="sp-doc-chips">
-            {ESTUDIOS_PRESET.map(preset => (
-              <button key={preset} type="button" onClick={() => togglePreset(preset)}
-                aria-pressed={estudios.includes(preset)} className="sp-chip">
-                {preset}
-              </button>
-            ))}
-          </div>
+        <div className="sp-doc-cardbody sp-lab-cuerpo">
+          <BuscadorEstudio ref={buscadorRef} id="laboratorio-buscar" pedidos={estudios}
+            onAnadir={anadir} onQuitarUltimo={() => quitar(estudios[estudios.length - 1])}
+            invalido={senalar('estudios')} />
+          <FrecuentesLab pedidos={estudios} onAlternar={alternar} />
+          <PedidosLab pedidos={estudios} ultimo={ultimo}
+            onQuitar={e => { quitar(e); buscadorRef.current?.focus() }} />
         </div>
       </section>
 
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
-          <h2 className="sp-label">Estudios solicitados</h2>
-          <button type="button" onClick={addEstudio} aria-label="Agregar"
-            className="sp-btn sp-btn--compact sp-doc-add">
-            <Plus size={17} /><span className="sp-doc-long">Agregar</span>
-          </button>
-        </div>
-        <div className="sp-doc-cardbody">
-          {estudios.length === 0 ? (
-            <div className="sp-doc-empty">
-              <div className="sp-icobox sp-icobox--sm"><FlaskConical /></div>
-              <p className="sp-hint">Sin estudios. Usa «Agregar».</p>
-            </div>
-          ) : (
-            <div className={estudios.length >= 4 ? 'sp-doc-list--long' : undefined}>
-              {estudios.map((estudio, i) => (
-                <div key={i} className="sp-doc-listrow">
-                  {conNumeral && <span className="sp-label sp-doc-listnum">{i + 1}.</span>}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <ComboEscribible
-                      id={`laboratorio-estudio-${i}`}
-                      value={estudio}
-                      onChange={val => updateEstudio(i, val)}
-                      sugerencias={ESTUDIOS_LAB}
-                      minCaracteres={2}
-                      placeholder="Nombre del estudio"
-                      pie="Ninguno encaja: escribe el nombre y se usa tal cual."
-                      invalido={senalar('estudios')}
-                      claseExtra={senalar('estudios') ? 'sp-doc-invalid' : ''}
-                    />
-                  </div>
-                  <button type="button" onClick={() => removeEstudio(i)} disabled={estudios.length === 1}
-                    aria-label={estudio.trim() ? `Eliminar ${estudio.trim()}` : `Eliminar estudio ${i + 1}`}
-                    className="sp-doc-iconbtn">
-                    <Trash2 />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+      <CatalogoEstudios pedidos={estudios} onAlternar={alternar} />
 
       <section className="sp-card sp-doc-card">
         <div className="sp-doc-cardhead">
           <h2 className="sp-label">Indicaciones / Notas</h2>
         </div>
         <div className="sp-doc-cardbody">
-          <label htmlFor="laboratorio-notas" className="sr-only">Indicaciones / Notas</label>
-          <textarea id="laboratorio-notas" value={notas} onChange={e => setNotas(e.target.value)}
-            placeholder="Indicaciones especiales, ayuno requerido…" className="sp-textarea" />
+          <div className="sp-rx-campo sp-rx-campo--texto sp-lab-notas">
+            <label htmlFor="laboratorio-notas" className="sr-only">Indicaciones / Notas</label>
+            <textarea ref={notasRef} id="laboratorio-notas" rows={1} value={notas}
+              onChange={e => setNotas(e.target.value)}
+              placeholder="Indicaciones especiales, ayuno requerido…" className="sp-rx-fi sp-rx-ta" />
+          </div>
         </div>
       </section>
 

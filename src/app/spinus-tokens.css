@@ -3403,6 +3403,116 @@ html.dark .sp-rx-viaotra { background-color: var(--sup) !important; border-color
 html.dark .sp-rx-viaotra--on { background-color: var(--tonal) !important; border-color: var(--accion) !important; color: var(--tonal-tinta) !important; }
 html.dark .sp-rx-viafila--falta .sp-rx-viaotra { border-color: var(--mal-tinta) !important; }
 
+/* ── 26.2 · SOLICITUD DE LABORATORIO RÁPIDA (maqueta `laboratorio-rapido.html`, aprobada) ──
+   UN buscador que añade con Enter (`.sp-lab-bus`, reusa `.sp-rx-fi`,
+   `.sp-rx-lista` y `.sp-rx-op` de 26.1), frecuentes que se encienden
+   (`.sp-lab-tog`, `aria-pressed`), lo pedido como fichas en `--accion`
+   (`.sp-lab-p`) y el catálogo por categoría plegado aparte
+   (`.sp-lab-catalogo`). Densidad como 26.1: en táctil toques de 44 y letra de
+   16 en el campo; en `ih`/`esc`, 36–40 y 15. Contenedor estrecho (< 560): una
+   columna en el catálogo y fichas más altas. Nada aquí es `fixed`. */
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-lab-cuerpo { display: flex; flex-direction: column; gap: 14px; }
+.sp-lab-bus {
+  position: relative; display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: 50px; padding: 0 12px; border-radius: var(--r-control); background: var(--sup2);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-bus { min-height: 44px; }
+.sp-lab-bus:focus-within { outline: 2px solid var(--enlace); outline-offset: 0; }
+.sp-lab-bus--falta { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-lab-bus > svg { flex: none; width: 18px; height: 18px; color: var(--tinta2); }
+.sp-lab-rot {
+  margin: 0 0 6px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--tinta2);
+}
+
+/* Frecuentes: el toque mide `--k-toque`; el dibujo, una píldora. */
+.sp-lab-frec { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-lab-tog {
+  display: inline-flex; align-items: center; gap: 5px; height: var(--k-toque); margin: 0; padding: 0 14px;
+  border: 1px solid var(--borde); border-radius: var(--r-pildora); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform var(--dur-toque) ease-out;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-tog { padding: 0 12px; font-size: 13px; }
+.sp-lab-tog > svg { width: 15px; height: 15px; margin-left: -2px; }
+.sp-lab-tog[aria-pressed="true"] { background: var(--tonal); border-color: var(--accion); color: var(--tonal-tinta); font-weight: 600; }
+@media (hover: hover) { .sp-lab-tog:hover:not([aria-pressed="true"]) { background: var(--sup2); } }
+.sp-lab-tog:active { transform: scale(.97); }
+.sp-lab-tog:focus-visible, .sp-lab-p > button:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+
+/* Lo pedido: fichas en `--accion`, cada una con su ✕. Entra sólo la última. */
+.sp-lab-ped { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sp-lab-p {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%; height: 38px; padding: 0 3px 0 14px;
+  border-radius: var(--r-pildora); background: var(--accion); color: var(--sobre-accion);
+  font-size: 14px; line-height: 18px; font-weight: 500;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p { height: 36px; padding-left: 12px; font-size: 13px; }
+.sp-lab-p > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-lab-p > button {
+  /* El toque mide `--k-toque` aunque la píldora sea más baja: sobresale
+     (transparente) por arriba y por abajo, como el área de `.sp-rx-ficha`. */
+  flex: none; display: grid; place-items: center; width: 36px; height: var(--k-toque); margin: -4px 0; padding: 0; border: 0;
+  border-radius: var(--r-pildora); background: transparent; color: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p > button { margin: 0; }
+.sp-lab-p > button > svg { width: 15px; height: 15px; }
+@media (hover: hover) { .sp-lab-p > button:hover { background: color-mix(in srgb, var(--sobre-accion) 20%, transparent); } }
+.sp-lab-p > button:focus-visible { outline-color: var(--sobre-accion); outline-offset: -3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sp-lab-p--nuevo { animation: sp-lab-entra var(--dur-sale) var(--resorte-entra); }
+  @keyframes sp-lab-entra { from { opacity: .3; transform: scale(.85); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) { .sp-lab-tog:active { transform: none; } }
+.sp-lab-vacio { margin: 0; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+
+/* Catálogo por categoría: una tarjeta `details`, plegada por omisión. */
+.sp-lab-catalogo > summary, .sp-lab-cat > summary { list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sp-lab-catalogo > summary::-webkit-details-marker, .sp-lab-cat > summary::-webkit-details-marker { display: none; }
+.sp-lab-catalogo-t {
+  display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 20px;
+  color: var(--enlace); font-size: 15px; line-height: 20px; font-weight: 600;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-catalogo-t { min-height: 44px; }
+.sp-lab-catalogo-t > span { flex: 1; }
+.sp-lab-flecha { flex: none; width: 18px; height: 18px; color: var(--tinta2); transition: transform var(--dur-toque) ease-out; }
+details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .sp-lab-flecha { transition: none; } }
+.sp-lab-catalogo > summary:focus-visible, .sp-lab-cat > summary:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; border-radius: var(--r-control); }
+.sp-lab-cats { padding: 0 20px 8px; }
+.sp-lab-cat { border-top: 1px solid var(--linea); }
+.sp-lab-cat > summary { display: flex; align-items: center; gap: 8px; min-height: var(--k-toque); padding: 6px 2px; }
+.sp-lab-cat > summary > .sp-lab-flecha { margin-left: auto; }
+.sp-lab-cat-n { flex: 0 1 auto; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--tinta); }
+.sp-lab-cat-c { flex: none; white-space: nowrap; font-size: 12px; line-height: 16px; color: var(--tinta2); font-variant-numeric: tabular-nums; }
+.sp-lab-cat-c > b { color: var(--enlace); font-weight: 700; }
+.sp-lab-its { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 12px; padding: 0 0 10px; }
+.sp-lab-it {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: var(--k-toque); padding: 4px 6px;
+  border-radius: var(--r-control); font-size: 14px; line-height: 18px; color: var(--tinta); cursor: pointer;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-it { font-size: 13px; }
+@media (hover: hover) { .sp-lab-it:hover { background: var(--sup2); } }
+.sp-lab-it > input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accion); }
+.sp-lab-it:focus-within { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.sp-lab-it > input:focus-visible { outline: none; }
+
+/* Notas: una línea que crece (reusa `.sp-rx-campo` sin rótulo visible). */
+.sp-lab-notas { padding: 0 12px; }
+
+/* Estrecho (`ext`/`tel`): una columna en el catálogo, fichas de 40. */
+@container docform (max-width: 559px) {
+  .sp-lab-p { height: 40px; font-size: 15px; }
+  .sp-lab-p > button { width: 40px; margin: -2px 0; }
+  .sp-lab-its { grid-template-columns: minmax(0, 1fr); }
+  .sp-lab-it { font-size: 15px; padding-block: 8px; }
+  .sp-lab-cat > summary { min-height: 52px; }
+  .sp-lab-cat-n { font-size: 15px; }
+  .sp-lab-catalogo-t { padding: 0 16px; }
+  .sp-lab-cats { padding: 0 16px 8px; }
+}
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
