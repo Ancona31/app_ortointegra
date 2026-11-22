@@ -9,6 +9,7 @@ import { Paciente, Consulta, Documento } from '@/types'
 import ModalShell from '@/components/ui/ModalShell'
 import { AlertTriangle, Loader2, UserX } from 'lucide-react'
 import EstadoVacio from '@/components/ui/EstadoVacio'
+import { ExpedientePacienteSkeleton } from '@/components/ui/Skeleton'
 
 import CabeceraPaciente from '@/components/expediente/CabeceraPaciente'
 import PestanasExpediente, {
@@ -196,13 +197,13 @@ function ExpedientePacienteContent() {
   }
 
   // ── Loading / not-found guards ─────────────────────────────
-  if (loadingPaciente) {
-    return <p className="k-t-sec py-12 text-center" aria-busy="true">Cargando expediente...</p>
-  }
+  /* El mismo esqueleto que `loading.tsx`: la forma de la página, no un texto. */
+  if (loadingPaciente) return <ExpedientePacienteSkeleton />
   if (!paciente) {
     /* El vacío de página del catálogo (B12): las pantallas vecinas usan
-       EstadoVacio/EstadoError; aquí quedaba un párrafo suelto. Mismo texto. */
-    return <EstadoVacio icono={UserX} titulo="Paciente no encontrado" />
+       EstadoVacio/EstadoError; aquí quedaba un párrafo suelto. Mismo texto, y
+       la salida que tienen sus pantallas hermanas: volver a la lista. */
+    return <EstadoVacio icono={UserX} titulo="Paciente no encontrado" accion={{ etiqueta: 'Volver a Expediente', href: '/expediente' }} />
   }
 
   const cerrarEliminar = () => { if (!eliminandoPaciente) { setMostrarEliminarPaciente(false); setErrorEliminar('') } }
@@ -334,7 +335,7 @@ function ExpedientePacienteContent() {
 
 export default function ExpedientePacientePage() {
   return (
-    <Suspense>
+    <Suspense fallback={<ExpedientePacienteSkeleton />}>
       <ExpedientePacienteContent />
     </Suspense>
   )
