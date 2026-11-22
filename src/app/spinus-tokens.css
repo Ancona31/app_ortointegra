@@ -4227,6 +4227,42 @@ html.dark .sp-esc-titulo { background-color: transparent !important; border-colo
 .tiptap-viewer hr { border: 0; border-top: 1px solid var(--linea); margin: 14px 0; }
 .tiptap-viewer > :first-child { margin-top: 0; }
 
+/* ── 26.8 · PLAN DE SUPLEMENTACIÓN COMPACTO (maqueta `suplementos.html`, aprobada) ──
+   El patrón de la receta (26.1) con sus mismas piezas: un suplemento abierto
+   (`.sp-rx-ed`), los demás plegados (`.sp-rx-linea`), y los datos en una fila
+   con los campos de 26.5 (`.sp-hon-datos`). Lo propio: el peso con área de
+   escritura de ≥ 72 px en TODOS los formatos (en la primera maqueta quedó de
+   16 y no se podía teclear), el «para qué» del suplemento, la referencia del
+   cálculo por peso y las opciones ya elegidas atenuadas en el buscador. Nada
+   aquí es `fixed`. */
+.sp-hon-datos.sp-sup-datos > :first-child { flex: 1 1 240px; }
+.sp-sup-datos > :nth-child(2) { flex: 1 1 200px; }
+.sp-sup-peso .sp-rx-rot { width: auto; min-width: 0; }
+.sp-sup-pesofi {
+  flex: 0 0 auto; width: 88px; min-width: 72px; text-align: right;
+  font-weight: 600; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield;
+}
+.sp-sup-pesofi::-webkit-inner-spin-button, .sp-sup-pesofi::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.sp-sup-kg { flex: none; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-sup-benef {
+  margin: 0; padding: 8px 12px; border-radius: var(--r-control); background: var(--sup2);
+  font-size: 13px; line-height: 18px; color: var(--tinta2);
+}
+.sp-sup-dosis { font-weight: 600; font-variant-numeric: tabular-nums; }
+.sp-sup-calc { margin: -2px 0 0; padding: 0 4px; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-sup-usar { position: relative; font-size: 12px; }
+/* El enlace es de 16 de alto; el área de toque, la del formato (44 / 36). */
+.sp-sup-usar::after { content: ''; position: absolute; left: -4px; right: -4px; top: 50%; height: var(--k-toque); transform: translateY(-50%); }
+.sp-sup-op > small { flex-basis: 100%; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-sup-op--ya { opacity: .5; cursor: default; }
+.sp-sup-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.sp-sup-mas { margin-top: -4px; }
+@container docform (max-width: 559px) {
+  .sp-sup-acciones > .k-b-texto { width: 100%; justify-content: center; }
+  /* El peso conserva su ancho aunque la fila pase a una columna. */
+  .sp-hon-datos.sp-sup-datos > .sp-sup-peso { flex: 1 1 100%; }
+}
+
 } /* fin @layer components */
 
 /* ⚠ FUERA DE @layer A PROPÓSITO — NO LO METAS DENTRO. La hoja de react-easy-crop
