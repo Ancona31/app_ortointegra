@@ -1,5 +1,5 @@
 import BuscadorPaciente, { ALTO_CONTROL } from '@/components/dashboard/BuscadorPaciente'
-import { ProximasCitasCargando } from '@/components/dashboard/ProximasCitas'
+import { TARJETA } from '@/components/dashboard/PiezasCita'
 import { TarjetaHoyCargando } from '@/components/dashboard/TarjetaHoy'
 
 /* La tarjeta de los esqueletos de lista: la misma superficie, borde y filetes
@@ -45,10 +45,10 @@ export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
  * El dashboard mientras `useProfile` resuelve.
  *
  * ⚠️ ESTO NO ES «UNA CAJA GRIS CUALQUIERA»: ES EL LAYOUT DE `/dashboard`
- * REPETIDO EN HUESO, y tiene que seguir siéndolo. Réplica de los bloques 1 y 2
- * del rediseño (`src/app/(app)/dashboard/page.tsx`): cabecera de dos filas con
- * su filete de cierre, banda 1 de dos columnas, filete a todo el ancho y banda 2
- * de dos columnas con su filete vertical. Si allí cambian el ancho máximo, la
+ * REPETIDO EN HUESO, y tiene que seguir siéndolo. Réplica de la retícula de B5
+ * (`src/app/(app)/dashboard/page.tsx`, maqueta `dashboard-final`): cabecera con
+ * identidad y «Hoy», pieza principal, acciones, lista y la primera tarjeta de
+ * la columna derecha, en el orden de cada formato. Si allí cambian el ancho máximo, la
  * retícula o el ritmo, cámbialos aquí: lo que se ve al terminar la carga es un
  * salto, y el salto no avisa.
  *
@@ -57,7 +57,7 @@ export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
  * este componente recibe su manejador en vez de fabricarlo: el disparo del
  * Ctrl+K sintético vive en un solo sitio, en la página, y aquí sólo se enchufa.
  *
- * ⚠️ Y LOS TRES BOTONES SÍ VAN EN HUESO, A PROPÓSITO. Cuál se pinta depende del
+ * ⚠️ Y LOS BOTONES SÍ VAN EN HUESO, A PROPÓSITO. Cuál se pinta depende del
  * rol, y durante la carga el rol se desconoce: `useProfile` mantiene
  * `profile === null` hasta que resuelve, sin estado intermedio. Pintarlos aquí
  * sería enseñarle a una secretaria la cabecera del médico durante un fotograma,
@@ -71,84 +71,46 @@ export function PatientListSkeleton({ rows = 8 }: { rows?: number }) {
 export function DashboardSkeleton({ onBuscar }: {
   onBuscar: () => void
 }) {
+  /* La retícula y los huecos son COPIA de `RETICULA`/`HUECO` de
+     `app/(app)/dashboard/page.tsx` (rediseño B5): si cambian allí, cambian aquí,
+     o la página salta al resolver el perfil. Sin un solo rótulo: el rol aún no
+     se sabe (ver arriba). Los botones de acción, con la geometría del médico
+     (cuatro; tres en ext), que es el caso más frecuente. */
   return (
-    <div className="max-w-[1044px] mx-auto pt-2 pb-6">
-
-      {/* ── Región 1 · Cabecera ─────────────────────────────── */}
-      <div className="pb-[var(--sp-5-5)] border-b border-[color:var(--sp-line-card)]">
-
-        {/* Fila 1 · identidad. Consultorio activo y saludo salen los dos del
-            perfil, así que los dos esperan. */}
-        <Skeleton className="h-3.5 w-44 max-w-full" />
-        <Skeleton className="mt-[var(--sp-gap-title-sub)] h-8 w-72 max-w-full" />
-
-        {/* Fila 2 · acción. Misma retícula que la real para que nada se mueva
-            al resolver: búsqueda flexible y, a su derecha, el grupo que no
-            encoge. */}
-        <div className="mt-[var(--sp-gap-block)] flex flex-col gap-[var(--sp-gap-item)] lg:flex-row lg:flex-wrap lg:items-center">
-
-          <BuscadorPaciente onAbrir={onBuscar} />
-
-          {/* Los anchos son los de los botones reales medidos a 15 px, y el
-              orden es el suyo: en móvil el primario cruza las dos columnas, el
-              de documento cruza la fila siguiente y debajo van los otros dos;
-              en `lg`, fila.
-              ⚠️ EL SEGUNDO HUESO LLEVA `lg:hidden`, Y ES LO QUE HACE QUE ESTO
-              CUADRE: la cabecera real tiene CUATRO botones en móvil y TRES en
-              `lg` —«+ Nuevo documento» sólo se pinta apilado, porque en `lg`
-              vive arriba de la columna de Documentos—. Con tres huesos el
-              esqueleto medía 106 px y la cabecera resuelta 164: la página
-              entera daba un salto de 58 px al terminar de cargar el perfil,
-              que es justo lo que esta retícula existe para evitar. Si el botón
-              vuelve a la columna, este hueso se va con él. */}
-          <div className="order-2 grid grid-cols-2 gap-[var(--sp-gap-item)] lg:flex lg:shrink-0 lg:items-center">
-            <Skeleton className={`${ALTO_CONTROL} col-span-2 order-1 lg:order-3 lg:w-[208px] rounded-[var(--sp-r-btn)]`} />
-            <Skeleton className={`${ALTO_CONTROL} col-span-2 order-2 rounded-[var(--sp-r-btn)] lg:hidden`} />
-            <Skeleton className={`${ALTO_CONTROL} order-3 lg:order-2 lg:w-[197px] rounded-[var(--sp-r-btn)]`} />
-            <Skeleton className={`${ALTO_CONTROL} order-4 lg:order-1 lg:w-[169px] rounded-[var(--sp-r-btn)]`} />
-          </div>
+    <div className="mx-auto flex max-w-[1044px] flex-col gap-5 pb-6 pt-2 esc:gap-6" aria-busy="true">
+      <div className="flex flex-col gap-4 esc:flex-row esc:flex-wrap esc:items-end esc:justify-between esc:gap-x-8 esc:gap-y-4">
+        <div className="min-w-0">
+          <Skeleton className="h-3.5 w-44 max-w-full" />
+          <Skeleton className="mt-1 h-8 w-72 max-w-full" />
         </div>
-      </div>
-
-      {/* ── Banda 1 · flexible + fija ───────────────────────── */}
-      <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-5)]">
-        {/* La misma card de carga que pinta la región cuando ya está montada:
-            los cuatro renglones en hueso miden lo que van a medir de verdad. */}
-        <ProximasCitasCargando />
         <TarjetaHoyCargando />
       </div>
-
-      {/* Filete a todo el ancho del área de contenido. */}
-      <div className="mt-[var(--sp-gap-band)] border-t border-[color:var(--sp-line-card)]" />
-
-      {/* ── Banda 2 · flexible + fija, con el filete vertical ─ */}
-      <div className="mt-[var(--sp-gap-band)] grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-[var(--sp-gap-band)] lg:gap-0">
-
-        {/* ⚠️ LA BANDA 2 VA SIN UNA SOLA PALABRA, Y ÉSE ES TODO EL PUNTO.
-            Aquí se montaban `AtendidosCargando` y `DocumentosCargando`, que
-            escriben «Atendidos recientemente» y «Documentos recientes»: dos
-            rótulos que SÓLO existen en la pantalla del médico. Este esqueleto
-            se pinta ANTES de saber el rol —`useProfile` aún no ha resuelto—,
-            así que una secretaria veía un fotograma con la palabra
-            «Documentos», que es justo lo que su rol no tiene.
-            Lo que se conserva es la GEOMETRÍA, que sí es común a las dos
-            pantallas: dos columnas, el filete que cambia de lado con el tamaño,
-            y el encabezado de 32 px. Lo que se retira es el texto.
-            No vuelvas a importar aquí los esqueletos de una región concreta:
-            traen sus rótulos con ellos. */}
-        <div className="lg:pr-[var(--sp-pad-rule)]">
-          <div className="flex h-8 items-center"><Skeleton className="h-3 w-44 max-w-full" /></div>
-          <div className="mt-[var(--sp-gap-tiles)] grid grid-cols-2 gap-[var(--sp-gap-tiles)]">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-[106px] rounded-[14px]" />)}
+      <div className="grid grid-cols-1 items-start gap-4 iv:grid-cols-2 esc:grid-cols-[minmax(0,1fr)_minmax(300px,384px)] esc:gap-5">
+        <div className={`${TARJETA} order-1 iv:col-span-2 esc:col-start-1 esc:row-start-1`} aria-hidden="true">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-[50px] w-[52px] shrink-0 rounded-[12px]" />
+            <div className="flex flex-1 flex-col gap-2"><Skeleton className="h-3 w-[60%]" /><Skeleton className="h-3 w-[40%]" /></div>
+          </div>
+          <Skeleton className="mt-4 h-11 rounded-[12px]" />
+        </div>
+        <div className="order-2 flex flex-col gap-3 iv:col-span-2 esc:col-start-2 esc:row-start-1">
+          <BuscadorPaciente onAbrir={onBuscar} />
+          <div className="grid grid-cols-2 gap-2 ext:grid-cols-3 ih:grid-cols-4 iv:grid-cols-4" aria-hidden="true">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className={`${ALTO_CONTROL} rounded-[12px] ${i === 1 ? 'ext:hidden' : ''}`} />)}
           </div>
         </div>
-
-        <div className="border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3-5)] lg:border-t-0 lg:pt-0 lg:border-l lg:pl-[var(--sp-pad-rule)]">
-          <div className="flex h-8 items-center"><Skeleton className="h-3 w-28 max-w-full" /></div>
-          {/* Un solo bloque, del alto de la columna MÁS CORTA de las dos
-              pantallas. Al resolver, esta columna crece o se queda; crecer se
-              nota menos que encoger. */}
-          <div className="mt-[var(--sp-gap-tiles)]"><Skeleton className="h-[132px] rounded-[14px]" /></div>
+        <div className={`${TARJETA} order-3 esc:col-start-1 esc:row-start-2 esc:row-span-2`} aria-hidden="true">
+          <Skeleton className="mb-3 h-4 w-28" />
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex min-h-[64px] items-center gap-3 border-t border-linea py-3 first:border-t-0">
+              <Skeleton className="h-[50px] w-[52px] shrink-0 rounded-[12px]" />
+              <div className="flex flex-1 flex-col gap-2"><Skeleton className="h-3 w-[55%]" /><Skeleton className="h-3 w-[35%]" /></div>
+            </div>
+          ))}
+        </div>
+        <div className={`${TARJETA} order-4 esc:col-start-2 esc:row-start-2`} aria-hidden="true">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="mt-3 h-[60px] rounded-[12px]" />
         </div>
       </div>
     </div>
