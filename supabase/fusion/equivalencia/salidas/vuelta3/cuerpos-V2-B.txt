@@ -1,0 +1,24 @@
+
+######## proteger_reserva_contactos()
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -6,2 +6,6 @@
+ IF TG_OP = 'INSERT' THEN
++IF NOT EXISTS (SELECT 1 FROM public.profiles p
++WHERE p.id = NEW.medico_id AND p.clinica_id = NEW.clinica_id AND p.role = 'medico') THEN
++RAISE EXCEPTION 'El médico del contacto no pertenece a la clínica' USING ERRCODE = '23514';
++END IF;
+ NEW.created_at := now();
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -7,0 +8,8 @@
+#   +    -- El médico es de la clínica de la fila, lo inserte quien lo inserte (la
+#   +    -- FK es de una sola columna a profiles). Mismo error exista o no el perfil
+#   +    -- ajeno: con la RLS de la sesión, uno de otra clínica ni se ve. Va antes
+#   +    -- que la FK (BEFORE), así que no hay oráculo de existencia.
+#   +    IF NOT EXISTS (SELECT 1 FROM public.profiles p
+#   +                    WHERE p.id = NEW.medico_id AND p.clinica_id = NEW.clinica_id AND p.role = 'medico') THEN
+#   +      RAISE EXCEPTION 'El médico del contacto no pertenece a la clínica' USING ERRCODE = '23514';
+#   +    END IF;

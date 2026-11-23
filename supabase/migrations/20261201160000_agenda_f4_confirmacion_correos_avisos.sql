@@ -441,6 +441,8 @@ CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authe
 
 COMMENT ON TABLE public.avisos_clinica IS
   'Agenda v2: lo que pasó en la agenda sin que nadie de la clínica lo hiciera (reserva por enlace; cancelación, confirmación y reagendado del paciente; evento de Google por asignar; empalme con Google; movimiento rechazado de Google). Se conserva hasta que alguien del personal lo revisa (revisado_en/revisado_por) y después queda como registro. Sólo la escriben los disparadores aviso_clinica_de_* (dueño postgres); el personal sólo marca revisado. Sin FK a appointments a propósito (como reserva_empalmes_google): el lector cruza con appointments.';
+COMMENT ON COLUMN public.avisos_clinica.cita_id IS
+  'La cita del aviso. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).';
 
 -- ---------------------------------------------------------------------
 -- 6 · Funciones de la confirmación. Todas INVOKER; las que leen o escriben

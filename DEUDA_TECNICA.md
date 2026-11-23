@@ -6333,7 +6333,7 @@ archivo el 2026-11-22:
 | Ruta | `maxDuration` | Candado / plazo | Presupuesto interno | Frecuencia (`vercel.json`) |
 |---|---|---|---|---|
 | `/api/cron/google-sync` | 60 s (`src/app/api/cron/google-sync/route.ts:40`) | `LEASE_SEG = 90` (`:52`), «más que `maxDuration`» | `PRESUPUESTO_TOTAL_MS` 45 s (`:43`) | cada 10 min (`*/10`) |
-| `/api/cron/recordatorios` | **120 s** (`src/app/api/cron/recordatorios/route.ts:46`; era 60, subido en la oleada 3) | un envío `enviando` lo puede volver a tomar otra ejecución a los **10 min** (`cita_correo_tomar`, `supabase/migrations/20261201160000_agenda_f4_confirmacion_correos_avisos.sql:969` y `:980`; el listado lo mira igual en `:1049` y `:1053`; `COMMENT` de `cita_correos.testigo`, `:381-382`) | `PRESUPUESTO_MS` 45 s (`:50`) | cada 15 min (`*/15`) |
+| `/api/cron/recordatorios` | **120 s** (`src/app/api/cron/recordatorios/route.ts:46`; era 60, subido en la oleada 3) | un envío `enviando` lo puede volver a tomar otra ejecución a los **10 min** (`cita_correo_tomar`, `supabase/migrations/20261201160000_agenda_f4_confirmacion_correos_avisos.sql:971` y `:982`; el listado lo mira igual en `:1051` y `:1055`; `COMMENT` de `cita_correos.testigo`, `:381-382`) | `PRESUPUESTO_MS` 45 s (`:50`) | cada 15 min (`*/15`) |
 | `/api/google/sync` (el sondeo al abrir la agenda) | 30 s (`src/app/api/google/sync/route.ts:37`) | `LEASE_SEG = 30` (`:43`), «más que el presupuesto» | `PRESUPUESTO_MS` 8 s (`:41`) | no es tarea programada |
 
 Reglas:
@@ -6368,29 +6368,70 @@ sin subir antes `LEASE_SEG`, otra ejecución podría sincronizar la misma clíni
 mientras la primera sigue viva. No se cambia código; queda para que nadie toque
 uno sin el otro (relación de los tres límites con sus candados: AG-DT-268).
 
-### AG-DT-270 — Las acciones referenciales pasan por encima de los candados de la cita (nota)
+### AG-DT-270 — Nada vigila que `public` siga sin TRUNCATE por omisión
 
-**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, hallazgo
-A10: `supabase/produccion/auditoria/RONDA-1.md`). Un `ON DELETE SET NULL` o
-`CASCADE` corre como el dueño (`postgres`) y no lo frenan los disparadores de
-protección de `appointments`: comprobado por el auditor, como `service_role`,
-`delete from public.consultorios` deja `consultorio_id = NULL` en una cita
-reservada por enlace futura aunque su candado de elección lo prohíba. Hoy no
-muerde porque la app archiva consultorios y no los borra
-(`src/app/api/consultorios/[id]/route.ts:320`). Quien añada un borrado de una
-tabla padre de `appointments` lo mira antes.
+**Estado:** abierta, **sin hacer** (condición del auditor independiente, ronda 1,
+2026-11-22: `supabase/produccion/auditoria/RONDA-1.md`, «Juicio sobre la sección
+4-bis»; `supabase/AUDITORIA-MIGRACIONES.md` §4-bis). El paso 3 de
+`20261126120000_public_sin_truncate.sql` (`ALTER DEFAULT PRIVILEGES FOR ROLE
+postgres IN SCHEMA public REVOKE TRUNCATE ON TABLES …`) se queda, pero si la
+plataforma o alguien repone los privilegios por omisión, la siguiente tabla de
+`public` nace con TRUNCATE para `anon`, `authenticated` y `service_role` (que no
+pasa por la RLS ni por la auditoría) y sólo se nota al volver a correr la
+migración. **Lo que haría falta:** una comprobación periódica de sólo lectura;
+sirve la fila 1 de su rejilla («tablas de public con TRUNCATE para los tres = 0»)
+y, para la causa, su fila 6 (el ACL por omisión de `postgres` en `public` sin
+`D`). Dónde correrla (tarea programada, revisión manual tras cada migración) lo
+decide Angel.
 
-### AG-DT-271 — F5b sube de candado sobre `appointments` dentro de su transacción (nota)
+### AG-DT-271 — La reserva por enlace y el bloqueo no se serializan con el alta del personal (límite aceptado)
 
-**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, hallazgo
-A11). `20261201170000_agenda_f5b_protecciones_cita.sql` pide SHARE (índices de
-rango), luego SHARE ROW EXCLUSIVE (disparadores) y al final ACCESS EXCLUSIVE
-sobre `appointments`. Una transacción ajena que ya leyó la tabla y luego quiere
-escribirla puede acabar en abrazo mortal con ella; PostgreSQL mata a una de las
-dos al segundo (DEDUCIDO por el auditor, no ensayado). Con el archivo en una
-sola petición (`aplicar.sh`, oleada 3) la ventana es la del servidor, decenas de
-milisegundos, y se aplica a una hora sin consulta: improbable. Si pasa, F5b
-aborta entera y se repite.
+**Estado:** **límite aceptado** por Angel (auditoría independiente, ronda 1, A7,
+2026-11-22). `reservar_por_enlace` (F3) y `agenda_bloqueo_preparar` (F5a) toman
+`pg_advisory_xact_lock(1790, médico)`; el alta o el movimiento de una cita por el
+personal (PostgREST, `cita_proteger_bloqueo` de F5b) no. Comprobado por el
+auditor: una alta de la sesión con la transacción abierta y una
+`reservar_por_enlace` al mismo turno un segundo después → las dos entran (dos
+citas activas en el turno). Por lo mismo, un bloqueo que se confirma mientras el
+personal inserta puede dejar una cita dentro del bloqueo «total» (deducido).
+**Riesgo real:** dos pacientes en el mismo turno, en una ventana de milisegundos
+(PostgREST confirma cada alta en milisegundos); dentro de Spinus el empalme
+avisa. Queda escrito en los `COMMENT` de `reservar_por_enlace`,
+`cita_proteger_bloqueo` y `agenda_bloqueos`: «el bloqueo y la reserva son
+totales salvo carrera de milisegundos». **Lo que haría falta para cerrarlo:**
+que el alta y el movimiento de citas del personal tomen el mismo candado 1790
+del médico (un disparador BEFORE en `appointments`, con el orden fijo de dos
+candados al cambiar de médico, como `agenda_bloqueo_preparar`), con su medida
+de coste sobre la tabla más escrita y una carrera de dos sesiones en
+`scripts/reserva-carrera.sh`.
+
+### AG-DT-272 — Las acciones referenciales pasan por encima de los candados de la cita (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, A10,
+2026-11-22). `ON DELETE SET NULL`/`CASCADE` corren como el dueño (`postgres`) y
+no las frena ningún disparador de la cita: el auditor comprobó que, como
+`service_role`, `delete from public.consultorios where id = …` deja
+`consultorio_id = NULL` en una cita reservada por enlace futura, aunque
+`cita_proteger_eleccion` impida cambiar el consultorio de esa cita. Hoy la app
+archiva consultorios, no los borra (`src/app/api/consultorios/[id]/route.ts:320`),
+así que no muerde. **Para quien añada un borrado** de consultorios (o de
+cualquier tabla con una FK `SET NULL`/`CASCADE` desde `appointments`): ese borrado
+tiene que comprobar antes las citas que tocaría.
+
+### AG-DT-273 — F5b sube de candado sobre `appointments` dentro de la transacción (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, A11,
+2026-11-22; deducido, no reproducido). `20261201170000_agenda_f5b_protecciones_cita.sql`
+pide sobre `appointments` SHARE, luego SHARE ROW EXCLUSIVE y luego ACCESS
+EXCLUSIVE dentro de la misma transacción (ventana de ~12 viajes). Una
+transacción ajena que ya leyó `appointments` y luego quiere escribirla puede
+acabar en abrazo mortal con F5b; PostgreSQL mata a una de las dos al segundo
+(`deadlock_timeout`). Si muere F5b, se deshace entera y se reintenta; si muere la
+otra, falla una petición de la app. Fuera de horario es improbable. **Lo que
+haría falta para quitarlo:** pedir de entrada el candado más fuerte que la
+migración vaya a necesitar sobre `appointments` (un `LOCK TABLE … IN ACCESS
+EXCLUSIVE MODE NOWAIT` con reintentos, como F1), a costa de alargar la ventana
+de ACCESS EXCLUSIVE; es decisión de Angel junto con A1.
 
 ---
 

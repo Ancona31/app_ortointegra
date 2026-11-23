@@ -19,6 +19,19 @@
 -- misma sesión: «SET spinus.reversa_con_datos = 'si';» antes de correr el
 -- archivo (o «SET LOCAL spinus.reversa_con_datos = 'si';» justo después de
 -- su BEGIN). audit_log no se toca.
+-- GUARDA DE DATOS, SIN CORRER LA REVERSA (auditoría ronda 1, A5): consulta de
+--   SÓLO LECTURA con la misma condición que la negativa de abajo, para
+--   comprobar TODA la cadena de reversas antes de deshacer la primera. Con la
+--   migración aplicada; 0 filas = esta reversa no se negará por datos.
+--     SELECT 'F3: ' || t AS motivo, n FROM (
+--       SELECT 'reserva_avisos' AS t, count(*) AS n FROM public.reserva_avisos
+--       UNION ALL SELECT 'reserva_enlaces', count(*) FROM public.reserva_enlaces
+--       UNION ALL SELECT 'reserva_verificaciones', count(*) FROM public.reserva_verificaciones
+--       UNION ALL SELECT 'reserva_incidencias', count(*) FROM public.reserva_incidencias
+--       UNION ALL SELECT 'reserva_contactos', count(*) FROM public.reserva_contactos
+--       UNION ALL SELECT 'appointments con reserva_*', count(*) FROM public.appointments
+--                  WHERE reserva_canal IS NOT NULL OR reserva_enlace_id IS NOT NULL OR reserva_reagendados <> 0) x
+--      WHERE n > 0;
 --
 -- Bloqueos: ACCESS EXCLUSIVE sobre appointments (DROP COLUMN/CONSTRAINT/
 -- TRIGGER) hasta el COMMIT. lock_timeout 5 s. Si falla, no deja nada.

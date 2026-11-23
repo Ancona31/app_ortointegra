@@ -13,6 +13,15 @@
 -- privilegio es decisión aparte de Angel (reabriría el hueco).
 -- Va ANTES que las reversas del conjunto fundido (F5b … F1), que borran estas
 -- tablas.
+-- ⚠️ NO SE CORRE SOLA CON LA V2 ENCENDIDA en alguna clínica (auditoría ronda 1,
+--   A5): es la primera de la cadena, y si una reversa de después se niega por
+--   datos (F4, F2, F3, F5a, F1) la base queda con datos de la v2 y sin estos
+--   disparadores. Antes de correrla, las guardas de TODA la cadena (cabecera de
+--   cada reversa) tienen que dar 0 filas.
+-- GUARDA DE DATOS: esta reversa no se niega nunca por datos (no tiene guarda);
+--   para saber si la cadena podrá seguir, la de la v2 encendida:
+--     SELECT 'v2 encendida' AS motivo, count(*) FROM public.agenda_ajustes
+--      WHERE agenda_v2_encendida HAVING count(*) > 0;
 -- Ensayo: clon de la foto de producción, 2026-11-22 (ver la cabecera de la ida).
 -- ═══════════════════════════════════════════════════════════════════════
 

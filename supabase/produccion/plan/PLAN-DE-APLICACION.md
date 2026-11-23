@@ -1164,14 +1164,15 @@ una decisión nueva.
   bloqueo) no toma el candado del médico que toma `reservar_por_enlace`
   (`pg_advisory_xact_lock(1790, médico)`): si las dos escrituras caen en la
   misma ventana de milisegundos, pueden quedar dos citas en el mismo turno, o
-  una cita dentro de un bloqueo. No se añade candado a las altas del personal.
+  una cita dentro de un bloqueo. No se añade candado a las altas del personal
+  (`DEUDA_TECNICA.md` AG-DT-271).
 - **A9 · Tres tablas guardan ids de cita sin llave foránea, a propósito:**
   `avisos_clinica.cita_id`, `gcal_movimientos_rechazados.cita_id` y
   `reserva_empalmes_google.cita_reserva_id`/`cita_otra_id`. El motivo queda en
   el `COMMENT` de cada columna (lo escribe el agente de las correcciones de SQL).
 - **A10 y A11 quedan en la deuda como notas:** las acciones referenciales pasan
-  por encima de los candados de la cita (`DEUDA_TECNICA.md` AG-DT-270) y F5b
-  sube de candado sobre `appointments` dentro de su transacción (AG-DT-271).
+  por encima de los candados de la cita (`DEUDA_TECNICA.md` AG-DT-272) y F5b
+  sube de candado sobre `appointments` dentro de su transacción (AG-DT-273).
 
 ---
 

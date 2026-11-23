@@ -14,6 +14,11 @@
 --   y añade «SET LOCAL spinus.reversa_con_datos = 'si';» justo después del
 --   BEGIN de este archivo (o corre «SET spinus.reversa_con_datos = 'si';» en
 --   la misma sesión antes de él). La auditoría de esos bloqueos se queda.
+-- GUARDA DE DATOS, SIN CORRER LA REVERSA (auditoría ronda 1, A5): consulta de
+--   SÓLO LECTURA con la misma condición que la negativa de abajo, para
+--   comprobar TODA la cadena de reversas antes de deshacer la primera. Con la
+--   migración aplicada; 0 filas = esta reversa no se negará por datos.
+--     SELECT 'F5a: agenda_bloqueos' AS motivo, count(*) FROM public.agenda_bloqueos HAVING count(*) > 0;
 -- RIESGO: bajo. DROP TABLE de una tabla propia; las FK hacia clinicas y
 --   profiles caen con ella (ACCESS EXCLUSIVE sobre agenda_bloqueos y SHARE ROW
 --   EXCLUSIVE un instante sobre clinicas y profiles; lock_timeout 5 s).

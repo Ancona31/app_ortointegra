@@ -274,7 +274,8 @@ pacientes) y se decide entre arreglar o revertir (`PLAN-DE-APLICACION.md` §8 y
 Lo pidió el auditor (`../auditoria/RONDA-1.md`, «Juicio sobre la sección
 4-bis»): la nº 2 (`20261126120000`) quita TRUNCATE a `anon`, `authenticated` y
 `service_role` en los privilegios por omisión de `postgres` en `public`, y nada
-vigila que siga así. Si la plataforma o alguien los repone, la siguiente tabla
+vigila que siga así (`DEUDA_TECNICA.md` AG-DT-270; dónde se corre de forma
+automática lo decide Angel). Si la plataforma o alguien los repone, la siguiente tabla
 nace con TRUNCATE y no se nota hasta volver a correr la nº 2. **Sólo lee.** Se
 corre el día de la aplicación (tras el §5), y después **una vez al mes** y tras
 cualquier cambio de la plataforma o migración nueva:

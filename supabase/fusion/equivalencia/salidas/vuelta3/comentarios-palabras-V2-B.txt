@@ -1,0 +1,27 @@
+### distinto function public.cita_proteger_bloqueo()
+  − 
+  + LÍMITE ACEPTADO (auditoría ronda 1, A7; decisión de Angel): el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa: el alta de una cita por el personal no toma el candado 1790, así que una reserva por enlace o un bloqueo confirmados a la vez pueden dejar dos citas en el turno o una cita dentro del bloqueo.
+### distinto function public.reservar_por_enlace(pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)
+  − 
+  + LÍMITE ACEPTADO (auditoría ronda 1, A7; decisión de Angel): el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa: el alta de una cita por el personal no toma el candado 1790, así que una reserva por enlace o un bloqueo confirmados a la vez pueden dejar dos citas en el turno o una cita dentro del bloqueo.
+### solo_b table column public.avisos_clinica.cita_id
+  − 
+  + La cita del aviso. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).
+### solo_b table column public.gcal_movimientos_rechazados.cita_id
+  − 
+  + La cita cuyo movimiento desde Google se rechazó. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).
+### solo_b table column public.reserva_empalmes_google.cita_otra_id
+  − 
+  + La cita que se le empalma. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).
+### solo_b table column public.reserva_empalmes_google.cita_reserva_id
+  − 
+  + La cita reservada por enlace del par. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).
+### distinto table public.agenda_bloqueos
+  − 
+  + LÍMITE ACEPTADO (auditoría ronda 1, A7; decisión de Angel): el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa: el alta de una cita por el personal no toma el candado 1790, así que una reserva por enlace o un bloqueo confirmados a la vez pueden dejar dos citas en el turno o una cita dentro del bloqueo.
+### distinto table public.reserva_contactos
+  − 
+  + medico_id es siempre un médico de clinica_id (proteger_reserva_contactos, para todos salvo postgres/supabase_admin; auditoría ronda 1, A3): la FK es de una sola columna.
+### distinto table respaldos.consultorios_horario_20261119
+  − es el instante ┃ copia: una fila ┃ consultorios con updated_at igual no se ha editado desde entonces (lo usa ┃ F1).
+  + horario, horario_propio y ┃ son la PRIMERA copia y no se pisan nunca. horario_antes, horario_copiado y copiado_en son ┃ ÚLTIMA pasada del backfill: lo que había justo antes, lo que escribió (el ┃ clínica) y cuándo. La ┃ F1 devuelve horario_antes sólo donde consultorios.horario sigue siendo horario_copiado.

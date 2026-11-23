@@ -26,6 +26,17 @@
 -- «SET spinus.reversa_con_datos = 'si';» antes de correr el archivo (o
 -- «SET LOCAL spinus.reversa_con_datos = 'si';» justo después de su BEGIN).
 -- La auditoría en audit_log se queda. Sin CASCADE. Re-ejecutable (IF EXISTS).
+-- GUARDA DE DATOS, SIN CORRER LA REVERSA (auditoría ronda 1, A5): consulta de
+--   SÓLO LECTURA con la misma condición que la negativa de abajo, para
+--   comprobar TODA la cadena de reversas antes de deshacer la primera. Con la
+--   migración aplicada; 0 filas = esta reversa no se negará por datos.
+--     SELECT 'F2: ' || t AS motivo, n FROM (
+--       SELECT 'gcal_sync_estado' AS t, count(*) AS n FROM public.gcal_sync_estado
+--       UNION ALL SELECT 'reserva_empalmes_google', count(*) FROM public.reserva_empalmes_google
+--       UNION ALL SELECT 'gcal_movimientos_rechazados', count(*) FROM public.gcal_movimientos_rechazados
+--       UNION ALL SELECT 'appointments con google_asignacion', count(*) FROM public.appointments
+--                  WHERE google_asignacion IS NOT NULL) x
+--      WHERE n > 0;
 -- Bloqueos: ACCESS EXCLUSIVE sobre appointments (disparador, CHECK y columna) y
 -- SHARE ROW EXCLUSIVE sobre clinicas (las FK) hasta el COMMIT. Si falla, no
 -- deja nada.

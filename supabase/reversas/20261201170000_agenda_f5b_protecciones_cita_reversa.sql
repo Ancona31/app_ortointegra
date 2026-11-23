@@ -23,6 +23,20 @@
 --     «Reagendar» (cita_proteger_eleccion);
 --   · el cierre de canceladas (columnas que desaparecen).
 --   Hazla con la v2 APAGADA en todas las clínicas o con la app en mantenimiento.
+--   ⚠️ NO SE CORRE SOLA CON LA V2 ENCENDIDA (auditoría ronda 1, A5): si la de F4
+--   o una posterior se niega por datos, la base queda con los enlaces vivos y
+--   sin estas protecciones. Antes de correrla, las guardas de TODA la cadena
+--   (cabecera de cada reversa) tienen que dar 0 filas.
+--
+-- GUARDA DE DATOS, SIN CORRER LA REVERSA (auditoría ronda 1, A5): consulta de
+--   SÓLO LECTURA con la misma condición que la negativa de abajo, para
+--   comprobar TODA la cadena de reversas antes de deshacer la primera. Con la
+--   migración aplicada; 0 filas = esta reversa no se negará por datos.
+--     SELECT 'F5b: canceladas cerradas' AS motivo, count(*) FROM public.appointments
+--      WHERE cerrada_en IS NOT NULL OR sustituida_por IS NOT NULL HAVING count(*) > 0
+--     UNION ALL
+--     SELECT 'v2 encendida (no la niega; ver arriba)', count(*) FROM public.agenda_ajustes
+--      WHERE agenda_v2_encendida HAVING count(*) > 0;
 --
 -- DATOS: si hay canceladas CERRADAS (cerrada_en o sustituida_por no nulos),
 --   quitar las columnas las haría reaparecer en la agenda y perdería a qué cita

@@ -28,6 +28,8 @@
 -- RIESGO: bajo. GRANT y ALTER DEFAULT PRIVILEGES sólo escriben catálogo; cada
 --   DROP TRIGGER toma ACCESS EXCLUSIVE un instante sobre su tabla
 --   (lock_timeout 5 s: si alguna está ocupada, aborta entera). Una transacción.
+-- GUARDA DE DATOS: ninguna (no se niega por datos; sólo por el estado del
+--   catálogo, ver el pre-vuelo). Se corre SÓLO por orden de Angel.
 -- SEGUNDA PASADA: aborta limpio (la función ya no está).
 -- ═══════════════════════════════════════════════════════════════════════
 

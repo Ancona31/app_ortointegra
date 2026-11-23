@@ -1,0 +1,70 @@
+BEGIN
+SET
+INSERT 0 2
+INSERT 0 4
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+INSERT 0 2
+INSERT 0 1
+INSERT 0 2
+INSERT 0 2
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+01 M1 (admin) bloquea su cita|authenticated|[{"n":2}]|ok|
+02 M1 desbloquea su cita (ON CONFLICT)|authenticated|[{"n":2}]|ok|
+03 M1 (admin) bloquea la cita de M3|authenticated|[{"n":2}]|ok|
+04 S1 (secretaria) desbloquea la cita de M3|authenticated|[{"n":2}]|ok|
+05 M3 bloquea su cita|authenticated|[{"n":2}]|ok|
+06 M3 marca la cita de M1 (no la ve)|authenticated|[{"n":0}]|ok|
+07 M2 (otra clínica) marca la cita de M1|authenticated|[{"n":0}]|ok|
+08 estado del candado manual (M1)|postgres|[{"bloqueado":false,"manual":false,"cancelaciones":0,"no_shows":0,"hasta":null}]|ok|
+10 M1 inserta con médico de SU clínica (M3)|authenticated|filas=1|ok|
+11 S1 inserta con médico de su clínica (M1)|authenticated|filas=1|ok|
+12 M3 inserta con él mismo de médico|authenticated|filas=1|ok|
+13 M1 inserta en C1 con médico de OTRA clínica (M2)  [el hueco]|authenticated|filas=1|ok|
+14 S1 inserta en C1 con médico de OTRA clínica (M2)  [el hueco]|authenticated|filas=1|ok|
+15 M1 inserta con quien NO es médico (S1)  [el hueco]|authenticated|filas=1|ok|
+16 M3 inserta con otro médico de su clínica (M1)|authenticated||42501|new row violates row-level security policy for table "reserva_contactos"
+17 M2 inserta en la clínica ajena C1|authenticated||42501|new row violates row-level security policy for table "reserva_contactos"
+18 anon inserta|anon||42501|permission denied for table reserva_contactos
+19 service_role inserta|service_role||42501|permission denied for table reserva_contactos
+20 postgres inserta con médico ajeno (exento)|postgres|filas=1|ok|
+21 M1 cambia el médico de una fila (identidad)|authenticated||42501|La identidad de un contacto no cambia
+22 M1 desbloquea una fila (UPDATE legítimo)|authenticated|filas=1|ok|
+23 filas finales (sin instantes)|postgres|[{"medico_id":"00000000-0000-4000-8000-0000000c0b01","clave":"1111","clase":"telefono","bloq":true,"perd":true,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":"00000000-0000-4000-8000-0000000c0b01"}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b01","clave":"2222","clase":"correo","bloq":true,"perd":true,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":"00000000-0000-4000-8000-0000000c0b01"}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b03","clave":"3333","clase":"telefono","bloq":true,"perd":true,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":"00000000-0000-4000-8000-0000000c0b05"}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b03","clave":"4444","clase":"correo","bloq":true,"perd":true,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":"00000000-0000-4000-8000-0000000c0b05"}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b03","clave":"5555","clase":"telefono","bloq":true,"perd":true,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":"00000000-0000-4000-8000-0000000c0b01"}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b01","clave":"6666","clase":"telefono","bloq":true,"perd":false,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b05","perdonado_por":null}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b03","clave":"7777","clase":"correo","bloq":false,"perd":true,"bloqueado_por":null,"perdonado_por":"00000000-0000-4000-8000-0000000c0b03"}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b02","clave":"8888","clase":"telefono","bloq":true,"perd":false,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":null}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b02","clave":"9999","clase":"telefono","bloq":true,"perd":false,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b05","perdonado_por":null}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b05","clave":"aaaa","clase":"telefono","bloq":true,"perd":false,"bloqueado_por":"00000000-0000-4000-8000-0000000c0b01","perdonado_por":null}, 
+ {"medico_id":"00000000-0000-4000-8000-0000000c0b02","clave":"ffff","clase":"telefono","bloq":true,"perd":false,"bloqueado_por":null,"perdonado_por":null}]|ok|
+ROLLBACK

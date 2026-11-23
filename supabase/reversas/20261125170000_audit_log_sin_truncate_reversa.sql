@@ -19,6 +19,8 @@
 -- RIESGO: bajo. GRANT sólo escribe catálogo; DROP TRIGGER toma ACCESS
 --   EXCLUSIVE un instante sobre audit_log (lock_timeout 5 s: si está ocupada,
 --   aborta entera sin cambiar nada). Una transacción.
+-- GUARDA DE DATOS: ninguna (no se niega por datos; sólo por el estado del
+--   catálogo, ver el pre-vuelo). Se corre SÓLO por orden de Angel.
 -- SEGUNDA PASADA: aborta limpio (la migración ya no está).
 -- ═══════════════════════════════════════════════════════════════════════
 
