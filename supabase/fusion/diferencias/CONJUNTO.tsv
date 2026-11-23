@@ -7,6 +7,11 @@
 # referencia, B = el conjunto. Se usa JUNTO con scripts/produccion/esperadas-clon.tsv (las del clon contra su foto).
 # Comprobado 2026-11-22 (agente X, para depurar, no como veredicto): clon de base-main + los seis en orden contra
 # la foto de ref-originales, con este archivo + esperadas-clon.tsv: 108 diferencias, 108 esperadas, 0 inesperadas, y ninguna línea sin aparecer (salvo la del CHECK de tipos_cita de esperadas-clon.tsv, que es del viaje foto → clon).
+# 2.ª vuelta de E0 (2026-11-22, tras las correcciones C1/C3): rehecho desde los .tsv por bloque de hoy. Se añaden
+# las 22 filas de la poda de comentarios (12 de F5.tsv, 10 de f4.tsv) y se toman de f4.tsv las razones de hoy de
+# 4 filas (cita_confirmacion_contexto, cita_confirmacion_responder, cita_reagendar_clinica, COMMENT de cita_correos).
+# Las 3 «colateral del ensayo» de f3.tsv no entran. Comprobado igual que arriba, con los seis de hoy (sin
+# 20261201180000): 130 diferencias, 130 esperadas, 0 inesperadas; sin aparecer sólo líneas de esperadas-clon.tsv.
 
 # ═══ F1 · 20261201120000_agenda_f1_ajustes_tipos_horarios (f1.tsv)
 solo_b	funcion	public.agenda_v2_encendida(p_clinica_id uuid)	pieza común del ENCARGO §5: la única lectura del interruptor; nueva, la crea F1 y la llaman los demás bloques
@@ -35,6 +40,19 @@ distinto	policy	public.agenda_bloqueos.agenda_bloqueos_insert	ENCARGO §5: EXIST
 distinto	policy	public.agenda_bloqueos.agenda_bloqueos_update	ENCARGO §5: la misma sustitución que en agenda_bloqueos_insert
 distinto	comentario	table public.agenda_bloqueos	el COMMENT de k1 decía «dentro de Spinus sólo pide confirmación», falso desde l1 (bloqueo total, CLAUDE.md «Tanda L»); se corrige y se quita «Tanda K (sección A)» (historia)
 
+# F5a/F5b · poda de comentarios (C1/C3, correcciones previas al ensayo); añadidas por E0, 2.ª vuelta
+distinto	comentario	function public.cita_proteger_atendida()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_bloqueo()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_borrado()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_cierre()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_eleccion()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_reserva()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_tiene_nota_ligada(pg_catalog.uuid,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table column public.appointments.cerrada_en	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table column public.appointments.sustituida_por	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	funcion	public.agenda_bloqueo_preparar()	C1: poda de dos comentarios del cuerpo («B3», «ver la cabecera»); md5 f1f887ec → dc778b4c. Mismo código
+distinto	funcion	public.cita_proteger_atendida()	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_proteger_cierre()	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
 # ═══ F3 · 20261201140000_agenda_f3_reserva_enlace (f3.tsv)
 distinto	comentario	function public.proteger_reserva_enlaces()	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
 distinto	comentario	function public.rate_limit_espera(pg_catalog.text,integer,integer)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
@@ -101,14 +119,24 @@ distinto	comentario	table public.gcal_sync_estado	COMMENT sin «(bloque C)»; mi
 distinto	comentario	table public.reserva_empalmes_google	COMMENT sin «D11:» ni «(ver la migración 20261116120000)», que deja de existir en migrations/; mismo contenido
 
 # ═══ F4 · 20261201160000_agenda_f4_confirmacion_correos_avisos (f4.tsv)
-distinto	funcion	public.cita_confirmacion_contexto(p_codigo_hash text)	md5_cuerpo: el NOT EXISTS (… agenda_ajustes … AND j.agenda_v2_encendida) pasa a NOT public.agenda_v2_encendida(v_c.clinica_id) (ENCARGO §5); equivalente: agenda_v2_encendida NOT NULL y clinica_id único (lo exige el pre-vuelo)
+distinto	funcion	public.cita_confirmacion_contexto(p_codigo_hash text)	md5_cuerpo: el NOT EXISTS (… agenda_ajustes … AND j.agenda_v2_encendida) pasa a NOT public.agenda_v2_encendida(v_c.clinica_id) (ENCARGO §5); equivalente: agenda_v2_encendida NOT NULL y clinica_id único (lo exige el pre-vuelo); además, md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
 distinto	funcion	public.cita_confirmacion_emitir(p_clinica_id uuid, p_cita_id uuid, p_id uuid, p_codigo_hash text, p_creado_por uuid)	md5_cuerpo: lectura del interruptor por public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente
-distinto	funcion	public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text)	md5_cuerpo: lectura del interruptor por public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente; el resto del cuerpo (FOR UPDATE, clock_timestamp, plazo de 1 h, spinus.via) idéntico
-distinto	funcion	public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone)	md5_cuerpo: NOT EXISTS (… AND j.agenda_v2_encendida IS TRUE) pasa a NOT public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente
+distinto	funcion	public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text)	md5_cuerpo: lectura del interruptor por public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente; el resto del cuerpo (FOR UPDATE, clock_timestamp, plazo de 1 h, spinus.via) idéntico; además, md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone)	md5_cuerpo: NOT EXISTS (… AND j.agenda_v2_encendida IS TRUE) pasa a NOT public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente; además, md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
 distinto	funcion	public.cita_correo_tomar(p_clinica_id uuid, p_cita_id uuid, p_tipo text, p_testigo uuid)	md5_cuerpo: sólo un comentario dentro del cuerpo: el aviso «la MISMA expresión que cita_correos_pendientes» apunta ahora a cita_recordatorios_pendientes (la retirada ya no existe)
 solo_a	funcion	public.cita_correos_pendientes(p_limite integer)	código muerto retirado (ENCARGO §6): sin llamadores en src, scripts ni e2e (sólo un comentario en src/lib/confirmacion/recordatorios.ts:19) ni en otras funciones; la sustituye cita_recordatorios_pendientes
 solo_a	permiso	funcion public.cita_correos_pendientes(p_limite integer) → postgres	sus permisos se van con la función retirada
 solo_a	permiso	funcion public.cita_correos_pendientes(p_limite integer) → service_role	sus permisos se van con la función retirada
-distinto	comentario	table public.cita_correos	el CONVENIO del destinatario nombraba a cita_correos_pendientes (retirada): ahora dice cita_recordatorios_pendientes; el resto del texto, igual
+distinto	comentario	table public.cita_correos	el CONVENIO del destinatario nombraba a cita_correos_pendientes (retirada): ahora dice cita_recordatorios_pendientes; el resto del texto, igual; además, texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
 distinto	comentario	function public.cita_recordatorios_pendientes(integer)	decía «Igual que cita_correos_pendientes (E4) más el interruptor…»: reescrito sin la función retirada, con las tres puertas que mira
-
+# F4 · poda de comentarios (C1/C3, correcciones previas al ensayo); añadidas por E0, 2.ª vuelta
+distinto	comentario	function public.aviso_clinica_de_confirmacion()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_nombre_saludo(pg_catalog.uuid,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_reagendar_clinica(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_reagendar_oferta(pg_catalog.uuid,pg_catalog.text)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.reagendar_por_enlace(pg_catalog.text,pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table public.avisos_clinica	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table public.cita_confirmaciones	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table public.cita_reagendos	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	funcion	public.cita_reagendar_oferta(p_clinica_id uuid, p_codigo_hash text)	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.reagendar_por_enlace(p_confirmacion_hash text, p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid)	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica

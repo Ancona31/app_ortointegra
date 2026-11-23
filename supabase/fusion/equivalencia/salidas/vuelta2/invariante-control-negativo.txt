@@ -1,0 +1,147 @@
+### base
+BEGIN
+SET
+INSERT 0 2
+INSERT 0 3
+UPDATE 1
+UPDATE 1
+UPDATE 1
+DO
+INSERT 0 2
+INSERT 0 2
+CREATE FUNCTION
+GRANT
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+
+
+
+
+
+
+v2 on · médico · con paciente crear|authenticated|filas=1|ok|
+v2 on · médico · con paciente editar|authenticated|filas=1|ok|
+v2 on · médico · con paciente mover|authenticated|filas=1|ok|
+v2 on · médico · con paciente cancelar|authenticated|filas=1|ok|
+v2 on · médico · sin paciente crear|authenticated|filas=1|ok|
+v2 on · médico · sin paciente editar|authenticated|filas=1|ok|
+v2 on · médico · sin paciente mover|authenticated|filas=1|ok|
+v2 on · médico · sin paciente cancelar|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente crear|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente editar|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente mover|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente cancelar|authenticated|filas=1|ok|
+v2 on · service_role · con paciente crear|service_role|filas=1|ok|
+v2 on · service_role · con paciente editar|service_role|filas=1|ok|
+v2 on · service_role · con paciente mover|service_role|filas=1|ok|
+v2 on · service_role · con paciente cancelar|service_role|filas=1|ok|
+v2 off · médico · con paciente crear|authenticated|filas=1|ok|
+v2 off · médico · con paciente editar|authenticated|filas=1|ok|
+v2 off · médico · con paciente mover|authenticated|filas=1|ok|
+v2 off · médico · con paciente cancelar|authenticated|filas=1|ok|
+v2 off · service_role · con paciente crear|service_role|filas=1|ok|
+v2 off · service_role · con paciente editar|service_role|filas=1|ok|
+v2 off · service_role · con paciente mover|service_role|filas=1|ok|
+v2 off · service_role · con paciente cancelar|service_role|filas=1|ok|
+RESUMEN pasos=24 fallidos=0
+ROLLBACK
+### 20261201120000_agenda_f1_ajustes_tipos_horarios.sql
+BEGIN
+SET
+INSERT 0 2
+INSERT 0 3
+UPDATE 1
+UPDATE 1
+UPDATE 1
+DO
+INSERT 0 2
+INSERT 0 2
+CREATE FUNCTION
+GRANT
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+
+
+
+
+
+
+v2 on · médico · con paciente crear|authenticated|filas=1|ok|
+v2 on · médico · con paciente editar|authenticated|filas=1|ok|
+v2 on · médico · con paciente mover|authenticated|filas=1|ok|
+v2 on · médico · con paciente cancelar|authenticated|filas=1|ok|
+v2 on · médico · sin paciente crear|authenticated|filas=1|ok|
+v2 on · médico · sin paciente editar|authenticated|filas=1|ok|
+v2 on · médico · sin paciente mover|authenticated|filas=1|ok|
+v2 on · médico · sin paciente cancelar|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente crear|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente editar|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente mover|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente cancelar|authenticated|filas=1|ok|
+v2 on · service_role · con paciente crear|service_role|filas=1|ok|
+v2 on · service_role · con paciente editar|service_role|filas=1|ok|
+v2 on · service_role · con paciente mover|service_role|filas=1|ok|
+v2 on · service_role · con paciente cancelar|service_role|filas=1|ok|
+v2 off · médico · con paciente crear|authenticated|filas=1|ok|
+v2 off · médico · con paciente editar|authenticated|filas=1|ok|
+v2 off · médico · con paciente mover|authenticated|filas=1|ok|
+v2 off · médico · con paciente cancelar|authenticated|filas=1|ok|
+v2 off · service_role · con paciente crear|service_role|filas=1|ok|
+v2 off · service_role · con paciente editar|service_role|filas=1|ok|
+v2 off · service_role · con paciente mover|service_role|filas=1|ok|
+v2 off · service_role · con paciente cancelar|service_role|filas=1|ok|
+RESUMEN pasos=24 fallidos=0
+ROLLBACK
+### 20261201130000_agenda_f5a_bloqueos.sql
+BEGIN
+SET
+INSERT 0 2
+INSERT 0 3
+UPDATE 1
+UPDATE 1
+UPDATE 1
+DO
+INSERT 0 2
+INSERT 0 2
+CREATE FUNCTION
+GRANT
+CREATE TABLE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+
+
+
+
+
+
+v2 on · médico · con paciente crear|authenticated|filas=1|ok|
+v2 on · médico · con paciente editar|authenticated|filas=1|ok|
+v2 on · médico · con paciente mover|authenticated|filas=1|ok|
+v2 on · médico · con paciente cancelar|authenticated|filas=1|ok|
+v2 on · médico · sin paciente crear|authenticated|filas=1|ok|
+v2 on · médico · sin paciente editar|authenticated|filas=1|ok|
+v2 on · médico · sin paciente mover|authenticated|filas=1|ok|
+v2 on · médico · sin paciente cancelar|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente crear|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente editar|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente mover|authenticated|filas=1|ok|
+v2 on · secretaria · con paciente cancelar|authenticated|filas=1|ok|
+v2 on · service_role · con paciente crear|service_role|filas=1|ok|
+v2 on · service_role · con paciente editar|service_role|filas=1|ok|
+v2 on · service_role · con paciente mover|service_role|filas=1|ok|
+v2 on · service_role · con paciente cancelar|service_role|filas=1|ok|
+v2 off · médico · con paciente crear|authenticated|filas=1|ok|
+v2 off · médico · con paciente editar|authenticated|filas=1|ok|
+v2 off · médico · con paciente mover|authenticated|filas=1|ok|
+v2 off · médico · con paciente cancelar|authenticated|filas=1|ok|
+v2 off · service_role · con paciente crear|service_role|filas=1|ok|
+v2 off · service_role · con paciente editar|service_role|filas=1|ok|
+v2 off · service_role · con paciente mover|service_role|filas=1|ok|
+v2 off · service_role · con paciente cancelar|service_role|filas=1|ok|
+RESUMEN pasos=24 fallidos=0
+ROLLBACK

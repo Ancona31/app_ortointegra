@@ -1,229 +1,206 @@
 # E0 · Equivalencia de las 44 migraciones originales y las 6 fundidas
 
-**Veredicto: ACEPTADO.** Hay 96 diferencias de estructura. Las 96 están explicadas, verificadas una
-por una y son ACEPTABLES. No hay ninguna DUDOSA ni NO ACEPTABLE.
+**Veredicto vigente (2.ª vuelta, 2026-11-22, tras las correcciones C1, C2 y C3): ACEPTADO.** Hay 118
+diferencias de estructura: las 96 de la 1.ª vuelta, que siguen todas, y 22 nuevas. Las 118 están
+explicadas y son ACEPTABLES. Las 22 nuevas vienen todas de la poda de comentarios. Ninguna función
+cambia una línea de código respecto de la 1.ª vuelta. No hay ninguna DUDOSA ni NO ACEPTABLE.
 
 Marcas: **[E]** = comprobado ejecutando; **[D]** = deducido (leyendo código o catálogo, sin ejecutar).
 
-## 1. Qué se comparó y cómo
+## 1. Método (el de la 1.ª vuelta, repetido)
 
-| Base | Construcción | Contenedor / puerto |
+| Base | Construcción | Contenedor (borrado al terminar) |
 |---|---|---|
-| común | clon de `~/spinus-fusion/base-main` (`clonar-desde-foto.sh`) | — |
-| **A** | común + las 44 originales del tag `fusion-originales` (`git archive`), en orden de nombre, `psql -v ON_ERROR_STOP=1` como `postgres` | `spinus-e0-a` 54391 |
-| **B** | común + las 6 `supabase/migrations/20261201*.sql` en orden de nombre | `spinus-e0-b` 54392 |
-| C / D | como A / B, pero sobre un clon con **datos previos inventados** (`datos-previos.sql`) | `spinus-e0-c/d` 54393/54394 |
+| común | clon de `~/spinus-fusion/base-main` (`clonar-desde-foto.sh`: 0 errores; 12 diferencias, las 12 de `esperadas-clon.tsv`, como en la 1.ª) | — |
+| **A** | común + las 44 del tag `fusion-originales`, en orden de nombre, `herramientas/aplicar.sh` (psql como `postgres`, `ON_ERROR_STOP`) | `clon-spinus-e0b-a` |
+| **B** | común + los 6 `supabase/migrations/202612011[2-7]0000_*.sql` de hoy, en orden de nombre. **Sin `20261201180000`** | `clon-spinus-e0b-b` |
+| **V** | común + los 6 fundidos de la 1.ª vuelta (commit `8f5ac083`) | `clon-spinus-e0b-v` |
+| C / D | como A / B, sobre un clon con `datos-previos.sql` | `clon-spinus-e0b-c/d` |
+| I | común + los 6 de hoy de uno en uno, con `invariante.sql` tras cada uno (§5) | `clon-spinus-e0b-i` |
+| P | clon de la foto REAL de producción (`~/spinus-produccion-foto`) + lo que le falta (§6) | `clon-spinus-e0b-prod` |
 
-Los contenedores se borraron al terminar. No se tocó el stack local compartido.
+V no estaba en la 1.ª vuelta. Lo añadí para aislar lo que cambiaron las correcciones: V↔B es
+exactamente el efecto de C1, C2 y C3 sobre el catálogo.
 
-- **La foto base-main es lo que dice ser [E].** Sus `99-sha256.txt` cuadran. `04-migraciones.tsv`
-  tiene exactamente las 5 de `main`, más `20261125170000` y `20261126120000`. El clon reproduce la
-  foto con las 12 diferencias conocidas del viaje foto → clon (`esperadas-clon.tsv`).
-- **Aplicación [E].** A: 44/44 sin ningún `ERROR`, con 303 filas OK y 17 INFO en las rejillas, y
-  ningún REVISAR. B: 6/6 sin ningún `ERROR`, con 51 OK y 3 INFO. Las salidas completas están en
-  `salidas/A-aplicar-44-originales.log` y `salidas/B-aplicar-6-fundidas.log`.
-- **El orden histórico no cambia nada [E].** En la referencia, `20261125170000` y `20261126120000`
-  corrieron después de casi toda la agenda. Aquí ya estaban en la base. Comparé A contra la foto
-  `ref-originales` (construida en orden histórico) y salen **0 diferencias** aparte de las 12 del viaje
-  foto → clon (`salidas/comparador-refOriginales-A.txt`). Hay dos razones:
-  - Cada tabla nueva de la agenda revoca TRUNCATE de forma explícita, así que los `ALTER DEFAULT
-    PRIVILEGES … REVOKE TRUNCATE` no cambian el resultado. En orden histórico, el barrido de
-    `20261126120000` encontraba lo mismo.
-  - Los disparadores `trg_<t>_sin_truncate` son para una lista fija de 11 tablas de `main`.
+**Aplicación [E].** A: 44/44 sin ningún `ERROR`. Su registro es idéntico al de la 1.ª vuelta (diff
+vacío, quitando las fechas). Tiene los 2 REVISAR esperados de la rejilla de K1: «con K3 ya aplicada,
+REVISAR es lo esperado», y su fila dice OK. B: 6/6 sin ningún `ERROR` ni REVISAR, con 51 OK y 3 INFO,
+igual que en la 1.ª vuelta (`salidas/vuelta2/B-aplicar-6-fundidas.log`). F5b exige ahora
+`current_user = 'postgres'`, y `aplicar.sh` ya conecta como `postgres`.
 
-  No hizo falta construir una variante aparte.
+## 2. Estructura: dos métodos independientes, el mismo resultado
 
-## 2. Dos métodos independientes, mismo resultado
+| Comparación | `comparar-estructura.sh` (catálogo) | `pg_dump --schema-only` por objeto (`dump_objetos.py`) |
+|---|---|---|
+| A ↔ B | **118** = 96 + 22. Con `--esperadas DIFERENCIAS.tsv`: 118 esperadas, 0 inesperadas, ninguna sin aparecer | **112** objetos = 90 + 22 |
+| V ↔ B | **27**: 18 COMMENT y 9 `md5_cuerpo` | **27**: 18 COMMENT y 9 FUNCTION |
+| C ↔ D | 118 (las mismas cuentas) | — |
 
-| Método | Diferencias A↔B |
-|---|---|
-| `comparar-estructura.sh` (catálogo) | **96**: 52 comentarios, 31 funciones, 10 permisos, 3 policies |
-| `pg_dump --schema-only` de toda la base, partido por objeto y comparado por texto (`herramientas/dump_objetos.py`) | **90** objetos: los mismos. El comparador cuenta los permisos por rol (10 filas) y `pg_dump` por función (4 entradas ACL): 96 − 10 + 4 = 90 |
-| `aclexplode` **con otorgante**, en tablas, columnas, funciones y default privileges de `public`, `respaldos`, `private`, `auth` y `storage` | tablas: 4050 = 4050, con el mismo md5. Columnas: 34 = 34. Default ACL: 345 = 345. Funciones: sólo los 7 EXECUTE retirados y los 3 nuevos (`salidas/acl-funciones-*.txt`) |
+En V↔B no cambia nada más que esos 27 [E]. Lo comprueban los dos métodos y además:
+- **Huellas idénticas en A, B y V** [E]. Son las mismas que en la 1.ª vuelta:
+  - ACL de tablas con otorgante: 4050 filas, md5 `b7dfd8be`;
+  - ACL de columnas: 34; default ACL: 345;
+  - columnas de `appointments` (`attnum:nombre:tipo`): 45, md5 `dfd24ac5`;
+  - disparadores (`pg_get_triggerdef` + `tgenabled`): 83, md5 `70ca9edf`;
+  - `supabase_realtime`: 1 tabla;
+  - `pg_description`: 5448 filas.
+- **Disparadores y FK** [E]. F4 lleva al final las FK y los disparadores, y F5b usa `CREATE OR
+  REPLACE TRIGGER` dentro de un bloque `DO`. Nada de eso deja rastro en el catálogo: los
+  disparadores salen con la misma definición, el mismo estado y el mismo orden de disparo (por
+  nombre), y las restricciones con la misma definición.
+- **Funciones** [E]. Ninguna cambia dueño, SECURITY DEFINER, `proconfig`, volatilidad, firma ni ACL:
+  en las 9 sólo cambia `md5_cuerpo`.
 
-`pg_dump` cubre lo que el comparador declara que no cubre: operadores, casts, clases de operadores,
-configuraciones de texto, FDW y estadísticas extendidas. Ahí no hay **ninguna** diferencia [E].
+## 3. Las funciones cuyo `prosrc` cambió con la poda: sólo comentarios
 
-MAINTAIN y TRUNCATE salen en `aclexplode`. Cuentan lo mismo en A y B: 304 MAINTAIN y 0 TRUNCATE para
-`anon`, `authenticated` y `service_role` en `public` [E].
+Son las 9 que se habían declarado, ni una más ni una menos [E: V↔B]. Hice dos pruebas, independientes
+entre sí:
+1. **`herramientas/cuerpos.py`**: quita comentarios `--` y `/* */` respetando literales `'…'` y
+   `$tag$`, colapsa espacios y compara línea a línea. Las 9 dan **IDÉNTICO** frente a V
+   (`salidas/vuelta2/cuerpos-V-B.txt`).
+2. **Diff de texto crudo V→B**: toda línea quitada o añadida es una línea entera de comentario
+   (`^\s*--`) o una línea vacía. Hay **0 líneas de código** tocadas en las 9.
 
-Hay otras cosas idénticas en los dos métodos [E]:
-- el orden de columnas de `appointments`: 45 columnas, md5 de `attnum:nombre:tipo` igual;
-- la publicación `supabase_realtime`: sólo `public.appointments`;
-- RLS activado y forzado;
-- disparadores (incluidos los de evento), índices, restricciones, tipos, roles y configuración.
+| Función | Archivo · quién | md5 `prosrc` A → V → B | Líneas −/+ (todas de comentario) | Frente a A |
+|---|---|---|---|---|
+| `reservar_por_enlace` | F3 · C2 | be25c167 → 05553eb1 → 739936d3 | 1/1 («AG-DT-28») | igual que en la 1.ª: sólo comentarios |
+| `agenda_bloqueo_preparar` | F5a · C1 | f1f887ec → f1f887ec → dc778b4c | 2/2 | **nueva**: sólo comentarios |
+| `cita_confirmacion_contexto` | F4 · C3 | 2fca66ff → 3c99f013 → 27979b04 | 2/2 | igual que en la 1.ª: sólo la línea del interruptor |
+| `cita_confirmacion_responder` | F4 · C3 | 7961e24a → 5b6de825 → 1b1fa721 | 2/2 | igual que en la 1.ª: sólo el interruptor |
+| `cita_reagendar_clinica` | F4 · C3 | 00656df5 → 1e156fb1 → 5c770c24 | 1/1 | igual que en la 1.ª: sólo el interruptor |
+| `cita_reagendar_oferta` | F4 · C3 | dbcd8da8 → dbcd8da8 → 419c936c | 1/1 | **nueva**: sólo comentarios |
+| `reagendar_por_enlace` | F4 · C3 | 54b257ed → 54b257ed → b05ddc49 | 3/3 | **nueva**: sólo comentarios |
+| `cita_proteger_atendida` | F5b · C3 | cfc4fcd7 → cfc4fcd7 → ba82c230 | 1/1 | **nueva**: sólo comentarios |
+| `cita_proteger_cierre` | F5b · C3 | e550ee48 → e550ee48 → 57510b8a | 2/2 | **nueva**: sólo comentarios |
 
-## 3. Las 96 diferencias
+Frente a A, el diff de código (sin comentarios) de las 27 funciones de la 1.ª vuelta es **byte a byte
+el mismo** que entonces [E]: comparé las secciones de código de `salidas/cuerpos-funciones.txt` con
+las de `salidas/vuelta2/cuerpos-A-B.txt`. Las otras 5 salen IDÉNTICO.
 
-La lista exacta está en `DIFERENCIAS.tsv`. Es una fila por diferencia, sin globs, y la razón empieza
-por el veredicto. Como `--esperadas` deja **96/96 esperadas, 0 inesperadas** y ninguna línea sobrante [E].
+En total, A↔B tiene 32 funciones con el cuerpo cambiado:
+- 14 sólo cambian comentarios: las 9 de antes y las 5 nuevas;
+- 17 sólo cambian la lectura del interruptor;
+- 1 sólo cambia el HINT.
 
-### 3.1 Funciones con el cuerpo cambiado (27): sólo cambia `md5_cuerpo`
+## 4. Lista de diferencias: qué cambió respecto de las 96
 
-En las 27 no cambia el dueño, SECURITY DEFINER, el search_path, la volatilidad ni la firma [E]. Así
-se reparten:
+`DIFERENCIAS.tsv`: las 96 de la 1.ª vuelta y, al final, las 22 nuevas. Es una fila por diferencia,
+con clave exacta (`[` se escribe `[[]`).
 
-- **9 sólo cambian comentarios.** Quité comentarios `--` y `/* */` respetando literales y `$tag$`, y
-  colapsé espacios: el código es **idéntico** [E] (`salidas/cuerpos-funciones.txt`). Son:
-  `agenda_restablecer_configuracion`, `cita_correo_tomar`, `log_cita_change`, `rate_limit_espera`,
-  `reserva_codigo_verificar`, `reserva_contacto_estado`, `reserva_enlace_emitir` (9 arg.),
-  `reserva_espera_reenvio` y `reservar_por_enlace`.
-- **17 cambian SÓLO la lectura del interruptor**, `EXISTS/JOIN agenda_ajustes … agenda_v2_encendida`
-  → `public.agenda_v2_encendida(x)`. El diff sin comentarios tiene esa única línea en cada una [E].
-  Son: `cita_confirmacion_contexto/emitir/responder`, `cita_movimiento_google_registrar`,
-  `cita_proteger_bloqueo/borrado/eleccion`, `cita_reagendar_clinica`, `cita_rsvp_google`,
-  `gcal_aplicar_evento`, `gcal_bloqueo_aplicar`, `gcal_citas_por_evento`, `gcal_importar_evento`,
-  `gcal_sync_tomar`, `reserva_codigo_emitir`, `reserva_empalmes_registrar` y `reserva_ocupacion`.
+**Ninguna de las 96 desapareció** [E: `--esperadas`, 0 «no apareció»]. **5 de las 96 cambian de
+valor** pero no de razón, y llevan la anotación «2.ª vuelta» en su fila:
+- las 4 funciones de la tabla que no son nuevas: el código frente a A no cambia;
+- el COMMENT de `cita_correos`, que además pierde «agenda E4 y G3» y «dimensión 16».
 
-  La sustitución es equivalente en cada sitio por lo siguiente:
-  - **Misma clínica.** El argumento es el mismo que la condición original: `p_clinica_id`,
-    `NEW/OLD.clinica_id`, `v_c.clinica_id` o `e.clinica_id`.
-  - **Sin fila = false.** `agenda_ajustes.clinica_id` es UNIQUE (`agenda_ajustes_clinica_key`) y
-    `agenda_v2_encendida` es NOT NULL [E, catálogo]. Por eso `coalesce((SELECT …), false)` vale lo
-    mismo que el EXISTS o el JOIN, y no puede dar «más de una fila».
-  - **Sin `FOR UPDATE`.** Ningún fragmento sustituido lo tenía [E, diff].
-  - **El modo de lectura no cambia.** Las 17 son INVOKER en A y en B, y `agenda_v2_encendida` es
-    INVOKER. Lee con los mismos permisos y la misma RLS que el EXISTS original.
-  - **EXECUTE por rol.** Revisé quién puede llegar a esa línea [E]:
-    - Las 14 que no son disparadores sólo tienen EXECUTE para `service_role`, que tiene EXECUTE sobre
-      `agenda_v2_encendida`.
-    - Los 3 disparadores corren con `authenticated`, `service_role`, `postgres` o `supabase_admin`, y
-      los cuatro tienen EXECUTE. `anon` tiene INSERT/UPDATE/DELETE sobre `appointments` pero no
-      EXECUTE. Aun así no llega a la llamada:
-      - en INSERT, `cita_proteger_bloqueo` lee antes `agenda_bloqueos` y falla con
-        `permission denied for table agenda_bloqueos`, igual en A (paso 01);
-      - en UPDATE y DELETE, la RLS no le deja ver ninguna fila (pasos 11 y 25).
-    - `supabase_read_only_user` y `supabase_etl_admin` leen `agenda_ajustes` pero no tienen EXECUTE.
-      Tampoco pueden escribir citas ni ejecutar ninguna de las 17, así que no llegan.
-  - **Ejecutadas por rol en A y en B, con resultado idéntico** [E], en `comportamiento.sql`. Se
-    ejecutaron todas salvo `gcal_aplicar_evento`, que necesita una conexión de Google (ésa queda
-    [D], por el diff de una línea). Los pasos están en `DIFERENCIAS.tsv`.
-- **1 HINT.** `gcal_sync_clinica_habilitada` sólo cambia el texto del HINT del P0001: nombra el archivo
-  fundido en lugar de C1. El SQLSTATE y la lógica no cambian. Nadie lee ese texto [E, grep].
+**22 nuevas, todas ACEPTABLES:**
 
-### 3.2 Funciones nuevas (1) y retiradas (3), con sus 10 permisos
+| Qué | Cuántas | Quién | Razón |
+|---|---|---|---|
+| `md5_cuerpo` | 5 | C1 (F5a: `agenda_bloqueo_preparar`), C3 (F4: `cita_reagendar_oferta`, `reagendar_por_enlace`; F5b: `cita_proteger_atendida`, `cita_proteger_cierre`) | sólo comentarios (§3) |
+| COMMENT de función | 12 | C3: F4 (`aviso_clinica_de_confirmacion`, `cita_nombre_saludo`, `cita_reagendar_clinica`, `cita_reagendar_oferta`, `reagendar_por_enlace`) y F5b (`cita_proteger_atendida/bloqueo/borrado/cierre/eleccion/reserva`, `cita_tiene_nota_ligada`) | sin etiquetas de tanda |
+| COMMENT de tabla o columna | 5 | C3: F4 (`avisos_clinica`, `cita_confirmaciones`, `cita_reagendos`) y F5b (`appointments.cerrada_en`, `appointments.sustituida_por`) | sin etiquetas de tanda |
 
-- `agenda_v2_encendida(uuid)` es nueva. Es sql, STABLE, INVOKER y con `search_path=''`. Su EXECUTE es
-  para postgres, authenticated y service_role, sin PUBLIC ni anon [E].
-- `reserva_enlace_regenerar_fijo` tiene 0 llamadores en `src/`, `scripts/` y `e2e/` [E, grep]. En
-  `supabase/pruebas-sql/` sólo aparece en `d1` y `seg_emision`, que esperan ahora
-  `undefined_function`. En los cuerpos de función sólo se nombraba a sí misma [E].
-- `reserva_enlace_emitir` de 7 argumentos. Sólo se llega a ella por la caída PGRST202 de
-  `src/app/api/agenda/enlaces/route.ts:128-131`, que no puede darse mientras exista la de 9 [D].
-  `e2e/seguridad-postgrest.e2e.ts:126` admite `42501` o `PGRST202`. Con B, PostgREST dará PGRST202:
-  la de 9 no tiene DEFAULT y no casa con 7 parámetros [D, no se levantó PostgREST].
-- `cita_correos_pendientes` sólo aparece en comentarios: `src/lib/confirmacion/recordatorios.ts:19` y
-  el cuerpo de `cita_correo_tomar` [E].
+El diff por palabras está en `salidas/vuelta2/comentarios-palabras-V-B.txt`. Casi todos sólo quitan
+«tanda X, punto N», «D3», «E6», «C5»… Cuatro cambian contenido, y comprobé el texto nuevo contra el
+catálogo [E]:
+- `aviso_clinica_de_confirmacion` nombra el índice `avisos_clinica_pendiente_key`, que existe.
+- `avisos_clinica` enumera los 7 tipos, que son exactamente los del CHECK `tipo = ANY (…)`.
+- `cita_proteger_eleccion`: «(Google … restablece, C5)» pasa a «la sincronización con Google rechaza
+  el cambio y restablece el evento». Es la regla J4 de CLAUDE.md [D].
+- `cita_proteger_bloqueo`: «como hoy» pasa a «como siempre». El sentido no cambia.
 
-### 3.3 Policies (3)
+**`diferencias/CONJUNTO.tsv`** (el conjunto contra `ref-originales`) está rehecho a partir de los
+`.tsv` por bloque de hoy:
+- se añaden las 22 filas de la poda: 12 de `F5.tsv` y 10 de `f4.tsv`;
+- 4 filas toman la razón de hoy de `f4.tsv`;
+- las 3 filas «colateral del ensayo» de `f3.tsv` no entran.
 
-- `agenda_bloqueos_insert` y `agenda_bloqueos_update`: la misma sustitución, dentro de un WITH CHECK
-  `TO authenticated`. Los pasos 14 a 18 dan lo mismo en A y en B [E].
-- `reserva_enlaces_insert`, retirada. Hice dos pruebas [E]:
-  - `INSERT` en `reserva_enlaces` como `anon`, como médico y secretaria de la clínica, como médico de
-    otra clínica (en la ajena y en la suya) y como `service_role` (pasos 32 a 37). Da el **mismo
-    SQLSTATE y el mismo mensaje** en A y en B. La sesión recibe `42501 «Los enlaces de reserva los
-    emite el servidor»` del disparador, `anon` recibe `permission denied for table` y `service_role`
-    inserta.
-  - Con el disparador desactivado (`policy-sin-disparador.sql`), en A la RLS deja pasar al
-    administrador de su clínica, que después cae en un CHECK. En B la RLS lo niega con `42501`.
-    **B es más estricta.**
+Lo comprobé con B contra `ref-originales/05-catalogo.jsonl`, usando `CONJUNTO.tsv` +
+`esperadas-clon.tsv`: **130 diferencias, 130 esperadas, 0 inesperadas** [E]. Las únicas líneas que no
+aparecen son de `esperadas-clon.tsv`, como en la 1.ª vuelta. Antes de rehacerlo daba 22 inesperadas,
+justo las de la poda.
 
-### 3.4 Comentarios (52)
+## 5. Comportamiento [E]
 
-Antes y después hay 5448 filas en `pg_description` [E]. Cambian 50, desaparece 1 (la de 7 argumentos)
-y aparece 1 (`agenda_v2_encendida`). El diff por palabras está en `salidas/comentarios-palabras.txt`.
+- **`comportamiento.sql` (89 pasos):**
+  - A, B y V dan una salida **idéntica byte a byte** (`salidas/vuelta2/comportamiento-*.out`).
+  - Frente a la salida de la 1.ª vuelta, sólo se mueven las fechas: el guion usa «hoy + 3 días» y se
+    corrió otro día.
+- **Pruebas SQL** (`salidas/vuelta2/pruebas-sql.tsv`):
+  - A, con las del tag: 45 de 46 pasan.
+  - B, con las de hoy: 45 de 47 pasan.
+  - Las que fallan son las mismas que se esperaban:
+    - `m_saludo_recordatorio`, en los dos lados, porque pide la semilla. Con `semilla-minima.sql`
+      pasa en A y en B.
+    - `t_agenda_sin_truncate`, sólo en B. Es la prueba de `20261201180000`, que a propósito no se
+      aplicó: el caso 3 encuentra el TRUNCATE permitido. No es una diferencia de la fusión.
+- **`policy-sin-disparador.sql`:** igual que en la 1.ª vuelta. A deja pasar al administrador por la
+  RLS y luego falla con `23514` (CHECK); B lo niega con `42501` (RLS).
+- **Datos previos:** `datos-extraer.sql` da C = D, y también igual a `salidas/datos-C.txt` de la 1.ª
+  vuelta (diff vacío).
+- **Invariante entre archivos** (`invariante.sql` + `herramientas/invariante.sh`):
+  - Tras la base y tras CADA uno de F1, F5a, F3, F2, F4 y F5b, en ese orden, hay 24 de 24 pasos con
+    `filas=1`: crear, editar (notas y título), mover y cancelar.
+  - Los pasos cubren al médico con y sin paciente, a la secretaria y a `service_role`, con la v2
+    encendida, y al médico y a `service_role` con la v2 apagada.
+  - **No hay ventana rota** (`salidas/vuelta2/invariante-tras-cada-archivo.txt`).
+- **Controles negativos del instrumento:**
+  - F2 aplicado sin F3 aborta en su propio pre-vuelo: «falta appointments.reserva_canal (F3…)». La
+    ventana F2/F3 está cerrada por el archivo, no sólo por el orden.
+  - Un disparador que lee `NEW.reserva_canal` antes de que exista la columna hace que el invariante
+    falle en todos los «crear», con `42703`. El instrumento detecta una ventana rota.
 
-Casi todos sólo pierden etiquetas de tanda («D1», «j2», «tanda I, punto 10»…). Seis cambian
-contenido, y comprobé que el texto nuevo es cierto:
-- `agenda_bloqueos`: el bloqueo total. Ejecutado, pasos 19 a 22.
-- `reserva_tel_hmac`: «candado» → «bloqueo manual», la regla vigente de CLAUDE.md.
-- `reserva_reagendados`: «única reserva_* con DEFAULT». Cierto en el catálogo.
-- `cita_recordatorios_pendientes`: enumera sus tres puertas. Cierto en el cuerpo.
-- `proteger_reserva_enlaces`: el md5 de `prosrc` sigue siendo `acd4128b`.
-- `cita_correos`: ya no nombra a la función retirada.
+## 6. Comprobación extra: el conjunto de hoy sobre un clon de la foto REAL de producción [E]
 
-El prefijo «false = la disponibilidad» de `consultorios.horario_propio`, que exige
-`b5_horario_propio.sql`, se conserva, y la prueba pasa en B [E].
+- **Clon.** `clonar-desde-foto.sh ~/spinus-produccion-foto`: 0 errores de restauración y 14
+  diferencias con la foto, las 14 de `esperadas-clon.tsv`. La foto tiene las 5 migraciones de `main`,
+  no `20261125170000` ni `20261126120000`.
+- **Aplicación** como `postgres`, con `aplicar.sh`: `20261125170000`, `20261126120000` y los 6
+  fundidos, en ese orden. **Entra limpio:** 8/8, 0 `ERROR`, **0 REVISAR**, 59 OK y 10 INFO en las
+  rejillas. Los INFO son conteos: privilegios restantes, filas de `audit_log`, tablas a las que se
+  quitó TRUNCATE, privilegios por omisión, consultorios respaldados (0), censo de enlaces (0) y
+  clínicas con estado de sincronización (0).
+- **Extra.** Después apliqué `20261201180000` aparte: 0 `ERROR`, 0 REVISAR y 4 OK. El invariante sobre
+  ese clon, ya con ella, da 24/24 (antes de aplicarla corrió sin error, pero no guardé su resumen).
+- No guardé el registro de este clon en el repo, porque refleja la estructura de producción. Sólo
+  quedan aquí los conteos.
 
-## 4. Comportamiento, no sólo estructura
+## 7. Lo que no comprobé
 
-- **Pruebas SQL [E]** (`salidas/pruebas-sql.tsv`):
-  - A, con las pruebas del tag: 45 de 46 pasan.
-  - B, con las actuales: 45 de 46 pasan.
-  - La que falla en los dos lados es `m_saludo_recordatorio`, porque necesita la semilla. Con
-    `semilla-minima.sql` pasa en A y en B, y es el mismo archivo en los dos. Total: **46/46 en cada
-    lado.**
-  - El commit `791ee3a3` cambió 5 pruebas: `d1`, `e4`, `j2`, `k3` y `seg_emision`. Las originales
-    fallan en B, y sólo porque llaman a lo retirado (`does not exist`). Las nuevas fallan en A en 3
-    casos, porque comprueban que lo retirado ya no existe. Ninguna pierde un caso de seguridad: donde
-    se esperaba `insufficient_privilege` ahora se espera `undefined_function`.
-- **Mismo guion en A y en B** [E]. `comportamiento.sql` tiene 89 pasos:
-  - con `anon`, `authenticated` (médico, secretaria, otra clínica) y `service_role`;
-  - con la v2 encendida y apagada;
-  - cubre alta, edición, mover, confirmar, columnas `reserva_*`, bloqueos, alta y movimiento dentro de
-    un bloqueo, borrar, cancelar, cerrar y reabrir;
-  - los enlaces, con INSERT directo y por RPC, y `reservar_por_enlace` (único, fijo sin código, código
-    y verificación, ocupado, dentro de un bloqueo);
-  - el candado de elección, reagendar, la confirmación, el correo, recordatorios, las `gcal_*` y
-    restablecer.
+- Lo mismo que en la 1.ª vuelta:
+  - `gcal_aplicar_evento` con datos, porque exige una conexión de Google [D, por el diff];
+  - `scripts/reserva-carrera.sh` y las e2e;
+  - el comportamiento a través de PostgREST [D];
+  - estadísticas, planes y rendimiento.
+- **Historial de migraciones.** Apliqué con psql, no con la CLI.
+- **Candados y tiempos.** No medí el efecto de las reordenaciones para acortar candados (NOWAIT y
+  reintentos de F1, FK al final en F4) bajo concurrencia. Sólo vi que el resultado en el catálogo es
+  el mismo.
 
-  Comparé resultado, SQLSTATE, mensaje, HINT y filas nuevas de `audit_log`: la salida es **idéntica
-  byte a byte** (`diff` vacío; `salidas/comportamiento-*.out`). Todo va en una transacción con
-  ROLLBACK, y `audit_log` no se tocó.
-- **Datos previos [E].** C y D se sembraron con clínicas, consultorios con y sin horario, citas
-  pasadas, futuras, de Google y canceladas. Después de las migraciones, consultorios, clínicas, citas,
-  `respaldos.consultorios_horario_20261119` y las 7 filas de `audit_log` del backfill son
-  **idénticos** (`salidas/datos-C.txt` = `datos-D.txt`). El comparador entre C y D da las mismas 96
-  diferencias.
+## 8. Historia: la 1.ª vuelta (2026-11-22, antes de C1/C2/C3)
 
-## 5. Lo que la fusión pudo perder sin que se note
+Se compararon las mismas bases A y B con los fundidos de `8f5ac083`. Dio 96 diferencias: 52
+comentarios, 31 funciones, 10 permisos y 3 policies. Las 96 fueron ACEPTABLES, y el razonamiento de
+cada una sigue en su fila de `DIFERENCIAS.tsv`:
+- 9 funciones cambiaban sólo comentarios.
+- 17 cambiaban sólo la lectura del interruptor, `EXISTS/JOIN agenda_ajustes` → `public.agenda_v2_encendida(x)`.
+  Es equivalente porque es la misma clínica, `agenda_ajustes.clinica_id` es UNIQUE y la columna NOT
+  NULL, no había `FOR UPDATE`, todo es INVOKER y el EXECUTE por rol se revisó.
+- 1 HINT.
+- 1 función nueva (`agenda_v2_encendida`) y 3 retiradas (`reserva_enlace_regenerar_fijo`,
+  `reserva_enlace_emitir` de 7 argumentos y `cita_correos_pendientes`), con sus 10 permisos.
+- 3 policies: dos con la misma sustitución y `reserva_enlaces_insert` retirada (B, más estricta).
+- 52 COMMENT.
 
-En las 44 originales hay, a nivel superior, 106 COMMENT, 16 RLS, 4 sentencias de datos y 21 DO que
-contienen palabras de escritura o de DDL; los demás DO sólo leen (`herramientas/sentencias.py`;
-`salidas/sentencias-no-ddl-*.tsv`). No hay ningún `NOTIFY`, `ALTER PUBLICATION`,
-`ALTER DEFAULT PRIVILEGES`, `OWNER TO`, `CREATE EXTENSION` ni GRANT sobre esquemas o secuencias, ni
-dentro de los DO [E, grep].
-
-- **COMMENT y RLS.** Su efecto sale en el catálogo y queda cubierto por §2 y §3.4 [E].
-- **Datos:**
-  - El backfill de G4 (respaldo + UPDATE de consultorios) está en F1, en las líneas 608 y 615, con el
-    mismo texto, y da los mismos datos (§4) [E].
-  - Los dos INSERT de arrastre de `avisos_clinica` de i5 se retiraron. Leen `reserva_empalmes_google`
-    y `cita_confirmaciones`, que crea esta misma tanda de migraciones, así que en un despliegue están
-    vacías: el arrastre inserta 0 filas siempre [D; en A y C insertó 0, E].
-- **DO.** Son pre-vuelos y post-vuelos, o `ADD CONSTRAINT` condicionales cuyo efecto está en el
-  catálogo. Ninguno escribe datos fuera del backfill. Busqué en el cuerpo de cada DO toda sentencia
-  que empiece por UPDATE, INSERT, DELETE, ALTER, GRANT, REVOKE, COMMENT, NOTIFY, CREATE o DROP. Sólo
-  salen `THEN ALTER TABLE … ADD CONSTRAINT` y un texto de RAISE. Las sentencias de datos que encuentra
-  el grep de archivos están dentro de cuerpos de función [E].
-- **Defaults.** Ninguna original cambia un DEFAULT después de crear la columna (no hay
-  `ALTER COLUMN … SET/DROP DEFAULT`). Por eso crear la columna ya con su DEFAULT final da los mismos
-  valores en las filas existentes [E en C/D].
-- **Disparadores del backfill.** Los de `consultorios` son los 6 de `main`, iguales en los dos órdenes.
-
-## 6. Lo que no cubre ninguno de los dos métodos, y lo que no comprobé
-
-- **Historial de migraciones.** En A, B, C y D sólo están las 7 de la base: apliqué con psql, no con
-  la CLI. En producción las versiones registradas serán las `20261201*`, no las 44. Es una decisión
-  de despliegue, no de estructura.
-- **No ejecutadas:**
-  - `gcal_aplicar_evento`, porque exige una conexión de Google [D];
-  - `scripts/reserva-carrera.sh` (la carrera de dos sesiones) y las e2e;
-  - el comportamiento a través de PostgREST (PGRST202 frente a 42501 de la de 7 argumentos) [D].
-- **Lo que no ve el catálogo:** estadísticas, planes y rendimiento. Pasar el JOIN de
-  `reserva_ocupacion` al WHERE con una función STABLE sin inlining (por el `SET search_path`) cambia
-  el plan, pero sobre una sola fila.
-- **Sobre `CONJUNTO.tsv`:** 18 entradas usan el glob `(*`, más ancho de lo necesario. Verifiqué que
-  cada una cubre una sola función y que dentro sólo hay lo declarado. `DIFERENCIAS.tsv` usa claves
-  exactas.
+En §5 (sentencias de datos y DO) se comprobó que la fusión no perdía escrituras: el backfill de G4
+sigue en F1, y el arrastre de i5 inserta siempre 0 filas. Las salidas de entonces siguen en
+`salidas/` (sin subcarpeta).
 
 ## Archivos
 
-- `DIFERENCIAS.tsv`: las 96 diferencias con la razón y el veredicto.
-- `comportamiento.sql`, `datos-previos.sql`, `datos-extraer.sql`, `policy-sin-disparador.sql` y
-  `semilla-minima.sql`: guiones de prueba con datos inventados.
-- `herramientas/`: `aplicar.sh`, `pruebas.sh`, `volcar.sh`, `dump_objetos.py`, `cuerpos.py`,
-  `comentarios.py`, `sentencias.py` y `hacer_tsv.py`.
-- `salidas/`: registros completos de aplicación (rejillas incluidas), comparaciones, cuerpos,
-  pruebas, comportamiento y datos.
+- `DIFERENCIAS.tsv`: las 118, en formato `--esperadas`.
+- `comportamiento.sql`, `invariante.sql` (nuevo), `datos-previos.sql`, `datos-extraer.sql`,
+  `policy-sin-disparador.sql` y `semilla-minima.sql`: guiones con datos inventados. Todos terminan
+  en ROLLBACK salvo `datos-previos.sql`.
+- `herramientas/`: las de la 1.ª vuelta e `invariante.sh` (nuevo).
+- `salidas/`: la 1.ª vuelta. `salidas/vuelta2/`: la 2.ª.
