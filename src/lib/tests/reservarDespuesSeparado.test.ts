@@ -48,7 +48,7 @@ vi.mock('@/lib/agenda/tiposPorConsultorio', () => ({ tiposDelConsultorio: (t: un
 vi.mock('@/lib/reserva/turnosReserva', () => ({ reglasDe: () => ({}), turnoValido: (_r: unknown, inicio: string) => ({ inicio }) }))
 vi.mock('@/lib/reserva/limitesReserva', async (original) => {
   const real = await original<typeof import('@/lib/reserva/limitesReserva')>()
-  return { ...real, dentroDeLimites: async () => true }
+  return { ...real, dentroDeLimites: async () => true, esperaSinContar: async () => 0 }
 })
 vi.mock('@/lib/reserva/servidorReserva', () => ({
   reservar: async () => ({ ok: true, data: { r_resultado: 'ok', r_cita_id: ID, r_inicio: '2031-05-06T16:00:00Z', r_fin: '2031-05-06T16:30:00Z', r_historial: 0 } }),

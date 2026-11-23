@@ -24,8 +24,10 @@ import { hmacRed } from '@/lib/reserva/secretos'
 /**
  * `confirmar`: el POST del enlace de confirmación de una cita (agenda E3), con el hash de SU código como `enlace`.
  * `sincronizar` (seg1, punto 8): las pasadas con Google que dispara el POST público de reservar (D11), por clínica.
+ * `sondeo` (agente S, orden de Angel del 2026-11-23): los POST de reservar con un código que NO abre (inexistente,
+ * revocado, pausado) o con un único que ya no está vigente (usado, caducado, agotado). Ver la ruta.
  */
-export type Accion = 'turnos' | 'codigo' | 'verificar' | 'reservar' | 'confirmar' | 'sincronizar'
+export type Accion = 'turnos' | 'codigo' | 'verificar' | 'reservar' | 'confirmar' | 'sincronizar' | 'sondeo'
 export type Sujeto = 'ip' | 'disp' | 'correo' | 'enlace' | 'clinica'
 const SUJETOS: readonly Sujeto[] = ['ip', 'disp', 'correo', 'enlace', 'clinica']
 
@@ -34,7 +36,15 @@ export const LIMITES: Readonly<Record<Accion, Partial<Record<Sujeto, readonly [n
   turnos: { ip: [120, 10] },
   codigo: { correo: [3, 60], ip: [10, 60], disp: [5, 60] },
   verificar: { ip: [20, 60] },
-  reservar: { ip: [6, 60], disp: [4, 60], enlace: [30, 1440] },
+  // Agente S (orden de Angel, 2026-11-23): `ip` y `disp` sólo cuentan con el
+  // enlace FIJO (antes 6 y 4 para los dos): las compañías de celular ponen a
+  // muchos detrás de una IP. El ÚNICO no cuenta aquí: lo frenan su uso único y
+  // sus 5 intentos en la base, y lo emite la clínica (la secretaria que agenda
+  // a varios pacientes desde la computadora del consultorio).
+  reservar: { ip: [30, 60], disp: [8, 60], enlace: [30, 1440] },
+  // Agente S: lo que no abre (y el único no vigente), con los mismos números
+  // que el fijo. Lleno, la ruta da 429 a TODO código antes de abrirlo.
+  sondeo: { ip: [30, 60], disp: [8, 60] },
   // E3 (plan_E): 10 por enlace y 30 por IP cada hora.
   confirmar: { ip: [30, 60], enlace: [10, 60] },
   // seg1: 60 pasadas con Google cada 10 min por clínica desde el POST público
@@ -123,6 +133,25 @@ export async function dentroDeLimites(accion: Accion, seudonimos: Partial<Record
   }
   const resultados = await Promise.all(llamadas)
   return resultados.every(Boolean)
+}
+
+/**
+ * Agente S: ¿tienen sitio TODOS los sujetos de la acción? Lee sin contar
+ * (`rate_limit_espera`): 0 = sí; > 0 = los segundos que faltan; null = no se
+ * sabe (RPC que falla, o sin seudónimo): quien llama falla CERRADO.
+ */
+export async function esperaSinContar(accion: Accion, seudonimos: Partial<Record<Sujeto, string | null>>): Promise<number | null> {
+  const llamadas: Promise<number | null>[] = []
+  for (const sujeto of SUJETOS) {
+    const regla = LIMITES[accion][sujeto]
+    if (!regla || seudonimos[sujeto] === undefined) continue
+    const valor = seudonimos[sujeto]
+    const llave = valor ? llaveLimite(accion, sujeto, valor) : null
+    if (!llave) return null
+    llamadas.push(espera(llave, regla[0], regla[1] * 60))
+  }
+  const esperas = await Promise.all(llamadas)
+  return esperas.some(s => s === null) ? null : Math.max(0, ...esperas.filter((s): s is number => s !== null))
 }
 
 /**

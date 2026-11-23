@@ -35,7 +35,14 @@ describe('limitesReserva', () => {
     expect(ok).toBe(false)
     expect(llamadas.map(l => l.p_ruta.split(':').slice(0, 3).join(':'))).toEqual(['reserva:reservar:ip', 'reserva:reservar:disp', 'reserva:reservar:enlace'])
     expect(llamadas.every(l => l.p_clave === 'reserva' && !l.p_ruta.includes('1.2.3.4'))).toBe(true)
-    expect(llamadas.map(l => [l.p_limite, l.p_ventana_min])).toEqual([[6, 60], [4, 60], [30, 1440]])
+    // Agente S (orden de Angel, 2026-11-23): IP 30 y dispositivo 8 por hora (antes 6 y 4); sólo los cuenta el fijo.
+    expect(llamadas.map(l => [l.p_limite, l.p_ventana_min])).toEqual([[30, 60], [8, 60], [30, 1440]])
+  })
+  it('sondeo (agente S): lo que no abre cuenta con los números del fijo, con su propia llave', async () => {
+    llamadas.length = 0
+    await dentroDeLimites('sondeo', { ip: 'c'.repeat(64), disp: 'd'.repeat(64) })
+    expect(llamadas.map(l => [l.p_ruta.split(':').slice(0, 3).join(':'), l.p_limite, l.p_ventana_min]))
+      .toEqual([['reserva:sondeo:ip', 30, 60], ['reserva:sondeo:disp', 8, 60]])
   })
   it('confirmar (E3): 30 por IP y 10 por enlace cada hora, con su propia llave', async () => {
     llamadas.length = 0

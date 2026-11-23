@@ -2,9 +2,14 @@
  * POST /api/reservar/[codigo] — reservar un turno por enlace (agenda D5).
  *
  * Pública y sin sesión. El orden importa y es éste:
- *   0. seg1 (punto 8): forma del código sin tocar la base (404) y límites por
- *      IP y dispositivo (429) ANTES de la primera consulta a la base;
- *   1. puerta común (404 uniforme); usado o caducado lo dice la RPC (410);
+ *   0. seg1 (punto 8): forma del código sin tocar la base (404) y, ANTES de la
+ *      primera consulta a la base, el freno de «sondeo» por IP y dispositivo
+ *      LEÍDO SIN CONTAR (429 a cualquier código si está lleno);
+ *   1. puerta común (404 uniforme); usado o caducado lo dice la RPC (410).
+ *      Agente S (orden de Angel, 2026-11-23): con el enlace ya abierto se
+ *      cuenta según la clase (`abrirConFreno`): fijo → IP 30 y dispositivo 8
+ *      por hora; único vigente → nada; lo que no abre y el único no vigente →
+ *      «sondeo» (404 siempre: el freno lo aplica la petición siguiente);
  *   2. forma del cuerpo (400) y casilla del aviso (`acepta_aviso: true`);
  *   3. límite por enlace fijo (429; necesita saber la clase del enlace);
  *   4. teléfono de México y correo con forma (400);
@@ -35,14 +40,15 @@
  * intentos del único (tope; agotado = 410 neutro).
  */
 import { cookies } from 'next/headers'
-import { after, type NextRequest } from 'next/server'
+import { after, NextResponse, type NextRequest } from 'next/server'
 import { ReservarSchema } from '@/lib/reserva/esquemasReserva'
 import {
   abrirEnlace, codigoAbrible, cuerpoJson, demasiadosIntentos, noEncontrado, nombreDelMedico, responder, telefonoDeContacto,
+  type EnlaceAbierto,
 } from '@/lib/reserva/puertaReserva'
 import { reagendar, reservar } from '@/lib/reserva/servidorReserva'
 import {
-  COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, esperaDeLimites, ipDe, seudonimoRed,
+  COOKIE_DISPOSITIVO, OPCIONES_COOKIE, dentroDeLimites, dispositivoDe, esperaDeLimites, esperaSinContar, ipDe, seudonimoRed,
 } from '@/lib/reserva/limitesReserva'
 import { normalizarCorreo, normalizarTelefonoMx } from '@/lib/reserva/contacto'
 import { hashDeCodigo, hmacContacto, hmacFicha } from '@/lib/reserva/secretos'
@@ -67,11 +73,8 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   const disp = dispositivoDe(almacen.get(COOKIE_DISPOSITIVO)?.value)
   if (disp.nuevo) almacen.set(COOKIE_DISPOSITIVO, disp.id, OPCIONES_COOKIE)
   const red = { ip: seudonimoRed('ip', ipDe(req.headers)), disp: seudonimoRed('disp', disp.id) }
-  // K2 (punto 10): los 429 dicen cuánto falta.
-  if (!(await dentroDeLimites('reservar', red))) return demasiadosIntentos(await esperaDeLimites('reservar', red))
-
-  const enlace = await abrirEnlace(codigo)
-  if (!enlace) return noEncontrado()
+  const enlace = await abrirConFreno(codigo, red)
+  if (enlace instanceof NextResponse) return enlace
   // Un único usado o caducado NO se corta aquí: lo dice la RPC (410), que
   // antes reconoce un reenvío del mismo client_id y devuelve la cita
   // (`repetida`, 200). Cortarlo aquí rompía la idempotencia del único.
@@ -122,6 +125,36 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
   if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, { nombre: b.nombre, correo, unico: ctx.clase === 'unico' }, r.data, !!b.origen)
   return responder(respuestaReserva(r.data.r_resultado, telefonoDeContacto(ctx, consultorio.id)))
+}
+
+/**
+ * Agente S (orden de Angel, 2026-11-23). El único vigente no cuenta por IP ni
+ * por dispositivo (antes 6 y 4 por hora, para los dos: el segundo único
+ * seguido desde el mismo navegador topaba). Para saber la clase hay que abrir
+ * el enlace, y eso no debe abrir un oráculo ni dejar sin freno los códigos
+ * que no abren. Por eso:
+ *   1. ANTES de la base se LEE (sin contar) el freno «sondeo»; lleno, 429 a
+ *      CUALQUIER código, sin abrirlo: con el freno puesto, inexistente,
+ *      revocado, pausado, agotado y válido responden igual;
+ *   2. lo que no abre (404) y el único no vigente (lo resuelve la RPC: 410 o
+ *      `repetida`) suman a «sondeo». El 404 no cambia aunque llene el freno:
+ *      el corte lo da la petición siguiente, en el paso 1;
+ *   3. el fijo cuenta por IP (30) y dispositivo (8), como antes pero con los
+ *      números nuevos; su tope por enlace sigue más abajo.
+ * Las peticiones simultáneas pasan el paso 1 a la vez (es una lectura): una
+ * ráfaga cuela tantas como lleguen juntas antes de que cuenten.
+ */
+async function abrirConFreno(codigo: string, red: { ip: string | null; disp: string | null }): Promise<EnlaceAbierto | NextResponse> {
+  const sondeo = await esperaSinContar('sondeo', red)
+  // K2 (punto 10): los 429 dicen cuánto falta (sin número si no se sabe: falla cerrado).
+  if (sondeo !== 0) return demasiadosIntentos(sondeo)
+  const enlace = await abrirEnlace(codigo)
+  if (!enlace || (enlace.ctx.clase === 'unico' && enlace.ctx.estado !== 'vigente')) await dentroDeLimites('sondeo', red)
+  if (!enlace) return noEncontrado()
+  if (enlace.ctx.clase === 'fijo' && !(await dentroDeLimites('reservar', red))) {
+    return demasiadosIntentos(await esperaDeLimites('reservar', red))
+  }
+  return enlace
 }
 
 type ConsultorioCtx = ContextoReserva['consultorios'][number]
