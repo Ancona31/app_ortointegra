@@ -348,8 +348,20 @@ test('4 · un evento de Google que se empalma con una reserva por enlace: un avi
   expect(importadas(ev)).toBe('1')
   const avisos = (): string => sqlLocal(`select count(*) from public.reserva_empalmes_google where cita_reserva_id = :'r'`, { r: reserva })
   const auditadas = (): string => sqlLocal(`select count(*) from public.audit_log where accion = 'reserva_empalme_google' and registro_id = :'r'`, { r: reserva })
-  expect(avisos()).toBe('1')
-  expect(auditadas()).toBe('1')
+  /* Se espera el par en vez de contarlo en el acto (falló una vez en la batería con 0 y sola
+     pasa siempre). La ruta espera la escritura de punta a punta, pero `ultimaBuenaHace` quita
+     el candado: otra pasada viva puede importar el evento primero (y la de esta petición ya no
+     lo ve como nuevo) y registrar el par un instante después. Lo que se prueba no cambia: un
+     par y una auditoría. Si no llega, lo recibido dice si la pasada contó el fallo en el log
+     (`avisarEmpalmes` se lo traga y la ruta responde `ok` igual). */
+  const falloEnLog = (): string => {
+    try {
+      return readFileSync('test-results/next-dev-3002.log', 'utf8').includes('empalmes con reservas sin registrar') ? '|fallo en el log' : ''
+    } catch { return '' }
+  }
+  await expect.poll(() => `${avisos()}|${auditadas()}${falloEnLog()}`, {
+    message: `par del empalme tras el sondeo (respuesta: ${JSON.stringify(s1)})`, timeout: 15_000,
+  }).toBe('1|1')
 
   // Resincronizar (y mover el evento sin dejar de empalmarse) no repite.
   const corrido = new Date(Date.parse(t.inicio) + 5 * 60_000).toISOString()
