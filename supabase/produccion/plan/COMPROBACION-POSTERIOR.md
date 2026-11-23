@@ -1,6 +1,7 @@
 # Comprobación posterior — que producción quedó IDÉNTICA al ensayo
 
-> Paso 5 de `PLAN-DE-APLICACION.md`, al día con las 9 migraciones y con la foto
+> Paso 7 de `PLAN-DE-APLICACION.md` (con el orden «código primero»: el código
+> nuevo ya está desplegado desde el paso 4), al día con las 9 migraciones y con la foto
 > real de producción (agente QL, 2026-11-22). Los comandos de §0 son los del
 > ensayo de punta a punta, que se corrió así sobre un clon nuevo de la foto
 > [C]. **Todo es de sólo lectura**: la única conexión a producción es la de
@@ -59,7 +60,9 @@ Lo que tiene que salir (salió así en el ensayo [C]):
   `referencia.claves`.
 
 Lo que el clon no ensaya: datos (el backfill de F1 pasa por construcción con 0
-consultorios) ni la latencia del pooler.
+consultorios) ni la latencia del pooler. Con datos sintéticos del tamaño real
+(18 consultorios, 247 citas) lo midió el agente PL: `PLAN-DE-APLICACION.md`
+§5.1 (las 9 sin REVISAR, 18 consultorios respaldados).
 
 ---
 
@@ -89,7 +92,8 @@ cut -f1-5 ~/spinus-produccion-foto-despues/difs-antes-despues.tsv | sort \
   si se repitió con otra foto).
 - **El `diff` tiene que salir vacío y escribir `IGUAL QUE EL ENSAYO`.** Una línea
   `<` es algo que el ensayo cambió y producción no; una `>`, algo que cambió en
-  producción y no en el ensayo. Cualquiera: no se despliega y se investiga.
+  producción y no en el ensayo. Cualquiera: no se enciende nada y se investiga
+  (el código nuevo ya está desplegado y sigue sirviendo con la v2 apagada).
 - Comparan foto con foto (las dos de `foto-produccion.sh`), así que las 14
   diferencias foto ↔ clon no aparecen aquí.
 
@@ -191,8 +195,9 @@ respaldados de F1, todos los consultorios).
 ## 7. Humo con la v2 APAGADA (Angel, con su cuenta)
 
 La app de siempre tiene que seguir igual. Sin datos de pacientes reales en
-ningún registro: sólo «sí/no» y cuentas. Se hace **después del despliegue del
-código** (paso 6 del plan) y, si se quiere, también antes (código viejo).
+ningún registro: sólo «sí/no» y cuentas. Se hace **después de aplicar las 9**
+(paso 6 del plan), con el código nuevo ya desplegado (paso 4). La versión corta
+de esto con la base vieja es el paso 5 del plan.
 
 Antes de empezar, una marca de tiempo (sólo lee):
 

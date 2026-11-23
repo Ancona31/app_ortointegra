@@ -6221,9 +6221,23 @@ de la oleada 3:
     un fallo al aplicar un bloqueo movido o borrado en Google cuenta en
     `errores` y la página avanza.
 
+* **(e) Las llamadas a Google no tienen tope de tiempo propio** (ampliación de
+  la oleada 3, 2026-11-22; orden de Angel). `abrirSesionGoogle`
+  (`src/lib/gcal.ts:230-250`) crea el cliente OAuth y `google.calendar(…)` sin
+  `timeout`, y gaxios (7.1.4) sólo pone un tope si la petición trae
+  `opts.timeout` (`node_modules/gaxios/build/cjs/src/gaxios.js:432`): por
+  omisión, ninguno [C, lectura; no se comprobó en ejecución]. Una llamada
+  colgada sólo la corta el `AbortSignal` de quien llama (donde lo hay, p. ej. el
+  `TIEMPO_GOOGLE_MS` de la reserva) o el límite de la función de Vercel; en un
+  `after()` o en la tarea programada, se come el presupuesto y lo que queda
+  detrás no se hace. **No se tocó:** `gcal.ts` lo usa también la agenda con la
+  v2 apagada (la de `main`), y cambiarlo ahí cambia su comportamiento.
+
 **Arreglo de fondo (el mismo para todo lo de arriba):** una cola de pendientes
 en la base (por clínica), que la pasada siguiente o una tarea reintenta antes de
-dar el trabajo por hecho, con su migración y su auditoría.
+dar el trabajo por hecho, con su migración y su auditoría. Para (e), además, un
+`timeout` explícito en el cliente de Google, medido contra los presupuestos de
+cada llamador.
 
 **Cuándo:** en su propia rama, después de producción y **antes de encender la
 v2 en otras clínicas**.
@@ -6305,6 +6319,39 @@ por omisión de la función: con Fluid Compute en Pro, 300 s (regla «La agenda
 depende de Fluid Compute en Vercel» de `CLAUDE.md`). No se toca; queda anotada
 para que nadie le ponga un límite corto sin mirar lo que hace la ruta antes de
 responder.
+
+### AG-DT-268 — Límite de duración y candado de las tareas de Google y del recordatorio van juntos
+
+**Estado:** regla, **sin arreglo pendiente** (oleada 3, 2026-11-22; orden de
+Angel: «para que nadie suba uno sin mirar el otro»). Cada ruta de abajo tiene un
+`maxDuration` que debe quedar por debajo de su candado o de su plazo de
+reintento: si la función vive más que el candado, otra ejecución entra mientras
+la primera sigue y las dos trabajan lo mismo (dos sincronizaciones de la misma
+clínica, o dos correos del mismo recordatorio). Líneas comprobadas abriendo cada
+archivo el 2026-11-22:
+
+| Ruta | `maxDuration` | Candado / plazo | Presupuesto interno | Frecuencia (`vercel.json`) |
+|---|---|---|---|---|
+| `/api/cron/google-sync` | 60 s (`src/app/api/cron/google-sync/route.ts:40`) | `LEASE_SEG = 90` (`:52`), «más que `maxDuration`» | `PRESUPUESTO_TOTAL_MS` 45 s (`:43`) | cada 10 min (`*/10`) |
+| `/api/cron/recordatorios` | **120 s** (`src/app/api/cron/recordatorios/route.ts:46`; era 60, subido en la oleada 3) | un envío `enviando` lo puede volver a tomar otra ejecución a los **10 min** (`cita_correo_tomar`, `supabase/migrations/20261201160000_agenda_f4_confirmacion_correos_avisos.sql:969` y `:980`; el listado lo mira igual en `:1049` y `:1053`; `COMMENT` de `cita_correos.testigo`, `:381-382`) | `PRESUPUESTO_MS` 45 s (`:50`) | cada 15 min (`*/15`) |
+| `/api/google/sync` (el sondeo al abrir la agenda) | 30 s (`src/app/api/google/sync/route.ts:37`) | `LEASE_SEG = 30` (`:43`), «más que el presupuesto» | `PRESUPUESTO_MS` 8 s (`:41`) | no es tarea programada |
+
+Reglas:
+
+* **`maxDuration` < candado/plazo, con margen.** google-sync: 60 < 90.
+  Recordatorios: 120 < 600, y 120 < 900 (la frecuencia): dos pasadas no se
+  pisan. `google/sync`: el candado (30 s) es **igual** al límite (30 s), no
+  mayor; como se toma después de arrancar, caduca un poco después de que muera la
+  función, y el presupuesto (8 s) queda muy por debajo. Si alguien sube su
+  `maxDuration`, sube antes `LEASE_SEG`.
+* **La frecuencia de `vercel.json` > `maxDuration`.** Hoy 600 > 60 y 900 > 120.
+* **Los dos candados viven en la base.** El de Google lo toma por clínica
+  `gcal_sync_tomar` con `leaseSeg` (`src/lib/gcalSincronizacionBase.ts:135`),
+  el MISMO para el sondeo y la tarea: cada ruta pasa el suyo. El del
+  recordatorio es la fila de `cita_correos` con su `testigo`: cambiar el plazo de
+  10 min exige migración y revisar esta tabla.
+* Las pruebas fijan los valores: `src/lib/tests/cronGoogleSync.test.ts:89` (60) y
+  `src/lib/tests/cronRecordatorios.test.ts:106` (120).
 
 ---
 
