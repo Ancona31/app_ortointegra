@@ -4,19 +4,31 @@
 -- ni un db reset la apliquen. Se pega a mano y SÓLO si Angel lo pide:
 -- reabre el hueco (TRUNCATE no pasa por la RLS ni por la auditoría).
 -- ───────────────────────────────────────────────────────────────────────
--- Deja los permisos como estaban antes de la migración:
---   · devuelve TRUNCATE en las 30 tablas del inventario de la migración, a
---     los mismos roles que lo tenían (las que no existan se saltan);
---   · devuelve TRUNCATE en los privilegios por omisión de postgres en public;
+-- QUÉ HACE: deja los permisos como estaban en PRODUCCIÓN antes de la
+--   migración:
+--   · devuelve TRUNCATE en las 28 tablas del inventario de abajo, a los
+--     mismos roles que lo tenían (las que no existan se saltan);
+--   · devuelve TRUNCATE en los privilegios por omisión de postgres en public
+--     (en producción eran arwdDxtm para los tres roles);
 --   · quita los 11 disparadores trg_<tabla>_sin_truncate y la función
 --     public.prohibir_truncate().
--- No toca audit_log (prevent_audit_truncate y su REVOKE son de
--- 20261125170000) ni el disparador propio de firmas_documento.
--- ⚠️ El inventario es el de la base local (2026-11-22). La migración quita el
--- privilegio sobre el catálogo de la base donde corre: si en producción quitó
--- TRUNCATE a otras tablas (la fila 2 de su rejilla las lista), añádelas a
--- v_inventario antes de pegar esto.
--- Ensayo: en seco (BEGIN … ROLLBACK) sobre la base local, 2026-11-22.
+-- EL INVENTARIO es el de la foto de la estructura de producción (22/11/2026,
+--   aclexplode(relacl) de cada tabla de public; todos con otorgante postgres),
+--   no el de la base local, que difería en cinco tablas. Fuera de él, a
+--   propósito:
+--   · audit_log: su TRUNCATE lo quita 20261125170000 (va antes por nombre) y
+--     lo devuelve su propia reversa, que se corre después de ésta;
+--   · las tablas de la agenda v2 (agenda_ajustes, tipos_cita, …): se crean
+--     después de esta migración y ya nacen sin TRUNCATE para esos roles.
+--   Si la migración quitó TRUNCATE a alguna tabla que no está aquí (la fila 2
+--   de su rejilla las lista, con lo que había en la base al aplicarla),
+--   añádela a v_inventario antes de pegar esto.
+-- DEPENDE DE: que la migración esté aplicada (si no existe
+--   public.prohibir_truncate(), aborta sin tocar nada).
+-- RIESGO: bajo. GRANT y ALTER DEFAULT PRIVILEGES sólo escriben catálogo; cada
+--   DROP TRIGGER toma ACCESS EXCLUSIVE un instante sobre su tabla
+--   (lock_timeout 5 s: si alguna está ocupada, aborta entera). Una transacción.
+-- SEGUNDA PASADA: aborta limpio (la función ya no está).
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -25,29 +37,32 @@ SET LOCAL lock_timeout = '5s';
 
 DO $$
 DECLARE
-  -- tabla:roles que tenían TRUNCATE antes de la migración (aclexplode, base local).
+  -- tabla:roles que tenían TRUNCATE en producción antes de la migración (foto de la estructura).
   v_inventario constant text[] := ARRAY[
-    'addendums:anon,authenticated,service_role', 'agenda_ajustes:service_role',
+    'addendums:anon,authenticated,service_role',
     'analitos_catalogo:anon,authenticated,service_role', 'appointments:anon,authenticated,service_role',
     'calculadora_resultados:anon,authenticated,service_role', 'casos_clinicos:anon,authenticated,service_role',
     'casos_clinicos_recursos:anon,authenticated,service_role', 'cat_cie10:anon,authenticated,service_role',
-    'clinica_conexiones_google:anon,service_role', 'clinicas:anon,authenticated,service_role',
+    'clinica_conexiones_google:service_role', 'clinicas:anon,authenticated,service_role',
     'consultas:anon,authenticated,service_role', 'consultorios:anon,authenticated,service_role',
-    'documentos:anon,authenticated,service_role', 'firmas_documento:anon,service_role',
-    'folios_contador:anon,authenticated,service_role', 'google_tokens:anon,authenticated,service_role',
+    'documentos:anon,authenticated,service_role', 'firmas_documento:service_role',
+    'folios_contador:service_role', 'google_tokens:anon,authenticated,service_role',
     'invitaciones:anon,authenticated,service_role', 'ip_rate_limits:anon,authenticated,service_role',
     'medicamentos:anon,authenticated,service_role', 'mediciones_analitos:anon,authenticated,service_role',
     'paciente_medico:anon,authenticated,service_role', 'pacientes:anon,authenticated,service_role',
-    'pdf_jobs:anon,authenticated,service_role', 'plantillas_documento:anon,authenticated,service_role',
+    'pdf_jobs:anon,authenticated,service_role', 'plantillas_documento:authenticated,service_role',
     'plantillas_honorarios:anon,authenticated,service_role', 'profiles:anon,authenticated,service_role',
     'rate_limits:anon,authenticated,service_role', 'solicitudes_arco:anon,authenticated,service_role',
-    'stripe_webhook_events:anon,authenticated,service_role', 'tipos_cita:service_role'];
+    'stripe_webhook_events:anon,authenticated,service_role'];
   v_tablas constant text[] := ARRAY['addendums', 'appointments', 'calculadora_resultados', 'casos_clinicos',
     'casos_clinicos_recursos', 'consultas', 'documentos', 'mediciones_analitos', 'paciente_medico',
     'pacientes', 'solicitudes_arco'];
   v_e text;
   v_t text;
 BEGIN
+  IF to_regprocedure('public.prohibir_truncate()') IS NULL THEN
+    RAISE EXCEPTION 'REVERSA ABORTADA: 20261126120000 no está aplicada (no existe public.prohibir_truncate()). No se toca nada.';
+  END IF;
   FOREACH v_e IN ARRAY v_inventario LOOP
     IF to_regclass('public.' || split_part(v_e, ':', 1)) IS NOT NULL THEN
       EXECUTE format('GRANT TRUNCATE ON TABLE public.%I TO %s', split_part(v_e, ':', 1),
