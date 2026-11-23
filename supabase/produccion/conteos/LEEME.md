@@ -112,6 +112,10 @@ Las consultas «aparte» que se citan son de lectura y las corres tú con `psql`
 
 ### G · general
 
+> **G.14, G.15 y G.16 se vuelven a mirar justo antes de empezar a aplicar**
+> (`../plan/PLAN-DE-APLICACION.md`, §4, paso 3, orden de Angel): con G.14
+> `ninguna`, G.15 `ninguno` y G.16 `true` se empieza; con otra cosa, no.
+
 | id | Qué significa | Sigue si | Si no |
 |---|---|---|---|
 | G.01 | Versión de Postgres. La foto es la **17.6**, y el `psql`/`pg_dump` de `aplicar.sh` son los de la imagen local (17.6). F3 concede `MAINTAIN` (sólo existe desde la 17). | `17.x` | Supabase cambió de versión mayor desde la foto: no apliques; toma otra foto y repite el ensayo (y fuerza `IMAGEN_PG` con una imagen de esa versión). |

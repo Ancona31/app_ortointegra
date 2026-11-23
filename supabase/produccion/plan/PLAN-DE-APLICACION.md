@@ -16,6 +16,19 @@
 > §6), la regla de reversa (§10) y la tabla exacta de variables de Vercel (§6.2).
 > «[C-PL]» = comprobado por PL en un clon de la foto con datos sintéticos del
 > tamaño real (§5).
+>
+> **Actualizado por el agente CA (2026-11-22, rama
+> `feature/agenda-v2-produccion-ca`) tras la auditoría independiente, ronda 1
+> (`../auditoria/RONDA-1.md`):** `aplicar.sh` manda **cada archivo en una sola
+> petición** y acota la transacción ociosa (A1, §2 y §5); tras un fallo
+> **pregunta al catálogo** en vez de afirmar, y se detiene si no puede leer el
+> historial (A2, §8); la reversa **comprueba toda la cadena antes de empezar**
+> (A5, §10); el respaldo fallido ya no deja un archivo con nombre válido (A8).
+> Además: se aplica **a una hora sin consulta** (§4, paso 0), `CRON_SECRET`
+> **antes de desplegar** (§6.2), la medición de la agenda al encender (§15) y los
+> límites aceptados (§14). «[C-CA]» = comprobado por CA en el clon
+> `clon-spinus-ca-1` de la foto real, con el guion nuevo; salidas en
+> `~/spinus-fusion/ensayo-ca/` (fuera del repo).
 
 Archivos de esta carpeta:
 
@@ -23,6 +36,7 @@ Archivos de esta carpeta:
 |---|---|
 | `aplicar.sh` | El único comando del día: `estado`, `respaldo`, `aplicar`, `reversa`, `reversa-truncate`. |
 | `huellas.sha256` | sha256 de las 9 migraciones y sus 9 reversas, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
+| `reversa-previa.sql` | Sólo lee. `aplicar.sh reversa` la corre antes de la primera reversa: reúne las negativas de toda la cadena (§10.1). |
 | `rejillas-del-ensayo.txt` | La rejilla final de cada archivo, literal, del ensayo de punta a punta sobre el clon de la foto (§11). |
 | `diferencias-antes-despues.clon-foto.tsv` | Las 958 diferencias de estructura antes → después de ese ensayo (claves: estado, tipo, esquema, clave, campo). |
 | `COMPROBACION-POSTERIOR.md` | Cómo comprobar que producción quedó idéntica al ensayo (paso 7). |
@@ -72,12 +86,72 @@ bash supabase/produccion/plan/aplicar.sh aplicar
 ```
 
 Por cada una de las 9: comprueba que no esté ya en el historial (si está, la
-salta), comprueba su sha256 contra `huellas.sha256`, pide escribir su versión,
-la ejecuta con `psql -X -v ON_ERROR_STOP=1 -f` (imagen de Postgres 17.6 del
-stack local, en un contenedor efímero, `supabase/` montado sólo lectura), para
-si `psql` falla o si su rejilla tiene alguna fila `REVISAR`, y la registra con
-la CLI: `npx --yes supabase@2.117.0 migration repair --status applied <versión>
+salta; si no puede LEER el historial, se detiene), comprueba en el catálogo que
+no esté ya aplicada sin registrar (su objeto testigo, §8), comprueba su sha256
+contra `huellas.sha256`, pide escribir su versión, la ejecuta con `psql` (imagen
+de Postgres 17.6 del stack local, en un contenedor efímero), para si `psql`
+falla o si su rejilla tiene alguna fila `REVISAR`, y la registra con la CLI:
+`npx --yes supabase@2.117.0 migration repair --status applied <versión>
 --db-url <URL sin contraseña>`. Comprueba que la fila quedó en el historial.
+
+**Cómo viaja cada archivo (A1, desde la oleada 3, ronda 1): ENTERO, EN UNA SOLA
+PETICIÓN.** Cada archivo es una sesión de `psql` con tres peticiones:
+
+```bash
+psql -X -v ON_ERROR_STOP=1 -P pager=off \
+  -c "SET idle_in_transaction_session_timeout = '10s'; SET lock_timeout = '5s'; SET statement_timeout = '120s'" \
+  -c "SELECT 'sesión: …' || current_setting(…)"   \   # deja en la salida los tres ajustes, para verlos
+  -c "<el archivo entero>"
+```
+
+- **Qué hace `psql -c` con un texto de varias sentencias** (documentación de
+  `psql` de PostgreSQL 17, opción `-c`,
+  https://www.postgresql.org/docs/17/app-psql.html, leída el 2026-11-22):
+  «Each SQL command string passed to -c
+  is sent to the server as a single request. Because of this, the server
+  executes it as a single transaction even if the string contains multiple SQL
+  commands, unless there are explicit BEGIN/COMMIT commands included in the
+  string to divide it into multiple transactions.» Los 9 archivos y las 9
+  reversas traen su `BEGIN; … COMMIT;` y, después, la `SELECT` de la rejilla:
+  el servidor ejecuta la transacción del archivo tal cual y la rejilla en su
+  propia transacción implícita. Un solo mensaje de consulta simple del
+  protocolo; el servidor no espera al cliente entre sentencias.
+  **[C-CA] Medido en el registro del servidor** (`log_min_duration_statement =
+  0` en el clon): **3 peticiones por archivo** (los SET, la línea de ajustes y
+  el archivo), en las 28 sesiones de archivo del ensayo; con `-f` eran 7–200
+  (una por sentencia).
+- **La rejilla y los NOTICE se siguen viendo.** psql 17 enseña el resultado de
+  CADA sentencia del texto (variable `SHOW_ALL_RESULTS`, activa por omisión;
+  la descripción de la variable no se releyó literal: el comportamiento se
+  comprobó en el clon) y los NOTICE/WARNING según llegan. Misma página: en
+  `-c` «you cannot mix SQL and psql meta-commands». [C-CA] Las 9 rejillas del
+  ensayo con el guion nuevo son **idénticas byte a byte** a las del guion viejo
+  (`rejillas-del-ensayo.txt`, `diff` vacío), con los mismos NOTICE.
+- **Se detiene igual.** Ante un error, el servidor deja de ejecutar el resto
+  del texto y deshace la transacción abierta; `psql` sale con 1 [C-CA: F3 con un
+  candado ajeno → `canceling statement due to lock timeout`, F3 no quedó, el
+  guion paró; con una fila `REVISAR` provocada, paró igual]. Lo que queda
+  aplicado tras un fallo es lo mismo que con `-f`: todo el archivo o nada,
+  porque cada archivo es una transacción (salvo un fallo DESPUÉS de su `COMMIT`,
+  que el guion ahora detecta: §8).
+- **`SET LOCAL`, bloques `DO $$…$$` y comillas**: van dentro del texto, que el
+  servidor analiza entero; `psql` no lo trocea ni interpola variables en `-c`.
+  Ningún archivo usa meta-comandos `\…` (comprobado con `grep`): con `-c` no se
+  podrían mezclar con SQL.
+- **Tamaño:** un argumento de la línea de órdenes no puede pasar de 128 KiB en
+  Linux (`MAX_ARG_STRLEN` = 131 072 bytes). El mayor, F3, tiene 102 233 bytes.
+  `aplicar.sh` se niega, sin correr nada, a mandar un archivo de 130 000 bytes o
+  más.
+- **Una diferencia nueva:** como el servidor ya tiene el archivo entero, **si el
+  cliente se corta a media aplicación, el servidor TERMINA el archivo** (y lo
+  confirma) aunque nadie vea la rejilla [C-CA, §5.2]. Por eso, tras un fallo,
+  `aplicar.sh` pregunta al catálogo (§8).
+- **Los tres ajustes de sesión** van con SQL (`SET`), no con `PGOPTIONS`: un
+  `SET` en la propia sesión pasa por cualquier pooler en modo sesión. Que
+  Supavisor deje pasar opciones de arranque (`PGOPTIONS`/`options`) no se pudo
+  comprobar sin producción, y así no hace falta. La línea «sesión:
+  idle_in_transaction_session_timeout=10s, lock_timeout=5s,
+  statement_timeout=2min» de cada `*.salida.txt` confirma que se aplicaron.
 
 **Por qué `psql` + `migration repair` y no `supabase db push`:**
 
@@ -93,14 +167,11 @@ la CLI: `npx --yes supabase@2.117.0 migration repair --status applied <versión>
   `supabase/migrations/` que no esté en el historial. Hoy no hay ninguno de más
   (el historial cuadra con las 5 de `main`), así que este motivo pesa menos que
   en el borrador.
-- Lo que `db push` haría mejor: manda cada archivo en una sola petición, con lo
-  que las ventanas de candado serían algo más cortas (sin un viaje por
-  sentencia). C1–C3 dejaron en 3–13 sentencias las ventanas fuertes de F1, F4
-  y F5b, **pero no las de F3 y F2**: su ACCESS EXCLUSIVE sobre `appointments`
-  dura **90 y 60 sentencias** desde el `ALTER TABLE` hasta el `COMMIT` [C-PL,
-  §5]. Por el pooler eso son segundos, no décimas (§5, estimación). Es el
-  argumento más fuerte a favor de mandar cada archivo en una sola petición
-  (§12, punto 6).
+- Lo que antes `db push` hacía mejor —mandar cada archivo en una sola petición,
+  sin un viaje por sentencia— ahora lo hace también `aplicar.sh` (arriba). Con
+  `-f`, el ACCESS EXCLUSIVE de F3 y F2 sobre `appointments` duraba 90 y 60
+  viajes; medido con 150 ms de ida y vuelta, 13,5 s y 8,9 s. Con una petición,
+  50 y 30 ms (§5).
 
 **Sobre «se aplica a producción con la CLI» (CLAUDE.md, flujo del 2026-11-22).**
 Este plan **usa la CLI para registrar** (`migration repair`) pero **no para
@@ -165,9 +236,15 @@ encendido.
 - [ ] Los conteos en OK (paso 3), corridos por Angel **ese mismo día**, justo
       antes de aplicar: el conteo previo del 2026-11-22 no vale por sí solo.
 - [ ] **Orden explícita de Angel**, ese día.
+- [ ] **Se aplica a una hora sin consulta** (decisión de Angel): ninguna
+      clínica atendiendo ni agendando. Aunque con el guion nuevo la ventana con
+      `appointments` cerrada es de decenas de milisegundos (§5), código y base
+      se tocan en la misma sesión y, si algo sale mal, hay que poder parar sin
+      nadie en consulta.
 - [ ] Nadie más desplegando ni tocando la base.
 - [ ] Las variables de Vercel del §6.2 preparadas (generadas en la terminal de
-      Angel, sin escribirlas en ningún archivo).
+      Angel, sin escribirlas en ningún archivo), **`CRON_SECRET` incluida: se
+      pone ANTES de desplegar** (§6.2).
 
 > **El orden del día (decisión de Angel, 2026-11-22): CÓDIGO PRIMERO y la BASE
 > inmediatamente después, en la misma sesión**, con la v2 apagada en todas las
@@ -206,8 +283,12 @@ AES256` (el volcado en claro nunca toca el disco), en
 `.sha256`. Comprobarlo con la línea que imprime al final (cuenta tablas con
 datos). Si `pg_dump` diera `permission denied` en un esquema gestionado:
 `RESPALDO_EXTRA="--exclude-schema=vault"`. Se borra con `shred -u` a los 7 días
-si nada lo necesitó. No se copia a ningún otro sitio. (Ensayado por L con la
-frase por stdin; no se repitió en este ensayo.)
+si nada lo necesitó. No se copia a ningún otro sitio. El volcado se escribe a
+`respaldo-<fecha>.dump.gpg.parcial` y **sólo se renombra si `pg_dump` y `gpg`
+salieron bien** (A8): si algo falla, borra el parcial y dice «NO hay respaldo»;
+no queda ningún archivo con nombre de respaldo bueno. [C-CA: con `pg_dump`
+forzado a fallar, ese mensaje y la carpeta sin `.gpg`; uno bueno del clon, con su
+`.sha256` verificado, se descifró y `pg_restore -l` lo leyó.]
 
 ### Paso 2 · La foto «antes»
 
@@ -265,7 +346,25 @@ perfiles y `audit_log` en la rejilla son estimaciones de `reltuples`; la exacta
 de consultorios la da F1.11: 18).
 
 **Este conteo hay que REPETIRLO justo antes de aplicar** (el mismo
-`correr-conteos.sh`, el mismo día, después del paso 5 y antes del 6). Qué mirar:
+`correr-conteos.sh`, el mismo día, después del paso 5 y antes del 6).
+
+> **Justo antes de empezar el paso 6 (orden de Angel): las filas de sesiones y
+> candados abiertos.** En la rejilla de ese conteo repetido, mirar **G.14**
+> (otras sesiones con una transacción abierta hace más de 60 s), **G.15**
+> (candados de otras sesiones, con transacción de más de 5 s, sobre las tablas
+> que se alteran) y **G.16** (si el rol ve la actividad de las demás). **Valor
+> aceptable: G.14 `ninguna`, G.15 `ninguno` y G.16 `true`.** Cualquier otra
+> cosa: no se empieza; esperar un minuto y repetir el conteo (si es una pestaña
+> propia del SQL Editor, cerrarla); si persiste, identificar la sesión como dice
+> `../conteos/LEEME.md` (G.14) sin terminar sesiones ajenas. Con G.16 en
+> `false`, G.14 y G.15 pueden contar de menos: no fiarse de su OK. Ojo: G.14
+> sólo enseña transacciones de más de 60 s y G.15 de más de 5 s; lo más corto
+> no frena nada (las migraciones esperan hasta 5 s y abortan limpias).
+> Y `aplicar.sh estado` enseña la **ida y vuelta medida** (mediana de 5
+> `select 1`): se anota; es el RTT real de la terminal de Angel al pooler (A1,
+> criterio c).
+
+Qué mirar, además:
 
 - **Lo que cambia con el tiempo** y puede salir distinto ese día: **G.14/G.15**
   (si hay una transacción larga o candados de otra sesión, esperar), **G.17**
@@ -286,7 +385,11 @@ de consultorios la da F1.11: 18).
 
 **Antes de desplegar** (Vercel → Project → Settings):
 
-- [ ] Las variables nuevas del §6.2 puestas en **Production** (Settings →
+- [ ] **⚠️ `CRON_SECRET` PUESTA ANTES DE DESPLEGAR** (Production, Sensitive).
+      Las dos tareas programadas **nacen con este despliegue** (§6.3): sin la
+      variable ya puesta, cada invocación de `google-sync` y `recordatorios`
+      responde 401 hasta que se ponga y se vuelva a desplegar.
+- [ ] Las demás variables nuevas del §6.2 puestas en **Production** (Settings →
       Environment Variables). Vercel aplica una variable a los despliegues que
       se hagan **después** de ponerla: se ponen antes de desplegar.
 - [ ] `AGENDA_RSVP_GOOGLE` **sin definir** (apagada; §6.2).
@@ -344,9 +447,13 @@ base vieja» dure minutos.
 bash supabase/produccion/plan/aplicar.sh aplicar
 ```
 
-Pide `PRODUCCION`, la contraseña y, antes de cada archivo, su versión. En el
-ensayo [C] cada una tardó 0,24–0,53 s en el clon (en las tres corridas) (incluye arrancar el
-contenedor de `psql`); por el pooler, más (§5). Mientras se aplica, el código
+Pide `PRODUCCION`, la contraseña y, antes de cada archivo, su versión. Con el
+guion nuevo [C-CA] cada una tardó 0,25–0,50 s en el clon sin retardo y
+1,19–1,51 s con 150 ms de ida y vuelta simulados (incluye arrancar el
+contenedor de `psql`, conectar y la línea de ajustes); la parte con candados es
+la del servidor (§5). Cada `*.salida.txt` empieza por la línea «sesión:
+idle_in_transaction_session_timeout=10s, lock_timeout=5s,
+statement_timeout=2min». Mientras se aplica, el código
 nuevo ya está desplegado: cada prefijo del orden es un estado que E2 probó o
 dedujo seguro con la v2 apagada (§8, «Quedarse a medias»), y las tareas
 programadas no hacen nada mientras ninguna clínica tenga la v2 (§6.3). Lo que hay que mirar en cada
@@ -379,13 +486,93 @@ Sólo cuando §13 esté resuelto. `agenda_ajustes.agenda_v2_encendida` **sólo**
 cambian `postgres`/`supabase_admin` (`trg_agenda_ajustes_proteger`): desde el
 SQL Editor, para la clínica de pruebas de Angel.
 
+**Antes de encender**, con la v2 todavía apagada: la medición «antes» de §15
+(cuánto tarda en abrir la agenda). **Primer paso tras encender** (orden de
+Angel): la medición «después» de §15, con la misma cuenta, el mismo equipo y la
+misma red, y compararla. Si sale peor de lo que dice §15, se apaga.
+
 ---
 
 ## 5. Candados y ventanas (las de hoy, tras C1–C3 y T)
 
 Cada archivo es UNA transacción: cada candado se mantiene hasta su `COMMIT`.
 Todos llevan `SET LOCAL lock_timeout = '5s'`; las de la agenda, además,
-`statement_timeout` 60 s (F5b 120 s).
+`statement_timeout` 60 s (F5b 120 s). La sesión de `aplicar.sh` fija además
+`idle_in_transaction_session_timeout` 10 s, `lock_timeout` 5 s y
+`statement_timeout` 120 s (§2).
+
+### 5.0 Medido con el guion NUEVO (un archivo, una petición) [C-CA, 2026-11-22]
+
+**Cómo.** Clon `clon-spinus-ca-1` de la foto real (14 diferencias foto ↔ clon,
+todas esperadas), como `postgres` NO superusuario. Para cada condición se
+aplicaron F3 y luego F2 sobre la base con las cuatro anteriores, y se
+revirtieron después. Dos sondas en paralelo, desde otras sesiones:
+
+- una que mira `pg_locks` cada 5 ms y apunta cuándo está concedido el ACCESS
+  EXCLUSIVE sobre `public.appointments` (ventana = última muestra − primera);
+- una «agenda» que lee `select count(*) from public.appointments` cada 20 ms y
+  apunta la lectura más lenta (lo que esperaría una petición de la app).
+
+**El retardo de red** se simuló con un proxy TCP escrito para esto
+(`~/spinus-fusion/ensayo-ca/proxy_retardo.py`, 60 líneas de `python3` sin
+dependencias: entrega cada trozo, en cada sentido, la mitad del retardo después).
+`tc netem` no se pudo usar: la imagen de Postgres no trae `tc` y en el equipo
+hace falta ser root. El retardo medido con `select 1` a través del proxy:
+**50,6 ms** y **150,8 ms** de ida y vuelta (sin proxy, 0,14 ms).
+
+| Archivo | Modo | Sin retardo | 50 ms de ida y vuelta | 150 ms de ida y vuelta |
+|---|---|---|---|---|
+| F3 | viejo (`psql -f`, una petición por sentencia) | 40 ms · lectura más lenta 40 ms | **4,55 s** · 4,54 s | **13,46 s** · 13,45 s |
+| F3 | **nuevo (`aplicar.sh`, `-c`)** | 20 ms · 10 ms | **45 ms** · 32 ms | **50 ms** · 48 ms |
+| F2 | viejo | 20 ms · 14 ms | **3,01 s** · 3,01 s | **8,91 s** · 8,90 s |
+| F2 | **nuevo** | 5 ms · 4 ms | **15 ms** · 17 ms | **30 ms** · 35 ms |
+
+(Primera cifra: ACCESS EXCLUSIVE visto por la sonda de `pg_locks`; segunda: la
+lectura de citas más lenta. Resolución de la sonda: 5 ms.) Las rejillas, en las
+12 corridas, sin ninguna REVISAR. **Lectura:** el estimado de hoy para el guion
+viejo (F3 4,5–13,5 s, F2 3–9 s con 50–150 ms) se confirma medido: 4,55/13,46 s
+y 3,01/8,91 s. Con el guion nuevo la ventana ya no depende de la red: es el
+tiempo de servidor (35 ms y 16 ms medidos por PL con 247 citas, §5.1), por
+debajo de los 3 s de `anon` y los 8 s de `authenticated` con mucho margen. Lo
+mismo vale para las demás ventanas de la tabla de §5.1: con una petición, la
+columna «ESTIMADO por el pooler» deja de aplicar y queda la de servidor.
+
+**De punta a punta con 150 ms** [C-CA]: `aplicar.sh reversa`, `reversa-truncate`
+y `aplicar` completos a través del proxy, en verde y sin REVISAR; cada archivo,
+1,19–1,51 s (casi todo es arrancar el contenedor, conectar y las otras dos
+peticiones); las 9 con su registro por la CLI, 63 s.
+
+### 5.2 Si el cliente se corta a media F3 [C-CA, 2026-11-22]
+
+Con 150 ms de ida y vuelta, se cortó el `psql` que aplicaba F3 y se midió
+cuánto tardaba el servidor en soltar el ACCESS EXCLUSIVE sobre `appointments`.
+«Matar» = `kill -9` (el sistema cierra la conexión y el servidor lo ve);
+«congelar» = `docker pause` del cliente: la conexión queda abierta sin que nadie
+hable, como un portátil suspendido o un wifi que se cae sin cerrar.
+
+| Modo | Corte | Candado suelto tras el corte | ¿F3 quedó? |
+|---|---|---|---|
+| viejo (`-f`), sin ajuste de sesión | matar a los 6 s | 0,14 s | no (se deshizo) |
+| viejo (`-f`), sin ajuste de sesión | **congelar** a los 6 s | **nunca**: a los 30 s seguía `idle in transaction` con el candado; se soltó a los 43,8 s, al descongelar y matar el cliente a mano | no |
+| viejo (`-f`) **con** `idle_in_transaction_session_timeout = 10s` | congelar a los 6 s | **10,15 s** (el servidor corta la sesión) | no |
+| **nuevo** (`aplicar.sh`), con el servidor A MEDIA F3 (otra sesión retenía `appointments` 4 s, así que F3 estaba dentro de su transacción esperando su `ALTER TABLE`) | matar a los 2,5 s | el servidor **siguió**: terminó F3 1,6 s después del corte, al soltarse el candado ajeno | **sí, entera** |
+| nuevo, ídem | congelar a los 2,5 s | ídem, 1,8 s | **sí, entera** |
+
+**Lectura.** Con el guion viejo, una conexión que se queda colgada a media F3 o
+F2 dejaba la agenda de todas las clínicas detenida **sin límite** (lo que temía
+el auditor). Con el nuevo ya no puede pasar: el servidor tiene el archivo entero
+y no espera al cliente; termina (o falla y deshace) por su cuenta, en lo que
+tarde el servidor. Y si algún día un archivo quedara ocioso dentro de su
+transacción, el ajuste de sesión lo corta a los 10 s (comprobado con el modo
+viejo). **La contrapartida:** si la conexión de Angel se corta a media
+aplicación, el archivo puede quedar APLICADO sin que se vea su rejilla y sin
+registrar: `aplicar.sh` lo detecta al repetir (§8, «aplicada sin registrar»).
+
+**Lo que no se pudo ensayar:** el pooler real. Con Supavisor en medio, lo que ve
+el servidor no es la terminal de Angel sino el pooler: si la terminal se corta,
+la conexión del pooler al servidor sigue viva hasta que Supavisor lo note (no
+medido). Con el guion nuevo da igual para los candados (el servidor no espera a
+nadie); con el viejo, eso era exactamente el caso «congelar».
 
 | # | Tabla | Candado | Cómo se pide | Ventana (desde el candado hasta el COMMIT) |
 |---|---|---|---|---|
@@ -422,7 +609,12 @@ rejillas sin ninguna REVISAR; F1 respaldó **18** consultorios y `audit_log` pas
 de 149 a 167 (+18, una por consultorio). Contenedor borrado al terminar; el
 script y las salidas, fuera del repo (scratchpad de la sesión de PL).
 
-| # | Ventana | Sentencias (= viajes por el pooler) | Tiempo de servidor medido, 247 citas | ESTIMADO por el pooler (+ N × RTT, ASUMIENDO RTT 50–150 ms) |
+> **Desde el guion nuevo (§5.0) la última columna es HISTÓRICA:** era el modo
+> viejo, una petición por sentencia. Con un archivo en una petición, cada
+> ventana dura lo que dice la columna de servidor. Se conserva porque es la
+> medida de servidor con 247 citas y porque explica por qué se cambió.
+
+| # | Ventana | Sentencias (= viajes por el pooler con el guion VIEJO) | Tiempo de servidor medido, 247 citas | ESTIMADO por el pooler con el guion VIEJO (+ N × RTT, ASUMIENDO RTT 50–150 ms) |
 |---|---|---|---|---|
 | 1 | archivo entero (SRE sobre `audit_log`) | 7 | 11 ms | 0,4–1,1 s |
 | 2 | archivo entero (SRE sobre las 11 clínicas) | 24 | 16 ms | 1,2–3,6 s |
@@ -447,29 +639,28 @@ Tiempo de servidor por archivo entero, 247 citas: 14 / 18 / 64 / 17 / 51 / 33 /
   ensayos de 20 000–200 000 citas sobrestiman por mucho lo que pasará: lo que
   crece con las citas (recorrer `appointments` al validar FK/CHECK, los dos
   índices de rango de F5b: 0,5–1,7 s con 200 000 [N]) es despreciable con 247.
-- **Lo que domina en producción es el número de viajes por el pooler**, no el
-  servidor. La columna «ESTIMADO» es sólo la cuenta N × RTT con un RTT
-  **supuesto** de 50–150 ms (el mismo que usó C3 en `fusion/notas/f4.md` §9); el
-  RTT real de la terminal de Angel a `us-west-2` no se ha medido. `aplicar.sh`
-  lo enseña indirectamente: lo que tarda cada archivo menos ~0,1 s, dividido por
-  sus sentencias.
-- **F3 y F2 son las ventanas largas** (C1–C3 no las acortaron: sus cabeceras lo
-  explican, «el ACCESS EXCLUSIVE del ADD COLUMN ya dura hasta el COMMIT»).
-  Durante esos segundos, abrir la agenda o guardar una cita **espera** hasta el
-  COMMIT. Y puede fallar: en la foto, `authenticated` tiene `statement_timeout`
-  de **8 s**, `anon` de **3 s** y `authenticator` `lock_timeout` de **8 s**
-  [C, `01-roles.sql` / `05-catalogo.jsonl` de la foto]; una petición que espere
-  más que eso acaba en error (ASUMIENDO que PostgREST aplica esos ajustes del
-  rol a cada petición, como documenta Supabase; no ensayado). Con un RTT alto,
-  la ventana de F3 podría pasar de 8 s: algún error suelto en la app durante esos
-  segundos; cada llamada a PostgREST es su propia transacción, pero una ruta
-  que haga varias podría quedar a medias como ante cualquier error de red
-  (DEDUCIDO).
-  Por eso la hora (abajo) y el §12, punto 6.
+- **Con el guion viejo dominaba el número de viajes por el pooler**, no el
+  servidor: la columna «ESTIMADO» (N × RTT supuesto de 50–150 ms) se confirmó
+  medida en §5.0 (F3 13,46 s y F2 8,91 s con 150 ms). **Con el guion nuevo, no
+  hay viajes dentro de la transacción**: la ventana es la de servidor. El RTT
+  real de la terminal de Angel al pooler lo da ahora `aplicar.sh estado` («ida y
+  vuelta al servidor», mediana de 5 `select 1`); sólo cuenta ya para lo que
+  tarda cada archivo de punta a punta, no para los candados.
+- **F3 y F2 eran las ventanas largas** (C1–C3 no las acortaron: sus cabeceras lo
+  explican, «el ACCESS EXCLUSIVE del ADD COLUMN ya dura hasta el COMMIT»). Con
+  el guion viejo, abrir la agenda o guardar una cita **esperaba** hasta el
+  COMMIT y, pasados 8 s, fallaba: en la foto, `authenticated` tiene
+  `statement_timeout` de **8 s**, `anon` de **3 s** y `authenticator`
+  `lock_timeout` de **8 s** [C, `01-roles.sql` / `05-catalogo.jsonl` de la
+  foto] (ASUMIENDO que PostgREST aplica esos ajustes del rol a cada petición,
+  como documenta Supabase; no ensayado). Con el nuevo, la espera medida de una
+  lectura de citas fue de 48 ms como máximo (§5.0).
 
-**Por el pooler** cada sentencia suma la ida y vuelta a `us-west-2`. Por eso
-C1–C3 juntaron lo que necesita el candado fuerte en bloques `DO`: lo que alarga
-la ventana es el número de viajes, no el trabajo del servidor.
+**Lo que sigue pudiendo alargar la espera** con el guion nuevo: que el archivo
+tenga que hacer cola detrás de otra transacción (abajo). Mientras F3, F2, F4,
+F5b o T esperan su candado (hasta 5 s), lo que llega detrás de ellas también
+espera; por eso G.14/G.15 justo antes de empezar (§4, paso 3) y la hora sin
+consulta.
 
 **Qué pasa con una transacción larga abierta** (G.14): F1 y F5a no hacen cola:
 reintentan 5 s y abortan con `CANDADOS: … reintenta en unos minutos`, sin dejar
@@ -480,8 +671,9 @@ statement due to lock timeout`. En los dos casos: esperar a que acabe y
 **repetir** `aplicar.sh aplicar` (salta lo registrado). No subir el
 `lock_timeout`.
 
-**A qué hora.** Cuando no haya consulta (ASUMIENDO de noche o domingo
-temprano), y fuera del horario de cualquier trabajo de `pg_cron` que nombre
+**A qué hora (decisión de Angel): a una hora sin consulta**, aunque con el
+guion nuevo la ventana sea de milisegundos (§4, paso 0). ASUMIENDO que eso es
+de noche o el domingo temprano; la hora la pone Angel. Y fuera del horario de cualquier trabajo de `pg_cron` que nombre
 `appointments` o `clinicas` (G.17; el 2026-11-22, ninguno). **Con «código
 primero», las dos tareas de `vercel.json` YA corren durante el paso 6** (cada
 10 min `google-sync`, minutos :00, :10, :20…; cada 15 `recordatorios`, :00,
@@ -537,7 +729,7 @@ Vercel → Project → Settings → Environment Variables.**
 | Nombre | Qué valor lleva | ¿Secreta? | Cómo generarla | ¿Obligatoria? | Comprobada / deducida |
 |---|---|---|---|---|---|
 | `RESERVA_SECRETO` | hexadecimal, **≥ 64 caracteres y de longitud par**, sólo `[0-9a-f]` (se recorta y pasa a minúsculas); si no cumple, cuenta como ausente (`src/lib/reserva/secretos.ts:38-42`) | **sí** (Sensitive). **Rotarla invalida todos los enlaces y el historial del candado**: se genera UNA vez y se guarda en el gestor de contraseñas de Angel | `openssl rand -hex 32` (64 hex) | **sí** para la v2: sin ella no se emiten enlaces de reserva ni de confirmación, ni sale el recordatorio (falla cerrado) | formato comprobado; presencia deducida (falta: es nueva) |
-| `CRON_SECRET` | cualquier cadena no vacía; la ruta compara la cabecera con `Bearer <CRON_SECRET>` en tiempo constante (`src/lib/cronAutorizacion.ts:20-24`); Vercel manda esa cabecera a las tareas programadas cuando la variable existe (documentación de Vercel Cron Jobs, citada en `mejora_agendaV2.md`; no releída por PL) | **sí** (Sensitive) | `openssl rand -hex 32` (sin espacios ni caracteres raros) | **sí**: sin ella `/api/cron/google-sync` y `/api/cron/recordatorios` responden 401 y no hacen nada | formato comprobado; presencia deducida (falta: es nueva) |
+| **`CRON_SECRET` — ⚠️ PONER ANTES DE DESPLEGAR** (las tareas programadas nacen con el despliegue: §6.3) | cualquier cadena no vacía; la ruta compara la cabecera con `Bearer <CRON_SECRET>` en tiempo constante (`src/lib/cronAutorizacion.ts:20-24`); Vercel manda esa cabecera a las tareas programadas cuando la variable existe (documentación de Vercel Cron Jobs, citada en `mejora_agendaV2.md`; no releída por PL) | **sí** (Sensitive) | `openssl rand -hex 32` (sin espacios ni caracteres raros) | **sí**: sin ella `/api/cron/google-sync` y `/api/cron/recordatorios` responden 401 y no hacen nada | formato comprobado; presencia deducida (falta: es nueva) |
 | `EMAIL_TRANSPORT` | el literal **`resend`**. Además exige `RESEND_API_KEY` y una `NEXT_PUBLIC_SUPABASE_URL` `https` remota; cualquier otro valor o vacío = apagado (`src/lib/correo/transporte.ts:127-136`) | no | se escribe tal cual | **sí** para que salgan los correos de la agenda; sin ella, apagado (nada sale, nada falla) | formato comprobado; presencia deducida (falta: es nueva) |
 | `AGENDA_RSVP_GOOGLE` | **NO SE DEFINE al desplegar.** Sólo el literal exacto `encendido` la enciende (`src/lib/gcalRsvp.ts:22-24`): ausente, vacía o cualquier otro valor = apagada. Se pondrá `encendido` **después** de probar Google real (RSVP) en la clínica de Angel | no | — | no (y hoy, no debe estar) | formato comprobado; que no exista, hay que mirarlo |
 
@@ -625,10 +817,36 @@ Todo lo demás es estructura nueva que nace vacía y detrás del interruptor
 
 ## 8. Si algo aborta: mensaje → causa → acción
 
-Regla general: **cada archivo es una transacción**. Si aborta, de ese archivo
-no queda nada y su versión no se registra; los anteriores quedan aplicados y
-registrados. `aplicar.sh` para con `ALTO: … FALLÓ`. Para seguir, quitar la
-causa y volver a correr `aplicar.sh aplicar`.
+Regla general: **cada archivo es una transacción**. Si aborta ANTES de su
+`COMMIT`, de ese archivo no queda nada y su versión no se registra; los
+anteriores quedan aplicados y registrados. **`aplicar.sh` ya no lo da por
+supuesto (A2):** tras cualquier fallo pregunta al catálogo por el **objeto
+testigo** del archivo (lo crea ese archivo, no existe en la foto) y dice una de
+tres cosas. Antes de contestar espera hasta 20 s si otra sesión del mismo
+usuario tiene una transacción abierta (con el archivo en una petición, el
+servidor puede estar terminándolo aunque el cliente haya muerto, §5.2).
+
+| Versión | Testigo |
+|---|---|
+| 20261125170000 | disparador `prevent_audit_truncate` en `audit_log` |
+| 20261126120000 | función `public.prohibir_truncate()` |
+| F1 | tabla `public.agenda_ajustes` |
+| F5a | tabla `public.agenda_bloqueos` |
+| F3 | tabla `public.reserva_enlaces` |
+| F2 | tabla `public.gcal_sync_estado` |
+| F4 | tabla `public.avisos_clinica` |
+| F5b | disparador `trg_appointments_proteger_borrado` |
+| T | disparador `trg_agenda_bloqueos_sin_truncate` |
+
+| Lo que dice `aplicar.sh` | Qué significa | Qué hacer |
+|---|---|---|
+| `… FALLÓ (ver arriba). El catálogo dice que NO quedó aplicada …` | se deshizo entera | quitar la causa (tabla de abajo) y volver a correr `aplicar.sh aplicar` (salta lo registrado) |
+| `… FALLÓ (ver arriba) DESPUÉS de su COMMIT: … SÍ quedó aplicada …, pero NO se registró` o, al repetir, `… no está en el historial pero YA está aplicada …: aplicada sin registrar` | el archivo está ENTERO (es una transacción: si el testigo existe, el COMMIT se hizo); falló la rejilla, o se cortó la conexión y no se vio | **aplicada sin registrar**: mirar su `*.salida.txt`; si trae la rejilla, leerla (ninguna REVISAR); si no la trae (corte), seguir igual: la comprobación posterior (paso 7) revisa el catálogo entero. Registrar SÓLO esa versión: `npx --yes supabase@2.117.0 migration repair --status applied <versión> --db-url "$URL"` (con `PGPASSWORD` en el entorno) y volver a correr `aplicar.sh aplicar` [C-CA: T con un fallo provocado tras su rejilla → este mensaje; al repetir, se negó a correrla otra vez; `repair` a mano y siguió] |
+| `… y NO SÉ si quedó aplicada …` / `no sé si … está aplicada: … otra sesión de … tiene una transacción abierta …` | no pudo preguntar al catálogo (red) u otra sesión tuya sigue trabajando | **no lo sé**: no correr nada. Esperar un minuto y `aplicar.sh estado`; mirar a mano si existe el testigo (p. ej. `select to_regclass('public.reserva_enlaces')`); con G.14 ver qué sesión es. Luego, según lo que diga, una de las dos filas de arriba |
+| `no pude LEER el historial …` | falló la consulta a `supabase_migrations.schema_migrations` | no seguir: sin historial no se sabe qué hay aplicado. Mirar el error (red, contraseña, permisos) y repetir [C-CA: con el historial ilegible, `estado`, `aplicar` y `reversa` se detienen sin tocar nada] |
+| `… tiene N bytes: no cabe en una sola petición …` | un archivo pasa de 130 000 bytes | no se aplicó nada; consultar (no partirlo a mano) |
+
+Causas de fallo, por el mensaje del servidor:
 
 | Mensaje (empieza por…) | Archivo | Causa | Acción |
 |---|---|---|---|
@@ -727,6 +945,32 @@ de cada una y quita su versión del historial (`migration repair --status
 reverted`). Antes: **apagar la v2 en todas las clínicas y respaldar** lo que se
 va a perder.
 
+**Comprobación previa de toda la cadena (A5, desde la oleada 3, ronda 1).**
+Antes de deshacer la PRIMERA, `aplicar.sh reversa` corre
+`reversa-previa.sql` (sólo lee: `BEGIN TRANSACTION READ ONLY` … `ROLLBACK`),
+que reúne por adelantado las negativas de las siete, sólo de las que siguen en
+el historial:
+
+- **BLOQUEA** — la cadena no empieza y no hay confirmación que lo salte: la v2
+  **encendida en alguna clínica** (regla de Angel: apagarla en TODAS antes),
+  no ser `postgres`, o que falte `respaldos.consultorios_horario_20261119`
+  (sin él la reversa de F1 no podría devolver el horario).
+- **DATOS** — lo que cada reversa se negaría a perder (las mismas cuentas que su
+  pre-vuelo). Se enseña **la lista entera, una vez**, y se pide escribir
+  `PERDER DATOS`; con eso las siete corren con `SET spinus.reversa_con_datos =
+  'si'` en su sesión. Cualquier otra respuesta para sin tocar nada.
+
+Así ya no puede pasar lo que vio el auditor: quitar T y F5b y descubrir en F4
+que no se puede seguir, con la v2 sin sus candados. [C-CA: con la v2 encendida
+en una clínica, «la v2 está ENCENDIDA en estas clínicas … : 1» y ALTO, T y F5b
+intactas; apagada, con un aviso y una fila de ajustes, la lista «F4:
+avisos_clinica: 1 · F1: agenda_ajustes (filas): 1»; sin confirmar, nada tocado;
+con `PERDER DATOS`, las siete en verde.] Si una reversa se negara igualmente
+(datos escritos entre la comprobación y su turno), `aplicar.sh` para ahí y pide
+empezar de nuevo. **Cada condición de `reversa-previa.sql` es copia de la guarda
+de su reversa:** quien cambie una guarda (p. ej. la de F1, hallazgo A4) cambia
+también la copia en el mismo commit.
+
 **Todas se niegan si hay datos** que se perderían (salvo T, que no guarda nada),
 sin tocar nada, diciendo cuáles; **sin datos, se aplican sin preguntar más**
 (recuadro, punto 4):
@@ -741,11 +985,12 @@ sin tocar nada, diciendo cuáles; **sin datos, se aplican sin preguntar más**
 | F5a | bloqueos | los bloqueos |
 | F1 | ajustes, tipos de cita, citas con tipo, consultorios revisados o con horario propio editados tras la copia, `clinicas.timezone` | ajustes e interruptor, tipos, horario propio/revisado, huso de fábrica. **Conserva** el respaldo |
 
-Si una se niega por datos, `aplicar.sh` lo dice y pregunta: escribir
-`PERDER DATOS <versión>` la repite con `SET spinus.reversa_con_datos = 'si'` en
-la sesión (lo que las reversas leen); cualquier otra cosa para sin tocar nada.
-[C: con una clínica de ensayo con huso, la de F1 se negó, se confirmó y se hizo;
-sin confirmar, paró y F1 siguió aplicada y registrada.]
+La confirmación de pérdida de datos se pide **una sola vez, al principio**, con
+la lista de la comprobación previa (arriba); ya no reversa por reversa. Tras un
+fallo de una reversa, `aplicar.sh` pregunta al catálogo por el testigo (§8):
+«SIGUE aplicada» (no hizo nada), «YA NO está … pero SIGUE en el historial»
+(repetir sólo `migration repair --status reverted <versión>`) o «no lo sé».
+`reversa-truncate` se niega sin tocar nada si T sigue en el historial [C-CA].
 
 Lo que la reversa no quita: `respaldos.consultorios_horario_20261119` (a
 propósito) y las filas de `audit_log` (nunca).
@@ -806,12 +1051,36 @@ Las tres corridas (clones `-b`, `-c` y `-e`, cada una sobre un clon nuevo)
 dieron las mismas cifras: 958 diferencias con las mismas claves, 63 OK + 10
 INFO, ninguna REVISAR, reversas al estado de la foto salvo el respaldo.
 
+**Repetido con el guion NUEVO [C-CA, 2026-11-22]**, sobre `clon-spinus-ca-1`
+(clon nuevo de la misma foto, 14 diferencias esperadas), con el registro de cada
+petición del servidor encendido: conteos 73 OK + 5 INFO; las 9 en verde, 3
+peticiones por archivo, rejillas idénticas byte a byte a
+`rejillas-del-ensayo.txt` (63 OK + 10 INFO, 0 REVISAR, mismos NOTICE); `estado`
+con las 14; `catalogo-despues.sql` con los valores de
+`COMPROBACION-POSTERIOR.md` §5; antes → después, 958 diferencias con las MISMAS
+claves que `diferencias-antes-despues.clon-foto.tsv`; reversa (con la
+comprobación previa: «ninguna se va a negar») y reversa-truncate en verde; contra
+la foto, sólo las 14 esperadas y las 10 del respaldo; segunda ida **con fallos
+provocados**: parar a petición antes de F3 (cuatro aplicadas, «Nada a medias»),
+F3 con un candado ajeno sobre `appointments` (`lock timeout` a los 5 s, «el
+catálogo dice que NO quedó aplicada», F3 ni en el catálogo ni en el historial),
+y la repetición (salta las cuatro, aplica las cinco); estructura idéntica a la
+primera ida (0 diferencias). Ninguna contraseña en los registros. Salidas en
+`~/spinus-fusion/ensayo-ca/salidas-20261122-222443/`; las pruebas de A2, A5 y A8
+en `pruebas-20261122-223440/`, las medidas de §5.0 y §5.2 en
+`medidas-20261122-222827/`. **En la fase 2 de CA se repite entero con el SQL
+definitivo** (las correcciones A3, A4 y A6 de las migraciones y reversas).
+
 **Lo que no se ensayó:**
 
+- El pooler real (Supavisor): cómo presenta la rejilla y los NOTICE de una
+  petición de 100 KB, cuánto tarda en notar una terminal muerta y si dejaría
+  pasar opciones de arranque (por eso los ajustes van con `SET`).
 - Datos: el clon está vacío. El backfill de F1 y las ventanas con citas se
   midieron con datos sintéticos (notas de C1–C3, hasta 200 000 citas).
-- El pooler: la latencia por sentencia y que Supavisor presente
-  `postgres.<ref>` como `postgres` (DEDUCIDO; G.02 lo dirá).
+- Que Supavisor presente `postgres.<ref>` como `postgres` (DEDUCIDO; G.02 lo
+  dirá). La latencia se simuló con un proxy (§5.0), no se midió contra el
+  pooler: la mide `aplicar.sh estado` el día.
 - `migration repair` contra el historial de producción (sí contra el clon,
   cuya tabla viene de la foto).
 - `aplicar.sh respaldo` (lo ensayó L; no se repitió).
@@ -827,9 +1096,11 @@ INFO, ninguna REVISAR, reversas al estado de la foto salvo el respaldo.
    reversas). Si la auditoría cambia alguno, se regenera en el mismo commit que
    la aprobación:
    `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* > supabase/produccion/plan/huellas.sha256`.
-2. Las dos REVISAR falsas de la segunda pasada (§9): decidir si se corrigen las
-   rejillas de 2 y F5a o basta con la regla.
-3. La decisión de §2 (`aplicar.sh` o `db push`).
+2. Las dos REVISAR falsas de la segunda pasada (§9): **se corrigen** en las
+   rejillas de 2 y F5a (hallazgo A6, otro agente, en curso). Al fusionarlo, §9 y
+   esta línea se ponen al día y se repite el ensayo (fase 2 de CA).
+3. ~~La decisión de §2 (`aplicar.sh` o `db push`).~~ **Decidido por Angel:
+   `aplicar.sh`**, que manda cada archivo en una sola petición (§2).
 4. **Duración máxima de las rutas de la agenda en Vercel: CONFIRMADA**
    (2026-11-22, oleada 3). Angel miró el panel: **Fluid Compute está
    activado**. Con Fluid Compute, en Pro, una función sin `maxDuration` tiene
@@ -856,17 +1127,17 @@ INFO, ninguna REVISAR, reversas al estado de la foto salvo el respaldo.
 5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
-6. **Las ventanas largas de F3 y F2 (§5.1): decisión de Angel / del
-   coordinador.** Con `psql -f`, cada sentencia es un viaje por el pooler: 90 y
-   60 viajes con ACCESS EXCLUSIVE sobre `appointments` (ESTIMADO 4,5–13,5 s y
-   3–9 s con un RTT supuesto de 50–150 ms; el `statement_timeout` de 8 s de
-   `authenticated` podría hacer fallar alguna petición en ese rato). Opciones,
-   **ninguna probada**: (a) dejarlo así y aplicar sin consulta; (b) medir antes
-   el RTT real (p. ej. `\timing` de un `select 1` por el pooler desde la terminal
-   de Angel) y decidir con la cifra; (c) mandar cada archivo en UNA petición
-   (el SQL Editor ya lo hace; con `psql`, el archivo entero como un solo `-c`),
-   lo que exigiría cambiar y volver a ensayar `aplicar.sh`, comprobando que la
-   rejilla y los NOTICE se siguen viendo. No se tocó `aplicar.sh`.
+6. ~~Las ventanas largas de F3 y F2.~~ **Resuelto (A1, agente CA):** decisión
+   de Angel, «cada archivo en una sola petición» **y** hora sin consulta.
+   Medido: 50 ms y 30 ms con 150 ms de ida y vuelta, frente a 13,5 s y 8,9 s
+   con el guion viejo (§5.0); transacción ociosa acotada a 10 s y el corte del
+   cliente ya no retiene candados (§5.2); el RTT real lo da `aplicar.sh estado`
+   el día (paso 3). Queda sin poder ensayar: el pooler real (§11).
+7. **Fase 2 de CA:** fusionar las correcciones de SQL (A3, A4, A6, cabeceras),
+   regenerar `huellas.sha256`, repetir el ensayo entero con el SQL definitivo y
+   regenerar `rejillas-del-ensayo.txt`, `catalogo-despues.sql` y la tabla de
+   diferencias; y poner al día en `reversa-previa.sql` la guarda de la reversa
+   de F1 que cambie A4.
 
 ---
 
@@ -879,3 +1150,111 @@ la LFPDPPP vigente de 2025, no de memoria); **Google real** (ida y vuelta, RSVP,
 y sólo entonces `AGENDA_RSVP_GOOGLE`); **PostgREST con `imatch`** (búsqueda de
 pacientes, sale sin interruptor: humo 5 de la comprobación posterior); y las
 decisiones pendientes de Angel de `mejora_agendaV2.md` §7.
+
+---
+
+## 14. Límites conocidos y aceptados
+
+Decididos por Angel tras la auditoría independiente, ronda 1
+(`../auditoria/RONDA-1.md`). No son defectos pendientes: no se «arreglan» sin
+una decisión nueva.
+
+- **A7 · El bloqueo y la reserva son totales salvo carrera de milisegundos, y
+  dentro de Spinus el empalme avisa.** El alta de una cita por el personal (o un
+  bloqueo) no toma el candado del médico que toma `reservar_por_enlace`
+  (`pg_advisory_xact_lock(1790, médico)`): si las dos escrituras caen en la
+  misma ventana de milisegundos, pueden quedar dos citas en el mismo turno, o
+  una cita dentro de un bloqueo. No se añade candado a las altas del personal.
+- **A9 · Tres tablas guardan ids de cita sin llave foránea, a propósito:**
+  `avisos_clinica.cita_id`, `gcal_movimientos_rechazados.cita_id` y
+  `reserva_empalmes_google.cita_reserva_id`/`cita_otra_id`. El motivo queda en
+  el `COMMENT` de cada columna (lo escribe el agente de las correcciones de SQL).
+- **A10 y A11 quedan en la deuda como notas:** las acciones referenciales pasan
+  por encima de los candados de la cita (`DEUDA_TECNICA.md` AG-DT-270) y F5b
+  sube de candado sobre `appointments` dentro de su transacción (AG-DT-271).
+
+---
+
+## 15. Medir cuánto tarda en abrir la agenda (al encender la v2)
+
+Orden de Angel: el **primer paso tras encender la v2 en su clínica** es medir en
+producción cuánto tarda en abrir la agenda y compararlo con lo de antes. Sin
+instalar nada: las herramientas de desarrollador de **Chrome o Edge** (en
+Firefox los nombres cambian y no da el LCP del punto 4).
+
+**Lo que la app ya marca:** nada. `src/` no tiene `performance.mark` ni
+`performance.measure` (comprobado con `git grep` el 2026-11-22), así que se mide
+con lo que da el navegador.
+
+**Las condiciones, iguales antes y después:** la misma cuenta, el mismo equipo,
+el mismo navegador, la misma red (no cambiar de wifi a datos), la misma vista y
+la misma semana de la agenda, a una hora parecida, sin otras pestañas pesadas.
+«Antes» = el mismo día, con las 9 aplicadas y la v2 todavía apagada; «después» =
+nada más encenderla.
+
+**Cada medición** (5 veces seguidas; se anota la **mediana**, la del medio al
+ordenarlas):
+
+1. Abrir la agenda (`/agenda`) con la sesión iniciada. `F12` → pestaña **Red**
+   (*Network*). Marcar **Inhabilitar caché** (*Disable cache*) y dejar el filtro
+   en **Todo** (*All*). Las herramientas tienen que seguir abiertas: con ellas
+   cerradas, la casilla de la caché no actúa.
+2. Recargar la página (`F5`). Esperar a que la agenda pinte las citas y a que la
+   lista de Red deje de crecer.
+3. En la barra de abajo de la pestaña Red, anotar: **solicitudes** (*requests*),
+   **Finalización** (*Finish*), **DOMContentLoaded** y **Carga** (*Load*). (Los
+   nombres exactos dependen del idioma del navegador.) Mirar también si alguna
+   fila sale en rojo (4xx/5xx).
+4. En la pestaña **Consola**, pegar esto y pulsar Enter (sólo lee los tiempos que
+   el navegador ya guarda; **no** enseña direcciones ni datos, sólo números):
+
+   ```js
+   new Promise(r => new PerformanceObserver(l => r(l.getEntries().at(-1)?.startTime ?? 0))
+     .observe({ type: 'largest-contentful-paint', buffered: true })).then(lcp => {
+     const n = performance.getEntriesByType('navigation')[0];
+     const rec = performance.getEntriesByType('resource');
+     const api = rec.filter(e => /\/(api|rest\/v1)\//.test(e.name));
+     console.table({
+       'primer byte (ms)': Math.round(n.responseStart),
+       'DOMContentLoaded (ms)': Math.round(n.domContentLoadedEventEnd),
+       'load (ms)': Math.round(n.loadEventEnd),
+       'mayor pintado, LCP (ms)': Math.round(lcp),
+       'recursos': rec.length,
+       'peticiones a /api y /rest': api.length,
+       'fin de la última de esas (ms)': Math.round(Math.max(0, ...api.map(e => e.responseEnd))),
+     });
+   });
+   ```
+
+   (Sintaxis comprobada con `node --check`; NO ejecutado en un navegador por el
+   agente que lo escribió: si da error, basta con los números del punto 3.)
+   El «primer byte» incluye el servidor: la página trae las citas de la semana
+   ya en el HTML. «Fin de la última de /api y /rest» es lo más cerca de «la
+   agenda terminó de cargar sus datos».
+
+**Tabla para anotar** (una fila por recarga; al final, la mediana de cada
+columna):
+
+| | Solicitudes | Finalización (s) | DOMContentLoaded (s) | Carga (s) | Primer byte (ms) | LCP (ms) | Fin de la última /api (ms) | Filas en rojo |
+|---|---|---|---|---|---|---|---|---|
+| antes 1 | | | | | | | | |
+| antes 2 | | | | | | | | |
+| antes 3 | | | | | | | | |
+| antes 4 | | | | | | | | |
+| antes 5 | | | | | | | | |
+| **mediana antes** | | | | | | | | |
+| después 1 | | | | | | | | |
+| … | | | | | | | | |
+| **mediana después** | | | | | | | | |
+
+**Qué se espera con la v2** (DEDUCIDO de `CLAUDE.md`, «Agenda v2»): unas
+pocas solicitudes más (el trozo de la campana y del engrane, que sólo se
+descarga con la v2, y `GET /api/agenda/por-confirmar` con los avisos); nada de
+peticiones nuevas para pintar la rejilla.
+
+**Cuándo apagar (PROPUESTA; la cifra la decide Angel):** se apaga y se investiga
+si, en la mediana, **LCP o «Fin de la última /api» empeoran más de un 50 % y
+además más de 1 s**, si **cualquier recarga pasa de 8 s** (el `statement_timeout`
+de `authenticated`), o si aparece **alguna fila en rojo** que antes no salía.
+Para apagar: `agenda_ajustes.agenda_v2_encendida = false` en esa clínica, desde
+el SQL Editor (§4, paso 8); la agenda vuelve a la de antes (falla cerrado).
