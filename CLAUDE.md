@@ -468,7 +468,7 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-263.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-264.
 
 **Estado:** el código y las migraciones de la agenda están en `feature/agenda-v2`,
 probados sólo en local. Las 44 migraciones del proyecto (`20261111120000` a
