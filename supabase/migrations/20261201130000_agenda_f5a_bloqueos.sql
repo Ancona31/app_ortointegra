@@ -1,27 +1,37 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Agenda v2 · F5a — BLOQUEOS DE HORARIO (public.agenda_bloqueos)
 -- ───────────────────────────────────────────────────────────────────────
--- Qué hace: crea la tabla de bloqueos (un periodo que el médico cierra a
+-- QUÉ HACE: crea la tabla de bloqueos (un periodo que el médico cierra a
 --   propósito; NO es una fila de appointments), sus índices, su RLS con
 --   cuatro policies, el disparador que toma el candado 1790 del médico
 --   (agenda_bloqueo_preparar) y su auditoría (log_tabla_change de main).
--- Va SEGUNDO del conjunto: después de F1 y ANTES de F3 y de F2, porque
---   reserva_ocupacion (F3) es LANGUAGE sql y nombra esta tabla al crearse, y
---   gcal_bloqueo_aplicar (F2) declara agenda_bloqueos%ROWTYPE (dependencia
---   dura: PL/pgSQL lo resuelve al crear la función).
--- Depende de:
+--   Ninguna policy ni objeto existente cambia.
+-- DEPENDE DE:
+--   · orden: SEGUNDO del conjunto, después de F1 y ANTES de F3 y F2:
+--     reserva_ocupacion (F3) es LANGUAGE sql y nombra esta tabla al crearse,
+--     y gcal_bloqueo_aplicar (F2) declara agenda_bloqueos%ROWTYPE (PL/pgSQL
+--     lo resuelve al crear la función).
 --   · main: clinicas, profiles, auth.uid(), get_clinica_id(),
 --     soy_admin_de_clinica(), get_my_role(), clinica_no_suspendida(),
 --     clinica_tiene_acceso(), perfil_completo(), log_tabla_change().
+--     De clinica_no_suspendida() y clinica_tiene_acceso() exige la huella
+--     (md5 del cuerpo con los fines de línea \r\n pasados a \n: en producción
+--     están guardadas con \r\n y el código es el mismo).
 --   · F1: agenda_ajustes y agenda_v2_encendida(uuid).
--- Bloqueos (lock_timeout 5 s): CREATE TABLE con dos FK → SHARE ROW EXCLUSIVE
---   un instante sobre clinicas y profiles. Nada sobre appointments.
--- Riesgo: bajo. Tabla nueva sin datos; ninguna policy ni objeto existente
---   cambia. Re-ejecutable: una segunda pasada no cambia nada (el pre-vuelo
---   exige que lo que ya exista tenga esta misma forma, y si no, aborta).
--- Vuelta atrás: supabase/reversas/20261201130000_agenda_f5a_bloqueos_reversa.sql
---   (exige quitar antes F2 y F3, que la nombran: la reversa del conjunto va
---   en orden inverso de bloques).
+--   · PostgreSQL ≥ 13 (gen_random_uuid() del núcleo); producción es 17.6.
+--   · No depende del search_path de la sesión: todo va calificado.
+-- RIESGO: bajo. Tabla nueva sin datos.
+--   · Bloqueos: CREATE TABLE con dos FK toma SHARE ROW EXCLUSIVE sobre
+--     clinicas y profiles hasta el COMMIT (frena sus escrituras, no sus
+--     lecturas). Se piden al principio con NOWAIT y reintentos (5 s): si están
+--     ocupadas, la migración no hace cola —la cola frenaría a todo el que
+--     llega detrás— y aborta sin cambiar nada; se reintenta más tarde. Nada
+--     sobre appointments.
+--   · Si falla, es UNA transacción: no queda nada.
+-- SEGUNDA PASADA: re-ejecutable; no cambia nada (el pre-vuelo exige que lo que
+--   ya exista tenga esta misma forma, y si no, aborta).
+-- CÓMO SE DESHACE: supabase/reversas/20261201130000_agenda_f5a_bloqueos_reversa.sql,
+--   después de las reversas de F5b, F4, F2 y F3, que la nombran.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -36,6 +46,7 @@ DO $$
 DECLARE
   v_n integer;
   v_md5 text;
+  v_crudo text;
 BEGIN
   IF to_regclass('public.clinicas') IS NULL OR to_regclass('public.profiles') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: faltan public.clinicas o public.profiles (main).';
@@ -46,14 +57,18 @@ BEGIN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta una de las funciones de main que usan las policies o la auditoría.';
   END IF;
   -- Las dos puertas de suscripción de appointments_gates_insert, que las policies
-  -- de alta y edición repiten DENTRO de su WITH CHECK: el cuerpo de main, exacto.
-  SELECT md5(prosrc) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure('public.clinica_no_suspendida()');
+  -- de alta y edición repiten DENTRO de su WITH CHECK: el cuerpo de main.
+  -- Huella del cuerpo con \r\n → \n (en producción están con \r\n); cualquier
+  -- otro cambio, aunque sea un espacio, cambia la huella y aborta.
+  SELECT md5(replace(prosrc, E'\r\n', E'\n')), md5(prosrc) INTO v_md5, v_crudo
+    FROM pg_proc WHERE oid = to_regprocedure('public.clinica_no_suspendida()');
   IF v_md5 IS DISTINCT FROM 'a2dcfa8f2cfda91bc9c7a7ff7b642e1e' THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_no_suspendida() falta o cambió (md5 %); revisar antes de repetirla en las policies.', v_md5;
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_no_suspendida() falta o cambió (md5 con \r\n→\n: %, tal cual: %; se esperaba a2dcfa8f2cfda91bc9c7a7ff7b642e1e con \r\n→\n). Si sólo difiere el tal cual, son fines de línea; si difiere el otro, cambió el código: revisar antes de repetirla en las policies.', v_md5, v_crudo;
   END IF;
-  SELECT md5(prosrc) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure('public.clinica_tiene_acceso()');
+  SELECT md5(replace(prosrc, E'\r\n', E'\n')), md5(prosrc) INTO v_md5, v_crudo
+    FROM pg_proc WHERE oid = to_regprocedure('public.clinica_tiene_acceso()');
   IF v_md5 IS DISTINCT FROM '2efd7734772dd4c7bea262e43a3779b5' THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_tiene_acceso() falta o cambió (md5 %); revisar antes de repetirla en las policies.', v_md5;
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_tiene_acceso() falta o cambió (md5 con \r\n→\n: %, tal cual: %; se esperaba 2efd7734772dd4c7bea262e43a3779b5 con \r\n→\n). Si sólo difiere el tal cual, son fines de línea; si difiere el otro, cambió el código: revisar antes de repetirla en las policies.', v_md5, v_crudo;
   END IF;
   -- F1: la tabla del interruptor y la función que lo lee (INVOKER: con la RLS de la sesión).
   IF to_regclass('public.agenda_ajustes') IS NULL THEN
@@ -67,9 +82,9 @@ BEGIN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: authenticated no puede ejecutar agenda_v2_encendida(uuid); las policies de alta fallarían siempre.';
   END IF;
   -- Segunda pasada: la función, si existe, es la de este archivo.
-  SELECT md5(prosrc) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure('public.agenda_bloqueo_preparar()');
-  IF v_md5 IS NOT NULL AND v_md5 <> 'f1f887ecf99cea0e16ce0ae202bf8df4' THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: agenda_bloqueo_preparar() ya existe con otro cuerpo (md5 %).', v_md5;
+  SELECT md5(replace(prosrc, E'\r\n', E'\n')) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure('public.agenda_bloqueo_preparar()');
+  IF v_md5 IS NOT NULL AND v_md5 <> 'dc778b4cbd29cedba8066caae5a7354f' THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: agenda_bloqueo_preparar() ya existe con otro cuerpo (md5 con \r\n→\n: %).', v_md5;
   END IF;
   -- Segunda pasada: la tabla, si existe, tiene exactamente estas columnas y
   -- restricciones (CREATE TABLE IF NOT EXISTS no las añadiría).
@@ -95,7 +110,29 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------
--- 2 · La tabla, sus índices, sus permisos y su RLS.
+-- 2 · Candados, antes de pedir ninguno de otra forma: SHARE ROW EXCLUSIVE
+--     sobre clinicas y profiles (los que tomarían las FK). NOWAIT: no entra
+--     en la cola de candados, así que nunca frena a quien llega detrás. Si
+--     no los consigue en 5 s (50 intentos cada 0,1 s), aborta sin cambiar
+--     nada. Un intento fallido se deshace entero (subtransacción): no se
+--     queda con la mitad de los candados.
+-- ---------------------------------------------------------------------
+DO $$
+BEGIN
+  FOR i IN 1..50 LOOP
+    BEGIN
+      LOCK TABLE public.clinicas, public.profiles IN SHARE ROW EXCLUSIVE MODE NOWAIT;
+      RETURN;
+    EXCEPTION WHEN lock_not_available THEN
+      PERFORM pg_sleep(0.1);
+    END;
+  END LOOP;
+  RAISE EXCEPTION 'CANDADOS: clinicas o profiles siguieron ocupadas 5 s (una transacción larga las escribe). No se cambió nada: reintenta en unos minutos.'
+    USING ERRCODE = '55P03';
+END $$;
+
+-- ---------------------------------------------------------------------
+-- 3 · La tabla, sus índices, sus permisos y su RLS.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.agenda_bloqueos (
   id               uuid        NOT NULL DEFAULT gen_random_uuid(),
@@ -183,7 +220,7 @@ COMMENT ON TABLE public.agenda_bloqueos IS
   'Un periodo que el médico cierra a propósito (horas o días completos, motivo opcional). NO es una cita ni un evento. En el enlace de reserva no se ofrecen turnos que lo toquen (reserva_ocupacion) y reservar_por_enlace lo rechaza (''ocupado''); dentro de Spinus, con la v2 encendida, ninguna cita ni evento entra ni se mueve a él (cita_proteger_bloqueo, HINT agenda_horario_bloqueado). Lo crean, editan y quitan quienes pueden agendar para ese médico (mismo predicado que appointments). google_event_id/gcal_*: el evento «Ocupado» del calendario de Spinus, sólo los escribe el servidor; gcal_bloqueo_aplicar trae lo movido o borrado en Google. agenda_bloqueo_preparar toma el candado 1790 del médico.';
 
 -- ---------------------------------------------------------------------
--- 3 · Antes de escribir: el candado del médico y updated_at.
+-- 4 · Antes de escribir: el candado del médico y updated_at.
 --     INVOKER: no decide nada, sólo serializa; no necesita más permisos.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.agenda_bloqueo_preparar()
@@ -194,8 +231,8 @@ SET search_path = ''
 AS $fn$
 BEGIN
   -- El candado de reservar_por_enlace (1790 + médico): un bloqueo y una
-  -- reserva del mismo médico a la vez no se cruzan (ver la cabecera).
-  -- Si cambia de médico, los dos candados en orden fijo (sin abrazo mortal, B3).
+  -- reserva del mismo médico a la vez no se cruzan (ver tras la función).
+  -- Si cambia de médico, los dos candados en orden fijo (sin abrazo mortal).
   IF TG_OP = 'UPDATE' AND OLD.medico_id IS DISTINCT FROM NEW.medico_id THEN
     PERFORM pg_advisory_xact_lock(1790, least(hashtext(OLD.medico_id::text), hashtext(NEW.medico_id::text)));
     PERFORM pg_advisory_xact_lock(1790, greatest(hashtext(OLD.medico_id::text), hashtext(NEW.medico_id::text)));
@@ -229,7 +266,7 @@ CREATE TRIGGER audit_agenda_bloqueos AFTER INSERT OR DELETE OR UPDATE ON public.
   FOR EACH ROW EXECUTE FUNCTION public.log_tabla_change();
 
 -- ---------------------------------------------------------------------
--- 4 · Post-vuelo. Si algo no quedó como se quiere, se deshace TODO.
+-- 5 · Post-vuelo. Si algo no quedó como se quiere, se deshace TODO.
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
@@ -272,7 +309,7 @@ END $$;
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 5 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
+-- 6 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
 -- ---------------------------------------------------------------------
 SELECT t.n, t.comprobacion, t.valor, t.esperado,
        CASE WHEN t.valor = t.esperado THEN 'OK' ELSE 'REVISAR' END AS estado
@@ -300,11 +337,11 @@ FROM (
                      FROM pg_class WHERE oid = to_regclass('public.agenda_bloqueos')), 'AUSENTE'),
          'false,false,false'
   UNION ALL
-  SELECT 5, 'agenda_bloqueo_preparar: md5 / INVOKER / search_path vacío / sin PUBLIC',
-         coalesce((SELECT md5(prosrc) || ' / ' || (NOT prosecdef)::text || ' / ' || (proconfig @> ARRAY['search_path=""'])::text
+  SELECT 5, 'agenda_bloqueo_preparar: md5 (\r\n→\n) / INVOKER / search_path vacío / sin PUBLIC',
+         coalesce((SELECT md5(replace(prosrc, E'\r\n', E'\n')) || ' / ' || (NOT prosecdef)::text || ' / ' || (proconfig @> ARRAY['search_path=""'])::text
                           || ' / ' || (NOT EXISTS (SELECT 1 FROM aclexplode(proacl) x WHERE x.grantee = 0))::text
                      FROM pg_proc WHERE oid = to_regprocedure('public.agenda_bloqueo_preparar()')), 'AUSENTE'),
-         'f1f887ecf99cea0e16ce0ae202bf8df4 / true / true / true'
+         'dc778b4cbd29cedba8066caae5a7354f / true / true / true'
   UNION ALL
   SELECT 6, 'disparadores de agenda_bloqueos, activos',
          coalesce((SELECT string_agg(tgname, ',' ORDER BY tgname) FROM pg_trigger
