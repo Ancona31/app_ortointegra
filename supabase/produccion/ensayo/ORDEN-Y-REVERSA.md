@@ -71,3 +71,69 @@ enseña («Failed to load resource»); la página sigue bien.
 **Conclusión (b):** seguro. Coste: un `warn` por petición autenticada mientras
 dure la ventana, un 404 en la consola del navegador de quien abra el dashboard,
 y los crons de `vercel.json` contestan `ok` sin trabajo.
+
+## 5.4 (a) Base NUEVA (14) + código VIEJO (`main`) [C]
+
+**Cómo se puso la base nueva:** con el propio `supabase/produccion/plan/aplicar.sh aplicar`
+contra el stack E2 (`APL_HOST=127.0.0.1 APL_PUERTO=55322 APL_USUARIO=postgres
+APL_SSL=disable APL_RED=host`, confirmaciones por stdin), sobre la base vieja
+de (b) con sus datos (semilla + lo que dejó (b): 366 citas, 4 consultorios, 2
+clínicas). Las 9 pasaron sus pre-vuelos sobre los cuerpos con `\r\n` (la
+corrección de `DERIVA.md` §0 funciona), sin ninguna fila REVISAR, y quedaron
+registradas con `migration repair --status applied`; duración de cada archivo
+0,27–0,58 s, ~3 s las 9 (`06a-aplicar.txt`). El cambio de estructura 5 → 14
+(`comparar-estructura.sh`) da **958 diferencias, idénticas una a una** a
+`plan/diferencias-antes-despues.clon-foto.tsv` (0 de más, 0 de menos). F1 dejó
+4 filas en `audit_log` (una por consultorio copiado): 48 → 52.
+
+Nota del montaje: la CLI crea `supabase/.temp/` en el repo al hacer el `repair`
+(está en `.gitignore`).
+
+**Lo que hace `main` encima** (`06a-arnes.txt`, `06a-servidor-main.log`,
+`nav-a-main*`). Línea base para comparar: el mismo arnés con `main` sobre la
+base VIEJA (`05x-arnes-main-base-vieja.txt`).
+
+| Gesto (admin, secretaria, invitado) | `main` + base vieja | `main` + base nueva |
+|---|---|---|
+| `/inicio`, `/agenda`, expediente, `GET /api/appointments` | 200 | 200 (agenda pintada en Chromium, sin errores de página) |
+| cita con y sin paciente: alta, notas, mover, confirmar, cancelar, borrar | 200; la fila desaparece | **igual** |
+| alta de paciente | 200 | 200 |
+| nota clínica ligada a una cita (`POST /api/consultas`) | 200, cita → `attended` | **igual** |
+| editar notas de la atendida con nota | 200 | 200 |
+| mover / cancelar / volver a agendada la atendida con nota | **200: lo hace** | **500** `{"error":"Una cita atendida con nota clínica no cambia de estado ni de fecha u hora"}`; la cita no cambia |
+| borrar la atendida con nota | **200: la borra** | **500** `{"error":"Una cita atendida con nota clínica no se borra"}`; la cita sigue |
+
+El registro del servidor de `main` no tiene ni un error en toda la corrida (sólo
+el aviso de Gemini sin llave, igual que en la línea base): esos 500 no se
+registran, `main` devuelve `error.message` de PostgREST al cliente.
+
+**`audit_log` empieza a recibir `log_cita_change`** (desde la marca previa al
+arnés): `cita_alta` 7, `cita_editada` 20, `cita_cancelada` 6, `cita_eliminada`
+6, de los 3 usuarios; nombres de columnas y estado de→a, sin valores
+(`06a-audit-durante.txt`). Las escrituras técnicas de Google que hace `main` con
+el cliente admin (`google_event_id`, `gcal_sync_status`, `gcal_calendar_id`, y
+el «unbound» de `gcal.ts`) pasan como `service_role` también sobre citas
+atendidas con nota (transacción deshecha, `06a-sql-tecnicas.txt`).
+
+**Por lectura de `main` (`git grep`/grep sobre su worktree) [D]:** sus únicas
+escrituras a `appointments` son el alta y el PUT de `/api/appointments` (columnas
+de la cita y del consultorio, nunca `reserva_*`, `cerrada_en`, `sustituida_por`,
+`tipo_cita_*`, `google_asignacion`), el `DELETE`, el paso a `attended` de
+`/api/consultas`, y cuatro escrituras técnicas de Google (`route.ts` del alta y
+del PUT, `fijarEventoCreado`, `gcal.ts`). Contra los disparadores: `proteger_reserva`,
+`proteger_cierre`, `proteger_eleccion` (sólo citas por enlace) y
+`asignacion_google`/`aviso_clinica` (sólo `service_role` + `spinus.via='google'`)
+no los alcanza; `proteger_borrado` y `horario_bloqueado` sólo actúan con la v2
+encendida o con bloqueos, que no existen mientras corre `main`;
+`proteger_atendida` es el único que cambia un resultado (tabla de arriba). Ningún
+código de `main` hace TRUNCATE. Las tablas nuevas nacen vacías, así que sus FK
+RESTRICT no frenan ningún borrado de clínica, consultorio o perfil de `main`.
+Un efecto lateral: si durante la ventana alguien cambia el horario de la clínica
+con `PUT /api/me/horario` de `main`, la copia que F1 hizo en cada consultorio
+(`horario_propio = true`) ya no lo sigue; con la v2 apagada nadie lo lee, pero al
+encenderla se verá el horario de la hora de F1.
+
+**Conclusión (a):** seguro salvo un cambio visible: un intento de mover,
+cancelar o borrar una cita **atendida con nota clínica** da 500 con un texto en
+castellano (antes se hacía). Es la protección que se quiere; con el código nuevo
+es un 409 con su mensaje. Nada más se rompe.
