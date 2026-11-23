@@ -19,15 +19,17 @@
  */
 import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
 import Portal from '@/components/ui/Portal'
-import { ALTO_MINIMO_CAPA, MARGEN_VENTANA, SEPARACION_CAPA } from '@/lib/agenda/posicionCapa'
+import { ALTO_MINIMO_CAPA, MARGEN_VENTANA, SEPARACION_CAPA, ventanaParaCapas } from '@/lib/agenda/posicionCapa'
 
 /** Debajo del botón, con su borde derecho; dentro de la ventana visible. */
 function colocarBajo(nodo: HTMLElement, boton: Element): void {
   const r = boton.getBoundingClientRect()
-  const ancho = window.innerWidth
+  /* B13 · AG8: dentro del área de contenido, sin el cromo (riel en `ext`, barra en `ih`). */
+  const v = ventanaParaCapas()
+  const desde = v.left ?? 0
   const alto = window.visualViewport?.height ?? window.innerHeight
   const w = nodo.offsetWidth
-  const left = Math.max(MARGEN_VENTANA, Math.min(r.right - w, ancho - w - MARGEN_VENTANA))
+  const left = Math.max(desde + MARGEN_VENTANA, Math.min(r.right - w, desde + v.width - w - MARGEN_VENTANA))
   const top = r.bottom + SEPARACION_CAPA
   nodo.style.left = `${left}px`
   nodo.style.top = `${top}px`

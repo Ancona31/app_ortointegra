@@ -230,7 +230,7 @@ test('encendido: Iniciar consulta lleva a la nota con ?cita=', async ({ page }) 
   await page.waitForURL(`**/expediente/${paciente}/nueva-nota?cita=${id}`)
 })
 
-test('encendido: en una por ligar, «Ligar expediente e iniciar» abre la ventana de ligar (tanda J), ni el modal ni la nota', async ({ page }) => {
+test('encendido: en una por ligar, «Ligar paciente e iniciar consulta» abre la ventana de ligar (tanda J), ni el modal ni la nota', async ({ page }) => {
   soloEn('escritorio')
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Persona F3')
@@ -239,8 +239,8 @@ test('encendido: en una por ligar, «Ligar expediente e iniciar» abre la ventan
   await aLaSemanaMasDos(page)
   await citaEnRejilla(page, nombre).click({ position: { x: 8, y: 8 } })
   await expect(tarjetaLectura(page).getByRole('button', { name: 'Iniciar consulta', exact: true })).toHaveCount(0)
-  await tarjetaLectura(page).getByRole('button', { name: 'Ligar expediente e iniciar', exact: true }).click()
-  await expect(page.getByRole('dialog', { name: 'Ligar e iniciar consulta' })).toBeVisible()
+  await tarjetaLectura(page).getByRole('button', { name: 'Ligar paciente e iniciar consulta', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Ligar paciente e iniciar consulta' })).toBeVisible()
   await expect(modalCita(page, 'Editar cita')).toHaveCount(0)
   expect(page.url()).toContain('/agenda')
 })

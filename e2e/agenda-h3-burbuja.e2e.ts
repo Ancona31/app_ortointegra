@@ -82,7 +82,8 @@ async function coloresYContraste(el: Locator): Promise<{ color: string; token: s
       return (c[3] ?? 0) >= 1 ? c.slice(0, 3) : sobre(c, fondo(e.parentElement))
     }
     const lum = (c: number[]) => { const [r = 0, g = 0, b = 0] = c.map(v => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
-    const token = getComputedStyle(raiz).getPropertyValue('--ag-success-text').trim()
+    /* B13 · AG5: el verde del kit (`--ok-tinta`), el de la capa del catálogo; antes `--ag-success-text`. */
+    const token = getComputedStyle(raiz).getPropertyValue('--ok-tinta').trim()
     return Array.from(raiz.querySelectorAll('span')).map((s) => {
       const bg = fondo(s)
       const fg = sobre(rgba(getComputedStyle(s).color), bg)
@@ -110,7 +111,7 @@ for (const tema of ['claro', 'oscuro'] as const) {
     // El fondo de la señalada es el verde de la agenda (no el azulado genérico de `.ag-opcion`).
     await expect.poll(() => registrar.evaluate((li) => {
       const muestra = document.createElement('i')
-      muestra.style.backgroundColor = 'var(--ag-success-bg)'
+      muestra.style.backgroundColor = 'var(--ok-fondo)'
       li.appendChild(muestra)
       const esperado = getComputedStyle(muestra).backgroundColor
       muestra.remove()

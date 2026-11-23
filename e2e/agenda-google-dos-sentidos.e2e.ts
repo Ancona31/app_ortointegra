@@ -385,7 +385,7 @@ test('encendido (I3): un evento nuevo de Google entra «Por asignar»; tras «¿
   const filaPintada = page.locator(`.fc-event:has([data-cita-id="${id}"])`)
   await expect(filaPintada.locator('.ag-icono-sin-exp')).toBeVisible({ timeout: 30_000 })
   await filaPintada.click()
-  await tarjetaLectura(page).getByRole('button', { name: 'No es una cita', exact: true }).click()
+  await tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?', exact: true }).click()
   await expect.poll(() => columna('google_asignacion'), { timeout: 15_000 }).toBe('evento')
 
   g().modificar(creado.id, { summary: `${titulo} editado` })
@@ -423,7 +423,7 @@ test('encendido: un evento creado en Google se convierte en cita; a Google va el
   /* I3 (punto 10): recién importado está «por asignar»; «¿No es una cita?» lo deja en
      evento y «Convertir en cita» es el camino de vuelta (el que prueba esto). */
   await filaPintada.click()
-  await tarjetaLectura(page).getByRole('button', { name: 'No es una cita', exact: true }).click()
+  await tarjetaLectura(page).getByRole('button', { name: '¿No es una cita?', exact: true }).click()
   await expect.poll(() => sqlLocal(`select coalesce(google_asignacion, '') from public.appointments where id = :'id'`, { id })).toBe('evento')
   await page.keyboard.press('Escape')
   await filaPintada.click()

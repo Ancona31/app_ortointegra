@@ -373,7 +373,7 @@ test('19: reserva, cancelación y reagendado del paciente → avisos con aviso e
   await abrirAvisos(page)
   await aviso(page, 'reagendado_paciente', nueva.id).click()
   await expect(panel(page)).toHaveCount(0)
-  await expect(page.getByRole('dialog', { name: 'Ligar e iniciar consulta' })).toBeVisible({ timeout: 10000 })
+  await expect(page.getByRole('dialog', { name: 'Ligar paciente e iniciar consulta' })).toBeVisible({ timeout: 10000 })
   await expect.poll(() => revisado('reagendado_paciente', nueva.id)).toBe('true')
   await page.keyboard.press('Escape')
   await abrirAgendaV2(page)

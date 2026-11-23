@@ -38,7 +38,7 @@ import Portal from '@/components/ui/Portal'
 import BurbujaCita, { type PropsBurbuja } from '@/components/agenda/BurbujaCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useArrastreHoja } from '@/components/ui/ModalShell'
-import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
+import { posicionCapa, ventanaParaCapas, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 
 /** Tanda K, punto 21 · Lo de la burbuja (`BurbujaCita`) más el sitio, la variante y el cierre. */
@@ -67,7 +67,8 @@ interface Props extends PropsBurbuja {
    `max-height`, para que la tarjeta no se corte al fondo de la pantalla. */
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
-  const ventana = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
+  const ventana = ventanaParaCapas()
   const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana, punto)
   nodo.style.left = `${p.left}px`
   nodo.style.top = `${p.top}px`

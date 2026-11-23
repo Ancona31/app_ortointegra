@@ -64,12 +64,12 @@ describe('burbujaDeTarjeta: qué va en cada sitio', () => {
     const d = burbujaDeTarjeta({ ...CON, status: 'scheduled' }, true, TODO)
     expect([...d.rejilla, ...d.pie, d.principal]).not.toContain('no-asistio')
   })
-  it('sin expediente (Google por asignar): «Ligar expediente e iniciar» con su ayuda; pie «No es una cita» | «Cancelar cita»', () => {
+  it('sin expediente (Google por asignar): «Ligar paciente e iniciar consulta» con su ayuda; pie «¿No es una cita?» | «Cancelar cita»', () => {
     const d = burbujaDeTarjeta({ ...POR_ASIGNAR, status: 'scheduled' }, true, TODO)
     expect(d).toMatchObject({ principal: 'ligar', ayuda: 'Primero buscas su expediente o le creas uno.', pie: ['no-es-cita', 'cancelar'] })
     expect(d.rejilla).toEqual(['menu-confirmar', 'reagendar', 'editar'])
   })
-  it('por enlace sin ligar: sin «No es una cita» (como hoy)', () => {
+  it('por enlace sin ligar: sin «¿No es una cita?» (como hoy)', () => {
     expect(burbujaDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'scheduled' }, true).pie).toEqual(['cancelar'])
   })
   it('evento: Editar | Convertir; pie «Eliminar evento»', () => {
@@ -87,7 +87,8 @@ describe('textos de la maqueta', () => {
   it('las acciones', () => {
     expect([ETIQUETA_ACCION['ver-expediente'], ETIQUETA_ACCION['reagendar-cita'], ETIQUETA_ACCION.reasignar, ETIQUETA_ACCION.ligar,
       ETIQUETA_ACCION['no-es-cita'], ETIQUETA_ACCION['no-asistio'], ETIQUETA_ACCION.confirmar])
-      .toEqual(['Ver la consulta', 'Darle otra cita', 'Reasignar el horario', 'Ligar expediente e iniciar', 'No es una cita', 'No asistió', 'Marcar como confirmada'])
+      /* B13 · AG7 (CALMA §28, textos unificados): el ligado y «¿No es una cita?» con signos. */
+      .toEqual(['Ver la consulta', 'Darle otra cita', 'Reasignar el horario', 'Ligar paciente e iniciar consulta', '¿No es una cita?', 'No asistió', 'Marcar como confirmada'])
   })
   it('el día largo y las iniciales del médico', () => {
     expect(diaLargoDeTarjeta({ start_time: '2026-11-18T22:00:00Z' }, 'America/Merida')).toBe('Miércoles 18 de noviembre')
@@ -149,10 +150,12 @@ describe('lo que pinta', () => {
     expect(pintar({ notes: null })).not.toContain('ag-burbuja-obs')
     expect(pintar({ notes: '   ' })).not.toContain('ag-burbuja-obs')
   })
-  it('el pie de una por asignar dice «No es una cita», sin signos', () => {
+  /* B13 · AG7 (CALMA §28 y §29.7): con signos, y su explicación a la vista, que lo describe. */
+  it('el pie de una por asignar dice «¿No es una cita?» y explica qué hace', () => {
     const html = pintar({ paciente_id: null, pacientes: null, google_asignacion: 'por_asignar', origen: 'google' })
-    expect(html).toContain('>No es una cita<')
-    expect(html).not.toContain('¿')
+    expect(html).toContain('>¿No es una cita?<')
+    expect(html).toContain('>Dejarlo como evento sin paciente: deja de pedir que se ligue</p>')
+    expect(html).toMatch(/aria-describedby="[^"]+"[^>]*>.*¿No es una cita\?/)
   })
 })
 

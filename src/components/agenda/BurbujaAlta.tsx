@@ -53,7 +53,7 @@ import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { AltaGuardada, Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
-import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
+import { posicionCapa, ventanaParaCapas, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 import { idDeOpcion, indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import { buscarPacientes, limpiarTextoBusqueda } from '@/lib/agenda/buscarCitasPaciente'
@@ -113,7 +113,8 @@ interface Props {
  */
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
-  const ventana = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
+  const ventana = ventanaParaCapas()
   const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana, punto)
   nodo.style.left = `${p.left}px`
   nodo.style.top = `${p.top}px`

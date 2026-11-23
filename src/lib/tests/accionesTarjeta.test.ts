@@ -39,11 +39,11 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
       .toEqual(['ligar', 'confirmar', 'reagendar', 'editar', 'cancelar'])
   })
   /* Tanda J (punto 7) · MUTACIÓN: principal `'iniciar-consulta'` en `disposicionSinCambios` → rojo. */
-  it('tanda J · la principal de una por ligar es «Ligar expediente e iniciar» (la ventana), no «Iniciar consulta»', () => {
+  it('tanda J · la principal de una por ligar es «Ligar paciente e iniciar consulta» (la ventana), no «Iniciar consulta»', () => {
     const d = disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, true)
     expect(d.principal).toBe('ligar')
-    /* Tanda K, punto 21 · el texto de la maqueta. */
-    expect(ETIQUETA_ACCION.ligar).toBe('Ligar expediente e iniciar')
+    /* B13 · AG7 · el texto unificado (CALMA §28). */
+    expect(ETIQUETA_ACCION.ligar).toBe('Ligar paciente e iniciar consulta')
     expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'unico', status: 'confirmed' }, false).principal).toBeNull()
   })
   /* Tanda L, punto 2 (AG-DT-192): «No asistió» pregunta, como «Cancelar cita».

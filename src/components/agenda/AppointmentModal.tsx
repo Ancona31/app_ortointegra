@@ -44,6 +44,7 @@ import {
   addMinutes, partirFechaHora, componerIso, diasEntreFechas, duracionEscrita, fechasDeTodoElDia,
 } from '@/lib/agenda/fechasAgenda'
 import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico, esPorAsignar, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
+import { textoDeConfirmacion } from '@/lib/agenda/accionesTarjeta'
 import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
 import { BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
 import BloqueReservaPorLigar from '@/components/agenda/BloqueReservaPorLigar'
@@ -530,6 +531,8 @@ export default function AppointmentModal({
   const [deleting,    setDeleting]    = useState(false)
   /* La alerta de la X del paciente. Ver el botón, más abajo. */
   const [quitarPaciente, setQuitarPaciente] = useState(false)
+  /* B13 · AG6 (CALMA §29.2): con la v2, cancelar o eliminar desde el pie pregunta antes. */
+  const [confirmarPie, setConfirmarPie] = useState<'cancelar' | 'eliminar' | null>(null)
   /* B3: con el interruptor encendido, una CITA ya guardada no se borra: la
      papelera y la X la cancelan. `yaCancelada` mira la FILA, no el selector
      de estado del formulario: lo que no se puede es borrar lo guardado. Una
@@ -1061,11 +1064,13 @@ export default function AppointmentModal({
         aria-labelledby={tituloId}
         tabIndex={-1}
         data-estado={saliendo ? 'saliendo' : undefined}
+        /* B13 · AG6 · con la v2, la piel del catálogo (`globals.css`, «EL FORMULARIO DE LA CITA»). */
+        data-form-v2={agendaV2 ? '' : undefined}
         /* F2.7 · `ag-modal-panel` y no `animate-modal-enter`, que es de toda la
            app (`ModalShell`): la entrada y la salida de este modal las define la
            agenda (bloque F §2, «Modal completo»). */
         className="ag-modal-panel relative focus:outline-none rounded-[22px] max-md:rounded-none w-full max-w-[560px] max-md:max-w-full md:max-h-[92dvh] max-md:h-full flex flex-col overflow-hidden"
-        style={{ background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
+        style={agendaV2 ? undefined : { background: 'var(--ag-modal-bg)', boxShadow: '0 30px 80px rgba(16, 32, 64, .28)' }}>
 
         {/* Header
 
@@ -1541,6 +1546,8 @@ export default function AppointmentModal({
                 </button>
               </div>
             ))}
+          {/* B13 · AG6 (CALMA §29.9): los rótulos de grupo aprobados, sólo con la v2. */}
+          {agendaV2 && <h3 className="ag-form-grupo">Fecha y hora</h3>}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
@@ -1613,6 +1620,7 @@ export default function AppointmentModal({
             <p role="alert" data-aviso-bloqueado className="text-[12.5px] font-semibold text-red-500">{TEXTO_HORARIO_BLOQUEADO}</p>
           )}
 
+          {agendaV2 && <h3 className="ag-form-grupo">Detalles</h3>}
           {/* B6c · Tipo de cita (P5). Sólo con el interruptor, en una cita con
               paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
               siempre está. El color es SÓLO la marca de la lista; la tarjeta
@@ -1856,7 +1864,7 @@ export default function AppointmentModal({
               CANCELA en vez de borrarse, y una ya cancelada no ofrece botón. */}
           {cancelaEnVezDeBorrar && !yaCancelada && (
             <button
-              onClick={handleCancelarCita}
+              onClick={() => (agendaV2 ? setConfirmarPie('cancelar') : void handleCancelarCita())}
               disabled={deleting}
               title={deleting ? 'Cancelando...' : 'Cancelar cita'}
               aria-label={deleting ? 'Cancelando cita' : 'Cancelar cita'}
@@ -1867,7 +1875,7 @@ export default function AppointmentModal({
           )}
           {isEdit && !cancelaEnVezDeBorrar && (
             <button
-              onClick={handleDelete}
+              onClick={() => (agendaV2 ? setConfirmarPie('eliminar') : void handleDelete())}
               disabled={deleting}
               title={deleting ? 'Eliminando...' : (esEvento ? 'Eliminar evento' : 'Eliminar cita')}
               aria-label={deleting
@@ -1974,6 +1982,20 @@ export default function AppointmentModal({
         {...(agendaV2 ? { verbo: 'Eliminar cita', icono: 'eliminar' as const } : {})}
         onConfirm={() => { setQuitarPaciente(false); void handleDelete() }}
         onCancel={() => setQuitarPaciente(false)}
+      />
+    )}
+
+    {/* B13 · AG6 (CALMA §29.2–§29.4): la confirmación del pie, con la alerta del catálogo: el mismo
+        texto que la burbuja (`textoDeConfirmacion`), el verbo y «Volver» al cancelar. */}
+    {confirmarPie && apt && (
+      <ConfirmModal
+        message={confirmarPie === 'cancelar' ? textoDeConfirmacion('cancelar', apt)
+          : esEvento ? textoDeConfirmacion('eliminar', apt) : `¿Eliminar la cita «${apt.title}»? No se puede deshacer.`}
+        verbo={confirmarPie === 'cancelar' ? 'Cancelar cita' : esEvento ? 'Eliminar evento' : 'Eliminar cita'}
+        secundario={confirmarPie === 'cancelar' ? 'Volver' : 'Cancelar'}
+        icono={confirmarPie === 'cancelar' ? 'cancelar' : 'eliminar'}
+        onConfirm={() => { const que = confirmarPie; setConfirmarPie(null); void (que === 'cancelar' ? handleCancelarCita() : handleDelete()) }}
+        onCancel={() => setConfirmarPie(null)}
       />
     )}
 

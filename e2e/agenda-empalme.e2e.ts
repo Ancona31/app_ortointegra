@@ -290,7 +290,7 @@ test('rejilla: un 409 empalme del servidor se pregunta SIEMPRE, aunque el client
   const elAviso = aviso(page, /Se empalma con «Cita simulada» \(16:00–16:30\)/)
   await expect(elAviso).toBeVisible()
   const resp = page.waitForResponse(r => r.url().includes(`/api/appointments/${movida}`) && r.request().method() === 'PUT' && r.status() === 200)
-  await elAviso.getByRole('button', { name: 'Guardar' }).click()
+  /* B13 · AG5: el cliente cree la v2 APAGADA, así que la alerta es la de siempre («Aceptar»). */ await elAviso.getByRole('button', { name: 'Aceptar' }).click()
   const res = await resp
   expect((res.request().postDataJSON() as { empalmes_aceptados?: string[] }).empalmes_aceptados).toEqual([FALSA])
   expect(horasEnBase(movida)).toBe('16:05-16:20')

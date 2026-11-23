@@ -21,6 +21,7 @@
  */
 import { useId, useState, type ReactElement } from 'react'
 import Portal from '@/components/ui/Portal'
+import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { addMinutes, componerIso, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { renderEnTZ, desplazarFecha } from '@/lib/dates'
@@ -99,9 +100,11 @@ async function enviar(modo: ModoBloqueo, c: Campos, zona: string): Promise<{ ok:
   return { ok: false, error }
 }
 
-const ETIQUETA = 'block text-[11px] font-bold uppercase tracking-[.06em] mb-1.5'
-const CAMPO = 'w-full rounded-xl border px-3 py-2 text-sm'
-const ESTILO_CAMPO = { borderColor: 'var(--ag-border-card)', color: 'var(--ag-ink)', background: 'var(--ag-surface)' }
+/* B13 · AG6 · las piezas del catálogo (maqueta `ag-form`, vista 2 «Bloqueo»): rótulo 13/600, campo
+   relleno `--sup2` sin borde (44/16 táctil, 40/15 computadora) con contorno `--enlace` al enfocar. */
+const ETIQUETA = 'block text-[13px] leading-[18px] font-semibold mb-1.5'
+const CAMPO = 'w-full h-11 esc:h-10 rounded-xl border-0 px-3 text-base esc:text-[15px] focus:outline-2 focus:outline-enlace'
+const ESTILO_CAMPO = { color: 'var(--tinta)', background: 'var(--sup2)' }
 
 function CamposPeriodo({ c, set }: { c: Campos; set: (p: Partial<Campos>) => void }): ReactElement {
   return (
@@ -112,13 +115,13 @@ function CamposPeriodo({ c, set }: { c: Campos; set: (p: Partial<Campos>) => voi
       </label>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>{c.todoElDia ? 'Desde' : 'Inicio'}</label>
+          <label className={ETIQUETA} style={{ color: 'var(--tinta2)' }}>{c.todoElDia ? 'Desde' : 'Inicio'}</label>
           <input type="date" className={CAMPO} style={ESTILO_CAMPO} value={c.fecha} aria-label="Fecha de inicio"
             onChange={e => set({ fecha: e.target.value, ...(c.fechaFin < e.target.value ? { fechaFin: e.target.value } : {}) })} />
           {!c.todoElDia && <input type="time" className={`${CAMPO} mt-1.5`} style={ESTILO_CAMPO} value={c.hora} aria-label="Hora de inicio" onChange={e => set({ hora: e.target.value })} />}
         </div>
         <div>
-          <label className={ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>{c.todoElDia ? 'Hasta (incluido)' : 'Fin'}</label>
+          <label className={ETIQUETA} style={{ color: 'var(--tinta2)' }}>{c.todoElDia ? 'Hasta (incluido)' : 'Fin'}</label>
           <input type="date" className={CAMPO} style={ESTILO_CAMPO} value={c.fechaFin} aria-label="Fecha de fin" onChange={e => set({ fechaFin: e.target.value })} />
           {!c.todoElDia && <input type="time" className={`${CAMPO} mt-1.5`} style={ESTILO_CAMPO} value={c.horaFin} aria-label="Hora de fin" onChange={e => set({ horaFin: e.target.value })} />}
         </div>
@@ -130,7 +133,7 @@ function CamposPeriodo({ c, set }: { c: Campos; set: (p: Partial<Campos>) => voi
 function CampoMedico({ c, set, medicos }: { c: Campos; set: (p: Partial<Campos>) => void; medicos: readonly MedicoConfig[] }): ReactElement {
   return (
     <div>
-      <label className={ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>Médico</label>
+      <label className={ETIQUETA} style={{ color: 'var(--tinta2)' }}>Médico</label>
       <select className={CAMPO} style={ESTILO_CAMPO} value={c.medicoId} aria-label="Médico" onChange={e => set({ medicoId: e.target.value })}>
         <option value="">Elige el médico</option>
         {medicos.map(m => <option key={m.id} value={m.id}>{componerNombreMedicoCompleto(m)}</option>)}
@@ -181,37 +184,39 @@ export default function ModalBloqueo(p: Props): ReactElement {
         <div className="ag-modal-velo absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={p.onClose} />
         <div ref={montarPanel} onKeyDown={alPulsarTecla} role="dialog" aria-modal="true" aria-labelledby={tituloId} tabIndex={-1}
           data-modal-bloqueo
-          className="ag-modal-panel relative focus:outline-none bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-3">
-          <h2 id={tituloId} className="text-base font-bold" style={{ color: 'var(--ag-ink)' }}>{editar ? 'Bloqueo de horario' : 'Bloquear horario'}</h2>
-          <p className="text-[12px] leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
+          className="ag-modal-panel relative focus:outline-none bg-sup text-tinta rounded-[20px] shadow-[var(--sombra-capa)] w-full max-w-[440px] ext:max-w-[310px] p-6 ext:p-5 flex flex-col gap-3 max-h-full overflow-y-auto">
+          <h2 id={tituloId} className="text-[17px] leading-[22px] font-bold text-tinta">{editar ? 'Bloqueo de horario' : 'Bloquear horario'}</h2>
+          <p className="text-[13px] leading-[18px] text-tinta2">
             En este periodo no se agenda ni se mueve nada, y el enlace de reserva no ofrece turnos.
           </p>
           {!p.ocultarMedico && !editar && <CampoMedico c={c} set={set} medicos={p.medicos} />}
           <CamposPeriodo c={c} set={set} />
           <div>
-            <label className={ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>Motivo (opcional)</label>
+            <label className={ETIQUETA} style={{ color: 'var(--tinta2)' }}>Motivo (opcional)</label>
             <input className={CAMPO} style={ESTILO_CAMPO} value={c.motivo} maxLength={120} aria-label="Motivo"
               placeholder="Vacaciones, congreso…" onChange={e => set({ motivo: e.target.value })} />
-            <p className="text-[11px] mt-1" style={{ color: 'var(--ag-muted)' }}>
+            <p className="text-[12px] leading-4 mt-1 text-tinta2">
               Si la clínica usa Google Calendar, el motivo aparece allí. No escribas datos de pacientes.
             </p>
           </div>
-          {estado.error && <p role="alert" className="text-[13px]" style={{ color: 'var(--ag-status-cancelled-text)' }}>{estado.error}</p>}
-          <div className="flex items-center gap-2 mt-2">
-            {editar && (confirmandoQuitar
-              ? <button type="button" className="px-3 py-2 rounded-xl text-sm font-semibold text-white" style={{ background: 'var(--ag-status-cancelled-text)' }}
-                  disabled={estado.ocupado} onClick={() => void quitar(editar.id)}>Sí, quitar</button>
-              : <button type="button" className="px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-100" style={{ color: 'var(--ag-status-cancelled-text)' }}
-                  onClick={() => setConfirmandoQuitar(true)}>Quitar bloqueo</button>)}
+          {estado.error && <p role="alert" className="text-[13px] font-semibold text-mal-tinta">{estado.error}</p>}
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {/* B13 · AG6 (§29.2, §29.4): «Quitar bloqueo» pregunta con la alerta del catálogo y su verbo. */}
+            {editar && <button type="button" className="k-b k-b-capa k-b-texto text-mal-tinta" disabled={estado.ocupado}
+              onClick={() => setConfirmandoQuitar(true)}>Quitar bloqueo</button>}
             <span className="flex-1" />
-            <button type="button" onClick={p.onClose} className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100">Cancelar</button>
-            <button type="button" disabled={estado.ocupado} onClick={() => void guardar(c)}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#1e5fa8] hover:bg-[#1a4f8c] disabled:opacity-60">
+            <button type="button" onClick={p.onClose} className="k-b k-b-capa k-b-quieto">Cancelar</button>
+            <button type="button" disabled={estado.ocupado} onClick={() => void guardar(c)} className="k-b k-b-capa k-b-prim">
               {estado.ocupado ? 'Guardando…' : 'Guardar'}
             </button>
           </div>
         </div>
       </div>
+      {editar && confirmandoQuitar && (
+        <ConfirmModal message="¿Quitar el bloqueo de horario? Se vuelve a poder agendar en ese periodo."
+          verbo="Quitar bloqueo" icono="eliminar"
+          onConfirm={() => { setConfirmandoQuitar(false); void quitar(editar.id) }} onCancel={() => setConfirmandoQuitar(false)} />
+      )}
     </Portal>
   )
 }

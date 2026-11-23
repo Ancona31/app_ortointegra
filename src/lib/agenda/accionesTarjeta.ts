@@ -62,8 +62,10 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   editar: 'Editar',
   convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
-  'no-es-cita': 'No es una cita',
-  ligar: 'Ligar expediente e iniciar',
+  /* B13 · AG7 (CALMA §28, textos unificados): «¿No es una cita?» con signos en todas partes, y el
+     ligado como en el dashboard. Antes, «No es una cita» y «Ligar expediente e iniciar». */
+  'no-es-cita': '¿No es una cita?',
+  ligar: 'Ligar paciente e iniciar consulta',
   'no-asistio': 'No asistió',
   /* Tanda L, punto 9 · la de una CANCELADA: la quita de la agenda sin borrarla (queda cerrada). */
   'eliminar-cita': 'Eliminar cita',

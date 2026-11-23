@@ -7478,6 +7478,35 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 :root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-pie::before { margin: 0 20px 4px; }
 .ag-burbuja-pie-boton--peligro, .ag-burbuja-pie-boton--peligro > svg { color: var(--mal-tinta); }
 .ag-burbuja-fin { display: none; }
+/* B13 · AG7 (CALMA §29.7): la explicación de «¿No es una cita?», bajo su fila y alineada con el texto. */
+.ag-burbuja-pie-ayuda { margin: -6px 0 4px; padding: 0 16px 0 48px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-pie-ayuda { padding: 0 20px 0 52px; }
+/* ── B13 · AG6 · EL FORMULARIO DE LA CITA (`AppointmentModal`, sólo con la v2: `[data-form-v2]`) ──
+   Maqueta `S/entrega/ag-form`. La geometría del panel NO cambia (pantalla completa por debajo de
+   `md`, tarjeta de 560 encima, `visualViewport`, áreas seguras: ver el archivo). Sólo la piel del
+   catálogo: superficie `--sup`, radio 20 y la sombra de las capas; rótulos 13/600 en `--tinta2`,
+   sin versalitas (nada < 12); campos rellenos `--sup2` sin borde (44/16 en táctil, 40/15 en `ih`/
+   `esc`) con contorno de 2 px `--enlace` al enfocar; los dos rótulos de grupo (§29.9). Las reglas
+   no tienen capa: ganan a las utilidades de Tailwind sin `!important`, salvo los colores en línea. */
+.ag-modal-panel[data-form-v2] { color: var(--tinta); background: var(--sup); box-shadow: var(--sombra-capa); }
+@media (min-width: 768px) { .ag-modal-panel[data-form-v2] { border-radius: 20px; } }
+.ag-modal-panel[data-form-v2] h2 { font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta) !important; }
+.ag-modal-panel[data-form-v2] label.uppercase {
+  font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--tinta2) !important;
+}
+.ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea) {
+  font-size: 16px; color: var(--tinta); background-color: var(--sup2); border-color: transparent;
+}
+.ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 44px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 40px; font-size: 15px; }
+.ag-modal-panel[data-form-v2] :is(input, select, textarea):focus-visible { outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none; }
+.ag-modal-panel[data-form-v2] .border-b, .ag-modal-panel[data-form-v2] .border-t { border-color: var(--linea) !important; }
+.ag-form-grupo { margin: 4px 0 -4px; font-size: 15px; line-height: 20px; font-weight: 700; color: var(--tinta); }
+
+/* B13 · AG7 · la ventana de ligar: el eslabón junto al título, y el pie con el principal a la derecha. */
+.ag-ligar-icono { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--enlace); background: var(--tonal); }
+.ag-ligar-pie { justify-content: flex-end; align-items: flex-start; }
+.ag-ligar-pie > :first-child:not(.ag-capa-boton) { margin-right: auto; }
 .ag-capa-acuse { display: flex; align-items: center; gap: var(--ag-2-5); }
 .ag-capa-acuse-icono {
   flex: none;
@@ -7807,107 +7836,119 @@ td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-fai
 }
 html.dark .ag-campana-punto { background: color-mix(in srgb, var(--ag-status-cancelled-dot) 82%, #000); }
 .ag-banda-movil-ctrl .ag-campana-punto { top: -4px; right: -4px; border-color: var(--ag-navy); }
-.ag-capa--campana { width: 400px; gap: var(--ag-3); padding-top: 0; }
+.ag-capa--campana { width: 400px; gap: 12px; padding-top: 0; }
+/* B13 · AG8 · las pestañas de la campana de borde a borde (el relleno de la capa es 20) y con los
+   tokens del kit: el subrayado y el texto elegido en `--enlace`. */
 .ag-campana-cab {
   display: flex;
   align-items: center;
-  gap: var(--ag-1);
-  margin: 0 calc(-1 * var(--ag-4));
-  padding: 0 var(--ag-2) 0 0;
-  border-bottom: 1px solid var(--ag-hairline);
+  gap: 4px;
+  margin: 0 -20px;
+  padding: 0 8px 0 0;
+  border-bottom: 1px solid var(--linea);
 }
 .ag-campana-pestanas { flex: 1 1 0; display: grid; grid-template-columns: 1fr 1fr; }
 .ag-campana-pestana {
-  padding: var(--ag-3) 0;
-  font-size: 13.5px;
+  min-height: 48px;
+  padding: 12px 0;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--ag-muted);
+  color: var(--tinta2);
   background: transparent;
   border: 0;
   transition: color var(--ag-dur-micro) var(--ag-ease), box-shadow var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-campana-pestana[aria-selected="true"] { color: var(--ag-brand-legible); box-shadow: inset 0 -2px 0 var(--ag-brand-legible); }
+.ag-campana-pestana[aria-selected="true"] { color: var(--enlace); box-shadow: inset 0 -2px 0 var(--enlace); }
 
 /* · «Por confirmar» (punto 17): cada fila es una rejilla de columnas FIJAS
      —datos, WhatsApp, correo—, así los dos botones quedan en el mismo sitio y
      del mismo tamaño en todas las filas (la celda existe aunque falte el
-     botón), y el estado de los dos va en UNA línea debajo de la fila. */
+     botón), y el estado de los dos va en UNA línea debajo de la fila.
+     B13 · AG8: los botones de 44 (40 en `ih`/`esc`) en `--sup2`, sin borde. */
 .ag-pc-fila {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px 38px;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
   grid-template-areas: "datos whatsapp correo" "estado estado estado" "sin sin sin";
-  column-gap: var(--ag-2);
+  column-gap: 8px;
   align-items: center;
-  padding: var(--ag-2-5) 0;
+  padding: 10px 0;
 }
-.ag-pc-fila + .ag-pc-fila { border-top: 1px solid var(--ag-hairline); }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-pc-fila { grid-template-columns: minmax(0, 1fr) 40px 40px; }
+.ag-pc-fila + .ag-pc-fila { border-top: 1px solid var(--linea); }
 .ag-pc-datos { grid-area: datos; }
 .ag-pc-celda--whatsapp { grid-area: whatsapp; }
 .ag-pc-celda--correo { grid-area: correo; }
 .ag-pc-estado {
   grid-area: estado;
-  margin: var(--ag-1) 0 0;
-  color: var(--ag-muted);
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--tinta2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ag-pc-estado--alerta { color: var(--ag-status-cancelled-text); white-space: normal; }
-.ag-pc-sin-medios { grid-area: sin; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ag-2); margin-top: var(--ag-1); }
+.ag-pc-estado--alerta { color: var(--mal-tinta); font-weight: 600; white-space: normal; }
+.ag-pc-sin-medios { grid-area: sin; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .ag-boton-icono {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  color: var(--ag-text);
-  background: var(--ag-surface);
-  border: 1px solid var(--ag-input-border);
-  border-radius: var(--ag-r-btn);
+  width: 44px;
+  height: 44px;
+  color: var(--enlace);
+  background: var(--sup2);
+  border: 0;
+  border-radius: 12px;
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-boton-icono:hover { background: var(--ag-btn-ghost-hover); }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-boton-icono { width: 40px; height: 40px; }
+.ag-boton-icono:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); }
 .ag-boton-icono:disabled { opacity: .6; }
 
 /* · «Avisos» (punto 19): una fila por aviso, con el punto de la marca. */
 .ag-aviso-fila {
   display: flex;
-  gap: var(--ag-2-5);
+  gap: 10px;
   width: 100%;
-  padding: var(--ag-2-5) var(--ag-1);
+  padding: 10px 4px;
   text-align: left;
   color: inherit;
   background: transparent;
   border: 0;
-  border-radius: var(--ag-r-btn-sm);
+  border-radius: 10px;
   text-decoration: none;
 }
-.ag-aviso-fila:hover { background: var(--ag-btn-ghost-hover); }
-li + li > .ag-aviso-fila { border-top: 1px solid var(--ag-hairline); border-radius: 0; }
-.ag-aviso-punto { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--ag-brand-secondary); }
+.ag-aviso-fila:hover { background: var(--fondo); }
+li + li > .ag-aviso-fila { border-top: 1px solid var(--linea); border-radius: 0; }
+.ag-aviso-punto { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--enlace); }
 
-/* · El MENÚ DEL ENGRANE (punto 15) y la capa de la leyenda. */
-.ag-capa--menu { width: 300px; gap: 0; padding: var(--ag-2); }
+/* · El MENÚ DEL ENGRANE (punto 15) y la capa de la leyenda. B13 · AG8: el menú del catálogo
+     (`.k-menu-op` de `sistema.css`): filas de 44 (38 anclado en `esc`), icono en `--enlace`, texto 15
+     (14 en `esc`), separador `--linea`. */
+.ag-capa--menu { width: 288px; gap: 0; padding: 8px; border-radius: 14px; }
 .ag-menu-opcion {
   display: flex;
   align-items: center;
-  gap: var(--ag-2-5);
+  gap: 12px;
   width: 100%;
-  min-height: 40px;
-  padding: 0 var(--ag-2-5);
-  font-size: 14px;
-  font-weight: 500;
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
   text-align: left;
-  color: var(--ag-text);
+  color: var(--tinta);
   background: transparent;
   border: 0;
-  border-radius: var(--ag-r-btn-sm);
+  border-radius: 10px;
 }
-.ag-menu-opcion:is(:hover, :focus-visible) { background: var(--ag-btn-ghost-hover); }
+:root[data-formato="esc"] .ag-menu-opcion { min-height: 38px; gap: 10px; padding: 4px 10px; font-size: 14px; }
+.ag-menu-opcion:is(:hover, :focus-visible) { background: var(--fondo); }
+.ag-menu-opcion:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
 .ag-menu-opcion[aria-disabled="true"] { opacity: .6; cursor: default; }
-.ag-menu-icono { display: inline-grid; place-items: center; color: var(--ag-muted); }
-.ag-menu-sep { margin: var(--ag-1-5) var(--ag-1); border: 0; border-top: 1px solid var(--ag-hairline); }
-.ag-capa--leyenda { width: 260px; }
-.ag-capa--leyenda .ag-leyenda { display: flex; flex-direction: column; gap: var(--ag-2); }
+.ag-menu-icono { display: inline-grid; place-items: center; color: var(--enlace); }
+.ag-menu-sep { margin: 6px 12px; border: 0; border-top: 1px solid var(--linea); }
+.ag-capa--leyenda { width: 280px; }
+.ag-capa--leyenda .ag-leyenda { display: flex; flex-direction: column; gap: 8px; }
 .ag-capa--leyenda .ag-leyenda > [aria-hidden] { display: none; }
 
 /* ════════════════════════════════════════════════════════════════

@@ -26,7 +26,8 @@
  * expediente tachado es un botón con nombre y aviso.
  */
 import { Fragment, useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode, type RefObject } from 'react'
-import { ArrowRightLeft, CalendarX, ChevronDown, Trash2, UserPlus, X as Tache } from 'lucide-react'
+import { ArrowRightLeft, CalendarX, ChevronDown, Link2, Trash2, UserPlus, X as Tache } from 'lucide-react'
+import { AYUDA_NO_ES_CITA } from '@/components/agenda/BotonNoEsCita'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
 import IconoEstadoCita from '@/components/ui/IconoEstadoCita'
@@ -97,7 +98,9 @@ function IconoDeAccion({ a }: { a: CeldaBurbuja }): ReactElement | null {
     case 'cancelar': return <Tache size={20} aria-hidden="true" />
     case 'eliminar': case 'eliminar-cita': return <Trash2 size={20} aria-hidden="true" />
     case 'no-es-cita': return <CalendarX size={20} aria-hidden="true" />
-    case 'iniciar-consulta': case 'ligar': return <IconoPlay />
+    case 'iniciar-consulta': return <IconoPlay />
+    /* B13 · AG7 (CALMA §29.6): ligar lleva el ESLABÓN, como en el dashboard. */
+    case 'ligar': return <Link2 size={20} aria-hidden="true" />
     default: return null
   }
 }
@@ -258,7 +261,8 @@ function Principal({ a, ayuda, alAccion, foco, autoFoco }: {
   a: AccionTarjeta; ayuda: string | null; alAccion: (a: AccionTarjeta) => void
   foco: { tabIndex: number; onFocus: () => void }; autoFoco: boolean
 }): ReactElement {
-  const icono = a === 'ver-expediente' ? <IconoDoc /> : a === 'reagendar' || a === 'reagendar-cita' ? <IconoCal /> : <IconoPlay />
+  const icono = a === 'ver-expediente' ? <IconoDoc /> : a === 'reagendar' || a === 'reagendar-cita' ? <IconoCal />
+    : a === 'ligar' ? <Link2 size={18} aria-hidden="true" /> : <IconoPlay />
   return (
     <div className="ag-burbuja-principal">
       <button type="button" data-clave="principal" autoFocus={autoFoco} {...foco} onClick={() => alAccion(a)}
@@ -305,6 +309,7 @@ interface PropsAcciones {
 function Acciones({ d, props, autoFoco, confirmar, mensaje, alMensaje }: PropsAcciones): ReactElement {
   const orden = ordenDeBarra(d, confirmar.abierto)
   const { barra, foco, alTeclear } = useFocoBarra(orden)
+  const idAyudaNoEsCita = useId()
   if (orden.length === 0) return <div className="ag-burbuja-fin" />
   const celda = (a: CeldaBurbuja): ReactElement => (
     <button key={a} type="button" className="ag-burbuja-celda" data-clave={`r:${a}`} autoFocus={autoFoco && orden[0] === `r:${a}`}
@@ -332,9 +337,14 @@ function Acciones({ d, props, autoFoco, confirmar, mensaje, alMensaje }: PropsAc
       {d.pie.length > 0 ? (
         <div className="ag-burbuja-pie">
           {d.pie.map(a => (
-            <button key={a} type="button" data-clave={`p:${a}`} {...foco(`p:${a}`)} autoFocus={autoFoco && orden[0] === `p:${a}`}
-              className={a === 'no-es-cita' ? 'ag-burbuja-pie-boton' : 'ag-burbuja-pie-boton ag-burbuja-pie-boton--peligro'}
-              onClick={() => props.alAccion(a)}><IconoDeAccion a={a} />{ETIQUETA_ACCION[a]}</button>
+            <Fragment key={a}>
+              <button type="button" data-clave={`p:${a}`} {...foco(`p:${a}`)} autoFocus={autoFoco && orden[0] === `p:${a}`}
+                className={a === 'no-es-cita' ? 'ag-burbuja-pie-boton' : 'ag-burbuja-pie-boton ag-burbuja-pie-boton--peligro'}
+                aria-describedby={a === 'no-es-cita' ? idAyudaNoEsCita : undefined}
+                onClick={() => props.alAccion(a)}><IconoDeAccion a={a} />{ETIQUETA_ACCION[a]}</button>
+              {/* B13 · AG7 (CALMA §29.7): la explicación de «¿No es una cita?», a la vista. */}
+              {a === 'no-es-cita' && <p id={idAyudaNoEsCita} className="ag-burbuja-pie-ayuda">{AYUDA_NO_ES_CITA}</p>}
+            </Fragment>
           ))}
         </div>
       ) : <div className="ag-burbuja-fin" />}

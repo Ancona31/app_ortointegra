@@ -39,7 +39,7 @@ import MiniMes from '@/components/agenda/MiniMes'
 import BuscadorCitas from '@/components/agenda/BuscadorCitas'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import type { ApiInteraccionesV2 } from '@/lib/agenda/contratosV2'
-import { posicionCapa, ventanaVisible, type Caja } from '@/lib/agenda/posicionCapa'
+import { posicionCapa, ventanaParaCapas, type Caja } from '@/lib/agenda/posicionCapa'
 import { partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { teclasDeAccion } from '@/lib/agenda/atajosAgenda'
 
@@ -72,7 +72,8 @@ function colocar(nodo: HTMLElement, ancla: Caja): void {
   /* T1: el arreglo de las otras dos copias (alto natural, parte visible de la
      ventana, `max-height`). El desplegable no cambia de alto: no se sigue. */
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
-  const ventana = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
+  const ventana = ventanaParaCapas()
   const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana)
   nodo.style.left = `${p.left}px`
   nodo.style.top = `${p.top}px`
