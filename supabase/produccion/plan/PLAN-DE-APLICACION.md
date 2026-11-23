@@ -8,6 +8,14 @@
 > `clon-spinus-ql-*`, PostgreSQL 17.6, `postgres` NO superusuario, como en
 > producción); «[N]» = comprobado por otro agente y anotado en
 > `supabase/fusion/notas/`; «ASUMIENDO QUE…» = no se pudo comprobar.
+>
+> **Actualizado por el agente PL (2026-11-22, rama
+> `feature/agenda-v2-produccion-pl`):** el conteo previo real de producción
+> (§4, paso 3), las ventanas de candado medidas con el volumen real (§5), el
+> orden **«código primero, base inmediatamente después»** (decisión de Angel,
+> §6), la regla de reversa (§10) y la tabla exacta de variables de Vercel (§6.2).
+> «[C-PL]» = comprobado por PL en un clon de la foto con datos sintéticos del
+> tamaño real (§5).
 
 Archivos de esta carpeta:
 
@@ -17,7 +25,7 @@ Archivos de esta carpeta:
 | `huellas.sha256` | sha256 de las 9 migraciones y sus 9 reversas, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
 | `rejillas-del-ensayo.txt` | La rejilla final de cada archivo, literal, del ensayo de punta a punta sobre el clon de la foto (§11). |
 | `diferencias-antes-despues.clon-foto.tsv` | Las 958 diferencias de estructura antes → después de ese ensayo (claves: estado, tipo, esquema, clave, campo). |
-| `COMPROBACION-POSTERIOR.md` | Cómo comprobar que producción quedó idéntica al ensayo (paso 5). |
+| `COMPROBACION-POSTERIOR.md` | Cómo comprobar que producción quedó idéntica al ensayo (paso 7). |
 
 Los conteos de sólo lectura de antes están en `../conteos/` (`LEEME.md`).
 
@@ -87,8 +95,12 @@ la CLI: `npx --yes supabase@2.117.0 migration repair --status applied <versión>
   en el borrador.
 - Lo que `db push` haría mejor: manda cada archivo en una sola petición, con lo
   que las ventanas de candado serían algo más cortas (sin un viaje por
-  sentencia). Desde C1–C3 las ventanas fuertes ya son de 3–13 sentencias (§5):
-  la diferencia es de décimas de segundo.
+  sentencia). C1–C3 dejaron en 3–13 sentencias las ventanas fuertes de F1, F4
+  y F5b, **pero no las de F3 y F2**: su ACCESS EXCLUSIVE sobre `appointments`
+  dura **90 y 60 sentencias** desde el `ALTER TABLE` hasta el `COMMIT` [C-PL,
+  §5]. Por el pooler eso son segundos, no décimas (§5, estimación). Es el
+  argumento más fuerte a favor de mandar cada archivo en una sola petición
+  (§12, punto 6).
 
 **Sobre «se aplica a producción con la CLI» (CLAUDE.md, flujo del 2026-11-22).**
 Este plan **usa la CLI para registrar** (`migration repair`) pero **no para
@@ -150,9 +162,26 @@ encendido.
       9 dicen «PENDIENTE DE AUDITORÍA INDEPENDIENTE»).
 - [ ] La equivalencia (E0) y el ensayo de código ↔ base (E2) en verde.
 - [ ] `huellas.sha256` regenerado con los archivos aprobados (§12, punto 1).
-- [ ] Los conteos en OK (paso 3), corridos por Angel.
+- [ ] Los conteos en OK (paso 3), corridos por Angel **ese mismo día**, justo
+      antes de aplicar: el conteo previo del 2026-11-22 no vale por sí solo.
 - [ ] **Orden explícita de Angel**, ese día.
 - [ ] Nadie más desplegando ni tocando la base.
+- [ ] Las variables de Vercel del §6.2 preparadas (generadas en la terminal de
+      Angel, sin escribirlas en ningún archivo).
+
+> **El orden del día (decisión de Angel, 2026-11-22): CÓDIGO PRIMERO y la BASE
+> inmediatamente después, en la misma sesión**, con la v2 apagada en todas las
+> clínicas (como nace). Pasos 1–3 preparan; 4 despliega el código; 5 comprueba
+> que la app sigue igual; 6 aplica las 9; 7 comprueba; 8 enciende (otro día).
+> Por qué y la alternativa, en §6.1.
+
+> ### ⚠️ REVERSA — LA REGLA, ANTES DE NADA
+> **Antes de revertir CUALQUIER migración, apagar la v2 en TODAS las clínicas.**
+> Revertir F3 (o más) con la v2 encendida en una clínica le rompe la agenda (500
+> al mover o cancelar) [C, E2 5.5.4]. **Las reversas, sólo con `aplicar.sh
+> reversa` / `reversa-truncate`**, que reparan el historial; nunca a mano (§10).
+> Si el problema es del CÓDIGO y la base aún no se tocó, no hay reversa de base:
+> se vuelve al despliegue anterior de Vercel (paso 5).
 
 ### Paso 1 · Respaldo previo
 
@@ -206,9 +235,110 @@ que mirar: **G.13b** (número de citas: ventanas de §5), **G.14/G.15**
 **G.18/F5b.3** (índices inválidos), **F1.10/C.1/C.2** (lo que haría abortar el
 backfill). `estado` enseña versión, usuario y `search_path` de la sesión, cuatro
 cuentas (citas, consultorios, clínicas, filas de `audit_log`) y el historial: se
-anotan las cuentas para el paso 5.
+anotan las cuentas para el paso 7.
 
-### Paso 4 · Las 9 migraciones
+#### Conteo previo del 2026-11-22 (Angel, contra producción, 21:08)
+
+Rejilla en `~/spinus-produccion-foto/conteos-20261122-210851.txt` (fuera del
+repo; aquí sólo cifras). **78 filas: 73 OK, 5 INFO, 0 AVISO, 0 ALTO** [C,
+leída por PL]. Las 5 INFO son las esperadas: G.13 (tamaños), M2.8 (29 tablas
+con TRUNCATE para los tres roles: `audit_log` y las 28 del inventario de la
+reversa de la nº 2, igual que la foto), F1.11 (lo que reescribirá el backfill),
+T.1 y T.2 (privilegios por omisión con TRUNCATE de `postgres` y de
+`supabase_admin`, los tres roles).
+
+| Dato | Rejilla | Lo que dijo Angel |
+|---|---|---|
+| citas (G.13b, `count` exacto) | **247** | 247 |
+| clínicas / consultorios / perfiles (G.13, por `reltuples`, estimado) | ≈17 / ≈18 / ≈20 | 17 / 18 / 20 |
+| filas de `audit_log` (G.13, estimado) | ≈9 679 (3,5 MB) | unas 9 700 |
+| backfill de F1 (F1.11) | **18 consultorios (17 activos / 1 archivado) · 13 clínicas · 15 médicos** | lo mismo |
+| G.14 / G.15 (transacciones y candados de otras sesiones) | ninguna / ninguno | — |
+| G.17 (`pg_cron` que nombre `appointments`/`clinicas`) | ninguno (1 trabajo activo en total) | — |
+| G.18 / F5b.3 (índices inválidos) | ninguno / ninguno | — |
+| F1.10 / C.1 / C.2 (lo que abortaría el backfill) | 0 / ninguna / 0 | — |
+| G.01 / G.02 / G.03 | 17.6 / `postgres` / BYPASSRLS sí, no superusuario | — |
+| G.07–G.11 (historial) | 5 versiones, las de `main`; ninguna de las 9 | — |
+
+Las cifras de Angel y las de la rejilla coinciden (las de clínicas, consultorios,
+perfiles y `audit_log` en la rejilla son estimaciones de `reltuples`; la exacta
+de consultorios la da F1.11: 18).
+
+**Este conteo hay que REPETIRLO justo antes de aplicar** (el mismo
+`correr-conteos.sh`, el mismo día, después del paso 5 y antes del 6). Qué mirar:
+
+- **Lo que cambia con el tiempo** y puede salir distinto ese día: **G.14/G.15**
+  (si hay una transacción larga o candados de otra sesión, esperar), **G.17**
+  (un `pg_cron` nuevo que toque las tablas), **G.18/F5b.3** (un índice inválido
+  que haya dejado algo entretanto), **G.13b** (número de citas: con 247 las
+  ventanas son las del §5; si fuera de otro orden de magnitud, se mide otra vez),
+  **F1.10/C.1/C.2** (un médico que haya quedado sin consultorio predeterminado
+  aborta F1) y **F1.11** (cuántos consultorios reescribirá: la cifra que la fila
+  12 de la rejilla de F1 tiene que repetir).
+- **Lo que tiene que seguir en OK exactamente igual** (si cambia, alguien tocó
+  producción y **se para**, como en el paso 2): G.01–G.11 (versión, rol,
+  atributos, historial), M1.2, F5a.2, F5a.3 y F4.3 (los md5 de
+  `prevent_audit_modification` y de las dos puertas), M2.8 (29), y todas las de
+  «objetos que YA existen» (M1.3, M2.5, M2.6, F1.7, F1.9, F3.4, F2.6, F2.8, F4.4,
+  F5b.4, T.3).
+
+### Paso 4 · Variables de Vercel y despliegue del código (v2 apagada)
+
+**Antes de desplegar** (Vercel → Project → Settings):
+
+- [ ] Las variables nuevas del §6.2 puestas en **Production** (Settings →
+      Environment Variables). Vercel aplica una variable a los despliegues que
+      se hagan **después** de ponerla: se ponen antes de desplegar.
+- [ ] `AGENDA_RSVP_GOOGLE` **sin definir** (apagada; §6.2).
+- [ ] Ninguna de las que no deben existir (§6.2, segunda tabla).
+- [ ] (Settings → Functions) **Fluid Compute sigue ACTIVADO.** La agenda depende
+      de él: el trabajo que sus rutas dejan en `after()` vive dentro del límite
+      de la función, y ninguna declara `maxDuration` (§12, punto 4).
+- [ ] **No hay un «Function Max Duration» de proyecto menor que 300 s.**
+- [ ] Anotar cuál es el despliegue de producción ACTUAL (el de `main`): es al
+      que se vuelve si el paso 5 falla.
+
+Desplegar la rama (el merge a `main` y el despliegue los hace Angel). Con este
+despliegue **nacen las dos tareas programadas**: `main` no tiene `crons` en
+`vercel.json` (comprobado: `git show main:vercel.json` sólo trae
+`buildCommand`); la rama trae `google-sync` cada 10 min y `recordatorios` cada
+15 (§6.3).
+
+### Paso 5 · Comprobación corta: la app sigue igual (código nuevo + base vieja)
+
+Con la base todavía sin las 9 y la v2 apagada (no hay ni tabla de interruptor),
+Angel, con su cuenta, unos minutos:
+
+1. **Entrar** (y `/inicio`), sin bucles de recarga.
+2. **Abrir un paciente** (de prueba o la cuenta demo): el expediente abre.
+3. **Abrir la agenda**: la vista de siempre, sin engrane v2, campana ni candado.
+4. **Crear una cita y cancelarla** (en un hueco de la semana siguiente; un evento
+   sin paciente basta).
+5. (Opcional) Vercel → el proyecto → Logs: un `warn` «interruptor de la agenda
+   sin leer (cuenta como apagado)» por petición es lo esperado (§6.1); un
+   `error` o un 500, no.
+
+Es lo que E2 ensayó en esta dirección [C, `../ensayo/ORDEN-Y-REVERSA.md` §5.4
+(b)]: los tres roles, 200 en todo, sin 500.
+
+**Si el código recién desplegado falla aquí (ANTES de tocar la base):** se
+vuelve al despliegue anterior desde el panel de Vercel, **sin ninguna reversa de
+base** (la base no se tocó). En el panel, Vercel ofrece volver a poner en
+producción un despliegue anterior («Instant Rollback», o «Promote to
+Production» sobre el despliegue anterior en la lista de Deployments) — **POR
+COMPROBAR en el panel ese día**: el nombre exacto y el sitio de la opción no se
+verificaron (este agente no tiene acceso al panel ni leyó esa página de la
+documentación). Lo que sí se sabe: el código de `main` sobre la base vieja es
+exactamente lo que hay hoy en producción. Las dos tareas programadas
+desaparecen con la vuelta atrás si el despliegue anterior no las trae
+(DEDUCIDO: lo dice `vercel.json`; no comprobado en Vercel). Luego, a investigar
+con calma; no se aplica nada.
+
+**Si todo va bien, sin pausa:** se repiten los conteos (paso 3, «REPETIRLO») y
+se sigue con el paso 6 en la misma sesión, para que la ventana «código nuevo +
+base vieja» dure minutos.
+
+### Paso 6 · Las 9 migraciones
 
 ```bash
 bash supabase/produccion/plan/aplicar.sh aplicar
@@ -216,14 +346,17 @@ bash supabase/produccion/plan/aplicar.sh aplicar
 
 Pide `PRODUCCION`, la contraseña y, antes de cada archivo, su versión. En el
 ensayo [C] cada una tardó 0,24–0,53 s en el clon (en las tres corridas) (incluye arrancar el
-contenedor de `psql`); por el pooler, más (§5). Lo que hay que mirar en cada
+contenedor de `psql`); por el pooler, más (§5). Mientras se aplica, el código
+nuevo ya está desplegado: cada prefijo del orden es un estado que E2 probó o
+dedujo seguro con la v2 apagada (§8, «Quedarse a medias»), y las tareas
+programadas no hacen nada mientras ninguna clínica tenga la v2 (§6.3). Lo que hay que mirar en cada
 rejilla (literal en `rejillas-del-ensayo.txt`: **63 OK, 10 INFO, 0 REVISAR**):
 
 | # | Filas | Mirar especialmente | NOTICE esperados (no son errores) |
 |---|---|---|---|
 | 1 | 7 (5 OK, 2 INFO) | fila 4: md5 normalizado `f1fe023a…`; fila 7: filas de `audit_log` (no cambian) | — |
 | 2 | 8 (3 OK, 5 INFO) | fila 2: **28 tablas** a las que quitó TRUNCATE (las del inventario de su reversa; si salen otras, añadirlas a la reversa); fila 8: «ninguna» | `schema "pg_temp" does not exist, skipping` |
-| 3 F1 | 15 (14 OK, 1 INFO) | consultorios respaldados = **todos** los consultorios (G.13/F1.11 de los conteos); 0 con `horario_propio = false` | — |
+| 3 F1 | 15 (14 OK, 1 INFO) | consultorios respaldados = **todos** los consultorios (F1.11 de los conteos: **18** el 2026-11-22); 0 con `horario_propio = false` | — |
 | 4 F5a | 6 OK | — | 6 × `policy/trigger … does not exist, skipping` |
 | 5 F3 | 9 (8 OK, 1 INFO) | el censo: 0 / 0 / 0 | — |
 | 6 F2 | 9 (8 OK, 1 INFO) | fila 8: md5 normalizado de las dos puertas, `a2dcfa8f…` / `2efd7734…` | 1 × `policy … does not exist, skipping` |
@@ -233,21 +366,14 @@ rejilla (literal en `rejillas-del-ensayo.txt`: **63 OK, 10 INFO, 0 REVISAR**):
 
 Terminadas: `aplicar.sh estado` → las 9 «ya registrada».
 
-### Paso 5 · La comprobación posterior
+### Paso 7 · La comprobación posterior
 
-`COMPROBACION-POSTERIOR.md` entero. Si algo no cuadra, no se despliega el
-código y se decide entre arreglar o revertir (§10).
+`COMPROBACION-POSTERIOR.md` entero (incluido su humo con la v2 apagada, que ya
+corre sobre el código nuevo y la base nueva). Si algo no cuadra, **no se
+enciende nada** y se decide entre arreglar o revertir (§10; primero la regla del
+recuadro del paso 0).
 
-### Paso 6 · Variables de Vercel (§6), y después el despliegue del código
-
-**Antes de desplegar** (Vercel → Project → Settings → Functions):
-
-- [ ] **Fluid Compute sigue ACTIVADO.** La agenda depende de él: el trabajo que
-      sus rutas dejan en `after()` vive dentro del límite de la función, y
-      ninguna declara `maxDuration` (§12, punto 4).
-- [ ] **No hay un «Function Max Duration» de proyecto menor que 300 s.**
-
-### Paso 7 · Encender la v2 en UNA clínica
+### Paso 8 · Encender la v2 en UNA clínica
 
 Sólo cuando §13 esté resuelto. `agenda_ajustes.agenda_v2_encendida` **sólo** la
 cambian `postgres`/`supabase_admin` (`trg_agenda_ajustes_proteger`): desde el
@@ -277,15 +403,73 @@ Todos llevan `SET LOCAL lock_timeout = '5s'`; las de la agenda, además,
 
 Ninguna toca `auth.users`.
 
-**Lo que cambia con el número de citas (G.13b).** F3 y F2 recorren
-`appointments` una vez (FK/CHECK nuevas) y F5b construye dos índices y valida
-una FK y un CHECK: las ventanas de F3, F2 y F5b crecen en proporción. Medido
-hasta 200 000. Con más, se avisa antes de seguir.
+Las cifras de la última columna son de los ensayos de C1–C3, con 0 y con
+20 000–200 000 citas **sintéticas**. Producción tiene **247** (conteo previo,
+§4 paso 3): para ese tamaño, la medida de abajo.
 
-**Por el pooler** cada sentencia suma la ida y vuelta a `us-west-2`
-(ASUMIENDO decenas de ms). Por eso C1–C3 juntaron lo que necesita el candado
-fuerte en bloques `DO`: lo que alarga la ventana es el número de viajes, no el
-trabajo del servidor.
+### 5.1 Medido con el volumen real [C-PL, 2026-11-22]
+
+**Cómo.** Un solo clon de la foto (`clonar-desde-foto.sh`, contenedor
+`clon-spinus-pl-medir`, 14 diferencias foto ↔ clon, todas esperadas), sembrado
+con datos **inventados** del tamaño de producción: 17 clínicas, 20 perfiles (con
+sus `auth.users` ficticios), 18 consultorios (17 activos y 1 archivado, de 13
+clínicas y 15 médicos: la forma de F1.11), 130 pacientes y **247 citas** con los
+cinco estados; `ANALYZE`. Sin filas sintéticas en `audit_log` (sólo las que
+escribieron los disparadores de la siembra: 149). Las 9 aplicadas con `psql -X
+-v ON_ERROR_STOP=1 -e` + `\timing` como `postgres` NO superusuario, en orden,
+dentro del contenedor (sin red: **no incluye la latencia del pooler**). Las 9
+rejillas sin ninguna REVISAR; F1 respaldó **18** consultorios y `audit_log` pasó
+de 149 a 167 (+18, una por consultorio). Contenedor borrado al terminar; el
+script y las salidas, fuera del repo (scratchpad de la sesión de PL).
+
+| # | Ventana | Sentencias (= viajes por el pooler) | Tiempo de servidor medido, 247 citas | ESTIMADO por el pooler (+ N × RTT, ASUMIENDO RTT 50–150 ms) |
+|---|---|---|---|---|
+| 1 | archivo entero (SRE sobre `audit_log`) | 7 | 11 ms | 0,4–1,1 s |
+| 2 | archivo entero (SRE sobre las 11 clínicas) | 24 | 16 ms | 1,2–3,6 s |
+| 3 F1 | SRE `clinicas`/`profiles`/`consultorios` → COMMIT | 66 | 51 ms | 3,3–9,9 s (escrituras de esas tablas esperan; lecturas no) |
+| 3 F1 | **ACCESS EXCLUSIVE** `appointments`/`consultorios`/`clinicas` → COMMIT | 3 | 32 ms (23 el COMMIT) | 0,2–0,5 s (**toda la app** espera: la RLS lee `clinicas`) |
+| 4 F5a | SRE `clinicas`/`profiles` → COMMIT | 29 | 12 ms | 1,5–4,4 s |
+| 5 F3 | **ACCESS EXCLUSIVE** `appointments`, desde el primer `ALTER TABLE` → COMMIT | **90** | 35 ms | **4,5–13,5 s** (ni se lee ni se escribe una cita) |
+| 6 F2 | **ACCESS EXCLUSIVE** `appointments`, desde el `ADD COLUMN` → COMMIT | **60** | 16 ms | **3–9 s** (ídem) |
+| 7 F4 | SRE `clinicas`/`appointments`/`profiles` (las 9 FK) → COMMIT | 9 | 22 ms | 0,5–1,4 s |
+| 8 F5b | escrituras de `appointments` bloqueadas (índices de rango → COMMIT) | 13 | 27 ms | 0,7–2 s |
+| 8 F5b | **ACCESS EXCLUSIVE** `appointments` → COMMIT | 4 | 24 ms (20 el COMMIT) | 0,2–0,6 s |
+| 9 T | archivo entero (tablas nuevas, vacías) | 19 | 30 ms | 1–2,9 s |
+
+Tiempo de servidor por archivo entero, 247 citas: 14 / 18 / 64 / 17 / 51 / 33 /
+61 / 42 / 32 ms; con el arranque de `psql`, 0,06–0,11 s cada uno.
+
+**Lectura.**
+
+- **Con 247 citas el volumen no cuenta** [C-PL]: los tiempos de servidor son los
+  mismos que los de los ensayos con la tabla vacía (F1: 45 ms SRE y 23 ms AE sin
+  datos [N] frente a 51 y 32 aquí; F3: 67 ms el archivo sin datos [N]). Los
+  ensayos de 20 000–200 000 citas sobrestiman por mucho lo que pasará: lo que
+  crece con las citas (recorrer `appointments` al validar FK/CHECK, los dos
+  índices de rango de F5b: 0,5–1,7 s con 200 000 [N]) es despreciable con 247.
+- **Lo que domina en producción es el número de viajes por el pooler**, no el
+  servidor. La columna «ESTIMADO» es sólo la cuenta N × RTT con un RTT
+  **supuesto** de 50–150 ms (el mismo que usó C3 en `fusion/notas/f4.md` §9); el
+  RTT real de la terminal de Angel a `us-west-2` no se ha medido. `aplicar.sh`
+  lo enseña indirectamente: lo que tarda cada archivo menos ~0,1 s, dividido por
+  sus sentencias.
+- **F3 y F2 son las ventanas largas** (C1–C3 no las acortaron: sus cabeceras lo
+  explican, «el ACCESS EXCLUSIVE del ADD COLUMN ya dura hasta el COMMIT»).
+  Durante esos segundos, abrir la agenda o guardar una cita **espera** hasta el
+  COMMIT. Y puede fallar: en la foto, `authenticated` tiene `statement_timeout`
+  de **8 s**, `anon` de **3 s** y `authenticator` `lock_timeout` de **8 s**
+  [C, `01-roles.sql` / `05-catalogo.jsonl` de la foto]; una petición que espere
+  más que eso acaba en error (ASUMIENDO que PostgREST aplica esos ajustes del
+  rol a cada petición, como documenta Supabase; no ensayado). Con un RTT alto,
+  la ventana de F3 podría pasar de 8 s: algún error suelto en la app durante esos
+  segundos; cada llamada a PostgREST es su propia transacción, pero una ruta
+  que haga varias podría quedar a medias como ante cualquier error de red
+  (DEDUCIDO).
+  Por eso la hora (abajo) y el §12, punto 6.
+
+**Por el pooler** cada sentencia suma la ida y vuelta a `us-west-2`. Por eso
+C1–C3 juntaron lo que necesita el candado fuerte en bloques `DO`: lo que alarga
+la ventana es el número de viajes, no el trabajo del servidor.
 
 **Qué pasa con una transacción larga abierta** (G.14): F1 y F5a no hacen cola:
 reintentan 5 s y abortan con `CANDADOS: … reintenta en unos minutos`, sin dejar
@@ -298,61 +482,120 @@ statement due to lock timeout`. En los dos casos: esperar a que acabe y
 
 **A qué hora.** Cuando no haya consulta (ASUMIENDO de noche o domingo
 temprano), y fuera del horario de cualquier trabajo de `pg_cron` que nombre
-`appointments` o `clinicas` (G.17). Las tareas de `vercel.json` aún no están
-desplegadas en el paso 4.
+`appointments` o `clinicas` (G.17; el 2026-11-22, ninguno). **Con «código
+primero», las dos tareas de `vercel.json` YA corren durante el paso 6** (cada
+10 min `google-sync`, minutos :00, :10, :20…; cada 15 `recordatorios`, :00,
+:15, :30, :45). Mientras ninguna clínica tenga la v2 no leen `appointments`
+(sus listados parten de `agenda_ajustes`, vacía, o no existen todavía: §6.3),
+así que no deberían chocar con los candados (DEDUCIDO). Aun así, por
+prudencia, no lanzar F3 ni F2 justo en esos minutos.
 
 ---
 
 ## 6. Código y base: el orden, y las variables de Vercel
 
-**Orden: migraciones primero, código después**, en la misma sesión (pasos 4 →
-5 → 6), para que la ventana «base nueva + código viejo» dure minutos.
+### 6.1 El orden: CÓDIGO PRIMERO, base inmediatamente después (decisión de Angel, 2026-11-22)
 
-- **Base migrada + código viejo (el de `main`, hoy en producción):** el código
-  viejo no conoce las tablas nuevas. Lo que actúa sin la v2 está en §7: lo único
-  que alguien podría notar es que una cita **atendida con nota** ya no cambia de
-  estado ni de fecha (el código viejo verá un error genérico en vez del 409
-  `nota_ligada`).
-- **Código nuevo + base sin migrar:** falla cerrado (interruptor ausente =
-  apagado; tolera 42P01/PGRST202), con un `warn` en el log por petición.
-- **E2** (ensayo de código ↔ base) es quien comprueba las dos direcciones; hasta
-  que lo confirme, este orden es el del diseño (`mejora_agendaV2.md` §7).
+**Recomendado y elegido: desplegar el código (paso 4), comprobar en unos
+minutos que la app sigue igual (paso 5) y aplicar las 9 a continuación (paso
+6), en la misma sesión**, con la v2 apagada en todas las clínicas. Sustituye a
+«migraciones primero» de las versiones anteriores de este plan y de
+`mejora_agendaV2.md` §7. El ensayo E2 probó las dos direcciones
+(`../ensayo/ORDEN-Y-REVERSA.md` §5.4) [C]: **las dos son seguras y ninguna deja
+a nadie sin agenda.** La diferencia:
 
-**Variables de entorno de Vercel** (nombres sacados de `src/` y `.env.example`
-el 2026-11-22; sólo nombres, nunca valores). Vercel lee las variables **al
-construir**: se ponen **antes** del despliegue (o se redespliega).
+| Ventana | Qué ve un médico o una secretaria | Qué ve el registro |
+|---|---|---|
+| **código nuevo + base vieja** (la elegida) | **nada distinto** de hoy; la cita atendida con nota ya queda protegida por la API (409 `nota_ligada` con su texto) [C] | un `warn` «interruptor de la agenda sin leer (cuenta como apagado)» por petición autenticada mientras dure; en el navegador de la secretaria, un 404 de `/rest/v1/agenda_ajustes` en la consola, sin efecto en la página [C]; las tareas programadas contestan `{"ok":true}` sin hacer nada [C, §6.3] |
+| base nueva + código de `main` (la alternativa, «base primero») | todo igual **salvo mover, cancelar, volver a agendada o borrar una cita ATENDIDA CON NOTA clínica: 500** con el texto de la base en castellano, y no se hace (antes `main` lo hacía) [C] | nada (`main` no registra esos 500); `audit_log` empieza a recibir `log_cita_change` [C]. Además, si alguien cambia el horario de la clínica con `main` en esa ventana, la copia de F1 en cada consultorio ya no lo sigue (con la v2 apagada nadie lo lee; se vería al encenderla) [D] |
 
-| Variable | ¿Nueva con la agenda v2? | Valor (cómo se genera) | Si falta |
-|---|---|---|---|
-| `RESERVA_SECRETO` | **sí** | `openssl rand -hex 32` (≥ 64 hex; `src/lib/reserva/secretos.ts`) | no se emiten enlaces de reserva ni de confirmación (falla cerrado) |
-| `EMAIL_TRANSPORT` | **sí** | el literal `resend` | los correos de la agenda no salen (`decidirTransporte`: apagado) |
-| `CRON_SECRET` | **sí** | `openssl rand -hex 32` | `/api/cron/google-sync` (cada 10 min) y `/api/cron/recordatorios` (cada 15 min) responden 401 |
-| `AGENDA_RSVP_GOOGLE` | **sí**, opcional | el literal `encendido` | apagado por omisión. **Sólo tras la prueba de RSVP con Google real** |
-| `RESEND_API_KEY` | no (ya la usa `main`) | — | sin correo |
-| `NEXT_PUBLIC_APP_URL` | no | — | los enlaces de los correos salen mal |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | no | — | — |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_SECRET` | no (ya la usa `main`) | — | sin conexión con Google |
+Con «código primero», además, cada estado intermedio mientras se aplican las 9
+es uno de los que E2 recorrió en la reversa: con la v2 apagada la rama funcionó
+en todos los que se probaron (las 5 de `main`, sólo las dos de TRUNCATE, +F1,
++F1+F5a, las 14) [C]; con +F3, +F2 y +F4 sólo se probó con la v2 ENCENDIDA (y
+funcionó salvo la reserva por enlace con F3 sin F2: 404 limpio) [C]; apagada se
+deduce que también [D, no ensayado].
 
-**Las que faltarían en producción, según lo que el repo permite saber:** las
-cuatro nuevas (`RESERVA_SECRETO`, `EMAIL_TRANSPORT`, `CRON_SECRET`,
-`AGENDA_RSVP_GOOGLE`), porque ningún código de `main` las lee (comparado
-`env.*` de `src/` en `main` y en la rama). Que las de `main` estén puestas es
-DEDUCIDO (`main` funciona en producción); el repo no puede verlo. Angel lo mira
-en Vercel → Project → Settings → Environment Variables.
+**Si se volviera a «base primero»:** la ventana es segura; hasta desplegar el
+código, una cita atendida con nota no se puede mover, cancelar ni borrar y la app
+vieja responde 500 con un texto legible. Ese es todo su coste.
 
-**Las que NO deben existir en producción** (son de pruebas locales; el código
-las ignora fuera de local, pero no se ponen): `GCAL_FALSO_URL`, `MAILPIT_URL`,
-`RESERVA_AVISO_BORRADOR_LOCAL`; y `EMAIL_TRANSPORT` nunca con `captura`.
+### 6.2 Variables de entorno de Vercel
+
+Nombres sacados el 2026-11-22 de `src/` en la rama y en `main` (`git grep -h -o
+"process\.env\.[A-Z_0-9]*"` y, además, los que se leen como `env.X` de un objeto
+de entorno: `EMAIL_TRANSPORT`, `AGENDA_RSVP_GOOGLE`, `MAILPIT_URL`,
+`RESERVA_AVISO_BORRADOR_LOCAL`, `VERCEL`) y de `.env.example`. **Sólo nombres y
+formatos; ningún valor real.** Vercel aplica una variable a los despliegues
+hechos **después** de ponerla: se ponen antes del paso 4 (o se redespliega).
+
+**Nuevas con la agenda v2** (ninguna la lee `main`: comprobado comparando las dos
+listas). «Formato» = comprobado leyendo el código; **que estén puestas en el
+panel no lo puede comprobar el repo: todas «deducida» = hay que mirarlas en
+Vercel → Project → Settings → Environment Variables.**
+
+| Nombre | Qué valor lleva | ¿Secreta? | Cómo generarla | ¿Obligatoria? | Comprobada / deducida |
+|---|---|---|---|---|---|
+| `RESERVA_SECRETO` | hexadecimal, **≥ 64 caracteres y de longitud par**, sólo `[0-9a-f]` (se recorta y pasa a minúsculas); si no cumple, cuenta como ausente (`src/lib/reserva/secretos.ts:38-42`) | **sí** (Sensitive). **Rotarla invalida todos los enlaces y el historial del candado**: se genera UNA vez y se guarda en el gestor de contraseñas de Angel | `openssl rand -hex 32` (64 hex) | **sí** para la v2: sin ella no se emiten enlaces de reserva ni de confirmación, ni sale el recordatorio (falla cerrado) | formato comprobado; presencia deducida (falta: es nueva) |
+| `CRON_SECRET` | cualquier cadena no vacía; la ruta compara la cabecera con `Bearer <CRON_SECRET>` en tiempo constante (`src/lib/cronAutorizacion.ts:20-24`); Vercel manda esa cabecera a las tareas programadas cuando la variable existe (documentación de Vercel Cron Jobs, citada en `mejora_agendaV2.md`; no releída por PL) | **sí** (Sensitive) | `openssl rand -hex 32` (sin espacios ni caracteres raros) | **sí**: sin ella `/api/cron/google-sync` y `/api/cron/recordatorios` responden 401 y no hacen nada | formato comprobado; presencia deducida (falta: es nueva) |
+| `EMAIL_TRANSPORT` | el literal **`resend`**. Además exige `RESEND_API_KEY` y una `NEXT_PUBLIC_SUPABASE_URL` `https` remota; cualquier otro valor o vacío = apagado (`src/lib/correo/transporte.ts:127-136`) | no | se escribe tal cual | **sí** para que salgan los correos de la agenda; sin ella, apagado (nada sale, nada falla) | formato comprobado; presencia deducida (falta: es nueva) |
+| `AGENDA_RSVP_GOOGLE` | **NO SE DEFINE al desplegar.** Sólo el literal exacto `encendido` la enciende (`src/lib/gcalRsvp.ts:22-24`): ausente, vacía o cualquier otro valor = apagada. Se pondrá `encendido` **después** de probar Google real (RSVP) en la clínica de Angel | no | — | no (y hoy, no debe estar) | formato comprobado; que no exista, hay que mirarlo |
+
+**Las que ya usa `main`** (siguen igual; que estén puestas es DEDUCIDO porque
+`main` funciona en producción): `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`SUPABASE_HOOK_SECRET`, `NEXT_PUBLIC_APP_URL` (los enlaces de los correos y de
+la reserva salen de aquí: tiene que ser el dominio de producción),
+`RESEND_API_KEY` (la usa también `EMAIL_TRANSPORT=resend`), `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_SECRET`,
+`GEMINI_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, las ocho
+`STRIPE_PRICE_*`, `NEXT_PUBLIC_GOOGLE_OAUTH`, `NEXT_PUBLIC_LOGIN_SERVIDOR`,
+`TZ`; y en `.env.example`, además, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`,
+`NEXT_PUBLIC_SENTRY_DSN` y `ANTHROPIC_API_KEY` (no salen en `src/`; se leen fuera
+o ya no se usan: no se tocan).
+
+**Las que pone Vercel solo** (no se definen a mano): `VERCEL` (la lee
+`avisoReserva.ts:91`: con `1`, la excepción local del aviso no existe) y
+`VERCEL_ENV` (la lee `gcalFalso.ts:41`); `NODE_ENV` la pone el build.
+
+**Las que NO deben existir en producción** (de pruebas locales):
+
+| Nombre | Por qué no | Qué haría si estuviera |
+|---|---|---|
+| `GCAL_FALSO_URL` | apunta al Google falso de las e2e | nada: `rootUrlGoogleFalso()` la ignora con `NODE_ENV=production`, con `VERCEL_ENV=production`, si no es `localhost`/`127.0.0.1` y si la Supabase no es local (`src/lib/gcalFalso.ts:40-46`). Igual no se pone |
+| `MAILPIT_URL` | el buzón de pruebas local | sólo se lee con `EMAIL_TRANSPORT=captura`, y sólo si es loopback (`transporte.ts:144-165`) |
+| `RESERVA_AVISO_BORRADOR_LOCAL` | abre la reserva con el aviso de privacidad PENDIENTE DE REVISIÓN LEGAL, sólo en local | nada en Vercel (`VERCEL=1`) ni con Supabase remota (`avisoReserva.ts:89-93`). Igual no se pone |
+| `EMAIL_TRANSPORT` = `captura` | manda los correos a Mailpit | con `captura` los correos no salen a nadie de verdad |
+| `AGENDA_RSVP_GOOGLE` = `encendido` | todavía no: falta la prueba con Google real | confirmaría citas por la respuesta a la invitación de Google |
 
 - Los valores se generan en la terminal de Angel y se pegan en Vercel como
   «Sensitive», entorno **Production** sólo (ASUMIENDO que las previews no usan la
   agenda v2: un `RESERVA_SECRETO` distinto contra la misma base daría enlaces
   que producción no reconoce). No se escriben en ningún archivo.
-- **Rotar `RESERVA_SECRETO` invalida todos los enlaces y el historial del
-  candado**: se genera una vez y se guarda en el gestor de contraseñas de Angel.
 - **Vercel está en Pro** (confirmado por Angel): las dos tareas de `vercel.json`
   (cada 10 y 15 min) se admiten. Tras el despliegue: Schedules → Cron Jobs →
   View Logs, la primera invocación en 2xx.
+
+### 6.3 Las dos tareas programadas en la ventana «código nuevo + base vieja»
+
+**Nacen con este despliegue**: `main:vercel.json` no tiene `crons`; la rama trae
+`/api/cron/google-sync` (`*/10 * * * *`) y `/api/cron/recordatorios` (`*/15 * *
+* *`) [C, `git show main:vercel.json` y `vercel.json`]. Sin `CRON_SECRET`
+responden 401 y no hacen nada.
+
+| Tarea | Qué llama primero | Con la base vieja (sin las 9) | Con las 9 y la v2 apagada en todas |
+|---|---|---|---|
+| `google-sync` | `gcal_sync_clinicas_pendientes` (de F2), por `listarConexionesParaSincronizar` (`src/lib/gcalConexion.ts:774-791`) | la RPC no existe: PGRST202 / 42883 / 42P01 → lista vacía → `{"ok":true}`, **sin escribir nada ni llamar a Google** [C: E2 5.4 (b), 200 `{"ok":true}`; el porqué, por lectura]. Sin `warn` en el registro | la lista parte de `agenda_ajustes … AND agenda_v2_encendida` (`20261201150000…:641-649`): vacía → nada [D, lectura] |
+| `recordatorios` | si `EMAIL_TRANSPORT` está apagado o falta `RESERVA_SECRETO`, contesta `{"ok":true}` sin tocar la base (`src/app/api/cron/recordatorios/route.ts:64-66`); si no, `cita_recordatorios_pendientes` (de F4) | la RPC no existe: PGRST202 / 42883 / 42P01 / PGRST205 → `RecordatoriosNoDisponibles` → un `warn` «recordatorios no disponibles: faltan las RPC de E4» → `{"ok":true}`, **sin tomar ni enviar nada** (`src/lib/confirmacion/recordatorios.ts:44-62`, `:205-210`) [C: E2 5.4 (b), 200 `{"ok":true}` y ese `warn` una vez, con `EMAIL_TRANSPORT=captura`; con `resend` el camino es el mismo, D] | el listado parte de `agenda_ajustes` con la v2 y el recordatorio encendidos (`20261201160000…:1026-1053`): vacío → nada [D, lectura] |
+
+Ninguna de las dos escribe antes de su primer listado, así que **no dejan nada
+a medias** en ninguna de las dos ventanas [D, lectura de las rutas]. **Google:**
+con la v2 apagada, el código nuevo no sincroniza (las dos puertas de arriba y
+`POST /api/google/sync`, que contesta `omitida` sin la v2: `src/app/api/google/sync/route.ts:80`), así
+que lo único que va a Google es lo que ya hacía `main` (el alta y los cambios de
+eventos al guardar citas) [D, lectura]. **No ensayado:** E2 no tuvo cuenta de
+Google ni Google falso, así que ninguna escritura hacia Google de la rama sobre
+la base vieja se vio en ejecución; tampoco Realtime.
 
 ---
 
@@ -375,7 +618,7 @@ Todo lo demás es estructura nueva que nace vacía y detrás del interruptor
 | F1 | `log_cita_change`: cada alta, borrado y cambio no técnico de una cita escribe en `audit_log` (nombres de columna, nunca valores) | nadie en pantalla; `audit_log` crece más deprisa |
 | F2 | `cita_asignacion_google` en cada alta de cita | nadie |
 | F3/F5b | una sesión no puede escribir columnas `reserva_*` | nadie (el código viejo no las conoce) |
-| F5b | **una cita atendida con nota clínica ligada no cambia de estado ni de fecha/hora ni se borra**, también para `service_role` | **un médico que lo intente** (error genérico con el código viejo) |
+| F5b | **una cita atendida con nota clínica ligada no cambia de estado ni de fecha/hora ni se borra**, también para `service_role` | **un médico que lo intente**: con el código nuevo (el orden elegido) ya lo rechazaba la API con 409 `nota_ligada`; sólo con «base primero» y `main` sería un 500 con el texto de la base (§6.1) |
 | F1–F5b | las columnas nuevas de `appointments` viajan en los mensajes de Realtime | nadie (van NULL) |
 
 ---
@@ -409,9 +652,13 @@ causa y volver a correr `aplicar.sh aplicar`.
 | `password authentication failed` | — | contraseña | repetir; la CLI no la imprime |
 
 **Quedarse a medias** entre dos archivos es válido días: cada prefijo del orden
-es coherente con la v2 apagada. Lo que no se hace es desplegar el código ni
-encender nada hasta tener las 9. Excepción conocida: entre F3 y F2 la reserva
-por enlace no funciona (nadie puede pedirla: no hay enlaces).
+es coherente con la v2 apagada, y con «código primero» el código nuevo ya está
+desplegado encima: E2 lo probó apagada con las 5 de `main`, sólo las dos de
+TRUNCATE, +F1, +F1+F5a y las 14 [C]; con +F3, +F2 y +F4, sólo encendida [C], y
+apagada se deduce [D] (§6.1). Lo que no se hace es encender nada hasta tener las
+9. Excepción conocida: entre F3 y F2 la reserva por enlace no funciona (nadie
+puede pedirla: no hay enlaces). Si se para a medias porque algo va mal, **no se
+revierte nada a mano** (§10).
 
 ---
 
@@ -444,6 +691,31 @@ deja para el coordinador.
 
 ## 10. Reversas (sólo con orden de Angel)
 
+> ### ⚠️ LA REGLA DE LA REVERSA (ensayo E2, `../ensayo/ORDEN-Y-REVERSA.md` §5.5)
+>
+> 1. **Antes de revertir CUALQUIER migración, apagar la v2 en TODAS las
+>    clínicas** (`agenda_ajustes.agenda_v2_encendida = false`, por SQL como
+>    `postgres`). Revertir F3 (o más) con la v2 encendida en una clínica **le
+>    rompe la agenda**: 21 de 66 peticiones dieron 500 (mover, editar,
+>    confirmar, cancelar, borrar citas; «Por confirmar»; enlaces) [C, E2 5.5.4,
+>    estado r5]. Con la v2 apagada, todos los estados probados funcionaron [C].
+> 2. **Las reversas, sólo con `aplicar.sh reversa` / `reversa-truncate`**,
+>    nunca a mano. `aplicar.sh` hace `migration repair --status reverted
+>    <versión>` tras cada una; las reversas no tocan el historial.
+> 3. **Si alguna vez se revierte a mano** (psql o SQL Editor), el paso
+>    siguiente OBLIGATORIO es reparar el historial, en la terminal de Angel:
+>    `npx --yes supabase@2.117.0 migration repair --status reverted <versión>
+>    --db-url "$URL"` (URL sin contraseña, `PGPASSWORD` en el entorno). Si no,
+>    el historial miente: la ida **salta** esa migración («ya registrada») y la
+>    deja sin aplicar, y `aplicar.sh reversa` intenta revertirla otra vez y falla
+>    [C, E2 5.5.6].
+> 4. **Una reversa sin datos que perder no pide confirmación de datos**: se
+>    aplica a la primera (la de T, la de F2 si no hubo Google, las dos de
+>    TRUNCATE). No se corre «para ver si se niega» [C, E2 5.5.6: la de F2, lanzada
+>    para ver la negativa, se aplicó].
+> 5. Si lo que falla es el CÓDIGO y la base aún no se tocó (paso 5), no hay
+>    reversa de base: se vuelve al despliegue anterior de Vercel.
+
 ### 10.1 La de la agenda
 
 ```bash
@@ -456,7 +728,8 @@ reverted`). Antes: **apagar la v2 en todas las clínicas y respaldar** lo que se
 va a perder.
 
 **Todas se niegan si hay datos** que se perderían (salvo T, que no guarda nada),
-sin tocar nada, diciendo cuáles:
+sin tocar nada, diciendo cuáles; **sin datos, se aplican sin preguntar más**
+(recuadro, punto 4):
 
 | Reversa | Se niega si hay… | Pierde |
 |---|---|---|
@@ -574,18 +847,32 @@ INFO, ninguna REVISAR, reversas al estado de la foto salvo el respaldo.
    `reservar/[codigo]`, `reservar/[codigo]/turnos`, `confirmar/[codigo]`,
    `appointments`, `appointments/[id]`, `appointments/[id]/reagendar`,
    `agenda/bloqueos`, `agenda/bloqueos/[id]` (todas bajo `src/app/api/`). Las
-   que sí lo declaran se quedan como están: `google/sync` (30 s) y
-   `cron/google-sync` y `cron/recordatorios` (60 s). La comprobación del panel
-   va en el paso 6.
+   que sí lo declaran: `google/sync` (30 s) y `cron/google-sync` (60 s), sin
+   tocar; y `cron/recordatorios`, **subida de 60 a 120 s** en la oleada 3
+   (agente PL): queda por debajo de los 10 min tras los que `cita_correo_tomar`
+   deja volver a tomar un envío y de la frecuencia de 15 min de `vercel.json`
+   (relación de cada límite con su candado: `DEUDA_TECNICA.md` AG-DT-268). La
+   comprobación del panel va en el paso 4.
 5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
+6. **Las ventanas largas de F3 y F2 (§5.1): decisión de Angel / del
+   coordinador.** Con `psql -f`, cada sentencia es un viaje por el pooler: 90 y
+   60 viajes con ACCESS EXCLUSIVE sobre `appointments` (ESTIMADO 4,5–13,5 s y
+   3–9 s con un RTT supuesto de 50–150 ms; el `statement_timeout` de 8 s de
+   `authenticated` podría hacer fallar alguna petición en ese rato). Opciones,
+   **ninguna probada**: (a) dejarlo así y aplicar sin consulta; (b) medir antes
+   el RTT real (p. ej. `\timing` de un `select 1` por el pooler desde la terminal
+   de Angel) y decidir con la cifra; (c) mandar cada archivo en UNA petición
+   (el SQL Editor ya lo hace; con `psql`, el archivo entero como un solo `-c`),
+   lo que exigiría cambiar y volver a ensayar `aplicar.sh`, comprobando que la
+   rejilla y los NOTICE se siguen viendo. No se tocó `aplicar.sh`.
 
 ---
 
 ## 13. Lo que no es de este plan pero bloquea ENCENDER la v2
 
-Aplicar las 9 y desplegar no enciende nada. Para el paso 7 hace falta, además
+Aplicar las 9 y desplegar no enciende nada. Para el paso 8 hace falta, además
 (detalle en `mejora_agendaV2.md` §7 y §10): el **texto legal** del aviso de la
 reserva (`src/lib/reserva/avisoReserva.ts`, PENDIENTE DE REVISIÓN LEGAL; contra
 la LFPDPPP vigente de 2025, no de memoria); **Google real** (ida y vuelta, RSVP,
