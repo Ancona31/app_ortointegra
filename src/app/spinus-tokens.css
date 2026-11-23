@@ -484,7 +484,6 @@
   --sp-ease-spring: cubic-bezier(.34, 1.32, .64, 1);/* aparición del check */
 }
 
-
 /* ============================================================================
    MODO OSCURO — override de TOKENS, no de clases.
    Paleta DERIVADA de las 76 reglas html.dark de ThemeProvider.tsx (Material
@@ -708,7 +707,6 @@ html.dark {
   --sp-shadow-frame:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
 }
 
-
 /* ============================================================================
    MODO OSCURO · LA MARCA — `MODO_OSCURO_APP.md` §3
    ----------------------------------------------------------------------------
@@ -831,7 +829,6 @@ html.dark {
   }
 }
 
-
 /* ============================================================================
    COMPONENTES
    ----------------------------------------------------------------------------
@@ -858,12 +855,9 @@ a { color: var(--sp-primary); text-decoration: none; }
 a:hover { color: var(--sp-primary-active); }
 */
 
-
 /* --- 2. TIPOGRAFÍA POR ROL ---------------------------------------------- */
 .sp-title-page   { font-size: var(--sp-fs-page);    font-weight: var(--sp-fw-black); line-height: var(--sp-lh-tight); letter-spacing: var(--sp-ls-tight); color: var(--sp-ink-800); margin: 0; }
 .sp-title-state  { font-size: var(--sp-fs-success); font-weight: var(--sp-fw-black); line-height: var(--sp-lh-tight); letter-spacing: var(--sp-ls-tight); color: var(--sp-ink-800); }
-.sp-title-modal  { font-size: var(--sp-fs-modal);   font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title); color: var(--sp-ink-800); }
-.sp-sub-modal    { font-size: var(--sp-fs-meta);    font-weight: var(--sp-fw-regular); line-height: var(--sp-lh-legal); color: var(--sp-ink-350); margin-top: 1px; }
 .sp-title-card   { font-size: var(--sp-fs-card);    font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title); color: var(--sp-ink-800); }
 .sp-title-sec    { font-size: var(--sp-fs-body);    font-weight: var(--sp-fw-bold);  color: var(--sp-ink-800); }
 .sp-label        { font-size: var(--sp-fs-label);   font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-350); text-transform: uppercase; }
@@ -871,10 +865,8 @@ a:hover { color: var(--sp-primary-active); }
 .sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary-text); text-transform: uppercase; }
 .sp-body         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-snug);  color: var(--sp-ink-700); }
 .sp-note         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-note);  color: var(--sp-ink-700); }
-.sp-secondary    { font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-body);  color: var(--sp-ink-500); }
 .sp-hint         { font-size: var(--sp-fs-hint);    line-height: var(--sp-lh-body);  color: var(--sp-ink-300); }
 .sp-legal        { font-size: var(--sp-fs-legal);   line-height: var(--sp-lh-legal); color: var(--sp-ink-350); }
-
 
 /* --- 3. BOTONES --------------------------------------------------------- */
 /* ⚠️ B2 DEL REDISEÑO: RE-PIEL, NO REDISEÑO. Cambian color, radio, sombra y la
@@ -914,7 +906,6 @@ a:hover { color: var(--sp-primary-active); }
 }
 /* CTA de recompensa (receta). B2: sin sombra (CALMA §3, ningún botón lleva);
    la clase se queda porque la usan dos archivos. */
-.sp-btn--reward { box-shadow: none; }
 
 .sp-btn--secondary {
   background: var(--sup2); color: var(--tinta);
@@ -922,27 +913,6 @@ a:hover { color: var(--sp-primary-active); }
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 24px;
 }
 .sp-btn--secondary:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); color: var(--tinta); }
-
-/* Terciario: rejilla de acciones post-guardado */
-.sp-btn--tertiary {
-  background: var(--sup2); color: var(--tinta);
-  border: var(--sp-bw-hair) solid transparent;
-  font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
-}
-/* ⚠️ EL HOVER CAMBIA FONDO Y TINTA, NO EL BORDE, y es una consecuencia de que el
-   contorno subiera a `--sp-line-control`. Antes el reposo iba en
-   `--sp-line-soft` y el hover en `--sp-line-input`, o sea que el hover era un
-   ESCALON DE BORDE; desde que el reposo usa el token de contorno de control
-   —el mas fuerte de la familia de lineas— no queda escalon por encima, y el
-   hover se habia quedado repitiendo el mismo borde: invisible.
-   Se resuelve con el mismo patron que ya usa `.sp-btn--secondary:hover`, que es
-   fondo hundido mas tinta un escalon mas oscura. Medido: la superficie da
-   ΔE2000 3.88 en claro y 4.42 en oscuro, y la tinta 10.61 y 6.34 — juntos, muy
-   por encima del ΔE 5.31 que se fijo como liston del hover del primario.
-   ⚠️ NO LE DEVUELVAS UN BORDE PROPIO sin crear antes un token para el: el unico
-   mas fuerte que `--sp-line-control` no existe, y `--sp-line-strong` es MAS
-   DEBIL (1.48:1 en claro) pese al nombre. */
-.sp-btn--tertiary:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); color: var(--tinta); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
 /* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
@@ -980,7 +950,6 @@ a:hover { color: var(--sp-primary-active); }
    IZQUIERDA salvo "Siguiente" (chevron a la derecha = avance). */
 .sp-btn svg { flex: 0 0 auto; }
 
-
 /* --- 4. CHIPS ----------------------------------------------------------- */
 /* B2: re-piel (color y toque; medidas y ancho de borde intactos, ver BOTONES).
    El borde de 1 px pasa a `--borde` del kit; el elegido, relleno `--accion`. */
@@ -1002,7 +971,7 @@ a:hover { color: var(--sp-primary-active); }
    ponía el fondo tonal con la letra blanca: el chip recién pulsado (el puntero
    sigue encima) se quedaba sin texto legible (entrevista de nueva nota). */
 .sp-chip:hover:not(.sp-chip--selected, [aria-pressed="true"]) { border-color: color-mix(in srgb, var(--accion) 30%, var(--borde)); background: var(--tonal); }
-.sp-chip[aria-pressed="true"], .sp-chip--selected {
+.sp-chip[aria-pressed="true"] {
   background: var(--accion); border-color: var(--accion); color: var(--sobre-accion);
 }
 /* Chip de medicamento: lleva ✕, padding derecho reducido para el botón */
@@ -1015,12 +984,6 @@ a:hover { color: var(--sp-primary-active); }
 }
 .sp-chip__remove:hover { color: var(--mal-tinta); }
 .sp-chip__remove svg { width: 14px; height: 14px; stroke-width: 2.2; }
-/* Chip neutro de contexto (edad, sexo): sin borde, fondo gris */
-.sp-chip--meta {
-  background: var(--sup2); border: none; color: var(--tinta2);
-  font-size: var(--sp-fs-body-sm); padding: 5px 12px; min-height: 0;
-}
-
 
 /* --- 5. CARDS ----------------------------------------------------------- */
 /* B2: re-piel. CALMA §3: tarjetas `--sup` SIN borde ni sombra. El borde se
@@ -1038,17 +1001,6 @@ a:hover { color: var(--sp-primary-active); }
   padding: var(--sp-pad-card-hero);
   box-shadow: none;
 }
-.sp-card--anchor {               /* Card Ancla: nota ya generada */
-  border-width: var(--sp-bw-accent); border-color: color-mix(in srgb, var(--ok-tinta) 32%, var(--sup));
-  padding: var(--sp-pad-card-hero);
-  box-shadow: none;
-}
-.sp-card-inner {                 /* agrupa una sección DENTRO del modal */
-  background: var(--fondo);
-  border: var(--sp-bw-hair) solid transparent;
-  border-radius: var(--r-control);
-  padding: var(--sp-pad-card-inner);
-}
 :where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-card { border-radius: var(--r-tarjeta-ancha); }
 .sp-row {                        /* fila de dato editable (diagnóstico) */
   display: flex; align-items: center; justify-content: space-between;
@@ -1056,7 +1008,6 @@ a:hover { color: var(--sp-primary-active); }
   border-radius: var(--sp-r-field-sm);
   padding: 12px 14px; background: var(--sp-surface);
 }
-
 
 /* --- 7. CONTENEDOR DE ÍCONO -------------------------------------------- */
 .sp-icobox {                     /* cuadrado redondeado: identidad del header */
@@ -1068,30 +1019,8 @@ a:hover { color: var(--sp-primary-active); }
   background: var(--sp-primary-bg); color: var(--sp-primary-text);
 }
 .sp-icobox--sm { width: 38px; height: 38px; }
-.sp-icobox--lg { width: 56px; height: 56px; border-radius: var(--sp-r-icon-lg); }
-.sp-icobox--success { background: var(--sp-success-bg-alt); color: var(--sp-success); }
 .sp-icobox svg { width: 22px; height: 22px; }
 .sp-icobox--sm svg { width: 19px; height: 19px; }
-.sp-icobox--lg svg { width: 28px; height: 28px; }
-
-/* Medallón de éxito: círculo relleno + anillo de halo (2 capas concéntricas) */
-.sp-medal {
-  width: 96px; height: 96px; border-radius: 50%;
-  background: var(--sp-success-bg);           /* anillo = 13px de halo */
-  display: flex; align-items: center; justify-content: center;
-}
-.sp-medal__core {
-  width: 70px; height: 70px; border-radius: 50%;
-  background: var(--sp-success);
-  display: flex; align-items: center; justify-content: center;
-  animation: sp-pop var(--sp-dur-check) var(--sp-ease-spring);
-}
-.sp-medal__core svg { width: 40px; height: 40px; stroke: #fff; stroke-width: 2.6; fill: none;
-  stroke-linecap: round; stroke-linejoin: round; }
-/* Trazo del check dibujándose */
-.sp-medal__core path { stroke-dasharray: 32; stroke-dashoffset: 32;
-  animation: sp-draw var(--sp-dur-check) var(--sp-ease-out) 120ms forwards; }
-
 
 /* --- 8. INPUTS / TEXTAREA ---------------------------------------------- */
 /* B2: re-piel al campo del kit (relleno `--sup2`, sin borde visible, foco de
@@ -1117,11 +1046,6 @@ a:hover { color: var(--sp-primary-active); }
   box-shadow: 0 0 0 .5px var(--enlace);
 }
 .sp-textarea { min-height: 88px; resize: vertical; line-height: var(--sp-lh-body); }
-.sp-textarea--capture {          /* el textarea protagonista de la captura */
-  min-height: 210px; border-radius: var(--sp-r-input);
-  padding: 16px 18px 54px;       /* 54px inferior reserva el slot de voz */
-  font-size: 15px; line-height: 1.6;
-}
 
 /* Campo de fecha nativo, y SOLO él. En Safari iOS/iPadOS el widget nativo
    impone su propio ancho y el `width: 100%` de arriba no lo baja de ahí. La
@@ -1152,7 +1076,6 @@ input[type="date"].sp-input {
   min-width: 0;
 }
 
-
 /* --- 9. BADGES --------------------------------------------------------- */
 .sp-badge {
   display: inline-flex; align-items: center; gap: var(--sp-1-5);
@@ -1163,17 +1086,6 @@ input[type="date"].sp-input {
   padding: 6px 12px; border-radius: 8px; white-space: nowrap;
 }
 .sp-badge svg { width: 13px; height: 13px; }
-.sp-badge--warn   { background: var(--aviso-fondo); color: var(--aviso-tinta); font-size: var(--sp-fs-label); padding: 6px 14px; }
-.sp-badge--inline {              /* badge DENTRO de un botón primario */
-  background: rgba(255,255,255,.24); color: #fff;
-  font-size: 12.5px; padding: 4px 11px;
-}
-.sp-badge--deferred {            /* elemento de proyecto futuro (voz) */
-  background: var(--sup2); color: var(--tinta3);
-  border: 1px dashed var(--borde);
-  font-size: 10.5px; letter-spacing: .04em; padding: 4px 9px;
-}
-
 
 /* --- 10. BANNERS ------------------------------------------------------- */
 /* B2: semánticos del kit (`--aviso-*` ámbar, `--mal-*`, `--tonal`), borde de
@@ -1199,26 +1111,7 @@ input[type="date"].sp-input {
   padding: 11px 14px;
 }
 
-
 /* --- 11. PROGRESO SEGMENTADO (Estado 1 · entrevista) ------------------ */
-/* Rediseño (ajuste de la nota): fino, en los colores del kit. La barra de la
-   entrevista y la del firmado comparten pieza. Sin transición de color (sólo
-   se anima transform/opacity): el segmento hecho aparece por opacidad. */
-.sp-progress { display: flex; align-items: center; gap: var(--sp-3); }
-.sp-progress__label {
-  font-size: 12px; font-weight: 600; line-height: 16px; color: var(--tinta2); white-space: nowrap;
-}
-.sp-progress__track { flex: 1; display: flex; gap: 4px; }
-.sp-progress__seg {
-  position: relative; flex: 1; height: 4px; border-radius: var(--r-pildora, 999px); background: var(--sup2);
-  overflow: hidden;
-}
-.sp-progress__seg::after {
-  content: ""; position: absolute; inset: 0; background: var(--enlace); opacity: 0;
-  transition: opacity var(--dur-entra) linear;
-}
-.sp-progress__seg--done::after { opacity: 1; }
-
 
 /* --- 12. LISTA DE PASOS (Estado 0 · "Spinus está redactando tu nota") -- */
 /* Rediseño: lista quieta, sin cajas de color. Hecho = palomita `--ok-tinta`;
@@ -1285,7 +1178,6 @@ input[type="date"].sp-input {
   border: 2px solid var(--sup2); border-top-color: var(--enlace);
   animation: sp-spin var(--sp-dur-spin) linear infinite;
 }
-.sp-spinner--xl { width: 86px; height: 86px; border-width: 2px; border-radius: 24px; }
 .sp-dots { display: flex; gap: 7px; }
 .sp-dots span {
   width: 9px; height: 9px; border-radius: 50%; background: var(--enlace);
@@ -1302,10 +1194,9 @@ input[type="date"].sp-input {
 .sp-nota-entra { animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both; }
 @media (prefers-reduced-motion: reduce) {
   .sp-nota-entra, .sp-step { animation: sp-nota-funde 200ms linear both; }
-  .sp-progress__seg::after, .nn-segs > span::after, .nn-avance > span { transition: none; }
+  .nn-segs > span::after, .nn-avance > span { transition: none; }
   .nn-marca-viva svg { animation: none; }
 }
-
 
 /* --- 13. ZONA DE EDICIÓN ACTIVA (Estado 2 · edición) ------------------ */
 /* Campo del kit (`--sup2`, sin borde) con el foco de 2 px en `--enlace`. */
@@ -1316,7 +1207,6 @@ input[type="date"].sp-input {
   font-size: 15px; line-height: 24px; color: var(--tinta);
   outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none;
 }
-
 
 /* --- 14. SIGNOS VITALES (fila plegada + capa; SignosVitalesCard) ------- */
 /* Color del valor por semáforo, en el resumen de la fila y en los campos de la
@@ -1368,7 +1258,6 @@ input[type="date"].sp-input {
 .sv-hoja .sv-in::-webkit-outer-spin-button,
 .sv-hoja .sv-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-
 /* --- 15. REJILLAS ------------------------------------------------------ */
 .sp-grid-2   { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }        /* SOAP manual */
 .sp-grid-2-1 { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--sp-3-5); }    /* seguimiento */
@@ -1384,7 +1273,6 @@ input[type="date"].sp-input {
   .sp-grid-2--soap { grid-template-columns: 1fr; gap: var(--sp-3); }
 }
 
-
 /* --- 16. CHECKBOX ------------------------------------------------------ */
 .sp-check { display: flex; align-items: center; gap: 11px; cursor: pointer; min-height: var(--sp-tap); }
 .sp-check__box {
@@ -1399,7 +1287,6 @@ input[type="date"].sp-input {
 .sp-check input:checked + .sp-check__box svg { opacity: 1; }
 .sp-check input:focus-visible + .sp-check__box { box-shadow: var(--sp-focus-ring); }
 .sp-check__label { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
-
 
 /* --- 17. SELECTOR DE TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04) ------------ */
 
@@ -1418,121 +1305,9 @@ input[type="date"].sp-input {
   gap: var(--sp-gap-block);            /* 18px */
 }
 
-/* Un solo umbral: 4 columnas desde 600px de contenedor, 2 por debajo. Ocho se
-   divide en 4 y en 2, así que ninguna fila queda coja en ningún ancho. */
-.sp-doc-typecards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-2-5);                  /* 10px */
-}
-
-/* minmax(0,1fr) y no 1fr: impide que el ancho mínimo intrínseco de la
-   etiqueta infle la pista y desborde la fila. */
-.sp-doc-typecard {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--sp-2-5);
-  min-height: 92px;                    /* 104px en 4 columnas */
-  padding: 14px 10px;
-  border-radius: var(--sp-r-card);     /* 16px */
-  background: var(--sp-surface);
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  box-shadow: var(--sp-shadow-flat);
-  color: var(--sp-ink-700);
-  font-size: 13px;                     /* 14px en 4 columnas */
-  font-weight: var(--sp-fw-semi);
-  line-height: 1.25;
-  text-align: center;
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              border-color var(--sp-dur-micro) var(--sp-ease-out);
-}
-
-/* El icono lleva el color del tipo AL 100 % EN LOS CUATRO ESTADOS. La
-   selección se comunica con peso, fondo y filete — nunca con la aparición
-   del color: si solo apareciera al seleccionar, cuando lo ves ya llegaste. */
-.sp-doc-typecard > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
-
-/* Máximo 2 líneas: la tarjeta las admite, así que «Honorarios / Cotización»
-   NO se acorta en móvil. */
-.sp-doc-typecard__label {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-
-/* @media (hover: hover): en táctil el hover se queda pegado tras el toque y
-   una tarjeta no seleccionada se leería como si lo estuviera. */
-@media (hover: hover) {
-  .sp-doc-typecard:hover {
-    background: color-mix(in srgb, var(--doc-color) 6%, var(--sp-surface));
-    border-color: color-mix(in srgb, var(--doc-color) 30%, var(--sp-surface));
-    color: var(--sp-ink-800);
-  }
-}
-
-/* Ninguna superficie del tipo es relleno sólido: máximo un lavado al 12 %
-   con filete de 1.5px. El acento del médico sí se pinta en sólido. Es lo que
-   impide confundir una tarjeta con un control de la app aunque los dos hex
-   coincidan.
-   Se mezcla contra --sp-surface y no contra #fff (spec §9): en claro es el
-   mismo #ffffff y en oscuro mezcla contra la superficie, que es lo que la
-   spec dejaba como NO DEFINIDO. */
-.sp-doc-typecard[aria-selected="true"] {
-  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
-  border: var(--sp-bw-accent) solid var(--doc-color);
-  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
-  font-weight: var(--sp-fw-bold);
-}
-
-.sp-doc-typecard:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
-}
-
-/* Línea plegada: 52px en vez de 398 en móvil (346 devueltos) y de 220 en el
-   resto. Toma el vestido del estado seleccionado. */
-.sp-doc-typecollapsed {
-  display: flex; align-items: center; gap: var(--sp-3);
-  width: 100%;
-  min-height: 52px;
-  padding: 0 14px;
-  border-radius: var(--sp-r-card);
-  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
-  border: var(--sp-bw-accent) solid var(--doc-color);
-  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
-  text-align: left;
-}
-.sp-doc-typecollapsed > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
-.sp-doc-typecollapsed:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
-}
-.sp-doc-typecollapsed__eyebrow {
-  display: block;
-  font-size: var(--sp-fs-legal); font-weight: var(--sp-fw-bold);
-  letter-spacing: var(--sp-ls-label-w); text-transform: uppercase;
-  color: var(--sp-ink-350);
-}
-.sp-doc-typecollapsed__name {
-  display: block;
-  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.sp-doc-typecollapsed__cta {
-  margin-left: auto; display: flex; align-items: center; gap: var(--sp-1-5);
-  font-size: var(--sp-fs-meta); font-weight: var(--sp-fw-semi);
-  color: var(--sp-ink-500); flex-shrink: 0;
-}
-.sp-doc-typecollapsed__cta > svg { width: 18px; height: 18px; color: var(--sp-ink-icon); }
-
-@container docform (min-width: 600px) {
-  .sp-doc-typecards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-gap-tiles); }
-  .sp-doc-typecard  { min-height: 104px; padding: 18px 12px; font-size: var(--sp-fs-body-sm); }
-  .sp-doc-typecard > svg { width: 24px; height: 24px; }
-}
-
 /* Sin soporte de consultas de contenedor (iPadOS ≤15): quedan las 2 columnas
    de la regla base. Correcto siempre, subóptimo en pantallas grandes — el
    fallback seguro, igual que en guía 03 §3.C.4. */
-
 
 /* --- 18. FORMULARIOS DE DOCUMENTO (GUIA_FORMULARIOS_01 §1 y §3) --------- */
 
@@ -1564,10 +1339,7 @@ input[type="date"].sp-input {
 @container docform (min-width: 840px) {
   .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-.sp-doc-span-2   { grid-column: span 2; }
 .sp-doc-span-all { grid-column: 1 / -1; }
-@container docform (max-width: 379px) { .sp-doc-span-2 { grid-column: auto; } }
-
 /* Campo: etiqueta sobre control, 6px. min-width:0 para que el campo pueda
    encogerse dentro de su pista de rejilla. */
 .sp-doc-field { display: flex; flex-direction: column; gap: var(--sp-gap-label); min-width: 0; }
@@ -1581,15 +1353,6 @@ input[type="date"].sp-input {
   border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
 }
 .sp-doc-cardbody { padding: var(--sp-pad-card); }   /* 18px 20px */
-.sp-doc-chips { display: flex; flex-wrap: wrap; gap: var(--sp-gap-item); }
-
-/* Acción de cabecera. En XS pierde el texto y queda como 44×44: el aria-label
-   viaja siempre, así que no se pierde el nombre. */
-.sp-doc-add { margin-left: auto; }
-@container docform (max-width: 379px) {
-  .sp-doc-add { width: var(--sp-tap); height: var(--sp-tap); min-height: var(--sp-tap); padding: 0; }
-  .sp-doc-add .sp-doc-long { display: none; }
-}
 
 /* Etiqueta larga del primario, que en XS no cabe */
 .sp-doc-short { display: none; }
@@ -1598,43 +1361,11 @@ input[type="date"].sp-input {
   .sp-doc-short { display: inline; }
 }
 
-/* Fila de lista. Con ≥4 filas gana un filete: por debajo, 12px de aire basta. */
-.sp-doc-listrow { display: flex; align-items: center; gap: var(--sp-2-5); }
-.sp-doc-listrow + .sp-doc-listrow { margin-top: var(--sp-3); }
-.sp-doc-list--long .sp-doc-listrow + .sp-doc-listrow {
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-  padding-top: var(--sp-3);
-}
-.sp-doc-listnum { flex: 0 0 20px; }
-
-/* Ícono-botón: 44×44 SIEMPRE, con el glifo a 18. El área táctil no se negocia
-   ni siquiera cuando el icono es pequeño (L-02 / I-01). Visible y disabled con
-   un solo ítem: ocultarlo mueve la interfaz entera al añadir el segundo. */
-.sp-doc-iconbtn {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  border: none; background: none; cursor: pointer;
-  border-radius: var(--sp-r-btn-sm);   /* 8 */
-  color: var(--sp-ink-icon);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              color var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-iconbtn:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
-.sp-doc-iconbtn:disabled { opacity: .4; cursor: not-allowed; }
-.sp-doc-iconbtn svg { width: 18px; height: 18px; }
-
-.sp-doc-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--sp-2); min-height: 96px; text-align: center;
-}
-.sp-doc-empty .sp-icobox { background: var(--sp-surface-empty); color: var(--sp-ink-150); }
-
 /* Campo señalado. Dos colores porque son dos cosas distintas: falta un
    obligatorio (warn, §3.8) o el par tipo+región está a medias (danger, §2.4).
    :focus gana por especificidad, que es lo que se quiere: al entrar a
    corregirlo, el campo se lee como activo y no como roto. */
 .sp-doc-invalid       { border-color: var(--sp-warn);   border-width: var(--sp-bw-accent); }
-.sp-doc-invalid--pair { border-color: var(--sp-danger); border-width: var(--sp-bw-accent); }
 
 /* Barra de acciones. SIN los márgenes negativos de la spec: ahí son los del
    padding de .sp-card, y esta barra es hermana de las cards, no hija — los
@@ -1775,77 +1506,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
  *   El más ancho de los cuatro pide 115 y la mitad da 159: sobran 44.
  */
 
-/* Renglón único: el reparto de siempre. */
-.sp-doc-actions--filas > .sp-btn { flex: 0 0 auto; white-space: nowrap; }
-.sp-doc-actions--filas > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
-
-/* «Guardar como plantilla» va corto en esta barra a TODOS los anchos: con su
-   rótulo entero el renglón único pediría ≈935 y el contenedor más ancho mide
-   896. Es el único de los cuatro cuyo rótulo largo no dice nada que no diga ya
-   su icono. */
-.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__long  { display: none; }
-.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__short { display: inline; }
-
-@container docform (max-width: 895px) {
-  /* Envolver, no apilar: `wrap` deja que dos quepan por renglón y que el corte
-     lo decida el ancho. El hueco entre renglones es el mismo `gap` de la barra,
-     así que no hay un número nuevo que mantener. */
-  .sp-doc-actions--filas { flex-wrap: wrap; align-items: stretch; }
-
-  /* Dos por renglón, exactos: dos veces `50% - gap/2` más el `gap` dan el 100%.
-     `min-width: 0` para que un rótulo largo no infle su mitad y empuje al otro
-     a un renglón propio. */
-  .sp-doc-actions--filas > .sp-btn {
-    flex: 1 1 calc(50% - (var(--sp-gap-item) / 2));
-    min-width: 0;
-    padding-left: 12px; padding-right: 12px;
-  }
-
-  /* Los cuatro rótulos, cortos. */
-  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__long  { display: none; }
-  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__short { display: inline; }
-
-  /* ⚠️ LAS PAREJAS. El orden del marcado es el de escritorio —borrador,
-     plantilla, sin firma, firmar— y aquí se recompone: arriba lo que abre
-     camino (guardar la plantilla y firmar), abajo las dos salidas sin firma.
-     Sin esto, envolver daría [borrador|plantilla] y [sin firma|firmar], que es
-     el emparejamiento del paso anterior. */
-  .sp-doc-actions--filas > .sp-tpl-guardar      { order: 1; }
-  .sp-doc-actions--filas > .sp-doc-act-firmar   { order: 2; }
-  .sp-doc-actions--filas > .sp-doc-act-sinfirma { order: 3; }
-  .sp-doc-actions--filas > .sp-doc-act-borrador { order: 4; }
-}
-
-/* Bloque de estudio (imagenología). Contenedor PROPIO: la rejilla interior se
-   mide contra el interior del bloque, no contra el formulario. */
-.sp-doc-studyblock {
-  container-type: inline-size;
-  container-name: docstudy;
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card-inner);   /* 13 */
-  background: var(--sp-surface);
-  padding: 14px;
-}
-.sp-doc-studyblock + .sp-doc-studyblock { margin-top: var(--sp-3); }
-.sp-doc-studyblock--invalid { border-color: var(--sp-danger-border); background: var(--sp-danger-bg); }
-.sp-doc-studyhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
-.sp-doc-studychip { display: none; }
-
-/* Tres trazados, ninguno reparte medias columnas (I-02 · I-03). */
-.sp-doc-studygrid { display: grid; gap: 14px; grid-template-columns: 1fr; }
-@container docstudy (min-width: 520px) {
-  .sp-doc-studygrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sp-doc-studychip {
-    display: inline-block; max-width: 220px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-}
-@container docstudy (min-width: 760px) {
-  .sp-doc-studygrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .sp-doc-studygrid > [data-span="2"] { grid-column: span 2; }
-  .sp-doc-studygrid > [data-span="3"] { grid-column: span 3; }
-}
-
 /* Desplegable escribible — patrón de referencia del sistema (imagen §2.2).
    Portal a body y position:fixed: dentro del flujo, el menú quedaba recortado
    por el scroller de la card (L-03). */
@@ -1893,106 +1553,7 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    siendo el del formulario. */
 .sp-doc-formbody { display: flex; flex-direction: column; gap: var(--sp-gap-block); }
 
-/* ── Receta · bloque de medicamento (GUIA_FORM_RECETA §2) ────────────────
-   Como el bloque de estudio pero con radio de control (9) y SIN contenedor
-   propio: la rejilla interior es la primitiva `.sp-doc-grid[data-cols="3"]`,
-   que mide `docform`. Receta no tiene trazado de 4 —cinco campos en tres
-   columnas dan tres filas exactas—, así que un segundo contexto de medida no
-   distinguiría ningún caso. */
-.sp-doc-medblock {
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-field-sm);   /* 9 */
-  background: var(--sp-surface);
-  padding: 14px;
-}
-.sp-doc-medblock + .sp-doc-medblock { margin-top: var(--sp-3); }
-.sp-doc-medhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
-.sp-doc-medhead > .sp-label { font-size: 11.5px; }
-.sp-doc-medhead > .sp-doc-iconbtn { margin-left: auto; }
-
-/* «Agregar medicamento» al pie de CADA bloque y no al final de la lista: con
-   tres o cuatro fármacos, un botón único obliga a bajar hasta abajo y volver a
-   subir (§2.2). */
-.sp-doc-medfoot { margin-top: 14px; }
-@container docform (max-width: 379px) {
-  .sp-doc-medfoot > .sp-btn { width: 100%; }
-}
-
-/* ── Suplementación · tarjetas (GUIA_FORM_SUPLEMENTACION §2) ─────────────
-   Columna única en los CUATRO anchos: cada tarjeta tiene alto distinto según su
-   beneficio, y en dos columnas la vecina nunca empieza donde la vista la busca
-   (§2.2). `align-items:start` para que abrir una no estire a ninguna otra. */
-.sp-doc-supgrid {
-  display: grid; grid-template-columns: 1fr;
-  gap: var(--sp-2-5); align-items: start;
-}
-.sp-doc-supcard {
-  display: flex; flex-direction: column; gap: var(--sp-2);
-  /* `relative` no es decorativo: la casilla es `sr-only`, o sea `absolute`, y
-     es el destino al que el banner de faltantes desplaza. Sin bloque contenedor
-     aquí, su rectángulo lo fija un ancestro cualquiera y el desplazamiento
-     aterriza en otro sitio. */
-  position: relative;
-  padding: 14px; cursor: pointer;
-  background: var(--sp-surface);
-  border: var(--sp-bw-hair) solid var(--sp-line-soft);
-  border-radius: var(--sp-r-card-inner);   /* 13 = --sp-r-field-sm + 4 */
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              border-color var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-supcard--on {
-  background: var(--sp-primary-bg-faint);
-  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
-}
-/* Solo la primera, y solo tras el primer intento: es la que el banner nombra. */
-.sp-doc-supcard--invalid { border-color: var(--sp-warn); border-width: var(--sp-bw-accent); }
-
-/* Cabecera: casilla + nombre + dosis de referencia. Es una etiqueta real, así
-   que el teclado la alcanza sin ARIA inventada; el resto de la tarjeta añade
-   superficie al mismo gesto. `flex-start` porque el nombre puede envolver. */
-.sp-doc-suphead { align-items: flex-start; }
-.sp-doc-suphead > .sp-check__box { margin-top: 1px; }
-.sp-doc-supname { font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-900); }
-.sp-doc-supref  { display: block; margin-top: 2px; font-size: 12.5px; color: var(--sp-ink-350); }
-
-/* El beneficio clínico es la referencia con la que el médico elige: se acota a
-   tres líneas, no se esconde (S-02). */
-.sp-doc-supbenefit { font-size: 13px; line-height: var(--sp-lh-body); color: var(--sp-ink-500); }
-.sp-doc-supbenefit--clamp {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
-}
-/* Sin resetear el borde: `.sp-link-alt` vive de su subrayado punteado, que es
-   un `border-bottom`, y el preflight ya deja el botón sin borde ni fondo. */
-.sp-doc-supmore { align-self: flex-start; min-height: 32px; padding: 0; }
-
-/* Campos que aparecen al seleccionar. Dosis y marca a la par; la nota debajo. */
-.sp-doc-supfields { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); }
-@container docform (min-width: 600px) {
-  .sp-doc-supfields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sp-doc-supfields > [data-span="2"] { grid-column: span 2; }
-}
-
-/* Notas y control: dos columnas SOLO desde 600px de contenedor (§4). El trazado
-   de `data-cols="2"` abre a 380, y ahí un textarea junto a un input miden 182px
-   cada uno. */
-.sp-doc-supnotas { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); }
-@container docform (min-width: 600px) {
-  .sp-doc-supnotas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-
 /* --- 19. PLANTILLAS DE DOCUMENTO (GUIA_FORMULARIOS_02) ------------------ */
-
-/* Fila de control del selector: select + «Gestionar». En XS el botón pasa
-   debajo a ancho completo (corrige H-03). */
-.sp-tpl-row { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-gap-item); }
-@container docform (max-width: 379px) {
-  .sp-tpl-row { grid-template-columns: 1fr; gap: var(--sp-2); }
-  .sp-tpl-row > .sp-btn { width: 100%; }
-}
-/* El compacto sube a 44px: es un control de fila, no una acción inline. */
-.sp-tpl-manage { min-height: var(--sp-tap); white-space: nowrap; }
-.sp-tpl-manage svg { width: 17px; height: 17px; }
 
 /* Bloque de 44px mientras carga. Sin shimmer: por debajo de 200ms un skeleton
    parpadea más de lo que informa. */
@@ -2046,15 +1607,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
   margin-bottom: var(--sp-gap-section);
 }
-.sp-tpl-back {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  border: none; background: none; cursor: pointer;
-  border-radius: var(--sp-r-btn-sm); color: var(--sp-ink-500);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-tpl-back:hover { background: var(--sp-surface-muted); }
-.sp-tpl-back svg { width: 20px; height: 20px; }
 .sp-tpl-panelhead > .sp-badge { margin-left: auto; }
 @container docform (max-width: 379px) {
   .sp-tpl-panelhead > .sp-title-card { font-size: var(--sp-fs-vitals); }
@@ -2124,101 +1676,13 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   font-size: 11.5px; font-weight: var(--sp-fw-black);
 }
 
-
 /* --- 20. EDITOR DEL ESCRITO MÉDICO (GUIA_FORM_ESCRITO_MEDICO §2.2 y §3) -- */
 
 /* Sección propia y no un apartado de la 18: el editor es de UN formulario de
    los ocho. Los demás no tienen cuerpo de texto enriquecido y no heredan nada
    de aquí. */
 
-/* Fila del título del pie: campo + enlace de reenganche (§2.2). El enlace es
-   `flex: 0 0 auto` y el campo se queda con todo lo que sobre. */
-.sp-ed-pie { display: flex; align-items: center; gap: var(--sp-2-5); }
-.sp-ed-pie > .sp-input     { flex: 1; min-width: 0; }
-.sp-ed-pie > .sp-link-alt  { flex: 0 0 auto; }
-
 /* ── Barra de herramientas (§3.3 y §3.4) ────────────────────────────────── */
-/* `position: relative` porque es el ancla de los tres menús, que cuelgan de su
-   borde inferior. Van DENTRO de la barra y no de la card: colgados de la card
-   aparecerían al pie del área de escritura.
-   `flex-wrap: nowrap` es la regla entera: la barra nunca pasa de una fila, y
-   lo que no cabe baja al menú. El reparto lo decide el CONTENEDOR y no el
-   viewport, así que sale igual en el iPad vertical que en una ventana
-   estrecha de escritorio.
-   La card NO lleva `overflow: hidden` — recortaría los menús. */
-.sp-ed-bar {
-  position: relative;
-  display: flex; align-items: center; flex-wrap: nowrap;
-  gap: var(--sp-1-5);                        /* 6 — niveles 1 y 2 */
-  padding: 8px 12px;
-  background: var(--sp-surface-sunken);
-  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-@container docform (min-width: 760px) {
-  .sp-ed-bar { gap: var(--sp-2); }           /* 8 — nivel 3, las nueve caben */
-}
-
-/* Objetivo de 44×44 con glifo de 18. Hoy eran 26 px reales, trece veces
-   (E-02). El área táctil no se negocia. */
-.sp-ed-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  border: none; background: none; cursor: pointer;
-  border-radius: var(--sp-r-btn-sm);         /* 8 */
-  color: var(--sp-ink-700);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              color var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-ed-btn:hover { background: var(--sp-surface-muted); }
-.sp-ed-btn svg { width: 18px; height: 18px; }
-/* Estado por FONDO y no solo por color de glifo: a 18 px la diferencia de
-   tinta sola no se lee. `aria-expanded` entra aquí para que el control que
-   tiene su menú abierto se vea encendido mientras dura. */
-.sp-ed-btn[aria-pressed="true"],
-.sp-ed-btn[aria-expanded="true"] {
-  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900);
-}
-
-/* Control de bloque, nivel 1: 52×44 con el glifo del bloque actual + chevron.
-   Sustituye al `<select>` porque a 332 px de barra útil no hay sitio para los
-   128 px del desplegable. */
-.sp-ed-block { flex: 0 0 52px; width: 52px; gap: 1px; }
-.sp-ed-block > svg:last-child { width: 13px; height: 13px; color: var(--sp-ink-icon); }
-
-/* Control de bloque, niveles 2 y 3: `<select>` nativo — en el iPad abre la
-   rueda del sistema. Sube a 44 px de alto vía `.sp-input`: era el control más
-   pequeño de los ocho formularios (E-05). */
-.sp-ed-select { display: none; flex: 0 0 128px; width: 128px; }
-@container docform (min-width: 520px) {
-  .sp-ed-block  { display: none; }
-  .sp-ed-select { display: block; }
-}
-@container docform (min-width: 760px) {
-  .sp-ed-select { flex-basis: 150px; width: 150px; }
-}
-
-/* Botón del menú. Separado del grupo de formato con `margin-left: auto` para
-   no pulsarlo al ir a por las listas, y con borde para leerse como otra cosa.
-   En nivel 3 no se renderiza: las nueve están en la barra. */
-.sp-ed-more { margin-left: auto; border: var(--sp-bw-hair) solid var(--sp-line-control); }
-@container docform (min-width: 760px) { .sp-ed-more { display: none; } }
-
-/* El reparto de §3.3, en dos pares de clases:
-     .sp-ed-n2 / .sp-ed-n3 — el control EN LA BARRA desde 520 / desde 760
-     .sp-ed-m2 / .sp-ed-m3 — la fila EN EL MENÚ, hasta 520 / hasta 760
-   Cada control se escribe dos veces en el árbol y el contenedor apaga una. Es
-   la única forma de repartir por consulta de contenedor sin medir con JS, que
-   es justo lo que el sistema evita en todas las demás rejillas. `display:none`
-   los saca también del orden de tabulación: no hay objetivos fantasma. */
-.sp-ed-n2, .sp-ed-n3 { display: none; }
-@container docform (min-width: 520px) {
-  .sp-ed-n2 { display: inline-flex; }
-  .sp-ed-m2 { display: none; }
-}
-@container docform (min-width: 760px) {
-  .sp-ed-n3 { display: inline-flex; }
-  .sp-ed-m3 { display: none; }
-}
 
 /* ── Menús de la barra (§3.4) ───────────────────────────────────────────── */
 .sp-ed-menu {
@@ -2229,8 +1693,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   border-radius: 12px;
   box-shadow: 0 12px 28px rgba(16, 42, 73, .14);
 }
-/* El de bloque cuelga del extremo izquierdo: su control es el primero. */
-.sp-ed-menu--left { right: auto; left: 0; }
 
 /* Fila de 44 px con icono de 20 y NOMBRE ESCRITO: en un menú no hay que
    adivinar qué hace un glifo. */
@@ -2306,7 +1768,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   color: var(--sp-ink-200);
 }
 
-
 /* --- 21. HONORARIOS / COTIZACIÓN (GUIA_FORM_HONORARIOS §2, §4) ---------- */
 
 /* Los dos documentos son UN formulario con variantes declaradas, así que aquí
@@ -2340,177 +1801,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 }
 .sp-doc-segmented__opt:hover { color: var(--sp-ink-800); }
 .sp-doc-segmented__opt[aria-pressed="true"] { background: var(--sp-primary); color: #fff; }
-/* Como CAMPO (divisa) el control entero mide 44 y no 46: la altura de control
-   del sistema manda sobre los 38 px que el segmentado usa dentro de una
-   cabecera de 56. */
-.sp-doc-segmented--field .sp-doc-segmented__opt { min-height: 36px; }
-
-/* Datos de la cotización: son CUATRO campos. A 788 de contenedor, cuatro
-   columnas dejarían el folio en 165px, así que el tramo MD va a dos y la cuarta
-   abre a 840 (§0). No es `data-cols="4"`: esa primitiva abre a tres en 600. */
-.sp-doc-honodatos { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
-@container docform (min-width: 380px) {
-  .sp-doc-honodatos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container docform (min-width: 840px) {
-  .sp-doc-honodatos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-/* Folio: lo asigna la base al insertar (§4.1), así que en pantalla no puede
-   mostrar número antes de emitir. Se lee como lo que es —un hueco reservado—,
-   no como un campo que el médico se dejó vacío. */
-.sp-doc-folio { background: var(--sp-surface-muted); color: var(--sp-ink-350); cursor: not-allowed; }
-
-/* Conmutador del seguro (§4.5). El RIEL mide 44×26 con perilla de 20, pero el
-   botón es 44×44: el piso táctil del sistema no admite excepciones (spec 01
-   §1) y un riel de 26 px de alto no es un objetivo de dedo. */
-.sp-doc-switch {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  margin-left: auto; padding: 0; border: none; background: none; cursor: pointer;
-}
-.sp-doc-switch__track {
-  position: relative; width: 44px; height: 26px;
-  border-radius: var(--sp-r-pill); background: var(--sp-line-strong);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-switch[aria-checked="true"] .sp-doc-switch__track { background: var(--sp-primary); }
-.sp-doc-switch__knob {
-  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
-  border-radius: var(--sp-r-pill); background: var(--sp-surface);
-  box-shadow: 0 1px 2px rgba(16, 42, 73, .28);
-  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-switch[aria-checked="true"] .sp-doc-switch__knob { transform: translateX(18px); }
-
-/* ── Rejilla de conceptos — tres trazados (§4.2) ─────────────────────────
-   El umbral es de CONTENEDOR y no de viewport: el mismo formulario vive en
-   tres montajes. El trazado de partida es el APILADO, que es el peor caso
-   (390 de viewport) y el que cierra H-02: `grid-cols-[1fr_140px_36px]` fijo
-   dejaba el concepto en 94 px ahí.
-   Apilada, cada fila es una minitarjeta y cada celda lleva su etiqueta; en una
-   línea, la cabecera de columnas se renderiza una vez y las etiquetas de celda
-   desaparecen. Las dos cosas viven en el DOM siempre y las conmuta el CSS: el
-   umbral es de contenedor y ningún cálculo en JS lo acertaría. */
-.sp-doc-honofilas { display: flex; flex-direction: column; gap: var(--sp-2-5); }
-.sp-doc-honofila {
-  display: grid; gap: var(--sp-2-5);
-  grid-template-columns: minmax(0, 1fr) 40px;
-  grid-template-areas: "c d" "o o" "p p";
-  padding: 12px;
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card-inner);      /* 13 */
-  background: var(--sp-surface);
-}
-.sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila { grid-template-areas: "c d" "p p"; }
-.sp-doc-honofila > [data-cell="c"] { grid-area: c; min-width: 0; }
-.sp-doc-honofila > [data-cell="o"] { grid-area: o; min-width: 0; }
-.sp-doc-honofila > [data-cell="p"] { grid-area: p; min-width: 0; }
-/* Apilada, la papelera comparte fila con el rótulo del concepto y su campo:
-   se alinea con el CAMPO, que es sobre lo que actúa. */
-.sp-doc-honofila > [data-cell="d"] { grid-area: d; align-self: end; }
-/* Etiqueta por celda. En los trazados de una línea se esconde A LA VISTA pero
-   NO se retira del árbol —`display:none` la quitaría de los dos—: la cabecera
-   de columnas es `aria-hidden`, así que sin esto el campo se quedaría sin
-   nombre justo en el trazado donde su rótulo está lejos. */
-.sp-doc-honocell-label { display: block; margin-bottom: var(--sp-gap-label); }
-/* La cabecera de columnas solo existe en los trazados de una línea. */
-.sp-doc-honocols { display: none; }
-.sp-doc-honocols > [data-cell="p"] { text-align: right; }
-
-@container docform (min-width: 520px) {
-  /* Recibo: concepto + precio + papelera, en una línea. */
-  .sp-doc-honofilas[data-tipo="honorarios"] { gap: var(--sp-3); }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila {
-    grid-template-columns: minmax(0, 1fr) 150px 40px;
-    grid-template-areas: "c p d";
-    align-items: center;
-    padding: 0; border: none; background: none;
-  }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocols { display: grid; }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocell-label {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
-  }
-
-  /* Cotización: el origen todavía no cabe en la línea y baja entero. */
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
-    grid-template-columns: minmax(0, 1fr) 150px 40px;
-    grid-template-areas: "c p d" "o o o";
-  }
-}
-@container docform (min-width: 760px) {
-  .sp-doc-honofilas[data-tipo="cotizacion"] { gap: var(--sp-3); }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
-    grid-template-columns: minmax(0, 1fr) 168px 150px 40px;
-    grid-template-areas: "c o p d";
-    align-items: center;
-    padding: 0; border: none; background: none;
-  }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocols { display: grid; }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocell-label {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
-  }
-}
-
-/* La papelera de la fila mide 40 de ancho y 44 de alto: los 44 son el piso
-   táctil y los 40 son la columna que la rejilla le reserva. */
-.sp-doc-honofila .sp-doc-iconbtn { flex: 0 0 40px; width: 40px; }
-
-/* Precio: el prefijo SIGUE A LA DIVISA. Cifra a la derecha y tabular para que
-   las columnas de importes se lean como una columna. */
-.sp-doc-precio { position: relative; }
-.sp-doc-precio > .sp-input {
-  padding-left: 28px; text-align: right; font-variant-numeric: tabular-nums;
-}
-/* «US$» no cabe en los 28 px que le bastan a «$». */
-.sp-doc-precio[data-divisa="USD"] > .sp-input { padding-left: 38px; }
-.sp-doc-precio__sim {
-  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-350); pointer-events: none;
-}
-
-/* ── Bloque de cierre (§4.4) ─────────────────────────────────────────────
-   SIEMPRE visible, también con total en cero: renderizarlo solo con `total > 0`
-   es lo que hoy lo hace aparecer y desaparecer mientras se teclea. */
-.sp-doc-cierre {
-  margin-top: var(--sp-4);
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-.sp-doc-cierrefila {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--sp-3); min-height: var(--sp-tap);
-}
-.sp-doc-cierrelabel {
-  min-width: 0; font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
-  color: var(--sp-ink-500);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.sp-doc-cierrecifra {
-  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
-  color: var(--sp-ink-800); font-variant-numeric: tabular-nums;
-}
-/* La fila que cierra el documento: la que el paciente lee primero. */
-.sp-doc-cierrefila--final { border-top: var(--sp-bw-hair) solid var(--sp-line-divider); }
-.sp-doc-cierrefila--final .sp-doc-cierrelabel { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
-/* ⚠️ LA CIFRA TIENE TOKEN PROPIO, `--sp-cifra-cierre`, y las dos alternativas
-   obvias están descartadas por escrito junto a su declaración:
-   NO `--sp-primary-hover` —que es lo que había: el hover del RELLENO del botón
-   primario, tomado prestado por salir un tono más fuerte; en cuanto ese hover
-   pasó a oscurecer se llevó esta cifra a 2.66:1 sobre la card—, y tampoco
-   `--sp-primary-text` a secas, que arregla el oscuro pero en claro cambia el
-   navy por el azul de marca, y esto es una hoja que se imprime y que el paciente
-   lee. El token propio deja el navy en claro y la tinta aclarada en oscuro.
-   Claro 11.60:1 sobre blanco · oscuro 6.23:1 sobre la card. */
-.sp-doc-cierrefila--final .sp-doc-cierrecifra {
-  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-cifra-cierre);
-}
-/* El único número editable del bloque. */
-.sp-doc-anticipo { flex: 0 0 170px; width: 170px; }
-
 
 /* ============================================================================
    ANIMACIONES
@@ -2536,7 +1826,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 }
 */
 
-
 /* --- 22. SECCIÓN PLEGABLE E INDICACIONES DE PISO ------------------------- */
 /* (GUIA_FORM_INTERNAMIENTO §3 y §4 · mecánica de la propuesta §3.A.3)
 
@@ -2550,82 +1839,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    archivo. `.sp-section` nace ya con dos
    consumidores —GUIA_FORM_CONSENTIMIENTO §3 la nombra para sus siete
    secciones—; el control de dos niveles es de internamiento y de nadie más. */
-
-/* ── Card plegable ─────────────────────────────────────────────────────────
-   El <h2> NO puede vivir dentro del <button> —contenido de flujo dentro de
-   contenido de frase—, así que lo envuelve: el encabezado da la semántica y el
-   botón es lo pulsable, que es lo que `aria-expanded` necesita debajo. */
-.sp-section__title { margin: 0; font: inherit; }
-.sp-section__head {
-  width: 100%; text-align: left; cursor: pointer;
-  background: none; color: inherit;
-  border: 0; border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-/* Plegada mide 58px: 56 de cabecera + 2 de bordes de la card. El filete
-   inferior se va porque ya no separa de nada. */
-.sp-section__head[aria-expanded="false"] { border-bottom: 0; }
-.sp-section__head:focus-visible { outline: none; box-shadow: var(--sp-focus-ring); }
-.sp-section__chev {
-  margin-left: auto; flex: 0 0 auto;
-  width: 18px; height: 18px; color: var(--sp-ink-icon);
-  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-section__head[aria-expanded="true"] .sp-section__chev { transform: rotate(180deg); }
-/* El bloque global de `globals.css` solo neutraliza las clases `animate-*`. */
-@media (prefers-reduced-motion: reduce) { .sp-section__chev { transition: none; } }
-/* En XS el título se lleva la primera línea y el resumen cae debajo con el
-   chevron: los tres en fila dejan el título en cuatro renglones —«Indicaciones
-   de ingreso a piso» mide 255 de los 276 útiles y el badge otros 154—. Las dos
-   líneas suman 46 y caben en los 56 de la cabecera, así que plegada sigue
-   midiendo 58. */
-@container docform (max-width: 379px) { .sp-section__head { flex-wrap: wrap; } }
-
-/* ── Control de dos niveles: grupos y renglones (§3) ──────────────────────── */
-.sp-doc-piso { display: flex; flex-direction: column; gap: var(--sp-3-5); }
-
-/* Chip que abre la fila de grupo propio. Es una ACCIÓN, no un grupo: nunca
-   lleva `aria-pressed`, así que nunca se enciende. */
-.sp-doc-chipadd svg { width: 16px; height: 16px; }
-
-.sp-doc-grupos { display: flex; flex-direction: column; gap: var(--sp-3); }
-.sp-doc-grupo {
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-field-sm);
-  padding: 14px;
-}
-.sp-doc-grupohead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
-/* Los dos con `flex: 0 0 auto`: el que cede ancho a 316 es el nombre, que
-   admite dos líneas — la papelera encogida deja de ser un objetivo de 44. */
-.sp-doc-grupohead > .sp-doc-iconbtn { margin-left: auto; flex: 0 0 auto; }
-/* El recuento es lo que hace que plegar resuma en vez de esconder (§3.4). */
-.sp-doc-grupocount {
-  flex: 0 0 auto;
-  font-size: var(--sp-fs-hint); color: var(--sp-ink-350); white-space: nowrap;
-}
-/* La cabecera ya trae sus 44px de alto; el primer renglón solo necesita aire. */
-.sp-doc-grupohead + .sp-doc-listrow { margin-top: var(--sp-2); }
-.sp-doc-grupofoot { margin-top: 14px; }
-
-/* Zona de arranque: 96px punteados que dicen qué hacer y quién pone los
-   guiones. Sin ella, cuatro chips apagados no explican nada. */
-.sp-doc-dashzone {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 96px; padding: var(--sp-3) var(--sp-4);
-  border: var(--sp-bw-hair) dashed var(--sp-line-dash);
-  border-radius: var(--sp-r-field-sm);
-  text-align: center;
-}
-
-/* Fila de grupo propio: campo + ✕ + Añadir. En XS el campo se lleva la primera
-   línea entera y los dos botones caen debajo. */
-.sp-doc-nuevogrupo { display: flex; align-items: center; gap: var(--sp-2); }
-.sp-doc-nuevogrupo > .sp-input { flex: 1; min-width: 0; }
-.sp-doc-nuevogrupo > .sp-btn { flex: 0 0 auto; min-height: var(--sp-tap); white-space: nowrap; }
-@container docform (max-width: 379px) {
-  .sp-doc-nuevogrupo { flex-wrap: wrap; }
-  .sp-doc-nuevogrupo > .sp-input { flex: 1 0 100%; }
-}
-
 
 /* --- 23. CONSENTIMIENTO INFORMADO (GUIA_FORM_CONSENTIMIENTO §2) ---------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22: fuera de
@@ -2647,33 +1860,11 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   .sp-doc-consent-id .sp-label-field { min-height: 34px; }
 }
 
-/* Fila 4: el divisor y las dos autorizaciones. Van bajo filete porque NO son
-   datos de identificación sino decisiones del paciente (§2).
-   Reparte por su cuenta y no con las columnas de la rejilla: en el tramo de dos
-   columnas el segmentado caería en una pista de 166px y sus dos botones en 77
-   cada uno, por debajo de lo cómodo. Abre a dos en el mismo umbral en que la
-   rejilla abre a tres, donde la pista ya mide 272. */
-.sp-doc-consent-auth {
-  grid-column: 1 / -1;
-  display: grid; grid-template-columns: 1fr; gap: var(--sp-4);
-  margin-top: var(--sp-4); padding-top: var(--sp-4);
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-@container docform (min-width: 600px) {
-  .sp-doc-consent-auth { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-/* El texto de la casilla envuelve a dos y tres renglones según el ancho, así
-   que la caja se ancla a la primera línea en vez de centrarse contra el bloque
-   entero. El contenedor conserva sus 44px de alto mínimo. */
-.sp-doc-consent-fotos { align-items: flex-start; }
-
 /* «El paciente no puede firmar», bajo el campo del familiar. Vive ahí y no con
    las autorizaciones porque marcarla cambia la regla del control que tiene
    encima: vuelve obligatorio el nombre del familiar, que pasa a ser quien
    consiente. Un poco de aire para que no se pegue al input. */
 .sp-doc-consent-nofirma { margin-top: var(--sp-1-5); }
-
 
 /* --- 24. DENEGACIÓN O REVOCACIÓN (GUIA_FORM_DENEGACION §1) --------------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22 y la 23.
@@ -2692,7 +1883,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    ancho entero y baja a una SEGUNDA LÍNEA DE LA MISMA CABECERA, no a una card
    propia. El icono y el rótulo se quedan arriba, juntos. */
 .sp-doc-consent-head { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
-
 
 /* --- 25. FIRMADO ELECTRÓNICO (GUIA_FORMULARIOS_05 §3 y §5) --------------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22, 23 y 24.
@@ -2751,8 +1941,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   .sp-firma-long  { display: inline; }
   .sp-firma-short { display: none; }
 }
-
-.sp-firma-progress { flex: 0 0 auto; padding: var(--sp-3); }
 
 .sp-firma-cuerpo {
   flex: 1; min-height: 0; overflow-y: auto;
@@ -2834,7 +2022,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-800);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.sp-firma-ico-vacio { background: var(--sp-surface-muted); color: var(--sp-ink-icon); }
 
 /* ═══ §6 · la foto de identificación — captura nativa y recorte ═══════════
    Vive dentro del cuerpo del modo de firmado y sustituye al lienzo mientras
@@ -2847,8 +2034,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 
 /* §6.1 · la pregunta. `Sin foto` es una respuesta, no una cancelación, y por eso
    es un botón del mismo peso que los demás y no una X. */
-.sp-idfoto-card { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3); }
-.sp-idfoto-card-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
 
 .sp-idfoto-controles { display: flex; align-items: center; gap: var(--sp-2-5); flex-wrap: wrap; }
 .sp-idfoto-controles > .sp-btn { min-height: var(--sp-ctrl-h-desktop); }
@@ -2881,7 +2066,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-idfoto-pie { text-align: center; color: var(--sp-ink-350); }
 
 @media (max-width: 379px) {
-  .sp-idfoto-card { flex-direction: column; }
   .sp-idfoto-controles > .sp-btn { width: 100%; }
 }
 
@@ -2922,43 +2106,12 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .4px; color: var(--enlace);
 }
 .sp-doc-cardhead { border-bottom-color: var(--linea); }
-.sp-section__head { border-bottom-color: var(--linea); }
 
 /* Rótulos de campo y ayudas. */
 .sp-doc-form .sp-label-field {
   font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--tinta2);
 }
 .sp-doc-form .sp-hint { font-size: 12px; line-height: 16px; color: var(--tinta2); }
-
-/* Bloques repetidos: sin caja propia, separados por una línea. */
-.sp-doc-medblock, .sp-doc-studyblock, .sp-doc-grupo {
-  border: 0; border-radius: 0; background: transparent; padding: 0;
-}
-.sp-doc-medblock + .sp-doc-medblock,
-.sp-doc-studyblock + .sp-doc-studyblock,
-.sp-doc-grupo + .sp-doc-grupo {
-  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--linea);
-}
-.sp-doc-studyblock--invalid {
-  padding: 12px; border-radius: var(--r-control); background: var(--mal-fondo);
-}
-.sp-doc-studyblock--invalid + .sp-doc-studyblock,
-.sp-doc-studyblock + .sp-doc-studyblock--invalid { padding-top: 12px; }
-/* «Medicamento 1»: etiqueta tonal (maqueta `docs-a`, vista 2), no rótulo de 11,5. */
-.sp-doc-medhead > .sp-label, .sp-doc-studyhead > .sp-label {
-  display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 8px;
-  background: var(--tonal); color: var(--tonal-tinta);
-  font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0; text-transform: none;
-}
-.sp-doc-dashzone { border-color: var(--borde); border-radius: var(--r-control); }
-
-/* Tarjetas elegibles de suplementación: relleno `--sup2` sin borde; la
-   elegida en `--tonal` con contorno de 2 `--accion` (el de la rejilla). */
-.sp-doc-supcard { background: var(--sup2); border-color: transparent; border-radius: 14px; }
-.sp-doc-supcard--on { background: var(--tonal); border-color: transparent; box-shadow: inset 0 0 0 2px var(--accion); }
-.sp-doc-supcard--invalid { box-shadow: inset 0 0 0 2px var(--aviso-tinta); }
-.sp-doc-supref { font-size: 12px; color: var(--tinta2); }
-.sp-doc-supbenefit { color: var(--tinta2); }
 
 /* Menú del desplegable escribible: capa con sombra (§3), sin borde. */
 .sp-doc-menu { border-color: transparent; background: var(--sup); border-radius: 14px; }
@@ -3050,21 +2203,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-tpl-empty-b:disabled { color: var(--tinta3); cursor: default; }
 .sp-tpl-card > .sp-tpl-aviso { margin: 0 0 14px; }
 
-/* ── Barra del consentimiento con el «···» (maqueta `docs-c`, vista 8) ─────
-   «Guardar borrador» y «Guardar como plantilla» viven en el «···» de la
-   cabecera; el pie queda en «Sin firma» + «Firmar» en una fila. SÓLO cuando el
-   formulario tiene «···» (no en el búnker sin conexión, donde las plantillas no
-   se montan y el borrador sigue en el pie). */
-.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > :is(.sp-doc-act-borrador, .sp-tpl-guardar) { display: none; }
-.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas { flex-wrap: nowrap; }
-.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-doc-act-sinfirma { order: 1; flex: 0 0 auto; min-width: 0; }
-.sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-doc-act-firmar { order: 2; flex: 1 1 auto; min-width: 0; }
-:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas { justify-content: flex-end; }
-:where([data-formato="iv"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas { justify-content: center; }
-:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-doc-act-firmar { flex: 0 0 auto; min-width: 104px; }
-:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-btn .sp-doc-actions__long { display: inline; }
-:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-form:has(.sp-doc-mas) .sp-doc-actions--filas > .sp-btn .sp-doc-actions__short { display: none; }
-
 /* ── Campos como filas «rótulo — valor» (maquetas `docs-a/b/c`) ────────────
    Sólo presentación: los campos, sus nombres y su orden no cambian (alimentan
    las ranuras del PDF). Dentro del cuerpo de una sección cada campo es una
@@ -3072,38 +2210,38 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    el foco se marca con un filete de 2 `--enlace` bajo el valor. En `ext`/`tel`
    el rótulo va encima; desde 520 de contenedor, a la izquierda en una columna
    de 188 (como `ih`/`iv`/`esc`). */
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) { grid-template-columns: minmax(0, 1fr); gap: 0; }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > :is(.sp-doc-span-2, .sp-doc-span-all, [data-span]) { grid-column: 1 / -1; }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field { gap: 2px; padding: 8px 0; }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > * + * { border-top: 1px solid var(--linea); }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field:first-child { padding-top: 0; }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field:last-child { padding-bottom: 0; }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input {
+.sp-doc-cardbody :is(.sp-doc-grid) { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > :is(.sp-doc-span-all, [data-span]) { grid-column: 1 / -1; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field { gap: 2px; padding: 8px 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > * + * { border-top: 1px solid var(--linea); }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field:first-child { padding-top: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field:last-child { padding-bottom: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input {
   min-height: 40px; padding: 8px 0; border-color: transparent; border-radius: 0; background-color: transparent;
   font-size: 16px; line-height: 22px;
 }
 /* Táctil: el control de la fila mide el toque del formato (44), no 40
    (revisión cruzada de los ocho formularios). */
 :where([data-formato="ext"], [data-formato="tel"], [data-formato="iv"]) .sp-doc-cardbody .sp-doc-grid > .sp-doc-field > :is(.sp-input, .sp-textarea) { min-height: 44px; }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea):focus,
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input:focus {
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea):focus,
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input:focus {
   border-color: transparent; background-color: transparent; box-shadow: inset 0 -2px 0 var(--enlace);
 }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea).sp-doc-invalid,
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input.sp-doc-invalid {
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea).sp-doc-invalid,
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input.sp-doc-invalid {
   border-color: transparent; box-shadow: inset 0 -2px 0 var(--mal-tinta);
 }
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field:has(.sp-doc-invalid) > .sp-label-field { color: var(--mal-tinta); }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field:has(.sp-doc-invalid) > .sp-label-field { color: var(--mal-tinta); }
 /* El área de texto en fila conserva su alto mínimo (88) y su asa. */
-.sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > textarea:is(.sp-input, .sp-textarea) { min-height: 88px; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > textarea:is(.sp-input, .sp-textarea) { min-height: 88px; }
 @container docform (min-width: 520px) {
-  .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field {
+  .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field {
     display: grid; grid-template-columns: 188px minmax(0, 1fr); column-gap: 16px; row-gap: 2px;
     align-items: start; padding: 4px 0;
   }
-  .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > * { grid-column: 2; }
-  .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > .sp-label-field { grid-column: 1; grid-row: 1 / span 4; padding-top: 11px; }
+  .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > * { grid-column: 2; }
+  .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > .sp-label-field { grid-column: 1; grid-row: 1 / span 4; padding-top: 11px; }
 }
 
 /* ── Firmado electrónico y foto de identificación (piel del kit) ───────────
@@ -3116,7 +2254,7 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    también es literal, en el componente). Con tokens, en oscuro la línea y el
    rótulo salían claros sobre blanco: invisibles. */
 .sp-firma-modo { background: var(--fondo); padding: var(--it) var(--ir) var(--ib) var(--il); }
-.sp-firma-head, .sp-firma-progress, .sp-firma-cuerpo { width: 100%; max-width: 672px; margin-inline: auto; }
+.sp-firma-head, .sp-firma-cuerpo { width: 100%; max-width: 672px; margin-inline: auto; }
 .sp-firma-head { gap: 8px; padding: 0 8px; border-bottom: 0; }
 .sp-firma-salir { width: var(--k-toque); height: var(--k-toque); border-radius: var(--r-pildora); color: var(--tinta2); }
 .sp-firma-salir:active { background: var(--sup2); }
@@ -3126,10 +2264,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   height: 24px; padding: 0 10px; border: 0; border-radius: var(--r-pildora);
   background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 600;
 }
-.sp-firma-progress { padding: 4px 16px 16px; }
-.sp-firma-progress .sp-progress__label { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .3px; color: var(--tinta2); }
-.sp-firma-progress .sp-progress__seg { background: var(--sup2); }
-.sp-firma-progress .sp-progress__seg--done { background: var(--accion); }
 .sp-firma-cuerpo { padding: 0 16px 16px; gap: 16px; }
 .sp-firma-quien .sp-label { font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .4px; color: var(--enlace); }
 .sp-firma-quien .sp-hint { font-size: 13px; line-height: 18px; color: var(--tinta2); }
@@ -3145,9 +2279,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-firma-fila + .sp-firma-fila { border-top: 1px solid var(--linea); }
 .sp-firma-fila-nombre { font-size: 15px; font-weight: 600; color: var(--tinta); }
 .sp-firma-fila .sp-hint { font-size: 13px; color: var(--tinta2); }
-.sp-firma-ico-vacio { background: var(--sup2); color: var(--tinta2); }
-.sp-idfoto-card { background: var(--sup); border: 0; border-radius: var(--r-tarjeta); padding: 16px; }
-.sp-idfoto-card > .sp-icobox { background: var(--tonal); color: var(--tonal-tinta); }
 .sp-idfoto-controles > .sp-btn { min-height: 44px; }
 .sp-idfoto-cropper { border-radius: var(--r-tarjeta); }
 .sp-idfoto-pie { font-size: 13px; color: var(--tinta2); }
@@ -3156,12 +2287,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    Botones de icono en `--tinta2`, encendidos en el par tonal; sin franja gris
    ni borde en «más»; los tres menús como capa `--sup` con la sombra de capas.
    Mismas medidas (44) y el mismo reparto por contenedor. */
-.sp-ed-bar { padding: 6px 8px; background: transparent; border-bottom: 1px solid var(--linea); }
-.sp-ed-btn { border-radius: 10px; color: var(--tinta2); }
-.sp-ed-btn:hover { background: var(--sup2); }
-.sp-ed-btn[aria-pressed="true"], .sp-ed-btn[aria-expanded="true"] { background: var(--tonal); color: var(--tonal-tinta); }
-.sp-ed-block > svg:last-child { color: var(--tinta3); }
-.sp-ed-more { border: 0; }
 .sp-ed-menu { border: 0; border-radius: 14px; background: var(--sup); box-shadow: var(--sombra-capa); padding: 6px; }
 .sp-ed-row { border-radius: 10px; font-size: 15px; color: var(--tinta); }
 .sp-ed-row > svg { color: var(--enlace); }
@@ -3170,13 +2295,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-ed-row__cue { color: var(--enlace); }
 .sp-ed-menuhead { border-bottom-color: var(--linea); }
 
-/* ── Indicaciones de piso (internamiento) ─────────────────────────────────
-   El grupo ya no es caja (arriba); su cabecera: nombre 15/600 en `--tinta` y
-   la cuenta como número plano. Lo demás (chips, zona punteada) es del kit. */
-.sp-doc-grupohead > .sp-label-field { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); }
-.sp-doc-grupocount { font-size: 12px; color: var(--tinta2); }
-.sp-doc-dashzone .sp-hint { color: var(--tinta2); }
-
 /* Panel «Gestionar plantillas»: la fila es tarjeta `--sup` sin borde (§3). */
 .sp-tpl-item { border-color: transparent; background: var(--sup); border-radius: var(--r-tarjeta); }
 
@@ -3184,8 +2302,8 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    `--sup2` y borde con !important (sin capa). En una fila el campo no lleva
    caja: aquí se gana con !important EN capa, que manda sobre el !important sin
    capa. Sólo fondo y borde; el color de la tinta sigue siendo el suyo. */
-html.dark .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
-html.dark .sp-doc-cardbody :is(.sp-doc-grid, .sp-doc-studygrid) > .sp-doc-field > div > .sp-input,
+html.dark .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
+html.dark .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input,
 html.dark .sp-tpl-select { background-color: transparent !important; border-color: transparent !important; }
 
 /* La rejilla (`sistema.css`) va ya en `@layer components`, importada DESPUÉS
@@ -4312,8 +3430,6 @@ html.dark .sp-esc-titulo { background-color: transparent !important; border-colo
 .sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
   border-color: rgba(255, 255, 255, 0.75);
 }
-
-
 
 /* ============================================================================
    20. GRÁFICA DE ANALITOS — el SVG de Recharts, vestido con tokens

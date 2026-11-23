@@ -148,8 +148,8 @@ export default function AvisoPerfilSidebar({
        aviso conserva su fuerza por color, posición y por el distintivo con el
        número que `Sidebar.tsx` pinta sobre «···» y sobre el botón de menú.
        Colores: los semánticos `--aviso-*` de `sistema.css`, con su oscuro.
-       Los keyframes `aviso*` de `globals.css` quedan sin consumidor y se borran
-       en la limpieza (B15), con su grep. */
+       Los keyframes `aviso*` de `globals.css` se quedaron sin consumidor y se
+       borraron en la limpieza final (B15). */
     <div role="status" aria-live="polite" className="nav-aviso">
       <button type="button" onClick={alternar} aria-expanded={!colapsado} aria-controls={idCuerpo}
         className="nav-aviso-cabeza">
