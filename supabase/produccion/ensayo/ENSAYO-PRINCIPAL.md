@@ -73,3 +73,151 @@ Huellas: `sha256sum aplicar.sh` = `67ec5d14…` (la del plan §2) y
   §4 de la comprobación.
 - Nota de montaje: la CLI deja `supabase/.temp/` en el repo al hacer `repair`
   (está en `.gitignore`).
+
+## 5.2 — Sembrar [C]
+
+`npx tsx scripts/agenda-semilla.ts` (el de siempre, contra el contenedor
+compartido) sobre la base de 14 (`09-semilla-catorce.txt`): **365 citas** (A:
+scheduled 112, confirmed 71, cancelled 41, no_show 21, attended 103 = 348; B: 17),
+29 pacientes, 4 consultorios, 2 clínicas, 4 perfiles; la v2 apagada en las dos.
+`audit_log` pasa a 1090 filas (con F1 aplicada, `log_cita_change` audita las
+altas de la semilla; antes de las 9, sembrar dejaba 39).
+
+**Volumen.** No añadí citas: la Clínica Semilla A ya tiene 348 citas, más que
+TODA producción junta (247 en 17 clínicas), así que supera a cualquier clínica
+real; lo que la agenda lee está acotado a una clínica y a un rango de semanas.
+Lo que NO reproduje [D, no medido]: las 17 clínicas, 18 consultorios, 20 perfiles
+y ~9 700 filas de `audit_log` de producción repartidas en otras clínicas. Las
+consultas de la agenda filtran por `clinica_id` y rango con índice, así que no
+espero que cambie las cifras; `audit_log` no lo lee ninguna pantalla medida. Las
+mediciones de 5.6 y la batería resiembran al empezar (su `globalSetup`): todas
+corren sobre estos mismos datos, recalculados desde hoy.
+
+## 5.3 — Todo, una vez y de una en una
+
+### (a) Vitest ×3 [C]
+
+`npx vitest run --exclude ".claude/**"`, uno tras otro (`10-vitest/`):
+
+| Zona | Resultado |
+|---|---|
+| sin `TZ` | **2387 de 2387** |
+| `TZ=UTC` | **2387 de 2387** |
+| `TZ=America/Hermosillo` | **2387 de 2387** |
+
+**Por qué el `--exclude`:** dentro del repo hay 28 worktrees de agentes anteriores
+en `.claude/worktrees/` (4,4 GB; `.claude/` está en `.gitignore`), y
+`vitest.config.ts` no los excluye: el primer intento recogía también las pruebas
+de esas 28 ramas (con fallos propios, p. ej. `agent-affc…/correoConfirmacionRuta`)
+y se paró a los 5 min (`10-vitest-descartado-worktrees/`). Todas las pruebas de
+la rama están en `src/` (163 archivos). No toqué esos worktrees: no son míos.
+Lo mismo afecta a `npm run lint` y a la comprobación de tipos del build (abajo).
+
+### (b) Pruebas SQL [C]
+
+Cada archivo de `supabase/pruebas-sql/` con el mismo comando que
+`scripts/pruebas-sql.sh` (psql como `postgres`, `ON_ERROR_STOP`, cada uno en su
+transacción con `rollback`), pero sin parar en el primero que falle:
+**48 de 48 en verde** (`11-sql/`). El encargo decía 49: en la rama hay 48
+archivos (`git ls-files`).
+
+### (c) Carreras [C]
+
+`12-carreras/`: `scripts/reserva-carrera.sh` en verde (escenarios 1–6b; 5 citas
+esperadas, 5) y `scripts/confirmacion-carrera.sh` en verde (1–3). Son los dos
+guiones de concurrencia del repo.
+
+### (d) Build y lint [C]
+
+- **`npm run build`** (una vez, `next build --webpack`): **sale 0**; compila en
+  22 s, TypeScript 28,6 s, 98 páginas (`13-build-rama.txt`).
+- **Lint.** `npm run lint` es `eslint` a secas, y `eslint.config.mjs` no ignora
+  `.claude/`: tal cual recorrería los 28 worktrees ajenos. Lo corrí como
+  `npx eslint --ignore-pattern '.claude/**'` en la rama y `npx eslint` en el
+  worktree de `main` (`95cb5781`, `node_modules` enlazado; no hizo falta
+  instalar nada):
+
+  | | errores | avisos |
+  |---|---|---|
+  | `main` | 96 | 67 |
+  | rama | 101 | 68 |
+
+  Comparando (archivo, regla) de cada error (`14-lint-*.err`): **los 96 de
+  `main` siguen en la rama y no hay ninguno nuevo en código versionado.** Las 5
+  diferencias: 5 errores que en `main` están en `src/app/(app)/agenda/page.tsx`
+  aparecen en `src/components/agenda/AppointmentModal.tsx` (el mismo código,
+  movido por el refactor A2.3, `d145b774`), y 5 `no-require-imports` en
+  `e2e/resultados/linea-base-equipo-nuevo/*.cjs`, que están en `.gitignore` (no
+  son de la rama: los dejó una medición anterior en disco).
+
+### (e) Batería completa de Playwright, una vez [C]
+
+Servidor: `next start -p 3001` sobre el build de (d) (`.env.local` del repo, que
+ya trae `EMAIL_TRANSPORT`, `RESERVA_AVISO_BORRADOR_LOCAL`, `CRON_SECRET`…), y
+`~/.local/state/spinus-e2e/bateria/correr.sh` desligado. **Corrió el lunes
+2026-11-23 de 00:35 a 01:00 (hora de Mérida)**; ese dato explica casi todo lo
+que sigue.
+
+**Resultado: 617 pasan, 5 fallan, 13 no corrieron (por las serie tras un
+fallo), 491 se saltan** (617 + 5 + 13 = 635 = las 634 + 1 de la última batería
+de la guía). Y **la guarda de asistencia pone la corrida en rojo con 51 citas**.
+Evidencias (copiadas ANTES de correr nada más): `~/spinus-fusion/ensayo-e1/bateria-20261123/`
+(`test-results/` con trazas y capturas, `e2e.log`, `salida.txt`,
+`srv-3001-bateria.log`, `test-results/next-dev-3002.log`). No hubo informe HTML
+(el config sólo usa `list` y la guarda).
+
+| Falla | Diagnóstico | De qué es | Certeza | Suelta (`--workers=1`) |
+|---|---|---|---|---|
+| `agenda-empalme` «redimensionar hasta otra cita también avisa» | la conocida AG-DT-257 | prueba | — (conocida) | no se repitió |
+| `agenda-g4-herencia-horario` «la migración de herencia copia una vez…» | la prueba recorta F1 desde `CREATE TABLE … respaldos.consultorios_horario_20261119` hasta `-- 9 · ` y lo ejecuta; en la F1 FUNDIDA ese tramo contiene además `CREATE FUNCTION public.agenda_restablecer_configuracion` (línea 621), que ya existe en una base con F1 → `ERROR: function "agenda_restablecer_configuracion" already exists`. Fallará en cualquier base con las 14 | **prueba** (desfasada respecto de la F1 fundida; la migración está bien: se aplicó y su rejilla salió OK) | alta (error literal y posiciones en el archivo) | **falla 3 de 3**, mismo error |
+| `reserva-enlace` «flujo completo con el enlace fijo…» | espera 1 fila en el turno reservado y hay 2: una **cancelada** que la SEMILLA pone (hoy) el lunes de la semana siguiente a las 08:00 en el consultorio Centro, y la reserva nueva. La página ofrece ese turno porque una cancelada no ocupa (correcto); `citasEnTurno` cuenta todas las filas | **prueba** (depende del día en que se siembra) | alta (audit_log de la reintento: alta+cancelación del admin en la siembra, 5 s antes de la reserva; la semilla de hoy tiene `Mon 30 08:00 cancelled`) | **falla 3 de 3**, mismo error |
+| `reserva-google` «4 · un evento de Google que se empalma…» | `0|0` en vez de `1|1` tras el sondeo (`cambios: 0`). La propia prueba documenta que «falló una vez en la batería con 0 y sola pasa siempre»: otra pasada de sincronización viva importa el evento antes | prueba (carrera con la pasada de fondo) | media (no vi el registro del `next dev` de ESA prueba: `next-dev-3002.log` lo pisa el siguiente archivo de Google) | **pasa 3 de 3** |
+| `agenda-f-pulido` [teléfono] «F1.12 · el domingo, sin citas de hoy en adelante…» | fija el reloj en el domingo de la semana anterior (22-nov) y espera que no tenga citas; `confirmacion-enlace.e2e.ts:235` (que corre antes) dejó una cita a «ahora − 2 h» = **domingo 22-nov 22:53** (corría el lunes 00:53) | prueba (hora de la corrida + resto de otra prueba) | alta (la guarda nombra esa cita y esa prueba) | **pasa 3 de 3** |
+
+**La guarda** (`e2e/guardaAsistencia.ts`) terminó en **rojo: «51 cita(s)
+dispararían «¿Asistió el paciente?» al final de la semana»**: 32 del lunes 23,
+16 del martes 24, 2 del jueves 26 y 1 del domingo 22, escritas por
+`agenda-h4-por-confirmar` (5 + 4 entre pruebas), `reserva-k2-codigo` (9),
+`confirmacion-enlace` (5), `recordatorios` (4), `agenda-k5-marcas` (3),
+`agenda-i5-barra-avisos`, `agenda-j3-ligar-ventana`, `agenda-l5-campana`,
+`husos-dos-consultorios`, `reserva-h1`, `reserva-i2` (2 cada una),
+`agenda-i3-por-asignar`, `reserva-m4-salir`, `whatsapp-manual` (1 cada una)
+y otras 5 «entre pruebas». **Diagnóstico [C por la lista, D en la causa
+general]:** son pruebas que crean citas «para mañana» o «dentro de N horas»
+(por confirmar, recordatorios, códigos, confirmación). Corriendo de sábado a
+domingo, «mañana» cae en la semana siguiente y la guarda no las cuenta (así se
+obtuvo el verde de la guía, «en fin de semana»); corriendo un **lunes**, caen
+en la semana actual y la guarda, que mira el peor momento (fin del domingo),
+las señala. Es la guarda haciendo su trabajo: **AG-DT-256 no está cerrada para
+una corrida de lunes a viernes.** Ninguna de esas citas tumbó una prueba en
+esta corrida (hoy no tienen 48 h), salvo la cadena de F1.12 de arriba. En las 12
+corridas sueltas la guarda dijo «ninguna prueba dejó citas…».
+
+Reintentos guardados en `bateria-20261123/reintentos/<archivo>-<n>/` (salida y
+`test-results`).
+
+### (f) `E2E_SIN_SEMILLA` [C]
+
+- **Esta rama no la conoce**: `git grep E2E_SIN_SEMILLA` vacío. Existe en
+  `2e2c4373` (sólo en `origin/feature/rediseno-estetico`): con `=1` el
+  `globalSetup` sólo comprueba el build y abre sesiones, sin apagar la v2 ni
+  resembrar.
+- **Comprobado el comportamiento de la guarda en ese modo:** config aparte
+  (`~/spinus-fusion/ensayo-e1/perf/sin-semilla.config.ts`: el de siempre sin
+  `globalSetup`, con el mismo reporter), y ANTES de empezar, como `postgres`,
+  una cita con paciente agendada hace 5 días y sin nota (Clínica Semilla A). Un
+  archivo corto: `agenda-m3-barra.e2e.ts` (enciende la v2). Resultado
+  (`15-sin-semilla.txt`, `15-test-results/`): la primera prueba **falla** por
+  timeout porque la ventana «¿Asistió el paciente?» tapa la rejilla (captura:
+  «Paciente Prueba 03 · Mié 18 nov · 10:30»), y **la guarda dice «ninguna
+  prueba dejó citas que dependan del día de la corrida»**. Sin la cita (corrida
+  anterior, misma config) pasan las 10.
+- **Respuesta: NO** — en ese modo la guarda funciona en el sentido estricto
+  (sólo acusa lo que escriben las pruebas), pero **es ciega a lo que ya trae la
+  base**: toma su línea base en `onBegin`, después del `globalSetup`, así que
+  cualquier cita vieja ya presente (de otra sesión, o de una semilla de otro
+  día que quedó sin resembrar) entra como «conocida» y no se señala, aunque tape
+  la rejilla y tumbe pruebas. Para que sirva sin resembrar haría falta, p. ej.,
+  que la guarda avise en `onBegin` si la línea base ya trae citas que la ventana
+  pregunta HOY (no las del peor domingo). No lo toqué (no es de este encargo).
+  La cita de la prueba se borró al terminar y la v2 quedó apagada en A y B.
