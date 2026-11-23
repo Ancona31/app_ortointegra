@@ -57,8 +57,8 @@ Lo que tiene que salir (salió así en el ensayo [C]):
   empieza además por la línea «sesión: idle_in_transaction_session_timeout=10s,
   lock_timeout=5s, statement_timeout=2min»; las rejillas salieron idénticas
   [C-CA];
-- el comparador: `Resumen: 2629 objetos en antes, 3503 en despues; 958
-  diferencias` (`exit 1`, normal: no se le dan esperadas). Sus claves son las de
+- el comparador: `Resumen: 2629 objetos en antes, 3510 en despues; 965
+  diferencias` (con el SQL definitivo de la ronda 1; antes eran 3503 y 958: +3 columnas del respaldo de F1 y +4 comentarios de columna, A4 y A9) (`exit 1`, normal: no se le dan esperadas). Sus claves son las de
   `diferencias-antes-despues.clon-foto.tsv` de esta carpeta (comprobado: tres
   corridas sobre clones nuevos, mismas claves). La referencia del día es
   `referencia.claves`.
@@ -92,7 +92,7 @@ cut -f1-5 ~/spinus-produccion-foto-despues/difs-antes-despues.tsv | sort \
   | diff ~/spinus-produccion-ensayo/referencia.claves - && echo "IGUAL QUE EL ENSAYO"
 ```
 
-- El comparador sale con `exit 1` y **958 diferencias** (o las del ensayo del §0
+- El comparador sale con `exit 1` y **965 diferencias** (o las del ensayo del §0
   si se repitió con otra foto).
 - **El `diff` tiene que salir vacío y escribir `IGUAL QUE EL ENSAYO`.** Una línea
   `<` es algo que el ensayo cambió y producción no; una `>`, algo que cambió en
@@ -114,7 +114,7 @@ echo "salida: $?"
   foto ↔ clon de `esperadas-clon.tsv` (configuración de roles y de la base que
   `pg_dump` no vuelca, y tres CHECK con otro deparseo). No se añade ninguna
   esperada el día: una diferencia nueva es un hallazgo. (En el ensayo, foto
-  ↔ clon después dio 972 = 958 + 14, el mismo cálculo.)
+  ↔ clon después dio 979 = 965 + 14, el mismo cálculo; [C-CA, fase 2].)
 
 ## 4. El historial
 

@@ -38,7 +38,7 @@ Archivos de esta carpeta:
 | `huellas.sha256` | sha256 de las 9 migraciones y sus 9 reversas, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
 | `reversa-previa.sql` | Sólo lee. `aplicar.sh reversa` la corre antes de la primera reversa: reúne las negativas de toda la cadena (§10.1). |
 | `rejillas-del-ensayo.txt` | La rejilla final de cada archivo, literal, del ensayo de punta a punta sobre el clon de la foto (§11). |
-| `diferencias-antes-despues.clon-foto.tsv` | Las 958 diferencias de estructura antes → después de ese ensayo (claves: estado, tipo, esquema, clave, campo). |
+| `diferencias-antes-despues.clon-foto.tsv` | Las 965 diferencias de estructura antes → después de ese ensayo (claves: estado, tipo, esquema, clave, campo). |
 | `COMPROBACION-POSTERIOR.md` | Cómo comprobar que producción quedó idéntica al ensayo (paso 7). |
 
 Los conteos de sólo lectura de antes están en `../conteos/` (`LEEME.md`).
@@ -139,7 +139,8 @@ psql -X -v ON_ERROR_STOP=1 -P pager=off \
   Ningún archivo usa meta-comandos `\…` (comprobado con `grep`): con `-c` no se
   podrían mezclar con SQL.
 - **Tamaño:** un argumento de la línea de órdenes no puede pasar de 128 KiB en
-  Linux (`MAX_ARG_STRLEN` = 131 072 bytes). El mayor, F3, tiene 102 233 bytes.
+  Linux (`MAX_ARG_STRLEN` = 131 072 bytes). El mayor, F3, tiene 103 708 bytes
+  (con las correcciones de la ronda 1).
   `aplicar.sh` se niega, sin correr nada, a mandar un archivo de 130 000 bytes o
   más.
 - **Una diferencia nueva:** como el servidor ya tiene el archivo entero, **si el
@@ -363,6 +364,24 @@ de consultorios la da F1.11: 18).
 > Y `aplicar.sh estado` enseña la **ida y vuelta medida** (mediana de 5
 > `select 1`): se anota; es el RTT real de la terminal de Angel al pooler (A1,
 > criterio c).
+>
+> **Prueba de humo de petición grande (orden de Angel), también en `aplicar.sh
+> estado`, de SÓLO LECTURA:** manda, por el MISMO camino que una migración (los
+> tres `-c`), UNA petición del tamaño del archivo mayor del conjunto (calculado
+> del archivo cada vez; hoy F3, ~104 KB): `BEGIN TRANSACTION READ ONLY;`, relleno
+> de comentarios, una línea que dice el tamaño recibido por el servidor, que la
+> transacción es de sólo lectura y que no tiene identificador de escritura, un
+> `SELECT 1` y `COMMIT`. En pantalla: «prueba de humo de SÓLO LECTURA: no
+> escribe nada …», la línea `humo: petición de N bytes en UNA petición;
+> transacción de sólo lectura: on; identificador de escritura asignado:
+> ninguno` y «aceptada; X s de punta a punta … No se escribió nada.» Se anota el
+> tiempo. **Si sale «NO aceptada», no se aplica** hasta saber por qué (el pooler
+> no acepta peticiones de ese tamaño: habría que volver a decidir el envío).
+> [C-CA, clon de la foto: aceptada, 104 104 bytes, 0,32 s directo y 1,10 s con
+> 150 ms de ida y vuelta; la misma construcción con un `INSERT` dentro da
+> `ERROR: 25006: cannot execute INSERT in a read-only transaction` y no entra;
+> los contadores de escritura de `pg_stat_database` (insertadas / actualizadas /
+> borradas) no cambiaron con las dos pruebas.]
 
 Qué mirar, además:
 
@@ -612,7 +631,10 @@ script y las salidas, fuera del repo (scratchpad de la sesión de PL).
 > **Desde el guion nuevo (§5.0) la última columna es HISTÓRICA:** era el modo
 > viejo, una petición por sentencia. Con un archivo en una petición, cada
 > ventana dura lo que dice la columna de servidor. Se conserva porque es la
-> medida de servidor con 247 citas y porque explica por qué se cambió.
+> medida de servidor con 247 citas y porque explica por qué se cambió. Los
+> recuentos de sentencias son de antes de las correcciones de la ronda 1 (F2
+> trae ahora 3 sentencias más antes de su ventana sobre `appointments`, y F4
+> una más); con el guion nuevo no cuentan.
 
 | # | Ventana | Sentencias (= viajes por el pooler con el guion VIEJO) | Tiempo de servidor medido, 247 citas | ESTIMADO por el pooler con el guion VIEJO (+ N × RTT, ASUMIENDO RTT 50–150 ms) |
 |---|---|---|---|---|
@@ -846,6 +868,46 @@ servidor puede estar terminándolo aunque el cliente haya muerto, §5.2).
 | `no pude LEER el historial …` | falló la consulta a `supabase_migrations.schema_migrations` | no seguir: sin historial no se sabe qué hay aplicado. Mirar el error (red, contraseña, permisos) y repetir [C-CA: con el historial ilegible, `estado`, `aplicar` y `reversa` se detienen sin tocar nada] |
 | `… tiene N bytes: no cabe en una sola petición …` | un archivo pasa de 130 000 bytes | no se aplicó nada; consultar (no partirlo a mano) |
 
+### 8.1 Si aborta por la espera del candado: repetir, y a qué hora
+
+Es el aborto más probable y el más inocente: otra transacción tenía la tabla y
+el archivo no consiguió su candado en 5 s (`lock_timeout`, aprobado por Angel
+junto con los 10 s de transacción ociosa, los 120 s por sentencia y el tope de
+130 000 bytes). **Lo que se verá**, una de estas dos:
+
+- F1 y F5a (piden el candado sin hacer cola):
+  `ERROR:  CANDADOS: clinicas, profiles o consultorios siguieron ocupadas 5 s (una transacción larga las escribe). No se cambió nada: reintenta en unos minutos.`
+  (o la variante con `appointments, consultorios o clinicas … las lee o escribe`,
+  o con `clinicas o profiles`);
+- las demás (hacen cola 5 s): `ERROR:  canceling statement due to lock timeout`;
+
+y debajo, en las dos, la línea del guion:
+`ALTO: <archivo> FALLÓ (ver arriba). El catálogo dice que NO quedó aplicada (no existe <testigo>) y NO se registró. Plan §8 (tabla de abortos).`
+
+**Qué significa:** de ESE archivo no quedó nada (es una transacción y se
+deshizo; lo confirma el propio guion preguntando al catálogo); los anteriores
+siguen aplicados y registrados; la v2 sigue apagada. Nadie notó nada más que una
+espera de hasta 5 s. [C-CA: F3 con un candado ajeno, en el ensayo.]
+
+**Qué hacer:**
+
+1. Mirar la fila de sesiones y candados abiertos: volver a correr los conteos y
+   leer **G.14 / G.15 / G.16** (§4, paso 3). Si dicen quién retiene la tabla y
+   es algo propio (una pestaña del SQL Editor), cerrarlo.
+2. Esperar **2 minutos** y repetir `bash supabase/produccion/plan/aplicar.sh
+   aplicar`: salta lo registrado y vuelve a intentar ese archivo.
+3. Repetir así **hasta 3 veces** en total (con 2 minutos de pausa entre cada una).
+   No subir el `lock_timeout` ni terminar sesiones ajenas.
+4. **Si persiste, se deja para otra hora sin consulta** —fuera del horario de
+   consulta de las clínicas; la hora la pone Angel—. Quedarse a medias entre dos
+   archivos es un estado válido (abajo, «Quedarse a medias»): se retoma ese otro
+   día desde el paso 3 (conteos) con `aplicar.sh aplicar`, que sigue donde se
+   quedó.
+
+(Los 2 minutos y las 3 veces son una propuesta de este agente: lo bastante para
+que acabe una transacción normal de la app, que dura milisegundos, y poco para
+no alargar la sesión; Angel puede cambiarlos.)
+
 Causas de fallo, por el mensaje del servidor:
 
 | Mensaje (empieza por…) | Archivo | Causa | Acción |
@@ -889,21 +951,16 @@ un archivo a mano después de aplicar las 9 [C, clon A, `psql -f` como
 | Archivo | Segunda pasada |
 |---|---|
 | 1 | entra, sin cambios, rejilla OK |
-| 2 | entra, sin cambios, pero **fila 3 REVISAR** (cuenta 22 disparadores con `prohibir_truncate()`: sus 11 y los 11 de T) |
+| 2 | entra, sin cambios, rejilla OK (desde A6 su fila 3 cuenta sólo sus 11 disparadores) [C-CA, fase 2] |
 | F1 | aborta limpio en el pre-vuelo («ya está aplicado o a medias») |
-| F5a | entra, sin cambios, pero **fila 6 REVISAR** (lista también `trg_agenda_bloqueos_sin_truncate`, de T) |
+| F5a | entra, sin cambios, rejilla OK (desde A6 su fila 6 lista sólo sus dos disparadores) [C-CA, fase 2] |
 | F3 | aborta limpio en el pre-vuelo |
 | F2 | entra, sin cambios, rejilla OK |
 | F4 | aborta limpio en el pre-vuelo |
 | F5b | entra, sin cambios, rejilla OK |
 | T | entra, sin cambios, rejilla OK |
 
-**Regla:** las de antes de T **no se repiten después de T**. Esos dos REVISAR
-son falsos (las rejillas de 2 y F5a no conocían T), no abortan y no cambian
-nada. Si hubiera que repetir 2 o F5a, se lee su rejilla sabiendo esto. Para que
-no salieran, habría que tocar el SQL de las rejillas de esas dos migraciones
-(contar sólo sus disparadores por nombre): fuera del encargo de este agente; se
-deja para el coordinador.
+**Desde la corrección A6** (ronda 1 de la auditoría) las rejillas de 2 y F5a cuentan sólo lo que crea cada archivo: repetirlas después de T ya **no** da REVISAR [C-CA, fase 2: las dos con `rc=0` y 0 REVISAR]. (Antes daban dos REVISAR falsos: la regla era no repetirlas tras T.)
 
 ---
 
@@ -969,7 +1026,7 @@ con `PERDER DATOS`, las siete en verde.] Si una reversa se negara igualmente
 (datos escritos entre la comprobación y su turno), `aplicar.sh` para ahí y pide
 empezar de nuevo. **Cada condición de `reversa-previa.sql` es copia de la guarda
 de su reversa:** quien cambie una guarda (p. ej. la de F1, hallazgo A4) cambia
-también la copia en el mismo commit.
+también la copia en el mismo commit. [C-CA, fase 2: con un dato para cada guarda, la comprobación previa y cada reversa real dieron el mismo veredicto, §11.]
 
 **Todas se niegan si hay datos** que se perderían (salvo T, que no guarda nada),
 sin tocar nada, diciendo cuáles; **sin datos, se aplican sin preguntar más**
@@ -1024,7 +1081,7 @@ stdin). Incluye `migration repair` de verdad (CLI 2.117.0) contra el clon.
 2. **`aplicar.sh aplicar`:** las 9 aplicadas y registradas; **ninguna REVISAR**;
    rejillas 63 OK + 10 INFO (`rejillas-del-ensayo.txt`).
 3. **`aplicar.sh estado`:** las 14 versiones, las 9 «ya registrada».
-4. **Antes → después:** 958 diferencias (`diferencias-antes-despues.clon-foto.tsv`).
+4. **Antes → después:** 958 diferencias entonces; **965 con el SQL definitivo** (fase 2 de CA, abajo: +3 columnas del respaldo y +4 comentarios de columna) (`diferencias-antes-despues.clon-foto.tsv`).
    Frente a las 952 del borrador sobre `base-main`: −5 (`anon`/`authenticated`
    no tenían en producción privilegios en `clinica_conexiones_google`,
    `firmas_documento`, `folios_contador` y `plantillas_documento`, así que ahí no
@@ -1035,7 +1092,8 @@ stdin). Incluye `migration repair` de verdad (CLI 2.117.0) contra el clon.
 6. **Contra la foto, tras las reversas:** sólo las 14 esperadas foto ↔ clon y
    **10 de `respaldos.consultorios_horario_20261119`** (relación, 5 columnas,
    llave primaria e índice, comentario, permiso de `postgres`): lo esperado.
-   Contra el clon de antes: esas 10 y nada más.
+   Contra el clon de antes: esas 10 y nada más. **Con el SQL definitivo (A4) son
+   13 y 8 columnas** (`horario_antes`, `horario_copiado`, `copiado_en`) [C-CA, fase 2].
 7. **Segunda ida:** las 9 otra vez en verde, sin REVISAR; estructura idéntica a
    la de la primera ida (0 diferencias). Las rejillas, iguales; la única
    diferencia de la salida es un NOTICE de F1 (`relation
@@ -1068,8 +1126,54 @@ y la repetición (salta las cuatro, aplica las cinco); estructura idéntica a la
 primera ida (0 diferencias). Ninguna contraseña en los registros. Salidas en
 `~/spinus-fusion/ensayo-ca/salidas-20261122-222443/`; las pruebas de A2, A5 y A8
 en `pruebas-20261122-223440/`, las medidas de §5.0 y §5.2 en
-`medidas-20261122-222827/`. **En la fase 2 de CA se repite entero con el SQL
-definitivo** (las correcciones A3, A4 y A6 de las migraciones y reversas).
+`medidas-20261122-222827/`. **La fase 2 de CA lo repitió entero con el SQL definitivo** (abajo).
+
+**Repetido ENTERO con el SQL DEFINITIVO [C-CA, fase 2, 2026-11-22]** (las
+correcciones de la ronda 1 de CB y el COMMENT de A3), sobre `clon-spinus-ca-2`,
+clon nuevo de la foto; salidas en `~/spinus-fusion/ensayo-ca/fase2-20261122-225336/`:
+
+1. Conteos: 0 ALTO, 0 AVISO (F1.9 `no existe`, con la forma nueva de 8 columnas).
+2. `aplicar.sh aplicar`: la prueba de humo (104 104 bytes, aceptada, 0,30 s) y
+   las 9 en verde, cada una con su rejilla visible; 3 peticiones por archivo en
+   el registro del servidor; 63 OK + 10 INFO, 0 REVISAR (`rejillas-del-ensayo.txt`,
+   regenerado: cambian los textos de la fila 3 de la nº 2 y de la fila 6 de F5a).
+3. `estado`: las 9 «ya registrada».
+4. `catalogo-despues.sql`: los mismos valores de `COMPROBACION-POSTERIOR.md` §5
+   (no cambió). Antes → después: **965** diferencias (958 + 3 columnas del
+   respaldo + 4 comentarios de columna; `diferencias-antes-despues.clon-foto.tsv`,
+   regenerada con este ensayo); foto → después, 979.
+5. Repetir la nº 2 y F5a después de T: `rc=0`, **0 REVISAR** (A6).
+6. `reversa` (comprobación previa: «ninguna se va a negar») y `reversa-truncate`:
+   en verde; contra la foto, las 14 esperadas y **13** del respaldo; historial en 5.
+7. Segunda ida: las 9 en verde, estructura idéntica a la primera (0 diferencias).
+8. **El ciclo de A4**, con dos consultorios sembrados ANTES de F1 (horarios
+   «previo-1» y «previo-2», la clínica con otro): aplicar → los dos con el de la
+   clínica; revertir sin preguntar nada → vuelven «previo-1» y «previo-2»;
+   reaplicar; editar el HORARIO de uno y el NOMBRE del otro; revertir → la
+   comprobación previa lista **sólo** «consultorios con horario editado …: 1» y,
+   sin confirmar, no toca nada; confirmada, el renombrado **recupera «previo-2»**
+   y el editado se queda con su edición; reaplicar en verde.
+9. **Cada guarda, comprobación previa frente a la reversa real:** con un dato
+   sembrado para cada una (cancelada cerrada, aviso, movimiento rechazado de
+   Google, contacto bloqueado, bloqueo, fila de ajustes y huso de fábrica),
+   `reversa-previa.sql` las listó todas, y cada reversa corrida a mano, sin
+   confirmar, **se negó por exactamente lo mismo** (T, que no tiene guarda, no);
+   confirmando, todas en verde.
+10. Las 48 pruebas de `supabase/pruebas-sql/` contra el clon migrado, con
+    `semilla-minima.sql`: **48 PASAN** (incluida `cb_aislamiento_clinicas`).
+11. A3 en el clon: con la sesión del médico administrador de la clínica A, un
+    contacto para un médico de OTRA clínica, para una secretaria o para un uuid
+    que no existe da el mismo `El médico del contacto no pertenece a la
+    clínica`; para el médico propio entra. Los enlaces (como `service_role`):
+    el mismo veredicto en los cuatro casos. md5 de `proteger_reserva_contactos`
+    `7049ecc7…` y de `proteger_reserva_enlaces` `acd4128b…`, sin cambios.
+12. **A través del proxy con 150 ms:** reversa, reversa-truncate y las 9 en
+    verde, sin REVISAR; 1,21–1,60 s por archivo; prueba de humo aceptada en
+    1,09 s.
+
+Las ventanas de candado de §5.0 y los cortes de §5.2 se midieron con el SQL de
+la fase 1; con una petición por archivo, las sentencias que añadió la ronda 1 no
+las cambian (es tiempo de servidor) — DEDUCIDO, no se volvieron a medir.
 
 **Lo que no se ensayó:**
 
@@ -1092,52 +1196,32 @@ definitivo** (las correcciones A3, A4 y A6 de las migraciones y reversas).
 
 ## 12. Pendiente antes del día
 
-1. **`huellas.sha256`:** está regenerado con los archivos de HOY (las 9 y sus 9
-   reversas). Si la auditoría cambia alguno, se regenera en el mismo commit que
-   la aprobación:
+Sólo lo que de verdad queda (al 2026-11-22, tras la fase 2 de CA). Lo resuelto
+se quitó: las rejillas de 2 y F5a (A6, corregidas), la elección `aplicar.sh` /
+`db push` (decidido: `aplicar.sh`), las ventanas de F3 y F2 (A1, resuelto con
+una petición por archivo, §5.0) y la duración de las rutas en Vercel (Fluid
+Compute confirmado por Angel; se mira el panel en el paso 4).
+
+1. **`huellas.sha256`:** regenerado con el SQL definitivo (fase 2 de CA: 17 de
+   los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Si se toca
+   cualquier migración o reversa, se regenera en el mismo commit:
    `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* > supabase/produccion/plan/huellas.sha256`.
-2. Las dos REVISAR falsas de la segunda pasada (§9): **se corrigen** en las
-   rejillas de 2 y F5a (hallazgo A6, otro agente, en curso). Al fusionarlo, §9 y
-   esta línea se ponen al día y se repite el ensayo (fase 2 de CA).
-3. ~~La decisión de §2 (`aplicar.sh` o `db push`).~~ **Decidido por Angel:
-   `aplicar.sh`**, que manda cada archivo en una sola petición (§2).
-4. **Duración máxima de las rutas de la agenda en Vercel: CONFIRMADA**
-   (2026-11-22, oleada 3). Angel miró el panel: **Fluid Compute está
-   activado**. Con Fluid Compute, en Pro, una función sin `maxDuration` tiene
-   **300 s por omisión** (800 s de máximo configurable): documentación de
-   Vercel, https://vercel.com/docs/functions/configuring-functions/duration,
-   «Duration limits» (leída por el coordinador el 2026-11-22). Lo entregado a
-   `waitUntil` —y `after()` va por ahí: Next 16.2.1,
-   `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md`,
-   «Duration» y «Reference: supporting `after` for serverless platforms»—
-   comparte ese límite y se cancela al alcanzarlo (Vercel,
-   `functions/functions-api-reference/vercel-functions-package`, `waitUntil`).
-   Esa documentación NO da la cifra con Fluid Compute desactivado.
-   Por eso **ninguna** de las rutas de la agenda con `after()` declara
-   `maxDuration` (decisión de Angel: 30 s acortaría el margen):
-   `reservar/[codigo]`, `reservar/[codigo]/turnos`, `confirmar/[codigo]`,
-   `appointments`, `appointments/[id]`, `appointments/[id]/reagendar`,
-   `agenda/bloqueos`, `agenda/bloqueos/[id]` (todas bajo `src/app/api/`). Las
-   que sí lo declaran: `google/sync` (30 s) y `cron/google-sync` (60 s), sin
-   tocar; y `cron/recordatorios`, **subida de 60 a 120 s** en la oleada 3
-   (agente PL): queda por debajo de los 10 min tras los que `cita_correo_tomar`
-   deja volver a tomar un envío y de la frecuencia de 15 min de `vercel.json`
-   (relación de cada límite con su candado: `DEUDA_TECNICA.md` AG-DT-268). La
-   comprobación del panel va en el paso 4.
-5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
+2. **§15, el tramo de «más del 20 % y hasta el 50 % más lenta»:** SIN DEFINIR
+   POR ANGEL (el coordinador se lo pregunta).
+3. **§15, el fragmento de la consola:** pendiente de probar en un navegador
+   real; lo prueba el agente del ensayo principal.
+4. **La hora sin consulta** (§4, paso 0; §8.1 si hay que dejarlo para otra):
+   la pone Angel. Y la pausa y el número de repeticiones de §8.1 (2 min, 3 veces)
+   son una propuesta de CA que Angel puede cambiar.
+5. **El pooler real** no se puede ensayar sin producción: el día lo dicen la
+   prueba de humo de petición grande y la ida y vuelta de `aplicar.sh estado`
+   (§4, paso 3). Si la prueba de humo sale «NO aceptada», no se aplica.
+6. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
-6. ~~Las ventanas largas de F3 y F2.~~ **Resuelto (A1, agente CA):** decisión
-   de Angel, «cada archivo en una sola petición» **y** hora sin consulta.
-   Medido: 50 ms y 30 ms con 150 ms de ida y vuelta, frente a 13,5 s y 8,9 s
-   con el guion viejo (§5.0); transacción ociosa acotada a 10 s y el corte del
-   cliente ya no retiene candados (§5.2); el RTT real lo da `aplicar.sh estado`
-   el día (paso 3). Queda sin poder ensayar: el pooler real (§11).
-7. **Fase 2 de CA:** fusionar las correcciones de SQL (A3, A4, A6, cabeceras),
-   regenerar `huellas.sha256`, repetir el ensayo entero con el SQL definitivo y
-   regenerar `rejillas-del-ensayo.txt`, `catalogo-despues.sql` y la tabla de
-   diferencias; y poner al día en `reversa-previa.sql` la guarda de la reversa
-   de F1 que cambie A4.
+7. Dónde correr de forma automática la comprobación periódica de los privilegios
+   por omisión (`COMPROBACION-POSTERIOR.md` §10; `DEUDA_TECNICA.md` AG-DT-270):
+   lo decide Angel. A mano, la consulta ya está.
 
 ---
 
@@ -1227,8 +1311,9 @@ ordenarlas):
    });
    ```
 
-   (Sintaxis comprobada con `node --check`; NO ejecutado en un navegador por el
-   agente que lo escribió: si da error, basta con los números del punto 3.)
+   **Pendiente de probar en un navegador real; lo prueba el agente del ensayo
+   principal.** (Sólo se comprobó su sintaxis con `node --check`; si da error,
+   basta con los números del punto 3.)
    El «primer byte» incluye el servidor: la página trae las citas de la semana
    ya en el HTML. «Fin de la última de /api y /rest» es lo más cerca de «la
    agenda terminó de cargar sus datos».
@@ -1253,9 +1338,20 @@ pocas solicitudes más (el trozo de la campana y del engrane, que sólo se
 descarga con la v2, y `GET /api/agenda/por-confirmar` con los avisos); nada de
 peticiones nuevas para pintar la rejilla.
 
-**Cuándo apagar (PROPUESTA; la cifra la decide Angel):** se apaga y se investiga
-si, en la mediana, **LCP o «Fin de la última /api» empeoran más de un 50 % y
-además más de 1 s**, si **cualquier recarga pasa de 8 s** (el `statement_timeout`
-de `authenticated`), o si aparece **alguna fila en rojo** que antes no salía.
-Para apagar: `agenda_ajustes.agenda_v2_encendida = false` en esa clínica, desde
-el SQL Editor (§4, paso 8); la agenda vuelve a la de antes (falla cerrado).
+**Qué se hace con el resultado (decisión de Angel, literal; se compara la
+mediana «después» con la mediana «antes» de encender):** «igual o más rápida:
+se sigue; hasta un 20 % más lenta: no se apaga, pero no se enciende en ninguna
+otra clínica hasta saber la causa; más de un 50 % más lenta, o con errores: se
+apaga en mi clínica y se investiga.»
+
+| Resultado (mediana después frente a mediana antes) | Qué se hace |
+|---|---|
+| igual o más rápida | se sigue |
+| hasta un 20 % más lenta | no se apaga; **no se enciende en ninguna otra clínica** hasta saber la causa |
+| **más del 20 % y hasta el 50 % más lenta** | **SIN DEFINIR POR ANGEL (el coordinador se lo pregunta)** |
+| más de un 50 % más lenta, **o con errores** | se apaga en la clínica de Angel y se investiga |
+
+«Errores» = filas en rojo (4xx/5xx) en la pestaña Red que antes no salían, o
+avisos de error en la página. Para apagar: `agenda_ajustes.agenda_v2_encendida =
+false` en esa clínica, desde el SQL Editor (§4, paso 8); la agenda vuelve a la
+de antes (falla cerrado).
