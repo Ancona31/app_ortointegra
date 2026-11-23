@@ -207,9 +207,42 @@ ida_y_vuelta() {  # 5 × select 1 en una sesión; imprime la mediana en ms (lo q
     | awk '/^Time: /{print $2}' | sort -n | awk '{a[NR]=$1} END{if (NR) printf "%.1f ms (mediana de %d)\n", a[int((NR+1)/2)], NR; else print "no medida"}'
 }
 
+# Prueba de humo de SÓLO LECTURA: una petición del tamaño del archivo mayor,
+# por el MISMO camino que una migración (los tres -c), para saber antes del día
+# que el pooler acepta ese tamaño y cuánto tarda. BEGIN TRANSACTION READ ONLY:
+# el servidor rechaza cualquier escritura en ella (25006), y la propia consulta
+# enseña que la transacción no tiene identificador de escritura asignado.
+humo_peticion_grande() {
+  local mayor=0 f b sql relleno t0 t1 salida
+  for f in "${MIGRACIONES[@]}"; do b=$(wc -c < "$REPO/supabase/migrations/$f.sql"); (( b > mayor )) && mayor=$b; done
+  for f in "${REVERSAS[@]}" "${REVERSAS_TRUNCATE[@]}"; do b=$(wc -c < "$REPO/supabase/reversas/${f}_reversa.sql"); (( b > mayor )) && mayor=$b; done
+  local linea='-- relleno de la prueba de humo de aplicar.sh: solo un comentario (ASCII), no hace nada' n
+  n=$(( mayor / (${#linea} + 1) + 1 ))   # sin tubería: con pipefail, un «head» cortaría con SIGPIPE
+  relleno="$(printf -- "$linea%.0s\n" $(seq 1 "$n"))"
+  sql="BEGIN TRANSACTION READ ONLY;
+$relleno
+SELECT 'humo: petición de ' || octet_length(current_query()) || ' bytes en UNA petición; transacción de sólo lectura: '
+       || current_setting('transaction_read_only') || '; identificador de escritura asignado: '
+       || coalesce(pg_current_xact_id_if_assigned()::text, 'ninguno') AS humo;
+SELECT 1 AS uno;
+COMMIT;"
+  salida="$DESTINO/humo-peticion-grande.salida.txt"
+  echo "── prueba de humo de SÓLO LECTURA: no escribe nada (BEGIN TRANSACTION READ ONLY). Una petición de ~$mayor bytes, el tamaño del archivo mayor."
+  t0=$(date +%s.%N)
+  if pg psql -X -q -v ON_ERROR_STOP=1 -P pager=off -At -c "$SESION_SQL" -c "$sql" > "$salida" 2>&1; then
+    t1=$(date +%s.%N)
+    grep '^humo:' "$salida"
+    echo "   aceptada; $(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f s", b-a}') de punta a punta (arranque del contenedor incluido). No se escribió nada."
+  else
+    cat "$salida"
+    echo "   ⚠️ NO aceptada (arriba el error). No se escribió nada. No apliques hasta saber por qué: plan §2."
+  fi
+}
+
 estado() {
   echo "── servidor y sesión"; q "select version()" || die "no puedo conectar."; q "select current_user, current_setting('search_path')"
   echo "── ida y vuelta al servidor (select 1): $(ida_y_vuelta)"
+  humo_peticion_grande
   echo "── tamaños (sólo cuentas; ningún dato): citas, consultorios, clínicas, audit_log"
   q "select (select count(*) from public.appointments), (select count(*) from public.consultorios),
             (select count(*) from public.clinicas), (select count(*) from public.audit_log)"
