@@ -237,7 +237,8 @@ encendido.
 - [ ] Los conteos en OK (paso 3), corridos por Angel **ese mismo día**, justo
       antes de aplicar: el conteo previo del 2026-11-22 no vale por sí solo.
 - [ ] **Orden explícita de Angel**, ese día.
-- [ ] **Se aplica a una hora sin consulta** (decisión de Angel): ninguna
+- [ ] **Se aplica a una hora sin consulta** (decisión de Angel; la elige él el
+      día y la apunta en el campo «Hora elegida» del paso 3): ninguna
       clínica atendiendo ni agendando. Aunque con el guion nuevo la ventana con
       `appointments` cerrada es de decenas de milisegundos (§5), código y base
       se tocan en la misma sesión y, si algo sale mal, hay que poder parar sin
@@ -349,6 +350,9 @@ de consultorios la da F1.11: 18).
 **Este conteo hay que REPETIRLO justo antes de aplicar** (el mismo
 `correr-conteos.sh`, el mismo día, después del paso 5 y antes del 6).
 
+> **Hora elegida (la escribe Angel el día de aplicar; fuera del horario de
+> consulta de las clínicas):** `____:____`, del día `____ / ____ / ______`.
+>
 > **Justo antes de empezar el paso 6 (orden de Angel): las filas de sesiones y
 > candados abiertos.** En la rejilla de ese conteo repetido, mirar **G.14**
 > (otras sesiones con una transacción abierta hace más de 60 s), **G.15**
@@ -904,9 +908,7 @@ espera de hasta 5 s. [C-CA: F3 con un candado ajeno, en el ensayo.]
    día desde el paso 3 (conteos) con `aplicar.sh aplicar`, que sigue donde se
    quedó.
 
-(Los 2 minutos y las 3 veces son una propuesta de este agente: lo bastante para
-que acabe una transacción normal de la app, que dura milisegundos, y poco para
-no alargar la sesión; Angel puede cambiarlos.)
+(Los 2 minutos y las 3 repeticiones, aprobados por Angel.)
 
 Causas de fallo, por el mensaje del servidor:
 
@@ -1014,8 +1016,16 @@ el historial:
   (sin él la reversa de F1 no podría devolver el horario).
 - **DATOS** — lo que cada reversa se negaría a perder (las mismas cuentas que su
   pre-vuelo). Se enseña **la lista entera, una vez**, y se pide escribir
-  `PERDER DATOS`; con eso las siete corren con `SET spinus.reversa_con_datos =
-  'si'` en su sesión. Cualquier otra respuesta para sin tocar nada.
+  `PERDER DATOS`; con eso cada una de las siete corre con la confirmación
+  **dentro de su propia transacción** (A15, ronda 2): la petición es
+  `BEGIN; SET LOCAL spinus.reversa_con_datos = 'si';` + el archivo, cuyo propio
+  `BEGIN` avisa «there is already a transaction in progress» y sigue dentro (lo
+  que documenta su cabecera). La confirmación muere con esa transacción —en su
+  `COMMIT` si sale bien, en el `ROLLBACK` si falla—, así que no sobrevive en la
+  conexión aunque el pooler la reutilice. `aplicar.sh` exige que el archivo
+  empiece por `BEGIN;` (lo cumplen las 9 reversas). Cualquier otra respuesta para
+  sin tocar nada. (Los tres plazos de sesión de §2 sí se quedan en la conexión,
+  a propósito: sólo la hacen más estricta.)
 
 Así ya no puede pasar lo que vio el auditor: quitar T y F5b y descubrir en F4
 que no se puede seguir, con la v2 sin sus candados. [C-CA: con la v2 encendida
@@ -1206,20 +1216,17 @@ Compute confirmado por Angel; se mira el panel en el paso 4).
    los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Si se toca
    cualquier migración o reversa, se regenera en el mismo commit:
    `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* > supabase/produccion/plan/huellas.sha256`.
-2. **§15, el tramo de «más del 20 % y hasta el 50 % más lenta»:** SIN DEFINIR
-   POR ANGEL (el coordinador se lo pregunta).
-3. **§15, el fragmento de la consola:** pendiente de probar en un navegador
+2. **§15, el fragmento de la consola:** pendiente de probar en un navegador
    real; lo prueba el agente del ensayo principal.
-4. **La hora sin consulta** (§4, paso 0; §8.1 si hay que dejarlo para otra):
-   la pone Angel. Y la pausa y el número de repeticiones de §8.1 (2 min, 3 veces)
-   son una propuesta de CA que Angel puede cambiar.
-5. **El pooler real** no se puede ensayar sin producción: el día lo dicen la
+3. **La hora sin consulta** (§4, paso 0; §8.1 si hay que dejarlo para otra):
+   la elige Angel el día de aplicar (campo «Hora elegida» del paso 3).
+4. **El pooler real** no se puede ensayar sin producción: el día lo dicen la
    prueba de humo de petición grande y la ida y vuelta de `aplicar.sh estado`
    (§4, paso 3). Si la prueba de humo sale «NO aceptada», no se aplica.
-6. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
+5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
-7. Dónde correr de forma automática la comprobación periódica de los privilegios
+6. Dónde correr de forma automática la comprobación periódica de los privilegios
    por omisión (`COMPROBACION-POSTERIOR.md` §10; `DEUDA_TECNICA.md` AG-DT-270):
    lo decide Angel. A mano, la consulta ya está.
 
@@ -1338,18 +1345,24 @@ pocas solicitudes más (el trozo de la campana y del engrane, que sólo se
 descarga con la v2, y `GET /api/agenda/por-confirmar` con los avisos); nada de
 peticiones nuevas para pintar la rejilla.
 
-**Qué se hace con el resultado (decisión de Angel, literal; se compara la
-mediana «después» con la mediana «antes» de encender):** «igual o más rápida:
-se sigue; hasta un 20 % más lenta: no se apaga, pero no se enciende en ninguna
-otra clínica hasta saber la causa; más de un 50 % más lenta, o con errores: se
-apaga en mi clínica y se investiga.»
+**Qué se hace con el resultado (decisión de Angel, literal):** «igual o más
+rápida que antes de encender: se sigue; más lenta, hasta un 50 %: no se apaga,
+pero no se enciende en ninguna otra clínica hasta saber la causa; más de un 50 %
+más lenta, o con errores: se apaga en mi clínica y se investiga. Se compara
+contra la mediana de «Carga» medida ANTES de encender, con el mismo
+procedimiento, equipo y red. Una medición rara no cuenta: se repite la tanda de
+5.»
 
-| Resultado (mediana después frente a mediana antes) | Qué se hace |
+| Mediana de «Carga» después, frente a la de antes | Qué se hace |
 |---|---|
 | igual o más rápida | se sigue |
-| hasta un 20 % más lenta | no se apaga; **no se enciende en ninguna otra clínica** hasta saber la causa |
-| **más del 20 % y hasta el 50 % más lenta** | **SIN DEFINIR POR ANGEL (el coordinador se lo pregunta)** |
+| más lenta, hasta un 50 % | no se apaga; **no se enciende en ninguna otra clínica** hasta saber la causa |
 | más de un 50 % más lenta, **o con errores** | se apaga en la clínica de Angel y se investiga |
+
+La cifra que decide es la mediana de **«Carga»** (*Load*) del punto 3; las demás
+columnas de la tabla sirven para buscar la causa. Si una recarga sale muy
+distinta de las otras cuatro (una medición rara), no cuenta: se repite la tanda
+entera de 5.
 
 «Errores» = filas en rojo (4xx/5xx) en la pestaña Red que antes no salían, o
 avisos de error en la página. Para apagar: `agenda_ajustes.agenda_v2_encendida =
