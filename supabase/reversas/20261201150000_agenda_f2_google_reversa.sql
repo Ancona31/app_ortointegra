@@ -20,10 +20,15 @@
 -- QUÉ SE PIERDE: los tokens y candados de sincronización (la siguiente pasada
 -- hace una completa), los pares de empalme ya avisados, los intentos
 -- rechazados y la marca «por asignar»/«evento» de las citas importadas de
--- Google (las citas se quedan). La auditoría en audit_log se queda.
--- Sin CASCADE. Re-ejecutable (IF EXISTS).
+-- Google (las citas se quedan). Por eso SE NIEGA, sin tocar nada, si hay
+-- cualquiera de esas filas, y dice cuántas de cada. Para quitar el bloque CON
+-- datos, respaldarlos antes y confirmarlo en la misma sesión:
+-- «SET spinus.reversa_con_datos = 'si';» antes de correr el archivo (o
+-- «SET LOCAL spinus.reversa_con_datos = 'si';» justo después de su BEGIN).
+-- La auditoría en audit_log se queda. Sin CASCADE. Re-ejecutable (IF EXISTS).
 -- Bloqueos: ACCESS EXCLUSIVE sobre appointments (disparador, CHECK y columna) y
--- SHARE ROW EXCLUSIVE sobre clinicas (las FK), un instante.
+-- SHARE ROW EXCLUSIVE sobre clinicas (las FK) hasta el COMMIT. Si falla, no
+-- deja nada.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -32,6 +37,10 @@ SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '60s';
 
 DO $$
+DECLARE
+  v_n   bigint;
+  v_t   text;
+  v_hay text[];
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_trigger WHERE NOT tgisinternal
                AND (tgname IN ('trg_appointments_aviso_clinica', 'trg_reserva_empalmes_aviso_clinica',
@@ -40,6 +49,30 @@ BEGIN
                                    coalesce(to_regclass('public.gcal_movimientos_rechazados'), 0),
                                    coalesce(to_regclass('public.gcal_sync_estado'), 0)))) THEN
     RAISE EXCEPTION 'REVERSA ABORTADA: quedan disparadores de F4 sobre objetos de F2; deshacer F4 antes.';
+  END IF;
+  -- Lo que se perdería: todas las filas que mira se cuentan antes de decidir.
+  FOREACH v_t IN ARRAY ARRAY['public.gcal_sync_estado', 'public.reserva_empalmes_google',
+                             'public.gcal_movimientos_rechazados'] LOOP
+    IF to_regclass(v_t) IS NOT NULL THEN
+      EXECUTE format('SELECT count(*) FROM %s', v_t) INTO v_n;
+      IF v_n > 0 THEN
+        v_hay := v_hay || (v_t || ': ' || v_n);
+      END IF;
+    END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass
+              AND attname = 'google_asignacion' AND NOT attisdropped) THEN
+    EXECUTE 'SELECT count(*) FROM public.appointments WHERE google_asignacion IS NOT NULL' INTO v_n;
+    IF v_n > 0 THEN
+      v_hay := v_hay || ('public.appointments con google_asignacion: ' || v_n);
+    END IF;
+  END IF;
+  IF v_hay IS NOT NULL THEN
+    IF current_setting('spinus.reversa_con_datos', true) IS DISTINCT FROM 'si' THEN
+      RAISE EXCEPTION 'REVERSA F2 ABORTADA: se perderían datos (%). No se tocó nada. Respáldalos y confírmalo con spinus.reversa_con_datos = ''si'' (ver la cabecera).',
+        array_to_string(v_hay, '; ');
+    END IF;
+    RAISE NOTICE 'Confirmado spinus.reversa_con_datos = si: se pierden %.', array_to_string(v_hay, '; ');
   END IF;
 END $$;
 

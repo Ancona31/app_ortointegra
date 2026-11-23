@@ -17,7 +17,10 @@
 --     reserva_empalmes_registrar · cita_rsvp_google
 --     cita_movimiento_google_registrar · gcal_bloqueo_aplicar
 --
--- DEPENDE DE
+-- DEPENDE DE (orden de aplicación: 4.º de 6, F1 → F5a → F3 → F2 → F4 → F5b)
+--   PostgreSQL: no concede MAINTAIN, así que no exige la 17 (producción es
+--   17.6). A service_role le deja el MAINTAIN de fábrica de la 17 sobre
+--   gcal_sync_estado; la fila 2 de la rejilla lo ignora.
 --   F1 (20261201120000): agenda_ajustes.agenda_v2_encendida y la función
 --     public.agenda_v2_encendida(uuid). gcal_sync_clinicas_pendientes es SQL y
 --     nombra agenda_ajustes al crearse.
@@ -27,39 +30,66 @@
 --     (disparador BEFORE de appointments) lee NEW.reserva_canal: sin la
 --     columna, TODA alta de cita que no haga postgres fallaría. Por eso F3 va
 --     antes que este archivo, y el pre-vuelo lo exige.
---   main: clinicas, appointments, pacientes, profiles, audit_log,
---     clinica_conexiones_google, get_clinica_id(), clinica_no_suspendida() y
---     clinica_tiene_acceso() (la puerta S3 lee su cuerpo; NO se modifican).
+--   main: clinicas, appointments (con google_event_id, gcal_etag,
+--     gcal_calendar_id, gcal_sync_status, origen, all_day, consultorio_timezone
+--     y el índice único parcial (clinica_id, google_event_id)), pacientes,
+--     profiles, audit_log, clinica_conexiones_google, get_clinica_id(),
+--     clinica_no_suspendida() y clinica_tiene_acceso() (la puerta S3 lee su
+--     cuerpo; NO se modifican), y los privilegios de service_role sobre ellas.
+--     El pre-vuelo comprueba cada cosa y dice cuál falta.
 --   Lo que necesitan de éste los demás bloques: F3 (anterior) llama a la
 --   puerta S3 sólo desde plpgsql, al ejecutarse: hasta este COMMIT la reserva
 --   por enlace no funciona (no hay enlaces todavía). F4 (posterior) la nombra
 --   en una función SQL, cuelga disparadores de reserva_empalmes_google y de
 --   gcal_movimientos_rechazados y lee google_asignacion en un WHEN.
 --
--- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s)
---   appointments: ACCESS EXCLUSIVE al añadir la columna (sin DEFAULT: sin
---   reescritura) y la CHECK (recorre la tabla una vez), SHARE ROW EXCLUSIVE al
---   crear el disparador. clinicas: SHARE ROW EXCLUSIVE un instante por cada FK.
---   Bloquea escrituras (y, con ACCESS EXCLUSIVE, lecturas) de citas mientras
---   dura la transacción.
+-- search_path: el resultado y las comprobaciones no dependen de él (todo va
+--   calificado; la definición del disparador, que el catálogo imprime con o
+--   sin public. según el search_path, se compara sin ese prefijo). Probado con
+--   '', 'public' y el del rol postgres ("$user", public, extensions).
+--
+-- LA PUERTA S3 CON LOS CUERPOS DE PRODUCCIÓN: allí clinica_no_suspendida() y
+--   clinica_tiene_acceso() tienen fines de línea CRLF (md5 crudos bff6c203… y
+--   038f41ee…; sin los \r, a2dcfa8f… y 2efd7734…). La puerta tolera los \r
+--   (son espacio para SQL) y abre: comprobado en el clon de la foto con una
+--   clínica VIP, una sin estrenar y una de pago (true) y una degradada y una
+--   suspendida (false). La fila 8 de la rejilla compara el md5 sin los \r.
+--
+-- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s). UNA transacción; cada
+--   candado dura hasta el COMMIT:
+--   · appointments: ACCESS EXCLUSIVE desde el ADD COLUMN google_asignacion
+--     (sin DEFAULT: no reescribe); la CHECK la recorre una vez. No se baja con
+--     NOT VALID + VALIDATE: el ACCESS EXCLUSIVE ya dura hasta el COMMIT.
+--   · clinicas: SHARE ROW EXCLUSIVE desde el primer CREATE TABLE (FK): no se
+--     escriben clínicas mientras dura.
+--   Medido en el clon de la foto: 52 ms en total con appointments vacía; con
+--   50 000 citas sintéticas, 161 ms en total y ~143 ms con ACCESS EXCLUSIVE
+--   sobre appointments (de ellos ~120 ms el COMMIT).
+--   Riesgo real: si una consulta larga tiene appointments, el ALTER espera
+--   hasta 5 s y las consultas nuevas a appointments esperan detrás; a los 5 s
+--   todo aborta sin dejar nada. Aplicar con poco tráfico.
 --
 -- RIESGO: MEDIO por el disparador nuevo en appointments (corre en cada INSERT
 --   y en cada UPDATE OF google_asignacion). Lo demás nace vacío y detrás del
---   interruptor (apagado de fábrica).
+--   interruptor (apagado de fábrica). Si falla en cualquier punto, la
+--   transacción se deshace entera.
 --
--- RE-EJECUTABLE: sí. Una segunda pasada sobre una base que ya lo tiene no
---   cambia nada (IF NOT EXISTS, CREATE OR REPLACE, DROP POLICY IF EXISTS). Si
---   algo de este bloque existe con OTRA forma, el pre-vuelo aborta sin tocar.
+-- SEGUNDA PASADA: RE-EJECUTABLE. Sobre una base que ya lo tiene (también con
+--   F4 y F5b puestos) no cambia nada (IF NOT EXISTS, CREATE OR REPLACE, DROP
+--   POLICY IF EXISTS) y la rejilla sale igual; comprobado en el clon de la
+--   foto. Si algo de este bloque existe con OTRA forma, el pre-vuelo aborta
+--   sin tocar.
 --
 -- CÓMO SE DESHACE: supabase/reversas/20261201150000_agenda_f2_google_reversa.sql
---   (después de deshacer F5b y F4; F3 se deshace DESPUÉS de éste). Pierde los tokens de sincronización, los
---   avisos de empalme y la marca «por asignar» de las citas.
+--   (después de deshacer F5b y F4; F3 se deshace DESPUÉS de éste). Se niega si
+--   hay estado de sincronización, empalmes, movimientos rechazados o citas con
+--   google_asignacion, salvo confirmación explícita (ver su cabecera).
 --
 -- QUIÉN PONE spinus.via (contrato con log_cita_change de F1, lista c_vias):
 --   'google'      gcal_aplicar_evento y gcal_importar_evento, antes de escribir appointments;
 --   'google_rsvp' cita_rsvp_google, antes de confirmar.
 --   gcal_bloqueo_aplicar no lo pone: escribe agenda_bloqueos, no appointments.
---   Lo leen log_cita_change (F1), cita_proteger_bloqueo (F5) y
+--   Lo leen log_cita_change (F1), cita_proteger_bloqueo (F5b) y
 --   cita_asignacion_google (aquí), siempre junto con current_user = 'service_role'.
 --
 -- A GOOGLE NO VIAJA NADA DE AQUÍ: estas funciones sólo leen de Google y
@@ -83,6 +113,26 @@ DECLARE
   v_fn  regprocedure;
   v_src text;
   v_cols text[];
+  v_n   bigint;
+  -- Las 15 funciones del bloque. Cualquier otra de public con su nombre (u
+  -- otra gcal_*) aborta: la rejilla, la reversa y el post-vuelo las cuentan
+  -- por nombre.
+  c_mias CONSTANT text[] := ARRAY[
+    'public.gcal_sync_tomar(uuid, uuid, text, integer, integer)',
+    'public.gcal_sync_avanzar(uuid, uuid, text, text, timestamptz, integer)',
+    'public.gcal_sync_reiniciar(uuid, uuid)',
+    'public.gcal_sync_soltar(uuid, uuid, text)',
+    'public.gcal_sync_clinicas_pendientes(integer)',
+    'public.gcal_sync_clinica_habilitada(uuid)',
+    'public.gcal_sync_frescura(uuid)',
+    'public.gcal_citas_por_evento(uuid, text[], uuid[])',
+    'public.gcal_aplicar_evento(uuid, uuid, timestamptz, text, text, timestamptz, text, boolean, timestamptz, timestamptz, boolean, text, boolean, text, boolean)',
+    'public.gcal_importar_evento(uuid, text, text, text, timestamptz, text, timestamptz, timestamptz, boolean, text, text, uuid)',
+    'public.reserva_empalmes_registrar(uuid, uuid[])',
+    'public.cita_rsvp_google(uuid, uuid, text, text, text[])',
+    'public.cita_asignacion_google()',
+    'public.cita_movimiento_google_registrar(uuid, uuid, timestamptz)',
+    'public.gcal_bloqueo_aplicar(uuid, text, text, uuid, text, timestamptz, boolean, timestamptz, timestamptz, date, date)'];
 BEGIN
   -- Las RPC son INVOKER y las llama service_role: sin BYPASSRLS no verían filas.
   IF NOT coalesce((SELECT rolbypassrls FROM pg_roles WHERE rolname = 'service_role'), false) THEN
@@ -99,20 +149,22 @@ BEGIN
      OR NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = 'public.clinicas'::regclass), 'USAGE') THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: el rol % no es dueño de appointments o de clinicas.', current_user;
   END IF;
-  IF (SELECT count(*) FROM pg_attribute
-       WHERE attrelid = 'public.clinica_conexiones_google'::regclass AND attnum > 0 AND NOT attisdropped
-         AND attname IN ('id', 'clinica_id', 'user_id', 'rol', 'estado', 'calendar_id', 'google_account_email')) <> 7 THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_conexiones_google no tiene la forma esperada.';
+  SELECT array_agg(c) INTO v_cols FROM (VALUES ('id', 'uuid'), ('clinica_id', 'uuid'), ('user_id', 'uuid'), ('rol', 'text'),
+      ('estado', 'text'), ('calendar_id', 'text'), ('google_account_email', 'text')) v(c, t)
+   WHERE NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.clinica_conexiones_google'::regclass
+                      AND attname = v.c AND atttypid = v.t::regtype AND NOT attisdropped);
+  IF v_cols IS NOT NULL THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: a clinica_conexiones_google le faltan (o tienen otro tipo) las columnas %.', v_cols;
   END IF;
-  IF (SELECT count(*) FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass AND attnum > 0 AND NOT attisdropped
-        AND (attname, atttypid) IN (('id', 'uuid'::regtype), ('clinica_id', 'uuid'::regtype),
-              ('google_event_id', 'text'::regtype), ('gcal_etag', 'text'::regtype),
-              ('gcal_calendar_id', 'text'::regtype), ('gcal_sync_status', 'text'::regtype), ('origen', 'text'::regtype),
-              ('all_day', 'boolean'::regtype), ('consultorio_timezone', 'text'::regtype),
-              ('updated_at', 'timestamptz'::regtype), ('status', 'text'::regtype), ('title', 'text'::regtype),
-              ('notes', 'text'::regtype), ('medico_id', 'uuid'::regtype), ('paciente_id', 'uuid'::regtype),
-              ('created_by', 'uuid'::regtype), ('start_time', 'timestamptz'::regtype), ('end_time', 'timestamptz'::regtype))) <> 18 THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: appointments no tiene las columnas de main que usan estas funciones.';
+  SELECT array_agg(c) INTO v_cols FROM (VALUES ('id', 'uuid'), ('clinica_id', 'uuid'),
+      ('google_event_id', 'text'), ('gcal_etag', 'text'), ('gcal_calendar_id', 'text'), ('gcal_sync_status', 'text'),
+      ('origen', 'text'), ('all_day', 'boolean'), ('consultorio_timezone', 'text'), ('updated_at', 'timestamptz'),
+      ('status', 'text'), ('title', 'text'), ('notes', 'text'), ('medico_id', 'uuid'), ('paciente_id', 'uuid'),
+      ('created_by', 'uuid'), ('start_time', 'timestamptz'), ('end_time', 'timestamptz')) v(c, t)
+   WHERE NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass
+                      AND attname = v.c AND atttypid = v.t::regtype AND NOT attisdropped);
+  IF v_cols IS NOT NULL THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: a appointments le faltan (o tienen otro tipo) las columnas de main %.', v_cols;
   END IF;
   -- gcal_importar_evento hace ON CONFLICT (clinica_id, google_event_id) WHERE google_event_id IS NOT NULL.
   IF NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = 'public.appointments'::regclass AND i.indisunique
@@ -127,13 +179,18 @@ BEGIN
         AND attname IN ('user_id', 'accion', 'tabla', 'registro_id', 'descripcion')) <> 5 THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: pacientes, profiles o audit_log no tienen las columnas esperadas.';
   END IF;
-  IF NOT (has_table_privilege('service_role', 'public.clinica_conexiones_google', 'SELECT')
-          AND has_table_privilege('service_role', 'public.clinicas', 'SELECT')
-          AND has_table_privilege('service_role', 'public.pacientes', 'SELECT')
-          AND has_table_privilege('service_role', 'public.profiles', 'SELECT')
-          AND has_table_privilege('service_role', 'public.appointments', 'SELECT, INSERT, UPDATE')
-          AND has_table_privilege('service_role', 'public.audit_log', 'INSERT')) THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: a service_role le falta un privilegio de main que estas RPC necesitan.';
+  -- Lo que leen y escriben las funciones de este bloque (INVOKER, las llama
+  -- service_role) en tablas que no crea: sale de sus cuerpos. La puerta S3
+  -- ejecuta el cuerpo de las dos de main, que leen clinicas. Si se añade una
+  -- tabla a una función, se añade aquí.
+  SELECT array_agg(v.t || ' ' || v.p) INTO v_cols FROM (VALUES
+      ('public.clinica_conexiones_google', 'SELECT'), ('public.clinicas', 'SELECT'), ('public.pacientes', 'SELECT'),
+      ('public.profiles', 'SELECT'), ('public.appointments', 'SELECT'), ('public.appointments', 'INSERT'),
+      ('public.appointments', 'UPDATE'), ('public.audit_log', 'INSERT'), ('public.agenda_ajustes', 'SELECT'),
+      ('public.agenda_bloqueos', 'SELECT'), ('public.agenda_bloqueos', 'UPDATE'), ('public.agenda_bloqueos', 'DELETE')) v(t, p)
+   WHERE to_regclass(v.t) IS NOT NULL AND NOT has_table_privilege('service_role', v.t, v.p);
+  IF v_cols IS NOT NULL THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: a service_role le faltan privilegios que estas RPC necesitan: %.', v_cols;
   END IF;
 
   -- Las dos puertas de main que evalúa gcal_sync_clinica_habilitada: tienen que
@@ -222,27 +279,34 @@ BEGIN
               AND pg_get_constraintdef(oid) <> 'CHECK (((google_asignacion IS NULL) OR ((origen = ''google''::text) AND (google_asignacion = ANY (ARRAY[''por_asignar''::text, ''evento''::text])))))') THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: appointments_google_asignacion_check existe con otra fórmula.';
   END IF;
+  -- La columna sin su CHECK (a medias): el ADD CONSTRAINT de la sección 3
+  -- validaría las filas que ya hay; si alguna no cumple, se dice aquí cuántas.
+  IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass
+              AND attname = 'google_asignacion' AND NOT attisdropped)
+     AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.appointments'::regclass
+                      AND conname = 'appointments_google_asignacion_check') THEN
+    EXECUTE 'SELECT count(*) FROM public.appointments
+              WHERE NOT (google_asignacion IS NULL
+                         OR (origen = ''google'' AND google_asignacion IN (''por_asignar'', ''evento'')))' INTO v_n;
+    IF v_n > 0 THEN
+      RAISE EXCEPTION 'PRE-VUELO FALLÓ: appointments.google_asignacion existe sin su CHECK y % fila(s) no la cumplen; revisar a mano.', v_n;
+    END IF;
+  END IF;
   -- CREATE OR REPLACE no convierte una DEFINER en INVOKER: si existe, que no lo sea.
-  FOREACH v_fn IN ARRAY ARRAY[
-      to_regprocedure('public.gcal_sync_tomar(uuid, uuid, text, integer, integer)'),
-      to_regprocedure('public.gcal_sync_avanzar(uuid, uuid, text, text, timestamptz, integer)'),
-      to_regprocedure('public.gcal_sync_reiniciar(uuid, uuid)'),
-      to_regprocedure('public.gcal_sync_soltar(uuid, uuid, text)'),
-      to_regprocedure('public.gcal_sync_clinicas_pendientes(integer)'),
-      to_regprocedure('public.gcal_sync_clinica_habilitada(uuid)'),
-      to_regprocedure('public.gcal_sync_frescura(uuid)'),
-      to_regprocedure('public.gcal_citas_por_evento(uuid, text[], uuid[])'),
-      to_regprocedure('public.gcal_aplicar_evento(uuid, uuid, timestamptz, text, text, timestamptz, text, boolean, timestamptz, timestamptz, boolean, text, boolean, text, boolean)'),
-      to_regprocedure('public.gcal_importar_evento(uuid, text, text, text, timestamptz, text, timestamptz, timestamptz, boolean, text, text, uuid)'),
-      to_regprocedure('public.reserva_empalmes_registrar(uuid, uuid[])'),
-      to_regprocedure('public.cita_rsvp_google(uuid, uuid, text, text, text[])'),
-      to_regprocedure('public.cita_asignacion_google()'),
-      to_regprocedure('public.cita_movimiento_google_registrar(uuid, uuid, timestamptz)'),
-      to_regprocedure('public.gcal_bloqueo_aplicar(uuid, text, text, uuid, text, timestamptz, boolean, timestamptz, timestamptz, date, date)')] LOOP
+  FOREACH v_src IN ARRAY c_mias LOOP
+    v_fn := to_regprocedure(v_src);
     IF v_fn IS NOT NULL AND (SELECT prosecdef OR NOT pg_has_role(current_user, proowner, 'USAGE') FROM pg_proc WHERE oid = v_fn) THEN
-      RAISE EXCEPTION 'PRE-VUELO FALLÓ: % existe como SECURITY DEFINER o no es de %.', v_fn, current_user;
+      RAISE EXCEPTION 'PRE-VUELO FALLÓ: % existe como SECURITY DEFINER o no es de %.', v_src, current_user;
     END IF;
   END LOOP;
+  SELECT array_agg(p.oid::regprocedure::text) INTO v_cols FROM pg_proc p
+   WHERE p.pronamespace = 'public'::regnamespace
+     AND (p.proname LIKE 'gcal\_%' OR p.proname IN ('reserva_empalmes_registrar', 'cita_rsvp_google',
+                                                    'cita_asignacion_google', 'cita_movimiento_google_registrar'))
+     AND p.oid <> ALL (SELECT to_regprocedure(f) FROM unnest(c_mias) f WHERE to_regprocedure(f) IS NOT NULL);
+  IF v_cols IS NOT NULL THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: hay funciones con nombre de este bloque que no son suyas: %.', v_cols;
+  END IF;
 END $$;
 
 -- ---------------------------------------------------------------------
@@ -290,8 +354,8 @@ CREATE TABLE IF NOT EXISTS public.gcal_sync_estado (
 ALTER TABLE public.gcal_sync_estado ENABLE ROW LEVEL SECURITY;
 -- Sin policies: ninguna sesión la lee. Los privilegios de fábrica de Supabase
 -- dan ALL a anon, authenticated y service_role: se quitan (TRUNCATE incluido).
--- A service_role se le quitan uno a uno, como en la referencia: conserva lo que
--- no se nombra (MAINTAIN, en PostgreSQL 17).
+-- A service_role se le quitan uno a uno para que conserve lo que
+-- no se nombra (MAINTAIN, en PostgreSQL ≥ 17).
 REVOKE ALL ON TABLE public.gcal_sync_estado FROM anon, authenticated;
 REVOKE DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.gcal_sync_estado FROM service_role;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.gcal_sync_estado TO service_role;
@@ -611,7 +675,7 @@ $fn$;
 -- FORMA (plpgsql, dos sentencias, get_clinica_id() sin `public.`, o
 -- `public.get_clinica_id()` dentro de un literal o un comentario) sin cambiar su
 -- lógica detiene la sincronización con Google, cerrada, hasta revisar esto. El
--- aviso no va en el COMMENT de las originales: S3 prohíbe modificarlas.
+-- aviso no va en el COMMENT de esas dos funciones de main: S3 prohíbe modificarlas.
 -- perfil_completo(), la tercera puerta del INSERT de appointments, no aplica:
 -- es del usuario que escribe, y aquí no hay usuario.
 CREATE OR REPLACE FUNCTION public.gcal_sync_clinica_habilitada(p_clinica_id uuid)
@@ -985,7 +1049,7 @@ $fn$;
 -- 4.7 · Lo movido o borrado en Google de un evento de BLOQUEO vuelve al
 -- bloqueo. Sólo un bloqueo que YA existe: nunca crea uno.
 -- ⚠️ Candado consultivo 1790 del médico, la MISMA clave que reservar_por_enlace
--- (F3) y agenda_bloqueo_preparar (F5): pg_advisory_xact_lock(1790,
+-- (F3) y agenda_bloqueo_preparar (F5a): pg_advisory_xact_lock(1790,
 -- hashtext(medico_id::text)), y ANTES que el FOR UPDATE de la fila, en el mismo
 -- orden que ellas. Cambiar la clave o el orden abre carreras (o interbloqueos)
 -- entre una reserva por enlace y un bloqueo movido en Google.
@@ -1204,10 +1268,15 @@ BEGIN
                   AND conname = 'appointments_google_asignacion_check' AND convalidated) THEN
     RAISE EXCEPTION 'POST-VUELO FALLÓ: appointments_google_asignacion_check falta o no está validada.';
   END IF;
-  IF (SELECT pg_get_triggerdef(oid) FROM pg_trigger WHERE tgrelid = 'public.appointments'::regclass
-        AND tgname = 'trg_appointments_asignacion_google' AND tgenabled = 'O')
-     IS DISTINCT FROM 'CREATE TRIGGER trg_appointments_asignacion_google BEFORE INSERT OR UPDATE OF google_asignacion ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_asignacion_google()' THEN
-    RAISE EXCEPTION 'POST-VUELO FALLÓ: trg_appointments_asignacion_google no quedó como debe.';
+  -- pg_get_triggerdef pone «public.» delante de la función o no según el
+  -- search_path; se compara sin él (la tabla siempre sale calificada), y la
+  -- función se ata además por su oid.
+  SELECT replace(pg_get_triggerdef(t.oid), 'EXECUTE FUNCTION public.', 'EXECUTE FUNCTION ') INTO v_t
+    FROM pg_trigger t WHERE t.tgrelid = 'public.appointments'::regclass
+     AND t.tgname = 'trg_appointments_asignacion_google' AND t.tgenabled = 'O'
+     AND t.tgfoid = 'public.cita_asignacion_google()'::regprocedure;
+  IF v_t IS DISTINCT FROM 'CREATE TRIGGER trg_appointments_asignacion_google BEFORE INSERT OR UPDATE OF google_asignacion ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_asignacion_google()' THEN
+    RAISE EXCEPTION 'POST-VUELO FALLÓ: trg_appointments_asignacion_google no quedó como debe (%).', coalesce(v_t, 'AUSENTE');
   END IF;
 
   -- Contratos que leen otros: spinus.via antes de escribir, y el candado 1790.
@@ -1286,8 +1355,9 @@ FROM (
   SELECT 7, 'la puerta S3 da false para una clínica inexistente',
          public.gcal_sync_clinica_habilitada('00000000-0000-0000-0000-000000000000'::uuid)::text, 'false'
   UNION ALL
-  SELECT 8, 'md5 de clinica_no_suspendida / clinica_tiene_acceso (main; si cambian, la puerta sigue la regla nueva: revisar a mano)',
-         (SELECT string_agg(md5(p.prosrc), ' / ' ORDER BY p.proname) FROM pg_proc p
+  -- Sin los \r: en producción las dos tienen fines de línea CRLF (ver la cabecera).
+  SELECT 8, 'md5 sin \r de clinica_no_suspendida / clinica_tiene_acceso (main; si cambian, la puerta sigue la regla nueva: revisar a mano)',
+         (SELECT string_agg(md5(replace(p.prosrc, E'\r\n', E'\n')), ' / ' ORDER BY p.proname) FROM pg_proc p
            WHERE p.oid IN (to_regprocedure('public.clinica_no_suspendida()'), to_regprocedure('public.clinica_tiene_acceso()'))),
          'a2dcfa8f2cfda91bc9c7a7ff7b642e1e / 2efd7734772dd4c7bea262e43a3779b5'
   UNION ALL
