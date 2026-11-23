@@ -312,7 +312,10 @@ Notas de lectura:
   muestras ~1000 y una de 1499). El salto es de ~500 ms exactos, lo que apunta a
   una espera fija en el cliente de `main` que la base nueva dispara siempre; no
   lo investigué [D]. Importa para la ventana «base nueva + código viejo»; con el
-  orden decidido (código primero) esa combinación no se da.
+  orden decidido (código primero) esa combinación no se da. *(Nota del agente BP,
+  2026-11-23: desde «base primero», decisión de Angel, esa combinación ES la
+  ventana entre el día de la base y el del código: este +500 ms aplica durante
+  días. Plan §6.1.)*
 - Con la v2 encendida, abrir cuesta +9 ms en frío y +8 ms con red limitada
   respecto de apagada, y 2 validaciones más contra Auth (4 frente a 2, las
   mismas que `main`).

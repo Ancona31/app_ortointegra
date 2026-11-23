@@ -13,7 +13,7 @@
 > `feature/agenda-v2-produccion-pl`):** el conteo previo real de producción
 > (§4, paso 3), las ventanas de candado medidas con el volumen real (§5), el
 > orden **«código primero, base inmediatamente después»** (decisión de Angel,
-> §6), la regla de reversa (§10) y la tabla exacta de variables de Vercel (§6.2).
+> §6; *sustituido el 2026-11-23 por «base primero», abajo*), la regla de reversa (§10) y la tabla exacta de variables de Vercel (§6.2).
 > «[C-PL]» = comprobado por PL en un clon de la foto con datos sintéticos del
 > tamaño real (§5).
 >
@@ -29,6 +29,18 @@
 > límites aceptados (§14). «[C-CA]» = comprobado por CA en el clon
 > `clon-spinus-ca-1` de la foto real, con el guion nuevo; salidas en
 > `~/spinus-fusion/ensayo-ca/` (fuera del repo).
+>
+> **Actualizado por el agente BP (2026-11-23, sobre `feature/agenda-v2-produccion`):
+> EL ORDEN CAMBIA A «BASE PRIMERO, CÓDIGO OTRO DÍA»** (decisión de Angel,
+> 2026-11-23: deja este equipo y prueba el rediseño de la agenda en los previews
+> de Vercel, que apuntan a la base de producción). Es la dirección (a) de
+> `../ensayo/ORDEN-Y-REVERSA.md` §5.4. **El día de la base** es §4 (pasos 0–7,
+> con el código de `main` en producción); **el día del código** (el merge a
+> `main`), §4-bis; **encender la v2 en la clínica de Angel para los previews**,
+> §4 paso 8. Qué cambia para los usuarios mientras tanto, qué se ensayó y qué
+> sólo se dedujo: §6.1 y `docs/despliegue/VENTANA-BASE-PRIMERO.md`. Sustituye a
+> «código primero, base inmediatamente después» (PL, 2026-11-22): donde este
+> plan decía eso, ya está cambiado o marcado *sustituido*.
 
 Archivos de esta carpeta:
 
@@ -270,10 +282,11 @@ Revisado línea a línea el 2026-11-22 [C, lectura y ensayo]:
 
 ---
 
-## 4. El día, paso a paso
+## 4. El día de la BASE, paso a paso
 
-Todo desde la raíz del repo, en la rama que se vaya a desplegar, con Docker
-encendido.
+Todo desde la raíz del repo, en `feature/agenda-v2-produccion` (el commit
+congelado que se desplegará después; `main` sigue en producción), con Docker
+encendido. El día del código es §4-bis.
 
 ### Paso 0 · Requisitos previos (si falta uno, no se empieza)
 
@@ -290,36 +303,40 @@ encendido.
 - [ ] **Se aplica a una hora sin consulta** (decisión de Angel; la elige él el
       día y la apunta en el campo «Hora elegida» del paso 3): ninguna
       clínica atendiendo ni agendando. Aunque con el guion nuevo la ventana con
-      `appointments` cerrada es de decenas de milisegundos (§5), código y base
-      se tocan en la misma sesión y, si algo sale mal, hay que poder parar sin
-      nadie en consulta.
-- [ ] Nadie más desplegando ni tocando la base.
-- [ ] **ANTES de fusionar a `main` y desplegar el código (paso 4): confirmar que
-      la integración de Supabase con GitHub sigue SIN CONECTAR** (panel de
+      `appointments` cerrada es de decenas de milisegundos (§5), si algo sale
+      mal hay que poder parar sin nadie en consulta.
+- [ ] Nadie más desplegando ni tocando la base. **Ese día no se fusiona nada a
+      `main` ni se despliega a producción**: producción sigue con el código de
+      `main` (§6.1).
+- [ ] **La integración de Supabase con GitHub sigue SIN CONECTAR** (panel de
       Supabase → Settings → Integrations; comprobado por Angel el 2026-11-22: no
-      está conectada). Si estuviera conectada, podría aplicar las migraciones
-      sola al subir a `main`, sin pasar por `aplicar.sh` ni por sus rejillas, y
-      habría que desconectarla ANTES de fusionar. Va antes del despliegue del
-      código, no antes de la base, porque el orden es código primero. (Dato de
-      Angel, mismo día: la integración de Vercel tampoco está instalada; por eso
-      las variables del §6.2 se ponen a mano en Vercel.)
-- [ ] Las variables de Vercel del §6.2 preparadas (generadas en la terminal de
-      Angel, sin escribirlas en ningún archivo), **`CRON_SECRET` incluida: se
-      pone ANTES de desplegar** (§6.2).
+      está conectada). Conectada, podría aplicar migraciones sola al subir ramas
+      a GitHub, sin `aplicar.sh` ni rejillas. Se mira el día de la base (Angel
+      sube ramas para sus previews) **y otra vez el día del código, antes de
+      fusionar** (§4-bis). (Dato de Angel, 2026-11-22: la integración de Vercel
+      tampoco está instalada; por eso las variables del §6.2 se ponen a mano.)
+- [ ] Leído `docs/despliegue/VENTANA-BASE-PRIMERO.md`: lo que ven los usuarios
+      con la base nueva y el código de `main` mientras dure la ventana.
+- *(Sustituido el 2026-11-23: las variables de Vercel, `CRON_SECRET` y Fluid
+  Compute ya no son requisito de este día; pasan al día del código, §4-bis.)*
 
-> **El orden del día (decisión de Angel, 2026-11-22): CÓDIGO PRIMERO y la BASE
-> inmediatamente después, en la misma sesión**, con la v2 apagada en todas las
-> clínicas (como nace). Pasos 1–3 preparan; 4 despliega el código; 5 comprueba
-> que la app sigue igual; 6 aplica las 9; 7 comprueba; 8 enciende (otro día).
-> Por qué y la alternativa, en §6.1.
+> **El orden (decisión de Angel, 2026-11-23): BASE PRIMERO; el código, OTRO
+> DÍA.** El día de la base, con `main` en producción y la v2 apagada en todas
+> las clínicas (como nace): pasos 1–3 preparan; 4 no hay (el código no se toca);
+> 5 repite los conteos; 6 aplica las 9; 7 comprueba **con el código de `main`**.
+> Otro día, el 8: encender la v2 SÓLO en la clínica de Angel para probar los
+> previews. Días después, el merge a `main` y su despliegue (§4-bis). Por qué y
+> qué cambia mientras tanto, §6.1. *(Sustituye a «CÓDIGO PRIMERO y la BASE
+> inmediatamente después, en la misma sesión», decisión del 2026-11-22.)*
 
 > ### ⚠️ REVERSA — LA REGLA, ANTES DE NADA
 > **Antes de revertir CUALQUIER migración, apagar la v2 en TODAS las clínicas.**
 > Revertir F3 (o más) con la v2 encendida en una clínica le rompe la agenda (500
 > al mover o cancelar) [C, E2 5.5.4]. **Las reversas, sólo con `aplicar.sh
 > reversa` / `reversa-truncate`**, que reparan el historial; nunca a mano (§10).
-> Si el problema es del CÓDIGO y la base aún no se tocó, no hay reversa de base:
-> se vuelve al despliegue anterior de Vercel (paso 5).
+> El día del código (§4-bis), si lo que falla es el CÓDIGO, no hay reversa de
+> base: se vuelve al despliegue anterior de Vercel, o sea a `main` sobre la base
+> nueva, que es el estado de la ventana [C, E2 §5.4 (a)].
 
 ### Paso 1 · Respaldo previo
 
@@ -407,7 +424,7 @@ perfiles y `audit_log` en la rejilla son estimaciones de `reltuples`; la exacta
 de consultorios la da F1.11: 18).
 
 **Este conteo hay que REPETIRLO justo antes de aplicar** (el mismo
-`correr-conteos.sh`, el mismo día, después del paso 5 y antes del 6).
+`correr-conteos.sh`, el mismo día: es el paso 5, justo antes del 6).
 
 > **Hora elegida (la escribe Angel el día de aplicar; fuera del horario de
 > consulta de las clínicas):** `____:____`, del día `____ / ____ / ______`.
@@ -463,66 +480,22 @@ Qué mirar, además:
   «objetos que YA existen» (M1.3, M2.5, M2.6, F1.7, F1.9, F3.4, F2.6, F2.8, F4.4,
   F5b.4, T.3).
 
-### Paso 4 · Variables de Vercel y despliegue del código (v2 apagada)
+### Paso 4 · (el día de la base no hay paso 4)
 
-**Antes de desplegar** (Vercel → Project → Settings):
+*(Sustituido el 2026-11-23.)* Con «código primero» aquí iban las variables de
+Vercel y el despliegue del código, y el paso 5 era la comprobación «código nuevo
++ base vieja». Con «base primero» ese día no se despliega nada: las dos cosas
+pasan al **día del código**, §4-bis, donde están completas. La numeración de los
+pasos 6–8 se conserva para no romper las referencias.
 
-- [ ] **⚠️ `CRON_SECRET` PUESTA ANTES DE DESPLEGAR** (Production, Sensitive).
-      Las dos tareas programadas **nacen con este despliegue** (§6.3): sin la
-      variable ya puesta, cada invocación de `google-sync` y `recordatorios`
-      responde 401 hasta que se ponga y se vuelva a desplegar.
-- [ ] Las demás variables nuevas del §6.2 puestas en **Production** (Settings →
-      Environment Variables). Vercel aplica una variable a los despliegues que
-      se hagan **después** de ponerla: se ponen antes de desplegar.
-- [ ] `AGENDA_RSVP_GOOGLE` **sin definir** (apagada; §6.2).
-- [ ] Ninguna de las que no deben existir (§6.2, segunda tabla).
-- [ ] (Settings → Functions) **Fluid Compute sigue ACTIVADO.** La agenda depende
-      de él: el trabajo que sus rutas dejan en `after()` vive dentro del límite
-      de la función, y ninguna declara `maxDuration` (§12, punto 4).
-- [ ] **No hay un «Function Max Duration» de proyecto menor que 300 s.**
-- [ ] Anotar cuál es el despliegue de producción ACTUAL (el de `main`): es al
-      que se vuelve si el paso 5 falla.
+### Paso 5 · Repetir los conteos, justo antes del 6
 
-Antes de fusionar: la casilla de la integración de Supabase con GitHub del
-paso 0 (sin conectar). Desplegar la rama (el merge a `main` y el despliegue los hace Angel). Con este
-despliegue **nacen las dos tareas programadas**: `main` no tiene `crons` en
-`vercel.json` (comprobado: `git show main:vercel.json` sólo trae
-`buildCommand`); la rama trae `google-sync` cada 10 min y `recordatorios` cada
-15 (§6.3).
+```bash
+bash supabase/produccion/conteos/correr-conteos.sh
+```
 
-### Paso 5 · Comprobación corta: la app sigue igual (código nuevo + base vieja)
-
-Con la base todavía sin las 9 y la v2 apagada (no hay ni tabla de interruptor),
-Angel, con su cuenta, unos minutos:
-
-1. **Entrar** (y `/inicio`), sin bucles de recarga.
-2. **Abrir un paciente** (de prueba o la cuenta demo): el expediente abre.
-3. **Abrir la agenda**: la vista de siempre, sin engrane v2, campana ni candado.
-4. **Crear una cita y cancelarla** (en un hueco de la semana siguiente; un evento
-   sin paciente basta).
-5. (Opcional) Vercel → el proyecto → Logs: un `warn` «interruptor de la agenda
-   sin leer (cuenta como apagado)» por petición es lo esperado (§6.1); un
-   `error` o un 500, no.
-
-Es lo que E2 ensayó en esta dirección [C, `../ensayo/ORDEN-Y-REVERSA.md` §5.4
-(b)]: los tres roles, 200 en todo, sin 500.
-
-**Si el código recién desplegado falla aquí (ANTES de tocar la base):** se
-vuelve al despliegue anterior desde el panel de Vercel, **sin ninguna reversa de
-base** (la base no se tocó). En el panel, Vercel ofrece volver a poner en
-producción un despliegue anterior («Instant Rollback», o «Promote to
-Production» sobre el despliegue anterior en la lista de Deployments) — **POR
-COMPROBAR en el panel ese día**: el nombre exacto y el sitio de la opción no se
-verificaron (este agente no tiene acceso al panel ni leyó esa página de la
-documentación). Lo que sí se sabe: el código de `main` sobre la base vieja es
-exactamente lo que hay hoy en producción. Las dos tareas programadas
-desaparecen con la vuelta atrás si el despliegue anterior no las trae
-(DEDUCIDO: lo dice `vercel.json`; no comprobado en Vercel). Luego, a investigar
-con calma; no se aplica nada.
-
-**Si todo va bien, sin pausa:** se repiten los conteos (paso 3, «REPETIRLO») y
-se sigue con el paso 6 en la misma sesión, para que la ventana «código nuevo +
-base vieja» dure minutos.
+Lo de «REPETIRLO» del paso 3: **G.14 `ninguna`, G.15 `ninguno`, G.16 `true`**;
+si no, esperar un minuto y repetir. Lo demás tiene que seguir como en el paso 3.
 
 ### Paso 6 · Las 9 migraciones
 
@@ -536,10 +509,11 @@ guion nuevo [C-CA] cada una tardó 0,25–0,50 s en el clon sin retardo y
 contenedor de `psql`, conectar y la línea de ajustes); la parte con candados es
 la del servidor (§5). Cada `*.salida.txt` empieza por la línea «sesión:
 idle_in_transaction_session_timeout=10s, lock_timeout=5s,
-statement_timeout=2min». Mientras se aplica, el código
-nuevo ya está desplegado: cada prefijo del orden es un estado que E2 probó o
-dedujo seguro con la v2 apagada (§8, «Quedarse a medias»), y las tareas
-programadas no hacen nada mientras ninguna clínica tenga la v2 (§6.3). Lo que hay que mirar en cada
+statement_timeout=2min». Mientras se aplica, en
+producción sigue el código de `main`: el estado final (las 14 + `main`) lo
+ensayó E2 [C, `../ensayo/ORDEN-Y-REVERSA.md` §5.4 (a)]; los estados intermedios
+con `main` **no se ensayaron** y se deducen seguros (§8.2) [D]. No hay tareas
+programadas: `main` no tiene `crons` (§6.3). Lo que hay que mirar en cada
 rejilla (literal en `rejillas-del-ensayo.txt`: **63 OK, 10 INFO, 0 REVISAR**):
 
 | # | Filas | Mirar especialmente | NOTICE esperados (no son errores) |
@@ -558,21 +532,108 @@ Terminadas: `aplicar.sh estado` → las 9 «ya registrada».
 
 ### Paso 7 · La comprobación posterior
 
-`COMPROBACION-POSTERIOR.md` entero (incluido su humo con la v2 apagada, que ya
-corre sobre el código nuevo y la base nueva). Si algo no cuadra, **no se
-enciende nada** y se decide entre arreglar o revertir (§10; primero la regla del
-recuadro del paso 0).
+`COMPROBACION-POSTERIOR.md` entero (incluido su humo con la v2 apagada, que el
+día de la base corre sobre **el código de `main`** y la base nueva). Si algo no
+cuadra, **no se enciende nada** y se decide entre arreglar o revertir (§10;
+primero la regla del recuadro del paso 0). Tras el paso 7, producción se queda
+así (base nueva + `main`) hasta el día del código: lo que se nota, §6.1.
 
-### Paso 8 · Encender la v2 en UNA clínica
+### Paso 8 · Encender la v2 en la clínica de Angel, para los previews (otro día)
 
-Sólo cuando §13 esté resuelto. `agenda_ajustes.agenda_v2_encendida` **sólo** la
-cambian `postgres`/`supabase_admin` (`trg_agenda_ajustes_proteger`): desde el
-SQL Editor, para la clínica de pruebas de Angel.
+Con `main` todavía en producción (decisión de Angel, 2026-11-23). Antes, leer
+`docs/despliegue/VENTANA-BASE-PRIMERO.md` §2 y §3: lo que le pasa a quien use la
+app de producción (v1) en ESA clínica con la v2 encendida, y los riesgos de los
+previews contra la base de producción (variables del entorno Preview,
+`docs/despliegue/VARIABLES-VERCEL.md`). `agenda_ajustes.agenda_v2_encendida`
+**sólo** la cambian `postgres`/`supabase_admin` (`trg_agenda_ajustes_proteger`):
+desde el SQL Editor, para la clínica de Angel y ninguna otra.
 
-**Antes de encender**, con la v2 todavía apagada: la medición «antes» de §15
-(cuánto tarda en abrir la agenda). **Primer paso tras encender** (orden de
-Angel): la medición «después» de §15, con la misma cuenta, el mismo equipo y la
-misma red, y compararla. Si sale peor de lo que dice §15, se apaga.
+**§13 no está resuelto** (texto legal, Google real, `imatch`): encender para los
+previews antes de resolverlo es decisión de Angel, sabiendo que con la marca del
+aviso la reserva por enlace no abre en Vercel (VENTANA §3).
+
+**Antes de encender**, con la v2 todavía apagada: la medición «antes» de §15,
+**en el mismo preview** que se va a usar después (mismo código: la v2 es por
+clínica y no por despliegue, así que encenderla cambia también lo que hace la
+base debajo de `main` en esa clínica). **Primer paso tras encender** (orden de
+Angel): la medición «después», mismo preview, cuenta, equipo y red. Si sale peor
+de lo que dice §15, se apaga. (Con el código nuevo en producción, la medición
+oficial se repite el día del código: §4-bis, paso C5.)
+
+---
+
+## 4-bis. El día del código: merge a `main` y despliegue (otro día, días después)
+
+Requisito: el día de la base terminado en verde (pasos 0–7) y la ventana sin
+sorpresas (§6.1). **No se toca la base este día.** Lo hace Angel; el merge es
+local a `main` y `git push`, sin PR (CLAUDE.md).
+
+**C0 · Antes de fusionar** (Vercel → Project → Settings):
+
+- [ ] **Integración de Supabase con GitHub SIN CONECTAR** (Settings →
+      Integrations), otra vez: conectada, podría aplicar migraciones sola al
+      subir a `main`. Con las 9 ya registradas no deberían volver a aplicarse
+      [D], pero no se comprueba con producción: se mira.
+- [ ] **⚠️ `CRON_SECRET` PUESTA ANTES DE DESPLEGAR** (Production, Sensitive).
+      Las dos tareas programadas **nacen con este despliegue** (§6.3): sin la
+      variable, cada invocación de `google-sync` y `recordatorios` responde 401
+      hasta que se ponga y se vuelva a desplegar.
+- [ ] Las demás variables nuevas del §6.2 en **Production** (y, si se usan
+      previews, en **Preview** con el MISMO `RESERVA_SECRETO`:
+      `docs/despliegue/VARIABLES-VERCEL.md`). Vercel aplica una variable a los
+      despliegues hechos **después** de ponerla.
+- [ ] `AGENDA_RSVP_GOOGLE` **sin definir** (§6.2), ni en Production ni en Preview.
+- [ ] Ninguna de las que no deben existir (§6.2, segunda tabla).
+- [ ] (Settings → Functions) **Fluid Compute sigue ACTIVADO** (el trabajo en
+      `after()` depende de él; ninguna ruta de la agenda declara `maxDuration`,
+      §12) y **ningún «Function Max Duration» de proyecto menor que 300 s**.
+- [ ] Anotar el despliegue de producción ACTUAL (el de `main`): es al que se
+      vuelve si C3 falla.
+- [ ] A una hora sin consulta (la elige Angel), por si hay que volver atrás.
+
+**C1 · Medición «antes» de §15**, en producción, todavía con `main`. Si la v2
+está encendida en la clínica de Angel (paso 8), la medición «antes» con la v2
+apagada exige apagarla un momento (por SQL) y volver a encenderla después de C5:
+**decisión pendiente de Angel** (alternativa: tomar como «antes» la medición del
+preview del paso 8).
+
+**C2 · Merge local a `main`, `git push` y despliegue** (lo hace Angel). Con este
+despliegue nacen las dos tareas programadas (`main` no tiene `crons`; la rama
+trae `google-sync` cada 10 min y `recordatorios` cada 15, §6.3).
+
+**C3 · Comprobación corta (código nuevo + base nueva)**, Angel con su cuenta,
+unos minutos:
+
+1. **Entrar** (y `/inicio`), sin bucles de recarga.
+2. **Abrir un paciente**: el expediente abre.
+3. **Abrir la agenda**: en una clínica con la v2 apagada, la vista de siempre
+   (sin engrane v2, campana ni candado); en la de Angel, si la encendió, la v2.
+4. **Crear una cita y cancelarla** (semana siguiente; un evento sin paciente
+   basta).
+5. **Búsqueda de pacientes en «Agendar»** (usa `imatch` de PostgREST): dos
+   palabras de un paciente de prueba; lo encuentra y la consola no tiene un 400.
+6. **Tareas de Vercel**: Schedules → Cron Jobs → View Logs de `google-sync` y
+   `recordatorios`: la primera invocación responde 2xx, no 401.
+7. Vercel → Logs: ni un `error` ni un 500 en `/api/appointments*`,
+   `/api/agenda/*`, `/api/cron/*`.
+
+Es lo que E2 ensayó como «las 14 + la rama» [C, `../ensayo/ORDEN-Y-REVERSA.md`
+§5.4 y §5.5.4, fila r0], más lo de Vercel, que no se pudo ensayar.
+
+**C4 · Si el código falla en C3:** se vuelve al despliegue anterior desde el
+panel de Vercel («Instant Rollback»: la documentación de Vercel, *Managing Cron
+Jobs*, leída el 2026-11-23, dice que restaura también las definiciones de las
+tareas del despliegue al que se vuelve, o sea ninguna; el sitio exacto de la
+opción en el panel, POR COMPROBAR ese día). **Sin ninguna reversa de base**: se
+vuelve a `main` sobre la base nueva, el estado de la ventana [C, E2 §5.4 (a)].
+
+**C5 · Medición «después» de §15** y los tres escalones de §15 (igual o más
+rápida → se sigue; hasta +50 % → no se enciende en ninguna otra clínica hasta
+saber la causa; más de +50 % o con errores → se apaga en la clínica de Angel).
+
+**C6 · Al terminar:** la línea `-- ESTADO · PRODUCCIÓN` de los 9 archivos (§12,
+punto 5) se escribe tras el día de la base, no éste.
+
 
 ---
 
@@ -761,42 +822,52 @@ statement due to lock timeout`. En los dos casos: esperar a que acabe y
 guion nuevo la ventana sea de milisegundos (§4, paso 0). ASUMIENDO que eso es
 de noche o el domingo temprano; la hora la pone Angel. Y fuera del horario de cualquier trabajo de `pg_cron` que nombre
 `appointments` o `clinicas` (G.17; el 2026-11-22, ninguno). **Con «código
-primero», las dos tareas de `vercel.json` YA corren durante el paso 6** (cada
-10 min `google-sync`, minutos :00, :10, :20…; cada 15 `recordatorios`, :00,
-:15, :30, :45). Mientras ninguna clínica tenga la v2 no leen `appointments`
-(sus listados parten de `agenda_ajustes`, vacía, o no existen todavía: §6.3),
-así que no deberían chocar con los candados (DEDUCIDO). Aun así, por
-prudencia, no lanzar F3 ni F2 justo en esos minutos.
+primero» (sustituido), las dos tareas de `vercel.json` habrían corrido durante el
+paso 6.** **Con «base primero» no corre ninguna**: `main` no tiene `crons`
+(`git show main:vercel.json`) y Vercel no las ejecuta en los previews
+(documentación de Vercel, *Managing Cron Jobs*, «Cron jobs run only on
+production deployments», leída el 2026-11-23). Nacen el día del código
+(§4-bis).
 
 ---
 
 ## 6. Código y base: el orden, y las variables de Vercel
 
-### 6.1 El orden: CÓDIGO PRIMERO, base inmediatamente después (decisión de Angel, 2026-11-22)
+### 6.1 El orden: BASE PRIMERO, el código otro día (decisión de Angel, 2026-11-23)
 
-**Recomendado y elegido: desplegar el código (paso 4), comprobar en unos
-minutos que la app sigue igual (paso 5) y aplicar las 9 a continuación (paso
-6), en la misma sesión**, con la v2 apagada en todas las clínicas. Sustituye a
-«migraciones primero» de las versiones anteriores de este plan y de
-`mejora_agendaV2.md` §7. El ensayo E2 probó las dos direcciones
-(`../ensayo/ORDEN-Y-REVERSA.md` §5.4) [C]: **las dos son seguras y ninguna deja
-a nadie sin agenda.** La diferencia:
+**Elegido:** el día de la base se aplican las 9 con el código de `main` en
+producción y la v2 apagada en todas (§4, pasos 0–7). **Días después**, el merge
+a `main` y su despliegue (§4-bis). Motivo (Angel, literal): «Angel deja esta
+computadora y va a probar el rediseño de la agenda en los previews de Vercel,
+que apuntan a la base de producción.» Sustituye a «código primero, base
+inmediatamente después» (decisión del 2026-11-22) y, antes, a «migraciones
+primero» de las primeras versiones de este plan.
 
-| Ventana | Qué ve un médico o una secretaria | Qué ve el registro |
+**Qué se ensayó de esta dirección** (E2, `../ensayo/ORDEN-Y-REVERSA.md` §5.4
+(a)) [C]: la base con las 14, aplicada con este mismo `aplicar.sh`, y `main`
+encima, los tres roles, con la v2 **apagada** en todas: todo igual que con la
+base vieja salvo la cita atendida con nota (abajo), y el registro de `main` sin
+errores. **Qué NO se ensayó** [D]: `main` sobre los estados intermedios (sólo
+las 5 y las 14), `main` con la v2 **encendida** en una clínica (el caso de los
+previews, `docs/despliegue/VENTANA-BASE-PRIMERO.md` §2), Google, Realtime y
+Vercel.
+
+**Lo que cambia para los usuarios mientras dure la ventana** (base nueva +
+código de `main`, v2 apagada en todas), detalle y archivo:línea en
+`docs/despliegue/VENTANA-BASE-PRIMERO.md` §1:
+
+| Efecto | Quién lo nota | Comprobado / deducido |
 |---|---|---|
-| **código nuevo + base vieja** (la elegida) | **nada distinto** de hoy; la cita atendida con nota ya queda protegida por la API (409 `nota_ligada` con su texto) [C] | un `warn` «interruptor de la agenda sin leer (cuenta como apagado)» por petición autenticada mientras dure; en el navegador de la secretaria, un 404 de `/rest/v1/agenda_ajustes` en la consola, sin efecto en la página [C]; las tareas programadas contestan `{"ok":true}` sin hacer nada [C, §6.3] |
-| base nueva + código de `main` (la alternativa, «base primero») | todo igual **salvo mover, cancelar, volver a agendada o borrar una cita ATENDIDA CON NOTA clínica: 500** con el texto de la base en castellano, y no se hace (antes `main` lo hacía) [C] | nada (`main` no registra esos 500); `audit_log` empieza a recibir `log_cita_change` [C]. Además, si alguien cambia el horario de la clínica con `main` en esa ventana, la copia de F1 en cada consultorio ya no lo sigue (con la v2 apagada nadie lo lee; se vería al encenderla) [D] |
+| **Cita ATENDIDA con nota clínica ligada**: moverla (arrastrar o redimensionar), cambiarle el estado o «todo el día», o borrarla, **no se hace**. La ruta responde **500** con el texto de la base: «Una cita atendida con nota clínica no cambia de estado ni de fecha u hora» (o «… no se borra»). Al mover o guardar, la agenda de `main` enseña ese texto en el aviso y devuelve la cita a su sitio; al borrar, enseña primero «Se eliminó de la agenda» (es optimista), luego «No se pudo eliminar», y la cita vuelve. Editar sus notas sí funciona | el médico o la secretaria que lo intente | 500 y texto de la ruta [C, E2]; lo que pinta la agenda [D, `main:src/app/(app)/agenda/page.tsx:7360-7363`, `:7512-7517`, `:7595-7611`] |
+| **El horario de la clínica y el de los consultorios se separan.** F1 copia una vez el `horario_consulta` de cada clínica a cada consultorio (`horario_propio = true`). `main` sigue leyendo y escribiendo sólo el de la clínica (`PUT /api/me/horario`): si alguien lo cambia en la ventana, la agenda vieja enseña el nuevo, pero los consultorios se quedan con la copia de F1, y la v2 (previews y, tras el merge, producción) usa la copia | nadie con la v2 apagada; al encenderla, el horario «viejo» | [D, E2 §5.4 (a) por lectura; `main:src/app/api/me/horario/route.ts:55`] |
+| **`audit_log` recibe `log_cita_change`**: cada alta, cambio no técnico y borrado de cita escribe una fila (nombres de columna, de→a del estado, sin valores) | nadie en pantalla; `audit_log` crece más deprisa | [C, E2] |
+| **Abrir la agenda de `main` con red limitada tarda ~+500 ms** sobre la base nueva (999 → 1506 ms, 4 rondas; no investigado) | todas las clínicas, con red lenta, durante toda la ventana (días) | [C local, `../ensayo/ENSAYO-PRINCIPAL.md` §5.6; en producción, D] |
+| TRUNCATE prohibido en `audit_log` y en las tablas clínicas y de la agenda | nadie (ningún código lo hace) | [C catálogo; D uso] |
 
-Con «código primero», además, cada estado intermedio mientras se aplican las 9
-es uno de los que E2 recorrió en la reversa: con la v2 apagada la rama funcionó
-en todos los que se probaron (las 5 de `main`, sólo las dos de TRUNCATE, +F1,
-+F1+F5a, las 14) [C]; con +F3, +F2 y +F4 sólo se probó con la v2 ENCENDIDA (y
-funcionó salvo la reserva por enlace con F3 sin F2: 404 limpio) [C]; apagada se
-deduce que también [D, no ensayado].
-
-**Si se volviera a «base primero»:** la ventana es segura; hasta desplegar el
-código, una cita atendida con nota no se puede mover, cancelar ni borrar y la app
-vieja responde 500 con un texto legible. Ese es todo su coste.
+Ninguno pierde ni corrompe datos [C para los gestos de E2; D para lo demás].
+**Con el código primero** (sustituido) la ventana no tenía el 500 ni el horario
+divergente; a cambio, un `warn` por petición. Las dos direcciones son seguras
+[C, E2 §5.4].
 
 ### 6.2 Variables de entorno de Vercel
 
@@ -805,7 +876,7 @@ Nombres sacados el 2026-11-22 de `src/` en la rama y en `main` (`git grep -h -o
 de entorno: `EMAIL_TRANSPORT`, `AGENDA_RSVP_GOOGLE`, `MAILPIT_URL`,
 `RESERVA_AVISO_BORRADOR_LOCAL`, `VERCEL`) y de `.env.example`. **Sólo nombres y
 formatos; ningún valor real.** Vercel aplica una variable a los despliegues
-hechos **después** de ponerla: se ponen antes del paso 4 (o se redespliega).
+hechos **después** de ponerla: se ponen antes del despliegue del día del código, §4-bis (o se redespliega).
 
 **Nuevas con la agenda v2** (ninguna la lee `main`: comprobado comparando las dos
 listas). «Formato» = comprobado leyendo el código; **que estén puestas en el
@@ -856,6 +927,12 @@ o ya no se usan: no se tocan).
 
 ### 6.3 Las dos tareas programadas en la ventana «código nuevo + base vieja»
 
+> *(Con «base primero», 2026-11-23, esa ventana ya no existe: las tareas nacen
+> el día del código, con la base ya nueva, o sea en la última columna de esta
+> tabla. La columna «base vieja» queda como histórico. Durante la ventana «base
+> nueva + `main`» no corre ninguna tarea: `main` no tiene `crons` y Vercel no
+> las ejecuta en los previews, §5.)*
+
 **Nacen con este despliegue**: `main:vercel.json` no tiene `crons`; la rama trae
 `/api/cron/google-sync` (`*/10 * * * *`) y `/api/cron/recordatorios` (`*/15 * *
 * *`) [C, `git show main:vercel.json` y `vercel.json`]. Sin `CRON_SECRET`
@@ -896,7 +973,7 @@ Todo lo demás es estructura nueva que nace vacía y detrás del interruptor
 | F1 | `log_cita_change`: cada alta, borrado y cambio no técnico de una cita escribe en `audit_log` (nombres de columna, nunca valores) | nadie en pantalla; `audit_log` crece más deprisa |
 | F2 | `cita_asignacion_google` en cada alta de cita | nadie |
 | F3/F5b | una sesión no puede escribir columnas `reserva_*` | nadie (el código viejo no las conoce) |
-| F5b | **una cita atendida con nota clínica ligada no cambia de estado ni de fecha/hora ni se borra**, también para `service_role` | **un médico que lo intente**: con el código nuevo (el orden elegido) ya lo rechazaba la API con 409 `nota_ligada`; sólo con «base primero» y `main` sería un 500 con el texto de la base (§6.1) |
+| F5b | **una cita atendida con nota clínica ligada no cambia de estado ni de fecha/hora ni se borra**, también para `service_role` | **un médico que lo intente**: con «base primero» (el orden elegido), durante la ventana, `main` responde **500** con el texto de la base (§6.1); tras el merge, la API nueva lo rechaza antes con 409 `nota_ligada` |
 | F1–F5b | las columnas nuevas de `appointments` viajan en los mensajes de Realtime | nadie (van NULL) |
 
 ---
@@ -1009,13 +1086,58 @@ Causas de fallo, por el mensaje del servidor:
 | `──────── EL ERROR (repetido …)` encima del `ALTO` | — | (no es un fallo nuevo) tras cualquier fallo el guion repite la línea del error, porque psql la escribe antes que el resto de la salida (G7) | leer ESE error, no las últimas líneas de la salida |
 
 **Quedarse a medias** entre dos archivos es válido días: cada prefijo del orden
-es coherente con la v2 apagada, y con «código primero» el código nuevo ya está
-desplegado encima: E2 lo probó apagada con las 5 de `main`, sólo las dos de
-TRUNCATE, +F1, +F1+F5a y las 14 [C]; con +F3, +F2 y +F4, sólo encendida [C], y
-apagada se deduce [D] (§6.1). Lo que no se hace es encender nada hasta tener las
-9. Excepción conocida: entre F3 y F2 la reserva por enlace no funciona (nadie
-puede pedirla: no hay enlaces). Si se para a medias porque algo va mal, **no se
-revierte nada a mano** (§10).
+es coherente con la v2 apagada. Con «base primero» encima corre `main`, y eso se
+ensayó sólo con las 5 y con las 14 [C]; los prefijos intermedios con `main` se
+deducen seguros (§8.2) [D]. Lo que no se hace es **encender nada (tampoco para
+los previews) hasta tener las 9** y la comprobación posterior en verde. Si se
+para a medias porque algo va mal, **no se revierte nada a mano** (§10).
+
+### 8.2 Si falla a media aplicación con «base primero» (el código de `main` en producción)
+
+**Qué queda:** los archivos anteriores, aplicados y registrados; el que falló,
+nada (es una transacción) o entero y sin registrar (§8, tabla del testigo); la
+v2, apagada en todas; producción, con `main`.
+
+**Qué hace `main` en cada estado intermedio** [D salvo donde dice C]. E2 leyó
+todo `main` (`git grep`): no nombra ningún objeto de las 9; sus únicas
+escrituras a `appointments` son el alta, el PUT, el DELETE, el paso a
+`attended` de `/api/consultas` y las escrituras técnicas de Google con
+`service_role` [D, E2 §5.4 (a)]. Lo único que puede cambiarle un resultado son
+los disparadores de las tablas que ya usa (lista leída del catálogo local con
+las 14, sólo lectura [C]):
+
+| Queda aplicado hasta… | Qué cambia para `main` | ¿Seguro para dejarlo días? |
+|---|---|---|
+| nada (falla la nº 1) | nada: es la base de hoy | sí [C: es producción hoy] |
+| nº 1, nº 2 | TRUNCATE prohibido (nadie lo usa) | sí [D] |
+| + F1 (**punto de no retorno**, §7) | `log_cita_change` en cada cita; horarios copiados a los consultorios; columnas nuevas con valor por omisión (un consultorio creado por `main` nace con `horario_propio = false`) | sí [D; las dos cosas, C en el estado final] |
+| + F5a | tabla nueva vacía | sí [D] |
+| + F3 | columnas `reserva_*` (NULL); disparador de incidencias sólo para citas con `reserva_canal` (ninguna) | sí [D] |
+| + F2 | `google_asignacion` (NULL en las altas de `main`; sólo `service_role` + `spinus.via` la pone) | sí [D; el NULL, C en el estado final] |
+| + F4 | tablas vacías con FK RESTRICT a `appointments`; aviso sólo para altas por enlace o «por asignar» (ninguna) | sí [D] |
+| + F5b | **la atendida con nota: 500 al moverla, cambiarle el estado o borrarla** (§6.1) | sí [C: es el estado final menos T] |
+| + T (las 9) | TRUNCATE prohibido también en las tablas nuevas | sí [C, E2 §5.4 (a)] |
+
+**Regla:** ante un fallo, **parar y no revertir** mientras se decide: cualquier
+prefijo deja la app de producción funcionando como hoy (salvo, desde F5b, la
+atendida con nota). Lo que se retoma otro día es `aplicar.sh aplicar` desde el
+paso 3 (conteos), que sigue donde se quedó. **Lo que no se hace** en un
+prefijo: encender la v2 (con +F3 sin F2, la reserva por enlace de la rama da
+404 y la sincronización con Google no existe [C, E2 §5.5.4, r4]; sin F4, no hay
+confirmaciones).
+
+**La reversa en este orden** (§10, sólo con orden de Angel): con `main` en
+producción no hay código nuevo que dependa de nada, así que revertir no rompe la
+app [C: `main` sobre la base revertida entera, E2 §5.5.3; los estados
+intermedios de la reversa con `main`, D]. Quitar F5b vuelve a dejar mover y
+borrar la atendida con nota (como hoy) [C, E2 §5.5.3]. La reversa de F1 devuelve
+los horarios del respaldo a los consultorios que nadie editó [C, E2 r7]; las
+filas de `audit_log` y el respaldo se quedan (por eso F1 es el punto de no
+retorno). **Si la v2 está encendida en la clínica de Angel por los previews, se
+apaga ANTES** (regla del recuadro; `aplicar.sh` lo exige, G2), y con las
+reversas de F3 o más, lo que esa clínica haya creado en la v2 se pierde (la
+comprobación previa lo lista y pide `PERDER DATOS`).
+
 
 ---
 
@@ -1065,8 +1187,12 @@ un archivo a mano después de aplicar las 9 [C, clon A, `psql -f` como
 >    aplica a la primera (la de T, la de F2 si no hubo Google, las dos de
 >    TRUNCATE). No se corre «para ver si se niega» [C, E2 5.5.6: la de F2, lanzada
 >    para ver la negativa, se aplicó].
-> 5. Si lo que falla es el CÓDIGO y la base aún no se tocó (paso 5), no hay
->    reversa de base: se vuelve al despliegue anterior de Vercel.
+> 5. Si lo que falla es el CÓDIGO el día del código (§4-bis, C4), no hay
+>    reversa de base: se vuelve al despliegue anterior de Vercel (`main` sobre la
+>    base nueva, el estado de la ventana [C]). *(Antes: «y la base aún no se tocó
+>    (paso 5)», del orden «código primero», sustituido.)*
+> 6. **Con la v2 encendida en la clínica de Angel para los previews** (paso 8),
+>    la regla 1 vale igual: apagarla antes de cualquier reversa.
 
 ### 10.1 La de la agenda
 
@@ -1331,7 +1457,7 @@ Sólo lo que de verdad queda (al 2026-11-22, tras la fase 2 de CA). Lo resuelto
 se quitó: las rejillas de 2 y F5a (A6, corregidas), la elección `aplicar.sh` /
 `db push` (decidido: `aplicar.sh`), las ventanas de F3 y F2 (A1, resuelto con
 una petición por archivo, §5.0) y la duración de las rutas en Vercel (Fluid
-Compute confirmado por Angel; se mira el panel en el paso 4).
+Compute confirmado por Angel; se mira el panel el día del código, §4-bis C0).
 
 1. **`huellas.sha256`:** regenerado con el SQL definitivo (fase 2 de CA: 17 de
    los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Regenerado otra
@@ -1354,10 +1480,11 @@ Compute confirmado por Angel; se mira el panel en el paso 4).
 5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
-6. **Confirmar, antes de fusionar a `main`, que la integración de Supabase con
-   GitHub sigue sin conectar** (Settings → Integrations; sin conectar el
-   2026-11-22, según Angel): conectada, podría aplicar las migraciones sola al
-   subir a `main`, sin `aplicar.sh` ni rejillas (§4, paso 0).
+6. **Confirmar que la integración de Supabase con GitHub sigue sin conectar**,
+   el día de la base y otra vez antes de fusionar a `main` (Settings →
+   Integrations; sin conectar el 2026-11-22, según Angel): conectada, podría
+   aplicar las migraciones sola al subir ramas, sin `aplicar.sh` ni rejillas
+   (§4 paso 0; §4-bis, C0).
 7. Dónde correr de forma automática la comprobación periódica de los privilegios
    por omisión (`COMPROBACION-POSTERIOR.md` §10; `DEUDA_TECNICA.md` AG-DT-270):
    lo decide Angel. A mano, la consulta ya está.
@@ -1414,7 +1541,11 @@ con lo que da el navegador.
 el mismo navegador, la misma red (no cambiar de wifi a datos), la misma vista y
 la misma semana de la agenda, a una hora parecida, sin otras pestañas pesadas.
 «Antes» = el mismo día, con las 9 aplicadas y la v2 todavía apagada; «después» =
-nada más encenderla.
+nada más encenderla. **Con «base primero» (2026-11-23) se mide dos veces:** al
+encender para los previews (§4 paso 8: antes y después en el MISMO preview) y el
+día del código (§4-bis, C1 y C5: en producción, con el código nuevo). Qué
+medición cuenta como «antes» el día del código si la v2 ya estaba encendida en
+la clínica de Angel: decisión pendiente de Angel (§4-bis, C1).
 
 **Cada medición** (5 veces seguidas; se anota la **mediana**, la del medio al
 ordenarlas):

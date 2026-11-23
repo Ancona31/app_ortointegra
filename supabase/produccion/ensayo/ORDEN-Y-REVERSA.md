@@ -161,6 +161,8 @@ exigente, y funcionaron salvo la reserva por enlace en +F3 sin F2 (404 limpio)
 dice «base primero» y también es seguro: la diferencia es ese 500, no un riesgo
 de datos. Lo decide Angel.
 
+> *Nota del agente BP (2026-11-23): Angel eligió **«base primero»** (el código, días después: plan §4, §4-bis y §6.1). Lo que este ensayo NO cubrió de esa dirección (estados intermedios con `main`, `main` con la v2 encendida, Google, Realtime): `docs/despliegue/VENTANA-BASE-PRIMERO.md`.*
+
 **Si se mantiene «base primero»**: la ventana es segura; hasta desplegar, una
 cita atendida con nota no se puede mover/cancelar/borrar y la app vieja lo dice
 con un error que trae un texto legible.

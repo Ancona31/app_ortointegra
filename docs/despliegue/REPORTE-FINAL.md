@@ -4,6 +4,8 @@
 > **Solo documentación: no se aplicó ni se desplegó nada, y no se tocó producción.** Escrito para alguien que no estuvo en la sesión.
 > **[C]** = comprobado, con el archivo o la orden al lado. **[D]** = deducido.
 > Tablero del día: `docs/despliegue/ESTADO.md`. Variables: `docs/despliegue/VARIABLES-VERCEL.md`.
+>
+> **Nota del agente BP (2026-11-23): EL ORDEN CAMBIÓ A «BASE PRIMERO, CÓDIGO OTRO DÍA»** (decisión de Angel: prueba el rediseño en los previews de Vercel, que apuntan a la base de producción; plan §4, §4-bis y §6.1). Por eso **ahora SÍ aplican, durante la ventana (días)**, dos cosas que este reporte daba por evitadas: el **500 de `main`** al mover, cambiar de estado o borrar una cita atendida con nota (§5, fila «Orden»), y los **+500 ms de `main` sobre la base nueva con red limitada** (§7). Lo que cambia para los usuarios y para los previews: `docs/despliegue/VENTANA-BASE-PRIMERO.md`. Donde abajo dice «repetir los conteos entre el paso 5 y el 6», hoy el paso 5 ES esa repetición.
 
 ## 1. ¿Hay algo que impida aplicar a producción?
 
@@ -98,7 +100,7 @@ Fuente: `supabase/fusion/equivalencia/DIFERENCIAS.md`, tercera vuelta.
 | Batería 3 (agente S) | lunes 23, 09:04–09:30, sobre `2e7d5d72` (build de `77751da3`): **632 pasan, 2 fallan, 4 no corren, 494 se saltan; guarda en VERDE**. Fallos: `reserva-k2-codigo` «la reserva falla después de verificar» (la prueba llenaba el tope viejo de 4; corregida en `131ad6c1`, suelta 3 de 3 en verde; las 4 que no corrieron son las que le siguen en serie) y `agenda-empalme` «redimensionar…» (AG-DT-257, suelta 1 de 3). No se repitió entera | [C] §10 |
 | Batería 4 (agente R) | lunes 23, 09:56:44–09:57:07, sobre `d7486b0c` (build de ese commit): **no corrió ninguna prueba.** El `globalSetup` abortó en la semilla: «Hay 1 fila(s) en documentos sobre pacientes sembrados. No se borra expediente clínico» (una solicitud de laboratorio creada a las 09:51 desde el `next start` de :3000, mientras Angel probaba a mano). No se borró la fila ni se recreó la base; repetida entera en la batería 5 | [C] §10.3 |
 | Batería 5 (agente R) | lunes 23, 10:02:21–10:28:39, sobre `d7486b0c`, con la base recreada desde cero (`base.sh 14`: historial 14) y la semilla limpia (6 almacenes): **637 pasan, 1 falla, 0 no corren, 494 se saltan; guarda en VERDE**. La falla es `agenda-empalme` «redimensionar hasta otra cita también avisa», la conocida AG-DT-257 (no aparece el aviso del empalme tras redimensionar). Sola, con `--workers=1`, falla 1 vez de 3 con el mismo error y pasa 2. No se tocó | [C] ENSAYO-PRINCIPAL, «Batería del agente R» |
-| Orden | las dos direcciones son seguras. Código primero: un `warn` por petición. Base primero: 500 con main sobre una cita atendida con nota | [C] ORDEN-Y-REVERSA §5.4 |
+| Orden | las dos direcciones son seguras. Código primero: un `warn` por petición. Base primero (**la elegida desde el 2026-11-23**): 500 con main sobre una cita atendida con nota | [C] ORDEN-Y-REVERSA §5.4 |
 | Reversa | se niega si hay datos. Con la v2 encendida, quitar F3 o más da 500 en 21 de 66 peticiones. `audit_log` solo crece. Volver a aplicar da 0 diferencias | [C] §5.5 |
 
 Hasta el agente S, `src/`, las migraciones y `vercel.json` no cambiaban desde `b2993fe1` [C: git diff vacío]; entre la batería 1 y la 2 sólo cambiaron archivos de `e2e/`. **El agente S cambia `src/`** (`77751da3`: la ruta de reservar, `limitesReserva.ts` y 5 pruebas de Vitest; §10). Migraciones y `vercel.json`, sin cambios [C: `git diff --stat b2993fe1 -- supabase/migrations vercel.json` vacío].
@@ -146,7 +148,7 @@ Fuente: ENSAYO-PRINCIPAL §5.6. Mediana de 20 muestras; servidor y base en la mi
 
 **«Carga» llega antes de que se pinte la agenda; el LCP no.** «Carga» es la cifra que decide en el plan §15, y llega a ≈144 ms frente a ≈313 ms del primer evento (640 frente a ≈800 con red limitada). El LCP sí coincide con la aparición de las citas. «Fin de la última /api» sube de ≈220 a ≈390 ms con la v2 por dos peticiones posteriores al pintado.
 
-**Main sobre la base nueva tarda +500 ms con red limitada** (999 → 1506 ms, en las 4 rondas). No se investigó. Solo importa con «base primero».
+**Main sobre la base nueva tarda +500 ms con red limitada** (999 → 1506 ms, en las 4 rondas). No se investigó. Solo importa con «base primero», **que es el orden elegido desde el 2026-11-23: aplica durante toda la ventana**.
 
 ## 8. Sin resolver y decisiones de Angel
 1. Qué cifra decide tras encender: «Carga» o LCP.

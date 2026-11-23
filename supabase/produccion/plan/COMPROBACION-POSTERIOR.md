@@ -1,7 +1,9 @@
 # Comprobación posterior — que producción quedó IDÉNTICA al ensayo
 
-> Paso 7 de `PLAN-DE-APLICACION.md` (con el orden «código primero»: el código
-> nuevo ya está desplegado desde el paso 4), al día con las 9 migraciones y con la foto
+> Paso 7 de `PLAN-DE-APLICACION.md`, **el día de la base: con «base primero»
+> (decisión de Angel, 2026-11-23) en producción sigue el código de `main`**; el
+> código nuevo llega otro día (plan §4-bis). *(Sustituye a «con el orden «código
+> primero»: el código nuevo ya está desplegado desde el paso 4».)* Al día con las 9 migraciones y con la foto
 > real de producción (agente QL, 2026-11-22). Los comandos de §0 son los del
 > ensayo de punta a punta, que se corrió así sobre un clon nuevo de la foto
 > [C]. **Todo es de sólo lectura**: la única conexión a producción es la de
