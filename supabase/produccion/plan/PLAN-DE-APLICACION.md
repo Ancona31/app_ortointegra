@@ -244,6 +244,15 @@ encendido.
       se tocan en la misma sesión y, si algo sale mal, hay que poder parar sin
       nadie en consulta.
 - [ ] Nadie más desplegando ni tocando la base.
+- [ ] **ANTES de fusionar a `main` y desplegar el código (paso 4): confirmar que
+      la integración de Supabase con GitHub sigue SIN CONECTAR** (panel de
+      Supabase → Settings → Integrations; comprobado por Angel el 2026-11-22: no
+      está conectada). Si estuviera conectada, podría aplicar las migraciones
+      sola al subir a `main`, sin pasar por `aplicar.sh` ni por sus rejillas, y
+      habría que desconectarla ANTES de fusionar. Va antes del despliegue del
+      código, no antes de la base, porque el orden es código primero. (Dato de
+      Angel, mismo día: la integración de Vercel tampoco está instalada; por eso
+      las variables del §6.2 se ponen a mano en Vercel.)
 - [ ] Las variables de Vercel del §6.2 preparadas (generadas en la terminal de
       Angel, sin escribirlas en ningún archivo), **`CRON_SECRET` incluida: se
       pone ANTES de desplegar** (§6.2).
@@ -424,7 +433,8 @@ Qué mirar, además:
 - [ ] Anotar cuál es el despliegue de producción ACTUAL (el de `main`): es al
       que se vuelve si el paso 5 falla.
 
-Desplegar la rama (el merge a `main` y el despliegue los hace Angel). Con este
+Antes de fusionar: la casilla de la integración de Supabase con GitHub del
+paso 0 (sin conectar). Desplegar la rama (el merge a `main` y el despliegue los hace Angel). Con este
 despliegue **nacen las dos tareas programadas**: `main` no tiene `crons` en
 `vercel.json` (comprobado: `git show main:vercel.json` sólo trae
 `buildCommand`); la rama trae `google-sync` cada 10 min y `recordatorios` cada
@@ -1185,6 +1195,23 @@ Las ventanas de candado de §5.0 y los cortes de §5.2 se midieron con el SQL de
 la fase 1; con una petición por archivo, las sentencias que añadió la ronda 1 no
 las cambian (es tiempo de servidor) — DEDUCIDO, no se volvieron a medir.
 
+**Fase 3 de CA (ronda 2 de la auditoría, A15 y A16) [C-CA, 2026-11-22]**, sobre
+`clon-spinus-ca-3`; salidas en `~/spinus-fusion/ensayo-ca/fase3-20261122-231300/`:
+- **A15:** tras una reversa confirmada que PASA (T), en la misma conexión la
+  confirmación ya no está (`current_setting` vacío) y la reversa de F5b sin
+  confirmar se NIEGA por la cancelada cerrada; tras una confirmada que FALLA
+  (F2 con F4 puesta), la transacción queda abortada, tras su `ROLLBACK` la
+  confirmación ya no está y la de F4 se NIEGA por el aviso. Con el `SET` de
+  sesión de antes, la confirmación sí sobrevivía (`[si]`). `aplicar.sh reversa`
+  con datos: sin confirmar, nada tocado; con `PERDER DATOS`, las 7 en verde (7
+  avisos «already a transaction in progress», los esperados).
+- **A16:** con una CLI que sólo imprime la línea que `registrar` filtra, el guion
+  viejo salió con 1 en silencio (sin ✓ ni ALTO) con la versión ya registrada; el
+  nuevo siguió, comprobó el historial y terminó «Las 9 aplicadas y registradas».
+- Ida → reversa con datos → reversa-truncate → ida, en verde y sin REVISAR; los
+  fallos de A2 (después del `COMMIT`, aplicada sin registrar, REVISAR, historial
+  ilegible), A5 y A8, igual que en la fase 1.
+
 **Lo que no se ensayó:**
 
 - El pooler real (Supavisor): cómo presenta la rejilla y los NOTICE de una
@@ -1226,7 +1253,11 @@ Compute confirmado por Angel; se mira el panel en el paso 4).
 5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
-6. Dónde correr de forma automática la comprobación periódica de los privilegios
+6. **Confirmar, antes de fusionar a `main`, que la integración de Supabase con
+   GitHub sigue sin conectar** (Settings → Integrations; sin conectar el
+   2026-11-22, según Angel): conectada, podría aplicar las migraciones sola al
+   subir a `main`, sin `aplicar.sh` ni rejillas (§4, paso 0).
+7. Dónde correr de forma automática la comprobación periódica de los privilegios
    por omisión (`COMPROBACION-POSTERIOR.md` §10; `DEUDA_TECNICA.md` AG-DT-270):
    lo decide Angel. A mano, la consulta ya está.
 
