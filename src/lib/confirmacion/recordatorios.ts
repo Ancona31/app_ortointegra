@@ -36,7 +36,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { logger } from '@/lib/logger'
 import { enviarCorreo } from '@/lib/correo/transporte'
-import { emitirEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
+import { emitirEnlaceParaCorreo } from '@/lib/confirmacion/enlaceConfirmacion'
 import { correoRecordatorio } from '@/lib/confirmacion/correosCita'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 
@@ -136,8 +136,11 @@ async function nombreDelSaludo(clinicaId: string, citaId: string): Promise<strin
 
 /** Compone y manda UN recordatorio ya tomado. Devuelve cómo cerrarlo. */
 async function mandar(clinicaId: string, citaId: string, t: Toma): Promise<Cierre> {
-  const enlace = await emitirEnlaceConfirmacion(clinicaId, citaId, null)
-  if (!enlace) return { estado: 'omitido', motivo: 'sin_enlace' }
+  const enlace = await emitirEnlaceParaCorreo(clinicaId, citaId, null)
+  // Oleada 3, arreglo 4: un ERROR queda `fallido` (F4: `cita_correo_tomar` lo vuelve a tomar, hasta 3
+  // intentos, y `cita_recordatorios_pendientes` lo vuelve a listar); sólo lo que no aplica, `omitido`.
+  if (enlace === 'error') return { estado: 'fallido', motivo: 'sin_enlace' }
+  if (enlace === 'no_aplica') return { estado: 'omitido', motivo: 'sin_enlace' }
   const nombre = await nombreDelSaludo(clinicaId, citaId)
   let correo
   try {

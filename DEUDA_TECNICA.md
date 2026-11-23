@@ -6155,8 +6155,10 @@ retire la rama, sus dos casos de prueba y, si Angel quiere, el comentario.
 
 ### AG-DT-264 — Los empalmes con reservas pendientes de registrar viven sólo en memoria
 
-**Estado:** abierta, **prioridad media** (decisión de Angel, 2026-11-22). Lo
-importado o movido desde Google en una página se junta en `pasada.movidas`
+**Estado:** abierta, **prioridad media** (decisión de Angel, 2026-11-22);
+ampliada en la oleada 3 (2026-11-22) con los demás reflejos y correos que se
+pierden sin reintento: **resolver antes de encender la v2 en otras clínicas**.
+Lo importado o movido desde Google en una página se junta en `pasada.movidas`
 (`src/lib/gcalSincronizacion.ts`) y `avisarEmpalmes` lo manda a
 `reserva_empalmes_registrar`. El par no se vuelve a detectar en otra pasada: si
 esa RPC falla, el aviso de empalme a la clínica se pierde. La tanda W lo mitigó
@@ -6174,11 +6176,135 @@ Dos límites de esa mitigación, comprobados al hacerla:
   `UUID_RE`, aplicado a `extra` en la línea 134): el día que se encienda,
   llegarán `[ID-REDACTADO]`. No se tocó el filtro.
 
-**Arreglo de fondo:** guardar los pendientes en la base (una cola por clínica
-que la pasada siguiente reintenta antes de avanzar), con su migración y su
-auditoría.
+**Ampliación (oleada 3, 2026-11-22; orden de Angel): lo que tampoco se
+reintenta.** Líneas comprobadas abriendo cada archivo, DESPUÉS de los arreglos
+de la oleada 3:
 
-**Cuándo:** en su propia rama, después de producción.
+* **(a) Reflejos hacia Google que pueden quedar a medias.** Todos corren en un
+  `after()`, una sola vez; si Google falla, queda el `registrarFalloGCal` o un
+  `logger.warn` y nada más:
+  - reagendar de la clínica y confirmar/cancelar por el enlace del paciente:
+    `src/app/api/appointments/[id]/reagendar/route.ts:144` y
+    `src/app/api/confirmar/[codigo]/route.ts:89`, los dos por `reflejarEnGoogle`
+    (`src/lib/confirmacion/googleConfirmacion.ts:42-56`), que no marca
+    `gcal_sync_status`. Su aviso decía «lo hará el sondeo», que era falso (el
+    sondeo es Google→Spinus y sólo mira eventos que cambiaron EN Google): la
+    oleada 3 corrigió el texto, no el comportamiento;
+  - bloqueos: `src/app/api/agenda/bloqueos/route.ts:50`,
+    `src/app/api/agenda/bloqueos/[id]/route.ts:63` (editar) y `:84` (quitar),
+    con `src/lib/agenda/bloqueosGoogle.ts:69-73` (`vinculoActual`), `:76-98`
+    (`empujarBloqueo`) y `:101-122` (`borrarBloqueoEnGoogle`);
+  - borrar una cita: `src/app/api/appointments/[id]/route.ts:1548-1573` (el
+    evento queda vivo en el calendario del médico);
+  - editar: los `after()` de `src/app/api/appointments/[id]/route.ts:1018`
+    (alta del evento al editar) y `:1204` (cambio del evento).
+* **(b) El comprobante de la reserva** que queda en `enviando` (la función se
+  corta entre el envío y el cierre) o en `fallido` (el transporte falló):
+  `src/lib/reserva/comprobanteReserva.ts:81-87`. Nadie vuelve a tomar un
+  `comprobante`: sólo lo pide el `after()` de la reserva, una vez. Lo único que
+  llega después es el recordatorio, si la clínica lo tiene encendido.
+* **(c) El correo a la clínica por cada reserva**, sin rastro si falla: la
+  opción y los destinatarios se leen tragándose el error
+  (`src/lib/reserva/correoClinicaReserva.ts:87-91` y `:94-102`: un error cuenta
+  como «apagado» o «sin destinatarios» y no sale nada, sin registro), y los
+  envíos de `:113` sólo quedan contados en la descripción del `logAudit`; uno
+  que falla no se reintenta.
+* **(d) Los otros tres sitios de la sincronización con el mismo patrón** que el
+  arreglo 3 de la oleada 3 no cubre (ese arreglo sólo hace que un fallo
+  PASAJERO de la base al aplicar una decisión no avance la página, como el
+  restablecimiento de la tanda J):
+  - `avisarMovimientoRechazado` (`src/lib/gcalSincronizacion.ts:486-495`): un
+    fallo cuenta en `errores` y el aviso de la campana se pierde;
+  - los RSVP (`confirmarPorRsvps`, `src/lib/gcalSincronizacion.ts:349-364`,
+    llamada en `:331`): lo mismo con la confirmación por `accepted`;
+  - los bloqueos de la página (`src/lib/gcalSincronizacionBloqueos.ts:64-67`):
+    un fallo al aplicar un bloqueo movido o borrado en Google cuenta en
+    `errores` y la página avanza.
+
+**Arreglo de fondo (el mismo para todo lo de arriba):** una cola de pendientes
+en la base (por clínica), que la pasada siguiente o una tarea reintenta antes de
+dar el trabajo por hecho, con su migración y su auditoría.
+
+**Cuándo:** en su propia rama, después de producción y **antes de encender la
+v2 en otras clínicas**.
+
+### AG-DT-265 — Sentry no carga en el servidor, y `CLAUDE.md` da a entender lo contrario
+
+**Estado:** abierta, **prioridad ALTA**, **fuera de la agenda, sin tocar**
+(oleada 3, 2026-11-22; decisión de Angel: Sentry se queda como está, apoyado en
+el registro de Vercel).
+
+* No existe `instrumentation.ts` (ni en la raíz ni en `src/`), así que
+  `Sentry.init()` de servidor no corre nunca. Es **deliberado**:
+  `sentry.server.config.ts:1-17` («ESTE ARCHIVO NO SE EJECUTA. NO HAY
+  TELEMETRÍA DE SERVIDOR EN SPINUS», por el coste de `@sentry/node` en cada
+  arranque en frío) y `next.config.ts:201-229` (`autoInstrumentServerFunctions`
+  y `autoInstrumentAppDirectory` apagadas por lo mismo). El de navegador sí corre
+  (`instrumentation-client.ts`).
+* `CLAUDE.md` da a entender lo contrario: «NUNCA envíes datos identificables de
+  pacientes a APIs externas (Gemini, Anthropic, Google Calendar, Sentry)»
+  (línea 134), «NUNCA quites los filtros PII de Sentry» (línea 136) y el stack,
+  «**Sentry** (`@sentry/nextjs` 10.47)» (línea 195), sin decir que en servidor
+  está apagado. Un editor lee ahí que los fallos de servidor llegan a Sentry.
+* **Consecuencia:** los fallos de servidor (rutas de API, `after()`, tareas
+  programadas) sólo quedan en el registro de Vercel. Un `Sentry.captureMessage`
+  de servidor (p. ej. `avisarSentryEmpalmes`, AG-DT-264) no envía nada.
+* Además, el día que se encienda, `src/lib/sentryPiiFilter.ts` redacta los uuid:
+  `UUID_RE` (línea 19), aplicado en `redactString` (línea 67), a los arreglos
+  (líneas 86-91) y a `extra` (línea 134). Los ids de clínica y de cita llegarían
+  como `[ID-REDACTADO]`.
+
+**Cuándo:** decisión de Angel; si se enciende, medir antes (cabecera de
+`sentry.server.config.ts`) y revisar qué ids se dejan pasar.
+
+### AG-DT-266 — `logAudit` falla en silencio y diez rutas ni siquiera lo esperan
+
+**Estado:** abierta, **prioridad ALTA**, **fuera de la agenda, sin tocar**
+(oleada 3, 2026-11-22).
+
+* `logAudit` (`src/lib/audit.ts:278-305`) nunca lanza ni devuelve su fallo: un
+  rechazo de Postgres o una excepción de red quedan sólo en `logger.error`
+  (`console.error`, o sea el registro de Vercel). Las rutas responden éxito
+  aunque la fila de auditoría no se haya escrito.
+* **Diez llamadas sin `await`** (fire-and-forget; comprobado abriendo cada una:
+  la línea empieza por `logAudit(` sin `await` ni `void`), todas bajo
+  `src/app/api/`: `pacientes/[id]/vincular/route.ts:73`,
+  `pacientes/[id]/correo/route.ts:142`, `paciente/[id]/exportar/route.ts:140`,
+  `admin/paciente/[id]/anonimizar/route.ts:78`,
+  `admin/paciente/[id]/rectificar/route.ts:75`, `admin/usuarios/route.ts:175`,
+  `auth/registro/route.ts:55`, `auth/rate-limit/route.ts:59`, `:72` y `:90`.
+  En una función de Vercel lo que no se espera ni se entrega a `after()` puede
+  no terminar cuando la respuesta ya salió (DEDUCIDO; no medido).
+* **Donde la fila de la app es el ÚNICO rastro** (no hay disparador que lo
+  registre, o el disparador no sabe quién fue):
+  - `src/app/api/me/horario/route.ts:85` (`horario_clinica_editado`: `clinicas`
+    no tiene disparador de auditoría y se escribe con el cliente de servicio);
+  - `src/app/api/agenda/correo/route.ts:105` (`enviar_confirmacion_cita`: la
+    fila de `cita_correos` la audita `log_tabla_change`, pero sólo aquí queda
+    QUIÉN la mandó);
+  - `src/app/api/appointments/[id]/reagendar/route.ts:103` (el aviso de cambio
+    al paciente por correo);
+  - los conflictos de la sincronización: `auditar` de
+    `src/lib/gcalSincronizacion.ts` (`gcal_conflicto_cita`,
+    `gcal_cambio_rechazado`) y `auditarConflictoEdicion` de
+    `src/lib/gcalEscritura.ts:167-181`.
+
+**Arreglo posible:** que `logAudit` devuelva si escribió (o lance), y que las
+rutas donde es el único rastro lo esperen y decidan; las diez sin `await`, con
+`await` o `after()`. Toca rutas clínicas: plan propio.
+
+**Cuándo:** en su propia rama; no es de la agenda.
+
+### AG-DT-267 — `consultas/route.ts` usa `after()` sin `maxDuration` (observación)
+
+**Estado:** observación, **sin prioridad** (oleada 3, 2026-11-22; orden de
+Angel: «ni maxDuration ni nada más»). `src/app/api/consultas/route.ts` (la ruta
+que guarda las notas clínicas) deja en `after()` sólo el color de «atendida» en
+Google. Como las rutas de la agenda, no declara `maxDuration` y hereda el límite
+por omisión de la función: con Fluid Compute en Pro, 300 s (regla «La agenda
+depende de Fluid Compute en Vercel» de `CLAUDE.md`). No se toca; queda anotada
+para que nadie le ponga un límite corto sin mirar lo que hace la ruta antes de
+responder.
 
 ---
 

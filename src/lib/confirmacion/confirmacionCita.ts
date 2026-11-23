@@ -24,7 +24,7 @@
 import { randomUUID } from 'node:crypto'
 import { logger } from '@/lib/logger'
 import { enviarCorreo } from '@/lib/correo/transporte'
-import { emitirEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
+import { emitirEnlaceParaCorreo } from '@/lib/confirmacion/enlaceConfirmacion'
 import { correoCambio, correoConfirmacion } from '@/lib/confirmacion/correosCita'
 import { RecordatoriosNoDisponibles, marcarEnvio, tomarEnvio, type Cierre, type Toma } from '@/lib/confirmacion/recordatorios'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
@@ -54,8 +54,11 @@ async function tomar(clinicaId: string, citaId: string, testigo: string): Promis
 
 /** Compone y manda la confirmación ya tomada. Devuelve cómo cerrarla. */
 async function mandar(clinicaId: string, citaId: string, perfilId: string, t: Toma, o: OpcionesConfirmacion): Promise<Cierre> {
-  const enlace = await emitirEnlaceConfirmacion(clinicaId, citaId, perfilId)
-  if (!enlace) return { estado: 'omitido', motivo: 'sin_enlace' }
+  const enlace = await emitirEnlaceParaCorreo(clinicaId, citaId, perfilId)
+  // Oleada 3, arreglo 4: un ERROR queda `fallido` (la base lo vuelve a dar al pulsar otra vez, y la ruta
+  // responde 502 reintentable); `omitido` lo cerraba para siempre (409 `no_disponible`).
+  if (enlace === 'error') return { estado: 'fallido', motivo: 'sin_enlace' }
+  if (enlace === 'no_aplica') return { estado: 'omitido', motivo: 'sin_enlace' }
   let correo
   try {
     const datos = {
@@ -75,7 +78,7 @@ async function mandar(clinicaId: string, citaId: string, perfilId: string, t: To
 
 function resultadoDe(c: Cierre): ResultadoConfirmacion {
   if (c.estado === 'enviado') return { tipo: 'enviado' }
-  if (c.motivo === 'sin_enlace') return { tipo: 'sin_enlace' }
+  if (c.estado === 'omitido' && c.motivo === 'sin_enlace') return { tipo: 'sin_enlace' }
   return c.motivo === 'duplicado' ? { tipo: 'no_toca' } : { tipo: 'fallido' }
 }
 

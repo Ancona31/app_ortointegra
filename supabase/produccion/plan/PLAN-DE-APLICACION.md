@@ -240,6 +240,13 @@ código y se decide entre arreglar o revertir (§10).
 
 ### Paso 6 · Variables de Vercel (§6), y después el despliegue del código
 
+**Antes de desplegar** (Vercel → Project → Settings → Functions):
+
+- [ ] **Fluid Compute sigue ACTIVADO.** La agenda depende de él: el trabajo que
+      sus rutas dejan en `after()` vive dentro del límite de la función, y
+      ninguna declara `maxDuration` (§12, punto 4).
+- [ ] **No hay un «Function Max Duration» de proyecto menor que 300 s.**
+
 ### Paso 7 · Encender la v2 en UNA clínica
 
 Sólo cuando §13 esté resuelto. `agenda_ajustes.agenda_v2_encendida` **sólo** la
@@ -550,18 +557,26 @@ INFO, ninguna REVISAR, reversas al estado de la foto salvo el respaldo.
 2. Las dos REVISAR falsas de la segunda pasada (§9): decidir si se corrigen las
    rejillas de 2 y F5a o basta con la regla.
 3. La decisión de §2 (`aplicar.sh` o `db push`).
-4. **Duración máxima de las rutas de la reserva en Vercel** (dato que Angel
-   mira en el panel; el repo no lo sabe). `POST /api/reservar/[codigo]` y
-   `GET /api/reservar/[codigo]/turnos` **no declaran `maxDuration`** y entregan
-   trabajo a `after()` (el evento de Google, el comprobante y el correo a la
-   clínica: `src/lib/reserva/sincronizarReserva.ts`, `googleReserva.ts`,
-   `comprobanteReserva.ts`, `correoClinicaReserva.ts`); lo de `after()` corre
-   dentro de la misma función y cuenta para su límite. Las de `cron/*` sí lo
-   declaran (60 s). Mirar en Vercel → Settings → Functions si el proyecto tiene
-   **Fluid Compute** y qué duración máxima por omisión aplica; si fuera corta,
-   un `after()` lento (Google) se cortaría sin error visible para el paciente.
-   Dato del coordinador; comprobado sólo que no hay `maxDuration` en esas rutas
-   (grep) y que `after()` está en `route.ts` y en esos cuatro módulos.
+4. **Duración máxima de las rutas de la agenda en Vercel: CONFIRMADA**
+   (2026-11-22, oleada 3). Angel miró el panel: **Fluid Compute está
+   activado**. Con Fluid Compute, en Pro, una función sin `maxDuration` tiene
+   **300 s por omisión** (800 s de máximo configurable): documentación de
+   Vercel, https://vercel.com/docs/functions/configuring-functions/duration,
+   «Duration limits» (leída por el coordinador el 2026-11-22). Lo entregado a
+   `waitUntil` —y `after()` va por ahí: Next 16.2.1,
+   `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md`,
+   «Duration» y «Reference: supporting `after` for serverless platforms»—
+   comparte ese límite y se cancela al alcanzarlo (Vercel,
+   `functions/functions-api-reference/vercel-functions-package`, `waitUntil`).
+   Esa documentación NO da la cifra con Fluid Compute desactivado.
+   Por eso **ninguna** de las rutas de la agenda con `after()` declara
+   `maxDuration` (decisión de Angel: 30 s acortaría el margen):
+   `reservar/[codigo]`, `reservar/[codigo]/turnos`, `confirmar/[codigo]`,
+   `appointments`, `appointments/[id]`, `appointments/[id]/reagendar`,
+   `agenda/bloqueos`, `agenda/bloqueos/[id]` (todas bajo `src/app/api/`). Las
+   que sí lo declaran se quedan como están: `google/sync` (30 s) y
+   `cron/google-sync` y `cron/recordatorios` (60 s). La comprobación del panel
+   va en el paso 6.
 5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.

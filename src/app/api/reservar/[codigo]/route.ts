@@ -24,7 +24,8 @@
  *      interruptor, aviso, S3, ventana, empalme, verificación y candado de la
  *      persona, e inserta la cita. Con `origen` (E6, reagendar), la misma
  *      llamada envuelta por `reagendar_por_enlace`.
- * Después de responder (`after()`, D8): el evento de Google y el comprobante.
+ * Después de responder (`after()`, D8): el comprobante, el aviso a la clínica y
+ * el evento de Google, cada uno en su `after()` (oleada 3).
  * Tanda I, punto 2: en el enlace de UN SOLO USO el correo es opcional (sin
  * código en los dos casos); sin correo no hay comprobante. El fijo no cambia.
  * Tanda J, punto 3: en el ÚNICO el correo que llegue en el cuerpo se IGNORA
@@ -136,6 +137,13 @@ type ConsultorioCtx = ContextoReserva['consultorios'][number]
  * citas que agenda el personal siguen sin correo al agendar.
  * I5 (punto 20): y, si la clínica lo encendió en la configuración (apagado de
  * fábrica), un correo a sus administradores (`correoClinicaReserva.ts`).
+ * Oleada 3 (orden de Angel): TRES `after()` independientes, el comprobante
+ * primero. Ni el comprobante ni el correo a la clínica usan nada del evento
+ * de Google (sólo la fila de la RPC y el contexto), así que no lo esperan.
+ * Next 16.2.1 corre cada callback de `after()` con su propio `try` y todos a
+ * la vez (`server/after/after-context.js`: `p-queue` sin límite de
+ * concurrencia): si Google tarda o lanza, los otros dos salen igual. Los tres
+ * comparten el límite de la ruta (`after.md`, «Duration»: `maxDuration`).
  */
 function programarDespues(
   ctx: ContextoReserva, consultorio: ConsultorioCtx, b: { nombre: string; correo: string | null; unico: boolean }, fila: ResultadoReservaRpc, reagendada: boolean,
@@ -143,31 +151,29 @@ function programarDespues(
   const { r_cita_id: citaId, r_inicio: inicio, r_fin: fin } = fila
   if (!citaId || !inicio || !fin) return
   const nombre = b.nombre.trim()
-  after(async () => {
-    await crearEventoReserva({
-      clinicaId: ctx.clinica_id, citaId, medicoId: ctx.medico_id, nombre, inicio, fin, zona: consultorio.timezone,
-      clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
-    })
-    // Tanda J, punto 3: en el único el destinatario lo da SÓLO la base (el
-    // correo del enlace; sin él, no hay a quién y no sale nada): sin
-    // `correoEscrito`, así que tampoco hay respaldo al tecleado. En el fijo, el
-    // verificado, como siempre. Integración I: no es un `return`, porque el
-    // aviso a la clínica (I5) sale también por una reserva sin correo.
-    if (b.unico || b.correo !== null) {
-      await enviarComprobante({
-        clinicaId: ctx.clinica_id, citaId, correoEscrito: b.unico ? null : b.correo,
-        datos: {
-          medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
-          telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
-          // M5 (punto 11): el nombre que escribió, para el saludo y la fila «Paciente» del comprobante.
-          paciente: nombre,
-        },
-      })
-    }
-    // I5 (punto 20): el aviso a la clínica, si lo encendió; detrás del comprobante y sin datos clínicos.
-    await avisarReservaAClinica({
-      clinicaId: ctx.clinica_id, citaId, nombre, medico: nombreDelMedico(ctx), consultorio: consultorio.nombre,
-      inicio, zona: consultorio.timezone, reagendada,
-    })
-  })
+  // Tanda J, punto 3: en el único el destinatario lo da SÓLO la base (el
+  // correo del enlace; sin él, no hay a quién y no sale nada): sin
+  // `correoEscrito`, así que tampoco hay respaldo al tecleado. En el fijo, el
+  // verificado, como siempre. El aviso a la clínica (I5) sale también por una
+  // reserva sin correo.
+  if (b.unico || b.correo !== null) {
+    after(() => enviarComprobante({
+      clinicaId: ctx.clinica_id, citaId, correoEscrito: b.unico ? null : b.correo,
+      datos: {
+        medico: nombreDelMedico(ctx), consultorio: consultorio.nombre, direccion: consultorio.direccion,
+        telefono: consultorio.telefono ?? ctx.medico.telefono, inicio, zona: consultorio.timezone,
+        // M5 (punto 11): el nombre que escribió, para el saludo y la fila «Paciente» del comprobante.
+        paciente: nombre,
+      },
+    }))
+  }
+  // I5 (punto 20): el aviso a la clínica, si lo encendió; sin datos clínicos.
+  after(() => avisarReservaAClinica({
+    clinicaId: ctx.clinica_id, citaId, nombre, medico: nombreDelMedico(ctx), consultorio: consultorio.nombre,
+    inicio, zona: consultorio.timezone, reagendada,
+  }))
+  after(() => crearEventoReserva({
+    clinicaId: ctx.clinica_id, citaId, medicoId: ctx.medico_id, nombre, inicio, fin, zona: consultorio.timezone,
+    clinica: ctx.clinica ? { nombre: ctx.clinica.nombre ?? '', nombre_display: ctx.clinica.nombre_display } : null,
+  }))
 }

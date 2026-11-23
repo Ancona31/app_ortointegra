@@ -92,7 +92,7 @@ describe('reservar sin correo (I, punto 2)', () => {
     expect(h.args[0].correo).toBeNull()
     expect(h.args[0].correoHmac).toBeNull()
     expect(h.args[0].telHmac).toMatch(/^[0-9a-f]{64}$/)
-    expect(h.orden).toEqual(['limites:reservar:ip,disp', 'rpc', 'google', 'comprobante'])
+    expect(h.orden).toEqual(['limites:reservar:ip,disp', 'rpc', 'comprobante', 'google'])  // oleada 3: el comprobante va primero y no espera a Google
     expect(h.escrito).toEqual([null])
   })
 
@@ -102,7 +102,7 @@ describe('reservar sin correo (I, punto 2)', () => {
     expect(r.status).toBe(201)
     expect(h.args[0].correo).toBeNull()
     expect(h.args[0].correoHmac).toBeNull()
-    expect(h.orden).toEqual(['limites:reservar:ip,disp', 'rpc', 'google', 'comprobante'])
+    expect(h.orden).toEqual(['limites:reservar:ip,disp', 'rpc', 'comprobante', 'google'])  // oleada 3: el comprobante va primero y no espera a Google
     expect(h.escrito).toEqual([null])
   })
 

@@ -468,7 +468,7 @@ Plan, decisiones y avance: `mejora_agendaV2.md` (§6-bis decisiones, §7 lo que
 le toca a Angel, §10 lo que no se probó en local). Auditoría del conjunto de
 migraciones: `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md`. Guía local:
 `GUIA_AUDITORIA_AGENDA_V2.md`; pruebas a mano: `GUIA_PRUEBAS_AGENDA_V2.md`.
-Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-264.
+Deuda abierta: `DEUDA_TECNICA.md`, AG-DT-13 a AG-DT-267.
 
 **Estado:** el código y las migraciones de la agenda están en `feature/agenda-v2`,
 probados sólo en local. Las 44 migraciones del proyecto (`20261111120000` a
@@ -575,6 +575,18 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
 * **El aviso de privacidad de la reserva** (`src/lib/reserva/avisoReserva.ts`)
   está PENDIENTE DE REVISIÓN LEGAL. Mientras lleve la marca, el enlace no abre
   aunque se apruebe su hash. No quites la marca sin la revisión de Angel.
+* **La agenda depende de Fluid Compute en Vercel** (oleada 3, 2026-11-22). Lo
+  que sus rutas dejan en `after()` vive dentro del límite de duración de la
+  función (`after.md` de Next 16.2.1, «Duration»). **Ninguna declara
+  `maxDuration`, a propósito:** heredan los 300 s por omisión que da Fluid
+  Compute en Pro (https://vercel.com/docs/functions/configuring-functions/duration,
+  «Duration limits», leída el 2026-11-22; Angel confirmó en el panel que está
+  activado). Si se desactiva Fluid Compute o se declara un `maxDuration` corto,
+  ese trabajo puede cortarse sin error visible. Son `reservar/[codigo]`,
+  `reservar/[codigo]/turnos`, `confirmar/[codigo]`, `appointments`,
+  `appointments/[id]`, `appointments/[id]/reagendar`, `agenda/bloqueos` y
+  `agenda/bloqueos/[id]` (bajo `src/app/api/`). `consultas` tampoco lo declara
+  (AG-DT-267).
 
 **Tanda tras las primeras pruebas a mano (2026-11-13, ramas T1-T3; sin
 migraciones).** Además de lo de arriba:
