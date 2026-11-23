@@ -2,6 +2,7 @@ import { test, expect, request, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { irAAgenda, modalCita, soloEscritorio, SESION, DIA_LABORABLE_LIBRE, tituloUnico, toastConTexto } from './ayudas'
 import { animacionesFueraDeRegla } from './movimientoAyudas'
+import { TOPE_MOVIMIENTO_MS } from '../src/lib/agenda/movimientoAgenda'
 
 /**
  * Bloque F, movimiento (F2.3-F2.8, diseño `plan_F.md` §2 y «Pruebas por paso»):
@@ -11,7 +12,8 @@ import { animacionesFueraDeRegla } from './movimientoAyudas'
  *   · `.ag-ev-saliendo` en una baja, y después la tarjeta desaparece;
  *   · el fundido de navegación es sólo opacidad y sin traslación;
  *   · con movimiento reducido todo aparece y desaparece igual, sin WAAPI;
- *   · la regla de `getAnimations` (sólo `opacity`/`transform`, ≤ 240 ms) en cada
+ *   · la regla de `getAnimations` (sólo `opacity`/`transform`, ≤ `TOPE_MOVIMIENTO_MS`,
+ *     400 ms desde B13 · AG0) en cada
  *     momento animado.
  *
  * ⚠️ LAS CLASES VIVEN POCO (la salida, 120 ms; la entrada, ~600 ms), así que no
@@ -151,7 +153,7 @@ test('abrir y navegar no ponen .ag-ev-nuevo; el fundido de fecha es sólo opacid
   expect(fundidos.length).toBeGreaterThan(0)
   for (const f of fundidos) {
     expect(f.propiedades).toEqual(['opacity'])
-    expect(f.duracion).toBeLessThanOrEqual(240)
+    expect(f.duracion).toBeLessThanOrEqual(TOPE_MOVIMIENTO_MS)
   }
 })
 

@@ -208,21 +208,28 @@
      NO SE DUPLICAN EN html.dark: son duraciones y curvas, no color. Si alguna
      vez aparece una contraparte oscura de uno de estos, es un error de copia.
 
-     El tope son 240 ms y no hay excepción. Una agenda es herramienta de
-     consulta: el médico la abre decenas de veces al día, y lo que se nota dos
-     veces molesta a la trigésima. El movimiento sirve para que un cambio no
-     aparezca de la nada, no para lucirse.
+     B13 · AG0: LA ESCALA ES LA DEL REDISEÑO (`sistema.css`, PLAN §2.6). Los
+     nombres `--ag-*` se quedan (los leen la hoja, `movimientoAgenda.ts` y los
+     componentes), pero apuntan a los tokens del catálogo: toque 100, salida
+     240, entrada 360 con el resorte (amortiguación 1). El tope de la regla de
+     la agenda (`REGLA_AGENDA`) sube con ellos a 400 ms, el del catálogo.
+     Una agenda es herramienta de consulta: el movimiento sirve para que un
+     cambio no aparezca de la nada, no para lucirse.
+     ⚠️ Las páginas públicas (`agendaPublica.css`) fijan sus valores de antes en
+     `body:has(.rp)`: no cambian de aspecto ni de ritmo.
+     ⚠️ Si cambias un valor, cambia su respaldo en `movimientoAgenda.ts`
+     (`RESPALDO_DURACION`) y el `dragRevertDuration` literal de `AgendaCliente`.
 
      ⚠️ SÓLO SE ANIMAN `opacity` Y `transform: translateY()`. Nunca `height`,
      `top` ni `width`: FullCalendar recalcula posiciones a partir del layout y
      animar algo que lo dispare sale como temblor de la rejilla entera. */
-  --ag-dur-micro: 120ms;   /* hover, press, focus */
-  --ag-dur-base:  180ms;   /* entrada de evento, cambio de vista */
-  --ag-dur-lento: 240ms;   /* aviso, panel, remonte del modal */
+  --ag-dur-micro: var(--dur-toque);   /* 100 ms · hover, press, focus */
+  --ag-dur-base:  var(--dur-sale);    /* 240 ms · entrada de evento, cambio de vista, salidas */
+  --ag-dur-lento: var(--dur-entra);   /* 360 ms · aviso, panel, entrada del modal */
 
-  --ag-ease-out: cubic-bezier(0, 0, .2, 1);    /* algo llega */
-  --ag-ease-in:  cubic-bezier(.4, 0, 1, 1);    /* algo se va */
-  --ag-ease:     cubic-bezier(.4, 0, .2, 1);   /* algo se mueve */
+  --ag-ease-out: var(--resorte-entra);          /* algo llega */
+  --ag-ease-in:  var(--resorte-sale);           /* algo se va */
+  --ag-ease:     cubic-bezier(.4, 0, .2, 1);    /* algo se mueve (FLIP, arrastre): sin resorte, no rebota */
 
   /* El anillo de la cita que llega por tiempo real (bloque F, `.ag-ev-remoto`).
      ES COLOR, ASÍ QUE ÉSTE SÍ TIENE CONTRAPARTE EN html.dark (#6b9bff). Mismo
@@ -577,7 +584,7 @@
 
   /* MODAL de cita (sub-fase 4) — variante clara. Nombrados para que la
      sub-fase 6 (dark) añada las contrapartes en html.dark. */
-  --ag-modal-overlay: rgba(0, 0, 0, .40);
+  --ag-modal-overlay: var(--velo);   /* B13 · AG0: el velo del catálogo (antes rgba(0,0,0,.40)) */
   --ag-modal-bg: #ffffff;
   --ag-input-bg: #ffffff;
   --ag-input-border: #e2e8f0;            /* ~slate-200 */
@@ -4456,6 +4463,11 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   animation: ag-modal-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
 }
 .ag-modal-velo {
+  /* B13 · AG0: el velo del catálogo, también con las clases de Tailwind que
+     traen los modales (`bg-black/40 backdrop-blur-sm`): esta regla no tiene
+     capa y les gana. Con transparencia reducida, opaco y sin desenfoque. */
+  background: var(--velo);
+  -webkit-backdrop-filter: var(--velo-filtro); backdrop-filter: var(--velo-filtro);
   animation: ag-modal-velo-entra var(--ag-dur-lento) var(--ag-ease-out) backwards;
 }
 .ag-modal-panel[data-estado="saliendo"] {
@@ -6568,7 +6580,10 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   position: fixed;
   inset: 0;
   z-index: 44;
-  background: rgba(16, 32, 64, .28);
+  /* B13 · AG0: el velo del catálogo (desenfoque; opaco y sin desenfoque con
+     transparencia reducida, `sistema.css`). Antes, rgba(16, 32, 64, .28). */
+  background: var(--velo);
+  -webkit-backdrop-filter: var(--velo-filtro); backdrop-filter: var(--velo-filtro); /* en este orden: al revés, el minificador se queda sólo con el prefijo */
   animation: ag-velo-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 
@@ -7412,13 +7427,21 @@ li + li > .ag-aviso-fila { border-top: 1px solid var(--ag-hairline); border-radi
    equivalente directo en el handoff), aprobado por el PO.
    ════════════════════════════════════════════════════════════════ */
 html.dark {
+  /* ── B13 · AG0: UN SOLO OSCURO. Las superficies, tintas y líneas NEUTRAS de
+     la agenda apuntan al oscuro navy del kit (`sistema.css`): ya no hay un navy
+     propio de la agenda distinto del de la app. Los estados, los eventos, Google
+     y el cromo de marca (`--ag-navy*`) se quedan con sus literales (medidos,
+     ver sus notas). Las notas que hablan de «#1E1E1E» describen el oscuro gris
+     de antes de B1; la superficie real hoy es `--sup` (#16223A). Las páginas
+     públicas no lo ven: redeclaran en claro todo `--ag-*` que el oscuro cambia
+     (`agendaPublicaTokens.test.ts`). ── */
   /* Superficies */
-  --ag-bg-app: #0c1420;
-  --ag-bg-main: #0f1828;
-  --ag-surface: #1b2a40;
+  --ag-bg-app: var(--fondo);
+  --ag-bg-main: var(--fondo);
+  --ag-surface: var(--sup);
   --ag-grid-col: transparent;                 /* ◆ columnas transparentes sobre mainBg */
   /* Bordes y líneas */
-  --ag-border-card: #2a3b57;
+  --ag-border-card: var(--borde);
   --ag-hour-line: rgba(255, 255, 255, .07);
   --ag-col-line: rgba(255, 255, 255, .05);
   --ag-hairline: rgba(255, 255, 255, .08);
@@ -7434,16 +7457,16 @@ html.dark {
      oscuro: ahí abajo la familia converge en un solo escalón bajo la superficie.
      La línea va en blanco con alfa —la «línea fuerte» del documento, que esa
      parte sí vale— para funcionar igual sobre superficie y sobre hundido. */
-  --ag-surface-sunken: #16233a;
+  --ag-surface-sunken: var(--fondo);
   --ag-line-dash: rgba(255, 255, 255, .16);
   --ag-primary-bg-faint: rgba(91, 140, 255, .10);
   /* Texto */
-  --ag-ink: #e8eef6;
-  --ag-text: #cdd8e6;
-  --ag-ink-600: #a8b4c2;                      /* ver la nota de la variante clara */
-  --ag-muted: #8b9bb0;
-  --ag-muted2: #6b7a90;
-  --ag-faint: #5d6b80;
+  --ag-ink: var(--tinta);
+  --ag-text: var(--tinta);
+  --ag-ink-600: var(--tinta2);                /* ver la nota de la variante clara */
+  --ag-muted: var(--tinta2);
+  --ag-muted2: var(--tinta3);
+  --ag-faint: var(--tinta3);
   /* Marca: --ag-brand-* NO se tocan */
   /* ⚠️ HASTA EL BLOQUE 2B ESTE ROJO ERA EXACTAMENTE --ag-status-cancelled-dot
      (los dos #f87171), y era una coincidencia incómoda: la línea de la hora
@@ -7475,16 +7498,16 @@ html.dark {
   --ag-shadow-pop: 0 12px 28px rgba(0, 0, 0, .55);
   --ag-shadow-elevada: 0 0 0 1px rgba(255, 255, 255, .14), 0 6px 14px rgba(0, 0, 0, .55);
   /* Chip médico */
-  --ag-chip-bg: #16233a;
-  --ag-chip-text: #cdd8e6;                    /* ◆ ≈ dark.text */
+  --ag-chip-bg: var(--sup2);
+  --ag-chip-text: var(--tinta2);
   /* Vista Mes */
-  --ag-month-cell: #141f33;
+  --ag-month-cell: var(--sup);
   --ag-month-weekend: #0e1828;
   --ag-month-other-day: #0c1422;
-  --ag-month-head: #101a2b;
-  --ag-month-gap: #22324c;
+  --ag-month-head: var(--sup);
+  --ag-month-gap: var(--linea);
   --ag-month-today-bg: color-mix(in srgb, var(--ag-brand-secondary) 12%, #0f1828); /* aclarado handoff */
-  --ag-month-num: #8b9bb0;                    /* ◆ ≈ dark.muted */
+  --ag-month-num: var(--tinta2);
   /* ⚠️ LITERALES, Y NO PUEDEN HEREDAR LA MARCA. --ag-brand-secondary NO se
      redefine en oscuro (sigue siendo --cs, #1e5fa8 por defecto), y ese azul
      sobre --ag-month-cell (#141f33) da 2.56:1 — ilegible como texto e
@@ -7509,8 +7532,8 @@ html.dark {
      (#27395a y #dbe7ff, lo que había) devolvería la pastilla apagada que el
      rediseño vino a quitar, y sólo en oscuro. La pista y la tinta inactiva sí,
      que ésas sí son superficie. */
-  --ag-segment-bg: #16233a;
-  --ag-segment-text: #8b9bb0;
+  --ag-segment-bg: var(--sup2);
+  --ag-segment-text: var(--tinta2);
   /* Estado (mapeo inglés DB → statusDark español del handoff).
      ⚠️ LA ASIGNACIÓN ROTÓ: ámbar es «agendada», azul «confirmada», verde
      «atendida». El porqué está en la nota larga de la variante clara.
@@ -7640,14 +7663,14 @@ html.dark {
   --ag-gcal-bg1: rgba(124, 92, 219, .18);
   --ag-gcal-bg2: rgba(124, 92, 219, .12);     /* ◆ variante más tenue de extDark.bg */
   /* Modal / input / patient-card */
-  --ag-modal-overlay: rgba(2, 6, 14, .58);
-  --ag-modal-bg: #152135;
-  --ag-input-bg: #16233a;
-  --ag-input-border: #2a3b57;
+  --ag-modal-overlay: var(--velo);
+  --ag-modal-bg: var(--sup);
+  --ag-input-bg: var(--sup2);
+  --ag-input-border: var(--borde);
   --ag-input-focus-ring: rgba(91, 140, 255, .30);     /* ◆ */
   --ag-input-focus-border: #5b8cff;                   /* ◆ */
-  --ag-modal-icon-bg: #1f2f48;                        /* ◆ ≈ dark.rowIconBg */
-  --ag-btn-ghost-hover: #1f2f48;                      /* ◆ */
+  --ag-modal-icon-bg: var(--sup2);
+  --ag-btn-ghost-hover: var(--sup2);
   /* Botones de la configuración en reposo (tanda H, punto 7): borde ≥ 3:1
      contra --ag-surface (#1b2a40) y contra el propio fondo del botón; el
      primario lleva borde claro porque #1e5fa8 sobre #1b2a40 da 2,2:1. */

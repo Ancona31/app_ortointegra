@@ -71,6 +71,16 @@ body:has(.rp) {
 /* ── Raíz y columna ──────────────────────────────────────────────────────── */
 
 .rp {
+  /* B13 · AG0: la agenda de la app pasó su escala de movimiento a la del
+     rediseño (`globals.css`); estas páginas NO cambian, así que conservan aquí
+     la de antes. Van en `.rp` y no en `body:has(.rp)`: ese bloque es sólo para
+     los colores que el oscuro cambia, con su valor claro idéntico
+     (`agendaPublicaTokens.test.ts`). */
+  --ag-dur-micro: 120ms;
+  --ag-dur-base: 180ms;
+  --ag-dur-lento: 240ms;
+  --ag-ease-out: cubic-bezier(0, 0, .2, 1);
+  --ag-ease-in: cubic-bezier(.4, 0, 1, 1);
   min-height: 100dvh;
   background: var(--ag-bg-app);
   color: var(--ag-text);

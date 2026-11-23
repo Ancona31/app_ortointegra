@@ -31,8 +31,10 @@
    │ prefers-color-scheme→ html.dark         ver arriba                          │
    └─────────────────────────────────────────────────────────────────────────────┘
 
-   ⚠️ NINGÚN `--ag-*` SE DECLARA AQUÍ. La agenda y las páginas públicas
-   (`/reservar`, `/confirmar`) siguen con los suyos hasta B13.
+   ⚠️ NINGÚN `--ag-*` SE DECLARA AQUÍ. Las páginas públicas (`/reservar`,
+   `/confirmar`) siguen con los suyos. La agenda de la app (B13) se pinta con la
+   familia `--cal-*` de este archivo y el kit; los `--ag-*` siguen en
+   `globals.css` (en oscuro, apuntando al kit desde AG0).
    ════════════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -194,6 +196,66 @@ html.dark {
 @media (prefers-reduced-transparency: reduce) {
   :root { --velo: rgba(10, 18, 32, .72); --velo-filtro: none; }
   html.dark { --velo: rgba(0, 0, 0, .7); }
+}
+
+/* ── LA AGENDA: familia `--cal-*` (B13 · AG0; `agenda-base/PIEZAS.md` §1) ──
+   Casi todos son mezclas o alias del kit, así que el oscuro sale solo; SÓLO los
+   seis colores de evento son literales y llevan valor de oscuro (abajo).
+   Uso en un bloque de cita: `--b-fondo` = relleno, `--b-barra` = barra izquierda
+   de 3 px (gráfico ≥ 3:1), `--b-tinta` = hora e icono de estado (texto ≥ 4,5:1);
+   el nombre siempre en `--tinta` (`--tinta2` si está pasado o cancelado).
+   ⚠️ «Agendada» es el ÁMBAR del kit: en la maqueta `--ag-fondo/-tinta/-punto`,
+   aquí `--aviso-*` (tabla de equivalencias de arriba). NO es `--ag-status-*`:
+   esa familia vieja sigue viva para la agenda con la v2 apagada, el dashboard y
+   las páginas públicas.
+   ⚠️ `--cal-h` / `--cal-hw` (alto de hora y columna de horas) también viven aquí,
+   por formato; la densidad compacta los baja en `globals.css`. */
+:root {
+  --cal-ag-fondo: color-mix(in srgb, var(--aviso-fondo) 78%, var(--sup));
+  --cal-ag-barra: var(--aviso-punto);
+  --cal-ag-tinta: var(--aviso-tinta);
+  --cal-conf-fondo: color-mix(in srgb, var(--tonal) 78%, var(--sup));
+  --cal-conf-barra: var(--accion);
+  --cal-conf-tinta: var(--tonal-tinta);
+  --cal-aten-fondo: color-mix(in srgb, var(--ok-fondo) 78%, var(--sup));
+  --cal-aten-barra: color-mix(in srgb, var(--ok-tinta) 82%, var(--sup));
+  --cal-aten-tinta: var(--ok-tinta);
+  --cal-canc-fondo: color-mix(in srgb, var(--mal-fondo) 55%, var(--sup));
+  --cal-canc-barra: var(--mal-tinta);
+  --cal-canc-tinta: var(--mal-tinta);
+  --cal-noas-fondo: color-mix(in srgb, var(--sup2) 70%, var(--sup));
+  --cal-noas-barra: var(--tinta3);
+  --cal-noas-tinta: var(--tinta2);
+  /* El color que elige el usuario para un evento (`COLORES_EVENTO`). */
+  --cal-ev-indigo: #3730a3;
+  --cal-ev-magenta: #a21caf;
+  --cal-ev-carmin: #9d174d;
+  --cal-ev-oliva: #4d7c0f;
+  --cal-ev-bronce: #78350f;
+  --cal-ev-grafito: #1f2937;
+  --cal-bloqueo-fondo: color-mix(in srgb, var(--tinta2) 5%, transparent);
+  --cal-bloqueo-raya: color-mix(in srgb, var(--tinta2) 20%, transparent);
+  --cal-bloqueo-tinta: var(--tinta2);
+  --cal-fuera: var(--fondo);
+  --cal-linea: var(--linea);
+  --cal-hoy: color-mix(in srgb, var(--accion) 5%, transparent);
+  --cal-hoy-num: var(--accion);
+  --cal-ahora: var(--mes);
+  --cal-hueco: var(--accion);
+  --cal-sel: var(--accion);
+  /* Medidas: 80 px por hora en los cinco formatos; columna de horas por formato. */
+  --cal-h: 80px;
+  --cal-hw: 44px;
+}
+:root:is([data-formato="ih"], [data-formato="iv"]) { --cal-hw: 52px; }
+:root[data-formato="esc"] { --cal-hw: 56px; }
+html.dark {
+  --cal-ev-indigo: #818cf8;
+  --cal-ev-magenta: #e879f9;
+  --cal-ev-carmin: #f391ca;
+  --cal-ev-oliva: #a3e635;
+  --cal-ev-bronce: #c98a4b;
+  --cal-ev-grafito: #7f96b8;
 }
 
 /* ── Utilidades de Tailwind sobre los tokens ──────────────────────────────

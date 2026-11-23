@@ -78,10 +78,11 @@ describe('salirConAnimacion', () => {
   it('marca, espera --ag-dur-micro y quita', () => {
     vi.useFakeTimers()
     const a = almacen(['x'])
-    expect(salirConAnimacion(a.api, 'x')).toBe(120)
+    /* 100 = respaldo de `--ag-dur-micro` (`--dur-toque` desde B13 · AG0; era 120). */
+    expect(salirConAnimacion(a.api, 'x')).toBe(100)
     expect(a.contador.batches).toBe(1)
     expect(clasesDeMovimiento('x', a.eventos.get('x')?.extendedProps ?? {})).toContain('ag-ev-saliendo')
-    vi.advanceTimersByTime(119)
+    vi.advanceTimersByTime(99)
     expect(a.eventos.has('x')).toBe(true)
     vi.advanceTimersByTime(1)
     expect(a.eventos.has('x')).toBe(false)

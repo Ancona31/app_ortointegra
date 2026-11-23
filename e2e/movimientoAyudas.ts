@@ -7,7 +7,8 @@ import {
  * Ayuda e2e del bloque F (F0): la regla de movimiento de la agenda, comprobada
  * en el navegador. Recorre `document.getAnimations()` —CSS, transiciones y
  * WAAPI por igual— y devuelve las que animan algo distinto de `opacity` y
- * `transform` (y de los colores de hover y foco) o duran más de 240 ms. Sólo
+ * `transform` (y de los colores de hover y foco) o duran más del tope
+ * (`TOPE_MOVIMIENTO_MS`, 400 ms desde B13 · AG0). Sólo
  * mira lo de la agenda: lo de toda la app (avisos de la barra lateral, los
  * toasts) queda fuera de esta regla. Vacío = se cumple.
  *

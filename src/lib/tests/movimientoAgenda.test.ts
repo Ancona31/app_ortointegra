@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   curvaToken, duracionMovimiento, duracionToken, esCambioDeFecha, fundirNavegacion, incumplimientosDeMovimiento,
-  interpretarDuracion, prefiereMenosMovimiento, type AnimacionObservada,
+  interpretarDuracion, prefiereMenosMovimiento, REGLA_AGENDA, TOPE_MOVIMIENTO_MS, type AnimacionObservada,
 } from '@/lib/agenda/movimientoAgenda'
 
 /** Simula un navegador mínimo: tokens en la raíz y la preferencia de movimiento. */
@@ -28,9 +28,10 @@ describe('interpretarDuracion', () => {
 
 describe('duracionToken y curvaToken', () => {
   it('sin navegador cae a los respaldos, que son la escala de la hoja', () => {
-    expect(duracionToken('--ag-dur-micro')).toBe(120)
-    expect(duracionToken('--ag-dur-base')).toBe(180)
-    expect(duracionToken('--ag-dur-lento')).toBe(240)
+    /* B13 · AG0: la escala del catálogo del rediseño (toque, salida, entrada). */
+    expect(duracionToken('--ag-dur-micro')).toBe(100)
+    expect(duracionToken('--ag-dur-base')).toBe(240)
+    expect(duracionToken('--ag-dur-lento')).toBe(360)
     expect(curvaToken('--ag-ease')).toBe('cubic-bezier(.4, 0, .2, 1)')
   })
   it('con navegador lee el token computado', () => {
@@ -40,7 +41,7 @@ describe('duracionToken y curvaToken', () => {
   })
   it('un token ilegible no devuelve NaN: vuelve al respaldo', () => {
     navegador({ '--ag-dur-micro': 'nada' })
-    expect(duracionToken('--ag-dur-micro')).toBe(120)
+    expect(duracionToken('--ag-dur-micro')).toBe(100)
   })
 })
 
@@ -71,9 +72,15 @@ describe('incumplimientosDeMovimiento', () => {
     expect(salida).toHaveLength(1)
     expect(salida[0]).toContain('anima width')
   })
-  it('lo que dura más de 240 ms incumple, aunque sólo anime opacidad', () => {
+  it('lo que dura más de 400 ms incumple, aunque sólo anime opacidad', () => {
     const larga: AnimacionObservada = { ...buena, nombre: 'ag-pulso', duracionMs: 900 }
-    expect(incumplimientosDeMovimiento([larga])[0]).toContain('dura 900 ms')
+    expect(incumplimientosDeMovimiento([larga])[0]).toContain('dura 900 ms (tope 400)')
+    expect(incumplimientosDeMovimiento([{ ...buena, duracionMs: 401 }])).toHaveLength(1)
+  })
+  it('B13 · AG0: el tope es el del catálogo (400); la entrada con resorte de 360 cumple', () => {
+    expect(TOPE_MOVIMIENTO_MS).toBe(400)
+    expect(REGLA_AGENDA.topeMs).toBe(TOPE_MOVIMIENTO_MS)
+    expect(incumplimientosDeMovimiento([{ ...buena, duracionMs: 360 }, { ...buena, duracionMs: 400 }])).toEqual([])
   })
   it('las excepciones son los dos bucles de carga: la barra y el giro del «guardando»', () => {
     const bucle: AnimacionObservada = { nombre: 'ag-barra-carga', propiedades: ['transform'], duracionMs: 1100, elemento: 'div' }
@@ -92,7 +99,7 @@ describe('incumplimientosDeMovimiento', () => {
     expect(incumplimientosDeMovimiento([foco])[0]).toContain('anima box-shadow, outline-width')
   })
   it('un color por encima del tope incumple igual', () => {
-    expect(incumplimientosDeMovimiento([{ ...buena, propiedades: ['background-color'], duracionMs: 300 }])).toHaveLength(1)
+    expect(incumplimientosDeMovimiento([{ ...buena, propiedades: ['background-color'], duracionMs: 450 }])).toHaveLength(1)
   })
   it('lo que no es de la agenda (la barra lateral, los avisos de la app) no cuenta; sin el campo, sí', () => {
     const ajena: AnimacionObservada = { nombre: 'avisoHalo', propiedades: ['box-shadow'], duracionMs: 2800, elemento: 'div', deLaAgenda: false }
@@ -144,7 +151,7 @@ describe('fundirNavegacion (F2.3)', () => {
     expect(fundirNavegacion(a)).toBe(true)
     expect(a.llamadas).toEqual([{
       fotogramas: [{ opacity: 0.7 }, { opacity: 1 }],
-      opciones: { id: 'ag-fundido-navegacion', duration: 120, easing: 'cubic-bezier(0, 0, .2, 1)' },
+      opciones: { id: 'ag-fundido-navegacion', duration: 100, easing: 'cubic-bezier(0, 0, .2, 1)' },
     }])
     const props = a.llamadas[0].fotogramas.flatMap(f => Object.keys(f))
     expect(props.every(p => p === 'opacity')).toBe(true)

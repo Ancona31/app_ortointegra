@@ -20,7 +20,8 @@
  *
  * También vive aquí la REGLA que se comprueba en las e2e
  * (`incumplimientosDeMovimiento`): sólo `opacity` y `transform` (más los colores
- * de hover y foco), y nada por encima de 240 ms. Es pura para poder probarla con Vitest; la extracción de
+ * de hover y foco), y nada por encima de 400 ms (el tope del catálogo de
+ * movimiento del rediseño, B13 · AG0; antes 240). Es pura para poder probarla con Vitest; la extracción de
  * `document.getAnimations()` la hace `e2e/movimientoAyudas.ts`.
  */
 
@@ -28,9 +29,10 @@ export type TokenDuracion = '--ag-dur-micro' | '--ag-dur-base' | '--ag-dur-lento
 export type TokenCurva = '--ag-ease-out' | '--ag-ease-in' | '--ag-ease'
 
 const RESPALDO_DURACION: Record<TokenDuracion, number> = {
-  '--ag-dur-micro': 120,
-  '--ag-dur-base': 180,
-  '--ag-dur-lento': 240,
+  /* B13 · AG0: `--dur-toque`, `--dur-sale` y `--dur-entra` de `sistema.css`. */
+  '--ag-dur-micro': 100,
+  '--ag-dur-base': 240,
+  '--ag-dur-lento': 360,
 }
 
 const RESPALDO_CURVA: Record<TokenCurva, string> = {
@@ -39,8 +41,12 @@ const RESPALDO_CURVA: Record<TokenCurva, string> = {
   '--ag-ease': 'cubic-bezier(.4, 0, .2, 1)',
 }
 
-/** El tope de la escala. Nada de la agenda dura más (CONTRASTE §2.1). */
-export const TOPE_MOVIMIENTO_MS = 240
+/** El tope de la escala. Nada de la agenda dura más. Era 240 (CONTRASTE §2.1);
+    B13 · AG0 lo sube al del catálogo de movimiento del rediseño (PLAN §2.6:
+    entrada de 360 ms con resorte, con margen hasta 400). Las curvas
+    `--ag-ease-out/-in` son ahora el resorte (`--resorte-entra/-sale`); los
+    respaldos de `RESPALDO_CURVA` quedan como curva sin hoja. */
+export const TOPE_MOVIMIENTO_MS = 400
 
 /**
  * Lee una duración CSS («120ms», «.18s», «0.01ms») y la devuelve en
@@ -181,7 +187,7 @@ export const REGLA_AGENDA: ReglaMovimiento = {
    foco: fondo y borde en `--ag-dur-micro`»): son el cambio de fondo, borde y
    tinta de hover y foco, que sólo repintan y que el diseño PIDE. Siguen fuera
    `width`, `height`, `top`, `left`, `box-shadow`, `outline-*`… y el tope de
-   240 ms vale para todo. */
+   `TOPE_MOVIMIENTO_MS` vale para todo. */
 const PROPIEDADES_PERMITIDAS = new Set([
   'opacity', 'transform',
   'background-color', 'color', 'border-color',

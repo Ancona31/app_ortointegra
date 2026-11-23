@@ -2055,12 +2055,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              con el interruptor apagado se comporta como hoy. */
           unselectCancel=".ag-capa"
           editable
-          /* F2.3: 180 = `--ag-dur-base` (decisión 5 del bloque F). Literal y
+          /* F2.3: 240 = `--ag-dur-base` (decisión 5 del bloque F; 180 hasta
+             B13 · AG0, que pasó el token a `--dur-sale`). Literal y
              primitivo a propósito: es una prop de `<FullCalendar>` y no puede
              cambiar de identidad (A1-bis.2). Si cambia el token, cambia esto.
              El regreso lo anima FullCalendar con `top`/`left` en línea sobre
              el espejo; con movimiento reducido lo corta el bloque CSS. */
-          dragRevertDuration={180}
+          dragRevertDuration={240}
           eventResizableFromStart
           businessHours={horasHabilesFc}
           eventSources={eventSourcesStable}
