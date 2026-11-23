@@ -61,8 +61,9 @@
 --   que se reutiliza si tiene su forma).
 -- CÓMO SE DESHACE: supabase/reversas/20261201120000_agenda_f1_ajustes_
 --   tipos_horarios_reversa.sql, DESPUÉS de las reversas de los bloques
---   posteriores. Devuelve el horario previo a los consultorios que nadie
---   editó desde la copia y conserva el respaldo; se niega si hay datos de la
+--   posteriores. Devuelve el horario previo a los consultorios cuyo horario
+--   nadie editó desde la copia (aunque se editara otro campo) y conserva el
+--   respaldo; aplicar → revertir → reaplicar → revertir funciona cada vez; se niega si hay datos de la
 --   v2 que se perderían, salvo confirmación explícita.
 -- El veredicto es la rejilla del final (OK / INFO / REVISAR).
 -- ═══════════════════════════════════════════════════════════════════════
@@ -182,7 +183,10 @@ BEGIN
   IF to_regclass('respaldos.consultorios_horario_20261119') IS NOT NULL
      AND (SELECT string_agg(attname || ':' || format_type(atttypid, atttypmod), ',' ORDER BY attnum) FROM pg_attribute
            WHERE attrelid = to_regclass('respaldos.consultorios_horario_20261119') AND attnum > 0 AND NOT attisdropped)
-         <> 'id:uuid,clinica_id:uuid,horario:jsonb,horario_propio:boolean,respaldado_en:timestamp with time zone' THEN
+         <> 'id:uuid,clinica_id:uuid,horario:jsonb,horario_propio:boolean,respaldado_en:timestamp with time zone,'
+            'horario_antes:jsonb,horario_copiado:jsonb,copiado_en:timestamp with time zone' THEN
+    -- Una base que aplicó la F1 de antes de la ronda 1 de la auditoría (A4) lo
+    -- tiene sin horario_antes/horario_copiado/copiado_en: se completa a mano.
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: respaldos.consultorios_horario_20261119 ya existe con otra forma. No se toca.';
   END IF;
 
@@ -581,12 +585,20 @@ GRANT EXECUTE ON FUNCTION public.log_cita_change() TO anon, authenticated, servi
 -- 7 · El respaldo del backfill (la copia y el UPDATE, en §10). Tabla propia
 --     del esquema respaldos: no toma candados sobre tablas de main.
 -- ---------------------------------------------------------------------
+-- horario / horario_propio / respaldado_en: la PRIMERA copia; no se pisan
+-- nunca. horario_antes / horario_copiado / copiado_en: la ÚLTIMA pasada del
+-- backfill (lo que había justo antes y lo que escribió); con ellas la reversa
+-- reconoce un horario que nadie tocó, aunque se haya editado otro campo, y el
+-- ciclo aplicar → revertir → reaplicar → revertir funciona cada vez (A4).
 CREATE TABLE IF NOT EXISTS respaldos.consultorios_horario_20261119 (
-  id             uuid PRIMARY KEY,
-  clinica_id     uuid NOT NULL,
-  horario        jsonb NOT NULL,
-  horario_propio boolean NOT NULL,
-  respaldado_en  timestamptz NOT NULL DEFAULT now()
+  id              uuid PRIMARY KEY,
+  clinica_id      uuid NOT NULL,
+  horario         jsonb NOT NULL,
+  horario_propio  boolean NOT NULL,
+  respaldado_en   timestamptz NOT NULL DEFAULT now(),
+  horario_antes   jsonb NOT NULL,
+  horario_copiado jsonb NOT NULL,
+  copiado_en      timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE respaldos.consultorios_horario_20261119 ENABLE ROW LEVEL SECURITY;
 -- Sin privilegios para nadie más que su dueño; el esquema no se expone a PostgREST.
@@ -708,7 +720,7 @@ COMMENT ON COLUMN public.tipos_cita.consultorio_id IS
 COMMENT ON FUNCTION public.log_cita_change() IS
   'Auditoría de public.appointments (AG-DT-10). Escribe NOMBRES de columnas y estado de→a, nunca valores: audit_log es inmutable y no admite ARCO. "via" sólo sin auth.uid() y con el GUC spinus.via en la lista blanca c_vias: google y google_rsvp (sincronización con Google), enlace_paciente (confirmación y reagendo por enlace); otro literal no se escribe. La lista c_tecnicas está también en el WHEN de audit_appointments_update: cambiar las dos.';
 COMMENT ON TABLE respaldos.consultorios_horario_20261119 IS
-  'consultorios.horario y horario_propio de cada consultorio sin horario propio, ANTES de heredar el de su clínica (backfill de 20261201120000_agenda_f1). respaldado_en es el instante de la copia: una fila de consultorios con updated_at igual no se ha editado desde entonces (lo usa la reversa de F1).';
+  'consultorios.horario y horario_propio de cada consultorio sin horario propio, ANTES de heredar el de su clínica (backfill de 20261201120000_agenda_f1). horario, horario_propio y respaldado_en son la PRIMERA copia y no se pisan nunca. horario_antes, horario_copiado y copiado_en son de la ÚLTIMA pasada del backfill: lo que había justo antes, lo que escribió (el de la clínica) y cuándo. La reversa de F1 devuelve horario_antes sólo donde consultorios.horario sigue siendo horario_copiado.';
 COMMENT ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) IS
   'Restablece la configuración de la agenda v2 de UNA clínica: consultorios al horario de partida de la v2 (el de la clínica copiado como horario propio) y POR REVISAR (horario_revisado_en NULL), tipos de cita archivados, enlaces de reserva vigentes revocados, plazos de fábrica y recordatorio apagado; una fila en audit_log. No toca citas, pacientes, auditoría ni contactos bloqueados. Sólo service_role; la llama POST /api/agenda/restablecer tras comprobar que p_actor es el administrador de p_clinica_id (y la función lo vuelve a comprobar).';
 
@@ -787,16 +799,24 @@ BEGIN
   -- Para TODAS las clínicas, también las de la v2 apagada: con ella apagada
   -- ningún código lee horario_propio ni consultorios.horario.
   -- El valor previo de consultorios.horario era INERTE (nadie lo leía) y
-  -- queda en el respaldo, escrito ANTES del UPDATE. respaldado_en y el
-  -- updated_at que pone trg_consultorios_updated_at son el mismo now() de
-  -- esta transacción: así la reversa sabe qué filas nadie editó después.
-  -- Si el respaldo ya existía (un reintento tras la reversa), se conserva la
-  -- PRIMERA copia de cada consultorio.
-  INSERT INTO respaldos.consultorios_horario_20261119 (id, clinica_id, horario, horario_propio)
-  SELECT k.id, k.clinica_id, k.horario, k.horario_propio
+  -- queda en el respaldo, escrito ANTES del UPDATE: horario_antes (lo que
+  -- había justo antes de ESTA pasada) y horario_copiado (lo que el UPDATE
+  -- escribe, el de su clínica). La reversa devuelve horario_antes sólo donde
+  -- consultorios.horario sigue siendo horario_copiado: una edición de otro
+  -- campo no cuenta como edición del horario. copiado_en y el updated_at que
+  -- pone trg_consultorios_updated_at son el mismo now() de esta transacción.
+  -- Si el respaldo ya existía (un reintento tras la reversa), la PRIMERA
+  -- copia (horario, horario_propio, respaldado_en) se conserva y sólo se
+  -- renuevan las columnas de la última pasada.
+  INSERT INTO respaldos.consultorios_horario_20261119 AS r
+         (id, clinica_id, horario, horario_propio, horario_antes, horario_copiado, copiado_en)
+  SELECT k.id, k.clinica_id, k.horario, k.horario_propio, k.horario, c.horario_consulta, now()
     FROM public.consultorios k
+    JOIN public.clinicas c ON c.id = k.clinica_id
    WHERE NOT k.horario_propio
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE
+     SET horario_antes = EXCLUDED.horario_antes, horario_copiado = EXCLUDED.horario_copiado,
+         copiado_en = EXCLUDED.copiado_en;
 
   -- También los archivados: si se reactivan, conservan el punto de partida.
   UPDATE public.consultorios k
@@ -1011,17 +1031,18 @@ FROM (
          (SELECT count(*)::text FROM respaldos.consultorios_horario_20261119 r
             JOIN public.consultorios k ON k.id = r.id
             JOIN public.clinicas c ON c.id = k.clinica_id
-           WHERE k.updated_at = r.respaldado_en
-             AND (k.horario IS DISTINCT FROM c.horario_consulta OR NOT k.horario_propio)),
+           WHERE k.updated_at = r.copiado_en
+             AND (k.horario IS DISTINCT FROM c.horario_consulta OR k.horario IS DISTINCT FROM r.horario_copiado
+                  OR NOT k.horario_propio)),
          '0'
   UNION ALL
   SELECT 14, 'heredados sin fila UPDATE de la copia en audit_log (deben ser 0)',
          (SELECT count(*)::text FROM respaldos.consultorios_horario_20261119 r
             JOIN public.consultorios k ON k.id = r.id
-           WHERE k.updated_at = r.respaldado_en
+           WHERE k.updated_at = r.copiado_en
              AND NOT EXISTS (SELECT 1 FROM public.audit_log a
                               WHERE a.tabla = 'consultorios' AND a.accion = 'UPDATE'
-                                AND a.registro_id = r.id AND a.created_at = r.respaldado_en)),
+                                AND a.registro_id = r.id AND a.created_at = r.copiado_en)),
          '0'
   UNION ALL
   SELECT 15, 'policies de appointments y consultorios, intactas (nombres)',

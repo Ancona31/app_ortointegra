@@ -18,4 +18,7 @@ distinto	comentario	table column public.agenda_ajustes.correo_reserva_clinica	CO
 distinto	comentario	table column public.clinicas.timezone	COMMENT sin el prefijo «K3 (punto 12)»; mismo convenio
 distinto	comentario	table column public.consultorios.horario_propio	COMMENT: «Desde 20261119130000 todos…» → «Al crearse esta columna, todos… (respaldo en …)». Conserva el prefijo «false = la disponibilidad» que exige pruebas-sql/b5_horario_propio.sql caso 5
 distinto	comentario	table column public.consultorios.horario_revisado_en	COMMENT sin «(tanda I, punto 3)» ni «en 20261119130000»; mismo convenio
-distinto	comentario	table respaldos.consultorios_horario_20261119	COMMENT: nombra el archivo fundido en vez de «20261119130000, punto 10 de Angel» y la reversa de F1 en vez de «VUELTA ATRÁS en el archivo»
+distinto	comentario	table respaldos.consultorios_horario_20261119	COMMENT: nombra el archivo fundido en vez de «20261119130000, punto 10 de Angel» y la reversa de F1 en vez de «VUELTA ATRÁS en el archivo» · Y ADEMÁS AUDITORÍA RONDA 1, A4: describe la primera copia (horario, horario_propio, respaldado_en) y la última pasada (horario_antes, horario_copiado, copiado_en)
+solo_b	columna	respaldos.consultorios_horario_20261119.horario_antes	AUDITORÍA RONDA 1, A4: lo que había justo antes de la ÚLTIMA pasada del backfill; la reversa lo devuelve
+solo_b	columna	respaldos.consultorios_horario_20261119.horario_copiado	AUDITORÍA RONDA 1, A4: lo que la última pasada escribió (el de la clínica); la reversa reconoce «horario sin editar» comparando con él, no por updated_at
+solo_b	columna	respaldos.consultorios_horario_20261119.copiado_en	AUDITORÍA RONDA 1, A4: instante de la última pasada (= updated_at que pone el backfill); lo usan las filas 13 y 14 de la rejilla
