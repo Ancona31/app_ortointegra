@@ -6461,6 +6461,452 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   color: var(--ag-faint);
 }
 
+/* Las dos piezas que sólo pinta la v2 (fuera de la raíz v2, ocultas). */
+.ag-tarjeta-pildora-ico, .ag-desglose-icono { display: none; }
+
+/* ═══ B13 · AG1 · LAS PIEZAS BASE DE LA AGENDA V2 (rediseño) ═══════════════════
+   Especificación: `docs/spec/rediseno/agenda-base/PIEZAS.md` (§1 tokens, §2
+   bloque, §3 rejilla, §4 barra, §8 panel del día, §9 avisos). Todo va bajo
+   `.agenda-raiz[data-agenda-v2="encendida"]`: la agenda con la v2 APAGADA no se
+   rediseña y no ve nada de esto. Las capas (burbuja, tarjeta, modales) se pintan
+   en `body`, fuera de la raíz: tampoco lo ven (son de AG5+).
+
+   ⚠️ LA PIEL SE CAMBIA RE-APUNTANDO TOKENS, NO CLASES. Dentro de la raíz v2 los
+   `--ag-*` neutros, de estado y de controles apuntan al kit y a `--cal-*`
+   (sistema.css); así lo que ya los usa —rejilla, listas, Mes, barra, panel— se
+   re-pinta sin tocar su regla, también en oscuro (los del kit cambian solos).
+   Las clases `.fc-*`, `.ag-*` y `.agenda-*`, los roles, los `aria-label`, los
+   `data-*` y los textos NO cambian.
+   ⚠️ Las reglas propias de abajo llevan `!important` sólo donde la regla vieja
+   lo lleva (los botones nativos, el día de hoy, la franja). */
+.agenda-raiz[data-agenda-v2="encendida"] {
+  /* Superficies y tintas: las del kit. */
+  --ag-bg-app: var(--fondo);
+  --ag-bg-main: var(--fondo);
+  --ag-surface: var(--sup);
+  --ag-surface-sunken: var(--fondo);
+  --ag-border-card: var(--borde);
+  --ag-hairline: var(--cal-linea);
+  --ag-hour-line: var(--cal-linea);
+  --ag-col-line: var(--cal-linea);
+  --ag-line-dash: var(--borde);
+  --ag-ink: var(--tinta);
+  --ag-text: var(--tinta);
+  --ag-ink-600: var(--tinta2);
+  --ag-muted: var(--tinta2);
+  --ag-muted2: var(--tinta2);
+  --ag-faint: var(--tinta3);
+  --ag-primary-bg-faint: var(--tonal);
+  --ag-brand-legible: var(--enlace);
+  --ag-chip-bg: var(--sup2);
+  --ag-chip-text: var(--tinta2);
+  --ag-btn-ghost-hover: var(--sup2);
+  --ag-input-bg: var(--sup);
+  --ag-input-border: var(--borde);
+  --ag-shadow-card: none;
+  /* Rejilla: hoy (sin anillo), fuera de horario (deja ver las líneas de
+     hora), hora actual. */
+  --ag-today-bg: var(--cal-hoy);
+  --ag-today-ring: transparent;
+  --ag-offhours-bg: color-mix(in srgb, var(--cal-fuera) 88%, transparent);
+  --ag-now-line: var(--cal-ahora);
+  --ag-now-pill-bg: var(--cal-ahora);
+  /* El conmutador de vistas (PIEZAS §4): pista `--sup2`, elegido `--sup`. */
+  --ag-segment-bg: var(--sup2);
+  --ag-segment-text: var(--tinta2);
+  --ag-segment-active-bg: var(--sup);
+  --ag-segment-active-text: var(--tinta);
+  --ag-segment-active-shadow: 0 1px 2px rgba(20, 33, 61, .14);
+  /* Los cinco estados, en la familia `--cal-*` (lo leen listas, Mes, chips de
+     todo el día, Google y el desglose; el bloque de la rejilla ya va por
+     `--b-*`). El marco, la barra al 34 %. */
+  --ag-status-scheduled-dot: var(--cal-ag-barra);
+  --ag-status-scheduled-text: var(--cal-ag-tinta);
+  --ag-status-scheduled-bg: var(--cal-ag-fondo);
+  --ag-status-scheduled-border: color-mix(in srgb, var(--cal-ag-barra) 34%, transparent);
+  --ag-status-confirmed-dot: var(--cal-conf-barra);
+  --ag-status-confirmed-text: var(--cal-conf-tinta);
+  --ag-status-confirmed-bg: var(--cal-conf-fondo);
+  --ag-status-confirmed-border: color-mix(in srgb, var(--cal-conf-barra) 34%, transparent);
+  --ag-status-attended-dot: var(--cal-aten-barra);
+  --ag-status-attended-text: var(--cal-aten-tinta);
+  --ag-status-attended-bg: var(--cal-aten-fondo);
+  --ag-status-attended-border: color-mix(in srgb, var(--cal-aten-barra) 34%, transparent);
+  --ag-status-cancelled-dot: var(--cal-canc-barra);
+  --ag-status-cancelled-text: var(--cal-canc-tinta);
+  --ag-status-cancelled-bg: var(--cal-canc-fondo);
+  --ag-status-cancelled-border: color-mix(in srgb, var(--cal-canc-barra) 34%, transparent);
+  --ag-status-no_show-dot: var(--cal-noas-barra);
+  --ag-status-no_show-text: var(--cal-noas-tinta);
+  --ag-status-no_show-bg: var(--cal-noas-fondo);
+  --ag-status-no_show-border: color-mix(in srgb, var(--cal-noas-barra) 34%, transparent);
+  /* Los colores de evento (`COLORES_EVENTO`), los del rediseño. */
+  --ag-evento-indigo: var(--cal-ev-indigo);
+  --ag-evento-magenta: var(--cal-ev-magenta);
+  --ag-evento-carmin: var(--cal-ev-carmin);
+  --ag-evento-oliva: var(--cal-ev-oliva);
+  --ag-evento-bronce: var(--cal-ev-bronce);
+  --ag-evento-grafito: var(--cal-ev-grafito);
+  /* El cromo de la banda móvil: el navy del kit, el mismo del menú (la franja
+     del sistema lo sigue, regla de abajo). */
+  --ag-navy: var(--navy);
+}
+/* La franja del sistema sigue a la banda: con la v2, el navy del kit. */
+body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil)::before { background: var(--navy); }
+
+/* ── La rejilla (PIEZAS §3): 80 px por hora (40 por franja de media hora), 48
+   con «Densidad compacta» (la regla de la densidad, más arriba, gana por ir
+   con su propio atributo). ── */
+.agenda-raiz[data-agenda-v2="encendida"]:not([data-densidad="compacta"]) { --ag-slot-h: calc(var(--cal-h) / 2); }
+
+/* La tarjeta del calendario deja de envolver la barra: la barra y los avisos
+   van sobre el fondo de la página y sólo la rejilla es tarjeta (`--sup`, sin
+   borde ni sombra, radio 16 · 18 ih/iv · 20 esc). */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc :is(.fc-toolbar, .ag-controles, .ag-leyenda) {
+  background: transparent;
+  border-bottom-color: transparent;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-view-harness {
+  background: var(--sup);
+  border-radius: var(--r-tarjeta);
+  overflow: hidden;
+}
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-view-harness { border-radius: 18px; }
+:root[data-formato="esc"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-view-harness { border-radius: var(--r-tarjeta-ancha); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-scrollgrid,
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-scrollgrid-section > * { border-color: var(--cal-linea); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-scrollgrid { border: 0; }
+
+/* Columna de horas: 12/16 tabular `--tinta2`. Sin líneas de media hora. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-timegrid-slot-label-cushion {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  color: var(--tinta2);
+  font-variant-numeric: tabular-nums;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-timegrid-slot-minor { border-top-color: transparent; }
+
+/* Cabecera de día: «LUN» 12/600 `--tinta2` + número 17/600; hoy, número
+   blanco en un círculo de 28 (`--cal-hoy-num`). */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-col-header-cell { background: var(--sup); }
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead { align-items: center; }
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-dow { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-hoy { display: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-num { font-size: 17px; line-height: 22px; font-weight: 600; }
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-num--hoy {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  border-radius: var(--r-pildora);
+  background: var(--cal-hoy-num);
+  color: var(--sobre-accion);
+}
+
+/* «Todo el día» (el eje de la fila de todo el día): 12 px en dos líneas, como
+   la maqueta; a 12 px en una línea no cabe en los 60 del eje. Los chips de esa
+   fila, 24 de alto con el título a 12/600 y radio 7. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timegrid .fc-timegrid-axis-cushion {
+  font-size: 12px;
+  line-height: 14px;
+  font-weight: 600;
+  color: var(--tinta2);
+  white-space: normal;
+  text-align: center;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-banda { height: 24px; border-radius: 7px; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-banda-titulo { font-size: 12px; }
+
+/* Hoy: la columna con el 5 % de la acción; la cabecera no se tiñe. */
+.agenda-raiz[data-agenda-v2="encendida"] .fc .fc-timegrid-col.fc-day-today { background: var(--cal-hoy) !important; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-col-header-cell.fc-day-today { background: var(--sup) !important; box-shadow: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timegrid .fc-daygrid-day.fc-day-today { background: var(--cal-hoy) !important; }
+
+/* Hora actual: línea de 2 px `--cal-ahora` y la píldora 20 de alto, 12/700,
+   `--sup` sobre `--cal-ahora` (en oscuro el rojo es claro: el texto oscuro). */
+.agenda-raiz[data-agenda-v2="encendida"] .fc .ag-hora-ahora {
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--cal-ahora);
+  color: var(--sup);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+/* Bloqueo: rayado a 135°, 1,5 px cada 9 px, sólo en los tramos en horario; el
+   rótulo «Bloqueado · motivo» 12/600 sobre `--sup`, radio 6, 20 de alto. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-bg-event.ag-bloqueo:not(:has([data-rayado="recortado"])),
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-bloqueo-tramo {
+  background-color: var(--cal-bloqueo-fondo) !important;
+  background-image: repeating-linear-gradient(135deg, var(--cal-bloqueo-raya) 0 1.5px, transparent 1.5px 9px) !important;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-bloqueo-rotulo {
+  height: 20px;
+  padding: 0 7px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--cal-bloqueo-tinta);
+  background: var(--sup);
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-bloqueo-fila { color: var(--cal-bloqueo-tinta); }
+
+/* ── El bloque de cita (PIEZAS §2) ──────────────────────────────────────────
+   Relleno `--b-fondo`, barra izquierda de 3 px como sombra interior
+   (`--b-barra`), sin marco, radio 8 (6 en el de una línea). Las variables las
+   pone `MemoizedEventContent` con la v2. Nada por debajo de 12 px. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta {
+  border: 0;
+  border-radius: 8px;
+  background: var(--b-fondo);
+  box-shadow: inset 3px 0 0 var(--b-barra);
+  padding: 2px 5px 2px 8px;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta:not(.ag-tarjeta--tiny) { row-gap: 0; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta--tiny { border-radius: 6px; padding: 1px 5px 1px 8px; gap: 5px; }
+/* Pasada: relleno al 55 % y el nombre en `--tinta2`. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-event-past .ag-tarjeta { background: color-mix(in srgb, var(--b-fondo) 55%, var(--sup)); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-event-past :is(.ag-tarjeta-nombre, .ag-tarjeta-nombre-corto) { color: var(--tinta2); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-event.ag-ev-status--cancelled :is(.ag-tarjeta-nombre, .ag-tarjeta-nombre-corto) { color: var(--tinta2); }
+/* El realce al pasar el ratón conserva la barra (la regla de G3 pone la sombra). */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-event:not(.fc-list-event):not(.fc-event-mirror):not(.fc-event-dragging):not(.fc-event-resizing):hover .ag-tarjeta {
+    box-shadow: inset 3px 0 0 var(--b-barra), var(--ag-shadow-elevada);
+  }
+}
+/* Tipografía: nombre 13/16 600 (Día 14/18), hora 12/16 600 tabular en
+   `--b-tinta`, el resto 12/16 `--tinta2`. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc :is(.ag-tarjeta-nombre, .ag-tarjeta-nombre-corto) {
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view :is(.ag-tarjeta-nombre, .ag-tarjeta-nombre-corto) { font-size: 14px; line-height: 18px; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-hora,
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-glifo { font-size: 12px; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc :is(.ag-tarjeta-desc, .ag-tarjeta-tz, .ag-tarjeta-datos, .ag-tarjeta-marca),
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view :is(.ag-tarjeta-desc, .ag-tarjeta-datos) {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  font-style: normal;
+  color: var(--tinta2);
+}
+/* Iniciales del médico: chip 12/700 sobre `--sup`. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-chip {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: var(--sup);
+  color: var(--tinta2);
+}
+/* El estado (sólo en Día): icono en su círculo de 18 + texto 12/600 en la tinta
+   del estado, sin marco ni fondo. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-pildora {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-pildora::before { display: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-pildora-ico { display: inline-flex; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-pildora-ico .k-est-c { width: 18px; height: 18px; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta-pildora-ico .k-est-c svg { width: 12px; height: 12px; }
+/* Día (ancha): relleno 3·6·3·10. La caja es contenedor de TAMAÑO para poder
+   preguntar por su alto (PIEZAS §2, «la regla de contenido»):
+   · una línea (15 min): «nombre · hora · estado»; lo que no cabe salta a una
+     segunda línea que no se ve (primero el estado, luego la hora);
+   · desde dos líneas de alto: «nombre … estado» / «hora · huso · teléfono ·
+     consultorio»; y las observaciones en una tercera cuando caben (45 min).
+   El salto de línea es el ::before de la caja (un hueco de ancho completo). */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta {
+  container: ag-tarjeta / size;
+  padding: 3px 6px 3px 10px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 8px;
+  row-gap: 0;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-icono { order: 0; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view :is(.ag-tarjeta-nombre, .ag-tarjeta-nombre-corto) { order: 1; flex: 1 1 0; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view :is(.ag-tarjeta-marca, .ag-tarjeta-tit > .ag-marcas) { order: 1; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora { order: 2; flex: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-chip { order: 3; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-pildora { order: 4; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-tz { order: 7; flex: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-datos { order: 8; flex: 1 1 0; min-width: 0; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc { order: 9; flex: 0 0 100%; }
+@container ag-tarjeta (max-height: 33.98px) {
+  .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view :is(.ag-tarjeta-tz, .ag-tarjeta-datos, .ag-tarjeta-desc) { display: none !important; }
+}
+@container ag-tarjeta (min-height: 34px) {
+  .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta::before { content: ''; order: 5; flex: 0 0 100%; height: 0; }
+  .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-hora { order: 6; }
+}
+/* Sin sitio para la tercera línea (menos de 45 min), las observaciones no se ven. */
+@container ag-tarjeta (max-height: 53.98px) {
+  .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timeGridDay-view .ag-tarjeta-desc { display: none !important; }
+}
+/* Iconos de procedencia (enlace, sin expediente) a 12 px junto al nombre. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-tarjeta .ag-marcas { color: var(--tinta2); }
+
+/* ── Avisos de página (PIEZAS §9): entre la barra y la rejilla, alto mínimo 44,
+   radio 12, icono 16 + texto 13; acción de texto con área de 36. ── */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-avisos > :is(.ag-aviso, .ag-banda-compacta) {
+  min-height: 44px;
+  margin-bottom: 8px;
+  padding: 4px 8px 4px 12px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-avisos :is(.ag-aviso-icono, .ag-banda-compacta-icono) { width: 16px; height: 16px; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-avisos :is(.ag-aviso-texto strong, .ag-banda-compacta-texto strong) { font-weight: 600; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-avisos :is(.ag-aviso-accion, .ag-banda-compacta-salida) {
+  min-height: 36px;
+  padding: 0 8px;
+  font-weight: 600;
+  color: var(--enlace);
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-aviso--error { background: var(--mal-fondo); color: var(--mal-tinta); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-aviso--error .ag-aviso-accion { color: var(--mal-tinta); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-aviso--gcal { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-aviso--gcal .ag-aviso-accion { color: var(--aviso-tinta); }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc :is(.ag-aviso--vacio, .ag-banda-compacta) { background: var(--sup); color: var(--tinta2); }
+:root[data-formato="ih"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-avisos > * { max-width: 431px; }
+
+/* ── La barra de computadora (PIEZAS §4, `esc`) ─────────────────────────────
+   Va sobre el fondo de la página. Los iconos, glifo `--tinta2` sin caja (fondo
+   `--sup2` al pasar o abierto); «Hoy» texto `--enlace`; ‹ › sin caja;
+   «Agendar», el primario del kit. El reparto en filas (M3) no cambia. */
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-button {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--tinta2) !important;
+  border-radius: var(--r-control) !important;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-button:hover { background: var(--sup2) !important; color: var(--tinta) !important; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-today-button { color: var(--enlace) !important; font-size: 14px !important; font-weight: 600 !important; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-today-button:disabled { color: var(--tinta3) !important; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-herramienta {
+  background: transparent;
+  border-color: transparent;
+  color: var(--tinta2);
+  border-radius: var(--r-control);
+}
+.agenda-raiz[data-agenda-v2="encendida"] .ag-herramienta:hover,
+.agenda-raiz[data-agenda-v2="encendida"] .ag-herramienta[aria-expanded="true"] { background: var(--sup2); border-color: transparent; color: var(--tinta); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-fecha-boton { color: var(--tinta); font-weight: 800; letter-spacing: -.2px; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-fecha-boton[aria-expanded="true"] { background: var(--sup2); border-color: transparent; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc [data-onboard="nueva-cita"] {
+  background: var(--accion);
+  color: var(--sobre-accion);
+  border-radius: var(--r-control);
+  box-shadow: none;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-controles-filtro > select {
+  border-radius: var(--r-pildora);
+  border-color: transparent;
+  background-color: var(--sup);
+  color: var(--tinta);
+}
+.agenda-raiz[data-agenda-v2="encendida"] .ag-campana-punto {
+  min-width: 18px;
+  height: 18px;
+  font-size: 12px;
+  background: var(--mes);
+  border-color: var(--fondo);
+}
+
+/* «Agendar» al pie (teléfono y tableta): el primario del kit, radio 12. Dónde va
+   por formato (riel en `ext`, píldora flotante en `tel`, barra en `ih`/`iv`)
+   es de AG8: aquí sólo la piel. */
+.agenda-raiz[data-agenda-v2="encendida"] .ag-barra-movil-cta {
+  border-radius: var(--r-control);
+  background: var(--accion);
+  color: var(--sobre-accion);
+  font-size: 16px;
+  font-weight: 600;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .ag-barra-movil-cta:hover { background: color-mix(in srgb, var(--accion) 88%, #000); }
+
+/* ── El panel del día (PIEZAS §8, `esc` en Día) ─────────────────────────── */
+.agenda-raiz[data-agenda-v2="encendida"] .ag-panelcard {
+  padding: 14px 16px 16px;
+  background: var(--sup);
+  border: 0;
+  border-radius: var(--r-tarjeta-ancha);
+  box-shadow: none;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .ag-panelcard-tit { font-size: 13px; line-height: 18px; letter-spacing: .3px; color: var(--enlace); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-panelcard-nota { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-tile { gap: 2px; padding: 10px 12px; background: var(--fondo); border-radius: var(--r-control); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-tile--primario { background: var(--fondo); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-tile-n { font-size: 22px; line-height: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-tile--primario .ag-tile-n { color: var(--enlace); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-tile-l { font-size: 13px; line-height: 18px; font-weight: 400; color: var(--tinta2); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-desglose { gap: 8px; margin-top: 14px; padding-top: 0; border-top: 0; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-desglose-fila { gap: 10px; font-size: 14px; line-height: 20px; color: var(--tinta); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-desglose-punto { display: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-desglose-icono { display: inline-flex; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-hueco-grupo,
+.agenda-raiz[data-agenda-v2="encendida"] .ag-hueco {
+  padding: 10px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--linea);
+  border-radius: 0;
+}
+.agenda-raiz[data-agenda-v2="encendida"] :is(.ag-hueco-grupo, .ag-hueco):last-child { border-bottom: 0; padding-bottom: 0; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-hueco:hover,
+.agenda-raiz[data-agenda-v2="encendida"] .ag-hueco:focus-visible { background: var(--sup2); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-hueco-rango { font-size: 15px; line-height: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-hueco-dur { font-size: 13px; color: var(--tinta2); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-turno {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  min-width: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-pildora);
+  background: var(--tonal);
+  color: var(--tonal-tinta);
+  font-size: 15px;
+  font-weight: 600;
+}
+.agenda-raiz[data-agenda-v2="encendida"] .ag-turno::before { content: '+'; font-size: 14px; font-weight: 600; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-turno:hover,
+.agenda-raiz[data-agenda-v2="encendida"] .ag-turno:focus-visible { background: color-mix(in srgb, var(--tonal) 82%, var(--accion)); }
+.agenda-raiz[data-agenda-v2="encendida"] :is(.ag-turnos-vacio, .ag-panelcard-vacio) { font-size: 13px; color: var(--tinta2); }
+/* El mini mes del panel: hoy en `--enlace`, el día a la vista relleno. */
+.agenda-raiz[data-agenda-v2="encendida"] .ag-minimes-titulo { font-size: 15px; font-weight: 600; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-minimes-rejilla th { font-size: 12px; font-weight: 600; color: var(--tinta2); }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-minimes-dia { font-size: 13px; font-weight: 400; }
+.agenda-raiz[data-agenda-v2="encendida"] .ag-minimes-dia[aria-current="date"] { color: var(--enlace); background: transparent; font-weight: 700; }
+.agenda-raiz[data-agenda-v2="encendida"] td[aria-selected="true"] > .ag-minimes-dia { background: var(--cal-hoy-num); color: var(--sobre-accion); font-weight: 700; }
+
 /* ═══ CAPAS E INTERACCIONES V2 (bloque F, F3) ═══════════════════════════════
    Las piezas nuevas del bloque F que van DETRÁS DEL INTERRUPTOR `agendaV2`:
    la burbuja de alta rápida, la tarjeta de lectura (capa en escritorio, hoja

@@ -2,6 +2,7 @@
 
 import { type ReactElement } from 'react'
 import type { Status } from '@/lib/agenda/tiposAgenda'
+import IconoEstadoCita from '@/components/ui/IconoEstadoCita'
 
 /** Las formas contadas de cada estado: «2 agendadas», «1 no asistió».
  *
@@ -37,6 +38,10 @@ export function DesgloseEstados(
           {/* UN token y un solo color, `-dot`: el mismo que la tarjeta pinta en
               su `borderLeft` y el mismo que la leyenda. Nunca un hex. */}
           <span className="ag-desglose-punto" style={{ backgroundColor: `var(--ag-status-${estado}-dot)` }} />
+          {/* B13 · AG1 · Con la v2, el icono del estado en su círculo de 24 en vez
+              del punto (PIEZAS §8); decorativo: el estado ya va escrito al lado.
+              La hoja enseña uno u otro según el interruptor. */}
+          <span className="ag-desglose-icono" aria-hidden="true"><IconoEstadoCita estado={estado} texto="nunca" compacto /></span>
           {/* El mismo «≥» del subtítulo breve, y por el mismo motivo: con la
               traída recortada esto deja de contar el día y pasa a ser un SUELO.
               «1 agendada» sobre un conjunto incompleto es falso; «≥ 1 agendada»

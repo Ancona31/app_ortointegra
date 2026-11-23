@@ -144,7 +144,7 @@ hallazgos de las 25 rutas, claro + oscuro:
 | B10 | Cuenta y administración | hecho | 7776920c, ff66a83e, d5b84ac4, 0f1299cc (fusión 2b2baf0d) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
 | B11 | Ayuda, estadísticas, suplementación | hecho | 21b45d15, e8a78684, d930489e (fusión c8486fe3) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
 | B12 | Integración de pantallas (push 2) | hecho (verificación tras el reinicio del contenedor) | 24ca09ba … a289ce13 y los de la verificación (ver «Integración de pantallas (B12) · notas») | ok | 87/61 | 2425/2425 (sin TZ y UTC) | ver notas | 3 roles × 5 formatos × 2 temas |
-| B13 | Agenda (AG0–AG10) | fuera de este cierre: espera el aviso del dueño | | | | | | |
+| B13 | Agenda (AG0–AG10) | AG0 y AG1 hechos (rama `feature/integracion-rediseno-agenda`); AG2–AG10 pendientes | AG0 980a44ce · AG1 ver «B13 · AG1 · notas» | ok | 87/61 | 2617/2617 (sin TZ, UTC, Hermosillo) | ver notas AG0/AG1 | antes/después 5 × 2, v2 encendida y apagada |
 | B14 | Retirada del lanzador `/inicio` | fuera del proyecto (decisión del dueño) | | | | | | |
 | — | Cierre de formularios (T1–T4) | hecho | 836d8990, a8ca4d36 · fead58a1, 8b175282 · 94adb879 · a0fc8193 | ok | 87/61 | 2575/2575 (sin TZ, UTC, Hermosillo) | 425/101/640 (ver notas) | 8 formularios + 3 vistas × 5 × 2 |
 | B15 | Limpieza final y QA (push 4) | hecho salvo lo sacado del alcance | e0a37c85, 55cb2198, d2c9371e | ok | 87/61 | 2575/2575 | subconjunto igual que B12 | diff de píxeles contra antes de la limpieza |
@@ -1024,6 +1024,139 @@ formatos; franjas de `tel` emuladas por CDP):
   los otros cinco formularios: sin cambios (capturas comparadas). Tab: 0
   fallos; «Imprimir» pulsable (`elementFromPoint`) en vacío, carga alta arriba
   y al fondo y con la lista abierta junto al pie, claro y oscuro.
+
+### B13 · AG0 · notas (tokens y movimiento, 2026-11-23)
+
+* **`--cal-*` viven en `sistema.css`** (bloque «LA AGENDA: familia `--cal-*`», tras
+  el `@media (prefers-reduced-transparency)`), no en `globals.css`: son tokens del
+  rediseño, como el kit. Valores de `agenda-base/PIEZAS.md` §1:
+  * estados `--cal-{ag,conf,aten,canc,noas}-{fondo,barra,tinta}`; «agendada»
+    (`ag`) es el ÁMBAR del kit, que aquí se llama `--aviso-*` (la tabla de
+    equivalencias de la cabecera de `sistema.css`: `--ag-fondo/-tinta/-punto`
+    de las maquetas = `--aviso-fondo/-tinta/-punto`);
+  * colores de evento `--cal-ev-{indigo,magenta,carmin,oliva,bronce,grafito}`,
+    los ÚNICOS literales, con su oscuro en `html.dark`;
+  * `--cal-bloqueo-{fondo,raya,tinta}`, `--cal-fuera`, `--cal-linea`,
+    `--cal-hoy`, `--cal-hoy-num`, `--cal-ahora`, `--cal-hueco`, `--cal-sel`;
+  * medidas `--cal-h` (80 px por hora en los cinco formatos) y `--cal-hw`
+    (columna de horas 44 · 52 `ih`/`iv` · 56 `esc`; FullCalendar mide su eje
+    solo y hoy NO lo lee nadie: queda para AG2/AG3).
+  * Regla de uso en un bloque: `--b-fondo` relleno, `--b-barra` barra de 3 px
+    (gráfico ≥ 3:1), `--b-tinta` hora e icono (texto ≥ 4,5:1); nombre en
+    `--tinta` (`--tinta2` pasado o cancelado).
+* **Movimiento** (`globals.css`, `:root`): `--ag-dur-micro/base/lento` =
+  `var(--dur-toque/--dur-sale/--dur-entra)` (100/240/360 ms) y
+  `--ag-ease-out/-in` = `var(--resorte-entra/-sale)`; `--ag-ease` (FLIP,
+  arrastre) se queda en la cúbica, sin resorte. `src/lib/agenda/movimientoAgenda.ts`
+  (permiso del dueño para presentación): `TOPE_MOVIMIENTO_MS` 240 → **400** (el
+  del catálogo; `REGLA_AGENDA` lo usa) y respaldos 100/240/360.
+  `dragRevertDuration` de `AgendaCliente` 180 → 240 (= `--ag-dur-base`). Sigue
+  siendo sólo `opacity`/`transform` (más los colores de hover y foco).
+* **Las páginas públicas no cambian de ritmo:** `agendaPublica.css` fija en `.rp`
+  la escala de antes (120/180/240 y las cúbicas). Va en `.rp` y NO en
+  `body:has(.rp)`, porque ese bloque sólo admite colores con su valor claro
+  idéntico al `:root` (`agendaPublicaTokens.test.ts`). Capturas de `/reservar` y
+  `/confirmar` antes/después: idénticas píxel a píxel en 5 formatos × 2 temas.
+* **Velo de la agenda:** `.ag-capa-velo`, `.ag-modal-velo` (gana a
+  `bg-black/40 backdrop-blur-sm` de los modales) y `--ag-modal-overlay` (claro y
+  oscuro) = `--velo` + `--velo-filtro`; con transparencia reducida, el velo opaco
+  y sin desenfoque del kit (solo, por el `@media` de `sistema.css`).
+* **Oscuro unificado:** en el `html.dark` de la agenda, las superficies, tintas y
+  líneas NEUTRAS apuntan al kit (`--ag-bg-app/-main` y `--ag-surface-sunken` →
+  `--fondo`, `--ag-surface`/`--ag-modal-bg`/`--ag-month-cell/-head` → `--sup`,
+  `--ag-chip-bg`/`--ag-segment-bg`/`--ag-input-bg`/`--ag-modal-icon-bg`/
+  `--ag-btn-ghost-hover` → `--sup2`, `--ag-border-card`/`--ag-input-border` →
+  `--borde`, `--ag-ink`/`--ag-text` → `--tinta`, `--ag-ink-600`/`--ag-muted`/
+  `--ag-chip-text`/`--ag-segment-text`/`--ag-month-num` → `--tinta2`,
+  `--ag-muted2`/`--ag-faint` → `--tinta3`, `--ag-month-gap` → `--linea`).
+  Estados, eventos, Google y el cromo (`--ag-navy*`) conservan sus literales en
+  ese bloque (la v2 los re-apunta dentro de su raíz, AG1). Ningún token nuevo en
+  `html.dark`: el conjunto que `agendaPublicaTokens.test.ts` recorre no cambió.
+* **Pruebas al día:** `movimientoAgenda.test.ts` (respaldos, tope 400 y su
+  caso nuevo), `marcasMovimiento.test.ts` y `flipTarjetas.test.ts` (respaldos
+  120 → 100 y 180 → 240), `agenda-f-movimiento.e2e.ts` (el tope sale de
+  `TOPE_MOVIMIENTO_MS`).
+
+### B13 · AG1 · notas (piezas base, 2026-11-23)
+
+**Cómo está hecho (léelo antes de AG2–AG10).** Todo lo de AG1 va bajo
+`.agenda-raiz[data-agenda-v2="encendida"]` en el bloque «B13 · AG1 · LAS PIEZAS
+BASE DE LA AGENDA V2» de `globals.css` (justo antes de «CAPAS E INTERACCIONES
+V2»). La agenda con la v2 apagada no lo ve. Las capas (burbuja, tarjeta,
+modales) se pintan en `body`, fuera de la raíz: tampoco lo ven.
+
+* **La piel se cambia RE-APUNTANDO TOKENS en la raíz v2**, no reescribiendo
+  reglas: dentro de `.agenda-raiz[data-agenda-v2="encendida"]` los `--ag-*`
+  neutros (superficies, tintas, líneas, chips, controles), el conmutador
+  (`--ag-segment-*`), hoy/fuera de horario/hora actual, los CINCO ESTADOS
+  (`--ag-status-*-{dot,text,bg,border}` → `--cal-*`), los colores de evento
+  (`--ag-evento-*` → `--cal-ev-*`) y `--ag-navy` (→ `--navy`) valen lo del kit.
+  Por eso listas, Mes, chips de todo el día y Google ya salen con la paleta
+  nueva sin tocarlos (AG3/AG4/AG7 parten de ahí). Si una pieza tuya necesita
+  otro valor, escríbelo en tu regla; no vuelvas a declarar los tokens.
+  ⚠️ Para que un token de la raíz llegue a una capa en `body`, la capa tiene que
+  leer el del kit (`--sup`, `--cal-*`): los re-apuntados NO llegan allí.
+* **Bloque de cita** (`MemoizedEventContent`): con la v2 los colores viajan como
+  variables `--b-fondo`/`--b-barra`/`--b-tinta` (función `coloresDeTarjeta`,
+  exportada) y la caja la pinta la hoja: sin marco, radio 8 (6 la de una línea),
+  barra de 3 px como sombra interior, pasada al 55 % con el nombre en `--tinta2`,
+  hover = barra + `--ag-shadow-elevada`. Letra: nombre 13/16 600 (Día 14/18),
+  hora 12/16 600 tabular, resto 12/16 `--tinta2`, iniciales 12/700 sobre `--sup`;
+  nada < 12 px. En Día la caja es contenedor de TAMAÑO (`container: ag-tarjeta /
+  size`) y reparte por alto: una línea (< 34 px) «nombre · hora · estado»; dos
+  «nombre … estado» / «hora · huso · teléfono · consultorio» (el salto es el
+  `::before` de la caja); tres con las observaciones (≥ 54 px). La píldora del
+  estado es icono en círculo de 18 (`IconoEstadoCita`, decorativo) + texto
+  12/600, sin marco. Semana conserva su escalera por tier (`tierDeTarjeta`): con
+  la franja a 40 px, 30 min = `tiny`, 45 = `compact`, 60+ = `full`.
+* **Rejilla:** `--ag-slot-h` = `--cal-h / 2` (40 px; 24 con «Densidad
+  compacta», como antes); la tarjeta del calendario ya no envuelve la barra:
+  `.agenda-fc` es transparente y sólo `.fc-view-harness` es tarjeta (`--sup`,
+  radio 16 · 18 `ih`/`iv` · 20 `esc`); barra nativa, controles y leyenda sobre el
+  fondo; horas 12/16 `--tinta2`; sin línea de media hora; cabecera «LUN» 12/600 +
+  número 17/600, hoy en círculo de 28 `--cal-hoy-num` (el «· HOY» se oculta a la
+  vista; sigue en el DOM); columna de hoy `--cal-hoy` sin anillo; hora actual
+  2 px `--cal-ahora` con píldora 20/12/700 en `--sup`; fuera de horario
+  `--cal-fuera` al 88 % (deja ver las líneas); bloqueo rayado 135° 1,5/9 con
+  `--cal-bloqueo-*` y rótulo 12/600 de 20 sobre `--sup`.
+* **Barra de computadora (`esc`):** sólo piel, el reparto en filas de M3 NO
+  cambia: ‹ › sin caja, «Hoy» texto `--enlace`, iconos (`.ag-herramienta`) glifo
+  `--tinta2` sin caja (fondo `--sup2` al pasar o abierto), fecha 800, filtro de
+  médico en píldora `--sup`, «Agendar» primario `--accion` radio 12, contador de
+  la campana 18/12/700 sobre `--mes`.
+* **Banda móvil (`ext`/`tel`/`ih`/`iv`):** sigue siendo la banda (su estructura
+  es de AG8); con la v2 su navy es el del kit (`--navy`) y la franja del sistema
+  la sigue (`body:has(… .ag-banda-movil)::before`). «Agendar» al pie: primario
+  `--accion`, radio 12.
+* **Avisos de página:** `.ag-aviso` y `.ag-banda-compacta` dentro de
+  `.ag-avisos`: alto ≥ 44, radio 12, texto 13, icono 16, acción 36 en `--enlace`;
+  tonos error `--mal-*`, Google `--aviso-*` (el ámbar), vacío y compacta `--sup`;
+  en `ih`, ≤ 431 px.
+* **Panel del día (`esc`, Día):** tarjetas `--sup` radio 20 sin borde ni sombra,
+  rótulo 13/700 `--enlace`; mosaicos `--fondo` radio 12 con número 22/700; el
+  desglose lleva el icono del estado en círculo de 24 (`.ag-desglose-icono`,
+  `IconoEstadoCita`, decorativo; el punto `.ag-desglose-punto` sigue en el DOM y
+  es lo que ve la v2 apagada); huecos como filas con línea, turnos en píldora
+  tonal de 36 con «+» (por CSS: el `aria-label` no cambia); mini mes con hoy en
+  `--enlace` y el día a la vista relleno.
+* **`agenda/loading.tsx`:** tarjeta `bg-sup` sin borde ni sombra, banda en
+  `--navy`, horas de `--cal-h`.
+
+**Pendiente (de otros sub-bloques o del dueño):**
+* **«3 días» en el conmutador:** la vista no existe todavía y añadirla toca
+  `src/lib/agenda/vistasAgenda.ts` (AG2). El conmutador conserva las vistas de
+  hoy con la piel nueva (pista `--sup2`, elegido `--sup` con sombra); su
+  `role="tablist"` y sus `role="tab"` admiten una cuarta sin cambiar nada.
+* **La barra por formato de PIEZAS §4** (título grande a la izquierda en `esc`;
+  en teléfono «‹ título ›» + campana + «···» y «Hoy» + conmutador; «Agendar» en
+  el riel / píldora flotante / barra según formato) NO está: exige mover
+  controles entre filas y al menú «···» (AG8) y rehacer la banda móvil. Hoy:
+  piel nueva sobre el reparto de M3 y la banda de siempre.
+* `--cal-hw` (columna de horas por formato) no se aplica: FullCalendar mide el
+  eje por su contenido.
+* El bloque NO lleva el icono de estado de 13 px ni el chip de estado de las
+  maquetas en Semana: conserva el glifo de texto delante de la hora (F1.8). Su
+  regla de contenido en Semana sigue siendo la de los tiers.
 
 ## Estado al cierre de pantallas y formularios
 

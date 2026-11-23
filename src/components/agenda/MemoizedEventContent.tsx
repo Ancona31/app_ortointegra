@@ -15,6 +15,7 @@ import { IconoDelEvento } from './IconoDelEvento'
 import { GLIFO_PILDORA } from './FilaListaDetalle'
 import { MarcaOrigenGoogle, ETIQUETA_ORIGEN_GOOGLE } from './MarcaOrigenGoogle'
 import { MarcasCita, ETIQUETA_ENLACE, ETIQUETA_SIN_EXPEDIENTE } from './MarcasCita'
+import IconoEstadoCita from '@/components/ui/IconoEstadoCita'
 
 /* ─── Renderer de eventos (estilo Google) — memoizado ──── */
 
@@ -138,6 +139,40 @@ export function tierDeTarjeta(alto: number | null, piso: number): 'tiny' | 'comp
   if (alto < Math.max(piso * TIER_TINY_FRANJAS, ALTO_MINIMO_COMPACT)) return 'tiny'
   if (alto < Math.max(piso * TIER_COMPACT_FRANJAS, ALTO_MINIMO_FULL)) return 'compact'
   return 'full'
+}
+
+/** El estilo en línea de la caja: propiedades CSS o, con la v2, las tres variables del bloque. */
+type EstiloTarjeta = CSSProperties & Partial<Record<'--b-fondo' | '--b-barra' | '--b-tinta', string>>
+
+/* B13 · AG1 · El estado en la familia `--cal-*` (PIEZAS §1): agendada = `ag`
+   (el ámbar del kit), confirmada = `conf`, atendida = `aten`, cancelada =
+   `canc`, no asistió = `noas`. */
+const ESTADO_CAL: Record<Status, string> = {
+  scheduled: 'ag', confirmed: 'conf', attended: 'aten', cancelled: 'canc', no_show: 'noas',
+}
+
+/**
+ * Los cuatro colores de la caja: `dot` (barra izquierda e icono), `txt` (hora,
+ * estado), `fondo` y `marco`. El color elegido de un evento manda sobre el del
+ * estado. Con la v2 salen de `--cal-*` y la caja no lleva marco (la barra es una
+ * sombra interior, `globals.css`); apagada, de `--ag-status-*`/`--ag-evento-*`,
+ * como siempre.
+ */
+export function coloresDeTarjeta(status: Status, color: ColorEvento | null, v2: boolean):
+  { dot: string; txt: string; fondo: string; marco: string } {
+  if (v2) {
+    const k = ESTADO_CAL[status]
+    return color
+      ? { dot: `var(--cal-ev-${color})`, txt: `var(--cal-ev-${color})`,
+          fondo: `color-mix(in srgb, var(--cal-ev-${color}) 12%, var(--sup))`, marco: 'transparent' }
+      : { dot: `var(--cal-${k}-barra)`, txt: `var(--cal-${k}-tinta)`, fondo: `var(--cal-${k}-fondo)`, marco: 'transparent' }
+  }
+  return {
+    dot: color ? `var(--ag-evento-${color})` : `var(--ag-status-${status}-dot)`,
+    txt: color ? `var(--ag-evento-${color})` : `var(--ag-status-${status}-text)`,
+    fondo: color ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))` : `var(--ag-status-${status}-bg)`,
+    marco: color ? `color-mix(in srgb, var(--ag-evento-${color}) 32%, transparent)` : `var(--ag-status-${status}-border)`,
+  }
 }
 
 export const FORMATO_HORA_INICIO = new Intl.DateTimeFormat('es-MX', {
@@ -358,14 +393,12 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
      distinguirlo de un vistazo. En una cita no hay color y esto no cambia nada.
      El fondo y el borde salen del mismo token con `color-mix`, así que basta un
      token por color y la paleta sigue siendo barata de sustituir. */
-  const dot = color ? `var(--ag-evento-${color})` : `var(--ag-status-${status}-dot)`
-  const txt = color ? `var(--ag-evento-${color})` : `var(--ag-status-${status}-text)`
-  const fondo  = color
-    ? `color-mix(in srgb, var(--ag-evento-${color}) 10%, var(--ag-surface))`
-    : `var(--ag-status-${status}-bg)`
-  const marco = color
-    ? `color-mix(in srgb, var(--ag-evento-${color}) 32%, transparent)`
-    : `var(--ag-status-${status}-border)`
+  /* B13 · AG1 · Con la v2 (`sinAvisoFlotante`) los colores salen de la familia
+     `--cal-*` del rediseño (PIEZAS §1) y viajan como VARIABLES (`--b-fondo`,
+     `--b-barra`, `--b-tinta`): la caja la pinta `globals.css` (relleno, barra
+     izquierda de 3 px como sombra interior, pasado al 55 %). Apagada, lo de
+     siempre, en línea. */
+  const { dot, txt, fondo, marco } = coloresDeTarjeta(status, color, sinAvisoFlotante)
   const isCancelled = status === 'cancelled'
   const name = pacNombre ?? title
   const etiquetaEstado = STATUS_CONFIG[status].label
@@ -374,11 +407,9 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
      3A: arrastraba el texto con el fondo y los ratios de la paleta de estado se
      midieron sin ella, así que al 70 % una cancelada bajaba de AA. El tachado
      del nombre y el fondo rojo ya dicen «cancelada» sin tocar el contraste. */
-  const root: CSSProperties = {
-    background: fondo,
-    borderColor: marco,
-    borderLeftColor: dot,
-  }
+  const root: EstiloTarjeta = sinAvisoFlotante
+    ? { '--b-fondo': fondo, '--b-barra': dot, '--b-tinta': txt }
+    : { background: fondo, borderColor: marco, borderLeftColor: dot }
 
   /* EL EMPUJE AL BORDE DERECHO DE LA FILA, y lo lleva UNO SOLO: el primero del
      grupo de la derecha. Dos márgenes `auto` se repartirían el hueco a partes
@@ -499,7 +530,13 @@ export const MemoizedEventContent = memo(function MemoizedEventContent({
           dos declaraciones lo heredan. Y como el color es `txt`, un evento con
           color elegido pinta su píldora con él, igual que ya hacen la barra
           izquierda, la hora y la etiqueta del descriptor. */}
-      <span className="ag-tarjeta-pildora" style={estiloPildora}>{etiquetaEstado}</span>
+      <span className="ag-tarjeta-pildora" style={estiloPildora}>
+        {/* B13 · AG1 · Con la v2 la píldora es «icono de estado en círculo + texto»
+            (PIEZAS §2); el icono es decorativo (el estado ya va en el texto y en
+            la etiqueta de la caja) y apagada no se ve (globals.css). */}
+        {sinAvisoFlotante && <span className="ag-tarjeta-pildora-ico" aria-hidden="true"><IconoEstadoCita estado={status} texto="nunca" compacto /></span>}
+        {etiquetaEstado}
+      </span>
     </div>
   )
 })
