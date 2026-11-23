@@ -8,22 +8,24 @@
  */
 import EditorDias from '@/components/agenda/configuracion/EditorDias'
 import SelectorHuso from '@/components/agenda/configuracion/SelectorHuso'
-import { SUB_PASO, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
+import { CABECERA_PASO, SECCION_PASO, SUB_PASO, SUPERFICIE, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
 import type { Horario } from '@/lib/configApp'
 
 export interface EleccionClinica { horario: Horario; huso: string }
 
 export default function PasoClinica({ eleccion, alCambiar }: { eleccion: EleccionClinica; alCambiar: (e: EleccionClinica) => void }) {
   return (
-    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
-      <div className="flex flex-col gap-[8px]">
+    <section className={SECCION_PASO} aria-labelledby="primera-vez-titulo">
+      <div className={CABECERA_PASO}>
         <h1 id="primera-vez-titulo" className={TITULO_PASO}>Horario de la clínica</h1>
         <p className={SUB_PASO}>
           Este horario se usará de fábrica en todos los consultorios que se creen. También puedes cambiar el horario y la ubicación de cada consultorio.
         </p>
       </div>
-      <div className={`${TARJETA} gap-[18px] sm:gap-[16px]`}>
+      <div className={`${SUPERFICIE} py-[4px]`}>
         <EditorDias horario={eleccion.horario} alCambiar={horario => alCambiar({ ...eleccion, horario })} />
+      </div>
+      <div className={TARJETA}>
         <SelectorHuso valor={eleccion.huso} alCambiar={huso => alCambiar({ ...eleccion, huso })} />
       </div>
     </section>

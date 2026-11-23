@@ -57,21 +57,28 @@ function useConfigAgregada() {
   return { config, fallo: !config && Boolean(error), actualizarConfig }
 }
 
+/**
+ * La lista de enlaces (`GET /api/agenda/enlaces`). B13 · AG10: SÓLO cuenta la respuesta de la ÚLTIMA petición.
+ * Cada paso del asistente la vuelve a pedir (`alCambiarDatos`) y una respuesta atrasada —p. ej. la que salió antes
+ * de guardar la duración— llegaba después de la nueva y la pisaba: el cierre decía «falta la duración de la
+ * consulta» con la duración ya guardada. Cada petición lleva su número y la que no es la última se tira.
+ */
 function useListaEnlaces(activa: boolean): { lista: EstadoLista; recargar: () => Promise<void> } {
   const [lista, setLista] = useState<EstadoLista>(null)
+  const ultima = useRef(0)
   const montado = useRef(true)
-  useEffect(() => () => { montado.current = false }, [])
-  const recargar = useCallback(async (): Promise<void> => {
+  useEffect(() => { montado.current = true; return () => { montado.current = false } }, [])
+  const cargar = useCallback(async (): Promise<void> => {
+    const esta = ++ultima.current
     const l = await cargarListaEnlaces()
-    if (montado.current) setLista(l)
+    if (montado.current && esta === ultima.current) setLista(l)
   }, [])
   useEffect(() => {
     if (!activa) return
-    let vivo = true
-    void cargarListaEnlaces().then(l => { if (vivo) setLista(l) })
-    return () => { vivo = false }
+    const esta = ++ultima.current
+    void cargarListaEnlaces().then(l => { if (montado.current && esta === ultima.current) setLista(l) })
   }, [activa])
-  return { lista, recargar }
+  return { lista, recargar: cargar }
 }
 
 type Vista = 'cargando' | 'pestanas' | { paso: PasoPrimeraVez }
@@ -115,7 +122,7 @@ export default function ConfiguracionAgenda(props: Props) {
   const alEmpezarDeNuevo = useCallback(() => { olvidarPaso(props.usuarioId); window.location.assign('/agenda/configuracion') }, [props.usuarioId])
   const vigencia = avisos.guardados?.vigencia_enlace_unico_dias ?? props.ajustes?.vigencia_enlace_unico_dias ?? null
 
-  if (vista === 'cargando') return <p className="mx-auto max-w-[760px] pt-[24px] sm:pt-[20px] text-[14px] text-[var(--ag-ink-600)]">Cargando…</p>
+  if (vista === 'cargando') return <p className="mx-auto w-full max-w-[680px] pt-[24px] text-[14px] text-tinta2">Cargando…</p>
   if (vista !== 'pestanas' && config) {
     const suyos = config.consultorios.filter(c => c.medico_id === props.usuarioId && c.activo !== false)
     const listaBuena = lista && lista !== 'error' ? lista : null

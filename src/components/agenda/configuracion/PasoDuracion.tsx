@@ -8,7 +8,7 @@
  */
 import { useId } from 'react'
 import { CalendarDays } from 'lucide-react'
-import { CAMPO_NUEVO, opcion, SUB_PASO, TARJETA, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, CABECERA_PASO, CAMPO_NUEVO, opcion, SECCION_PASO, SUB_PASO, SUPERFICIE, TITULO_PASO } from '@/components/agenda/configuracion/estilosConfig'
 import { consultasQueCaben } from '@/lib/agenda/gruposHorario'
 import type { Horario } from '@/lib/configApp'
 
@@ -32,33 +32,35 @@ export default function PasoDuracion({ eleccion, horarios, alCambiar }: Props) {
   const minutos = minutosDe(eleccion)
   const cabe = consultasQueCaben(horarios, minutos)
   return (
-    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
-      <div className="flex flex-col gap-[8px]">
+    <section className={SECCION_PASO} aria-labelledby="primera-vez-titulo">
+      <div className={CABECERA_PASO}>
         <h1 id="primera-vez-titulo" className={TITULO_PASO}>¿Cuánto dura tu consulta?</h1>
         <p className={SUB_PASO}>Con esto sabemos cuántas citas caben en tu día.</p>
       </div>
-      <div className={`${TARJETA} gap-[16px] sm:gap-[14px]`}>
-        <div className="grid grid-cols-3 gap-[10px]">
-          {DURACIONES.map(d => (
-            <button key={d} type="button" aria-pressed={!eleccion.otra && eleccion.minutos === d} className={opcion(!eleccion.otra && eleccion.minutos === d)}
-              onClick={() => alCambiar({ ...eleccion, minutos: d, otra: false })}>{d} min</button>
-          ))}
-          <button type="button" aria-pressed={eleccion.otra} className={opcion(eleccion.otra)} onClick={() => alCambiar({ ...eleccion, otra: true })}>Otra</button>
-        </div>
-        {eleccion.otra && (
-          <label htmlFor={`${id}-o`} className="flex items-center gap-[10px] text-[14px] text-[var(--ag-text)]">Mi consulta dura
-            <input id={`${id}-o`} type="number" inputMode="numeric" min={5} max={240} step={5} className={`${CAMPO_NUEVO} w-[96px]`}
-              value={eleccion.texto} onChange={e => alCambiar({ ...eleccion, texto: e.target.value })} />
-            minutos</label>
-        )}
-        {cabe && (
-          <div className="flex items-center gap-[12px] rounded-[12px] bg-[var(--ag-primary-bg-faint)] p-[16px] sm:p-[14px] text-[14px] leading-[1.5] text-[var(--ag-ink)]">
-            <CalendarDays size={22} className="flex-none text-[var(--ag-brand-legible)]" aria-hidden="true" />
-            <span>En un día de {cabe.desde} a {cabe.hasta} te caben <strong>{cabe.cuantas} consultas</strong> de {minutos} minutos.</span>
+      <div className="flex flex-col gap-[8px]">
+        <div className={SUPERFICIE}>
+          <div className="grid grid-cols-3 gap-[8px] py-[16px]">
+            {DURACIONES.map(d => (
+              <button key={d} type="button" aria-pressed={!eleccion.otra && eleccion.minutos === d} className={opcion(!eleccion.otra && eleccion.minutos === d)}
+                onClick={() => alCambiar({ ...eleccion, minutos: d, otra: false })}>{d} min</button>
+            ))}
+            <button type="button" aria-pressed={eleccion.otra} className={opcion(eleccion.otra)} onClick={() => alCambiar({ ...eleccion, otra: true })}>Otra</button>
           </div>
-        )}
+          {eleccion.otra && (
+            <label htmlFor={`${id}-o`} className="flex flex-wrap items-center gap-[8px] pb-[16px] text-[15px] leading-[20px] text-tinta">Mi consulta dura
+              <input id={`${id}-o`} type="number" inputMode="numeric" min={5} max={240} step={5} className={`${CAMPO_NUEVO} agc-num w-[76px]`}
+                value={eleccion.texto} onChange={e => alCambiar({ ...eleccion, texto: e.target.value })} />
+              minutos</label>
+          )}
+          {cabe && (
+            <div className="flex items-start gap-[12px] border-t border-linea py-[14px] text-[15px] leading-[22px] text-tinta">
+              <CalendarDays size={20} className="mt-[1px] flex-none text-enlace" aria-hidden="true" />
+              <span>En un día de {cabe.desde} a {cabe.hasta} te caben <strong className="font-semibold">{cabe.cuantas} consultas</strong> de {minutos} minutos.</span>
+            </div>
+          )}
+        </div>
+        <p className={`m-0 px-[4px] ${AYUDA}`}>Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
       </div>
-      <p className="m-0 text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">Si en algún consultorio dura distinto, lo cambias después en Configuración.</p>
     </section>
   )
 }

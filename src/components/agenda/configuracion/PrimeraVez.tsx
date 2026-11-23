@@ -21,10 +21,17 @@
  * al terminar, el enlace fijo si no tenía (`POST /api/agenda/enlaces`). Los
  * avisos se guardan solos al cambiarlos (`estadoAvisos`). «Terminar después»
  * guarda el paso en que está si se puede y apunta ese paso (`guardarPaso`).
+ *
+ * B13 · AG10 (rediseño, maqueta `ag-pv`): «‹ Agenda» y «Terminar después» como texto azul, el avance como barras
+ * de 4 px con su etapa debajo (12, ninguna letra < 12), cada paso en grupos del kit y el pie con «Atrás» (quieto)
+ * y «Continuar» (el único relleno). ARREGLO: al cambiar de paso la página vuelve ARRIBA. Antes se llamaba a
+ * `window.scrollTo`, pero en la app quien se desplaza es `<main>` (no la ventana) y el paso nuevo se abría a media
+ * altura; ahora se trae a la vista el principio del asistente (`scrollIntoView`), que mueve el contenedor que
+ * de verdad se desplaza, sea cual sea.
  */
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import PasoClinica, { type EleccionClinica } from '@/components/agenda/configuracion/PasoClinica'
 import PasoHorario, { type EleccionHorario } from '@/components/agenda/configuracion/PasoHorario'
@@ -103,13 +110,13 @@ function Avance({ paso, conClinica }: { paso: PasoPrimeraVez; conClinica: boolea
   const { n, de } = numeroDePaso(paso, conClinica)
   const etapas = conClinica ? ETAPAS_CON_CLINICA : ETAPAS
   return (
-    <div className="flex flex-col gap-[10px]">
-      <div className="text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-ink-600)]">Paso {n} de {de} · menos de 2 minutos</div>
-      <ol className={`m-0 grid list-none ${conClinica ? 'grid-cols-4' : 'grid-cols-3'} gap-[8px] p-0`}>
+    <div className="flex flex-col gap-[8px]">
+      <div className="text-[13px] font-semibold leading-[18px] tabular-nums text-tinta2">Paso {n} de {de} · menos de 2 minutos</div>
+      <ol className={`m-0 grid list-none ${conClinica ? 'grid-cols-4' : 'grid-cols-3'} gap-[6px] p-0`}>
         {etapas.map((e, i) => (
-          <li key={e} className="flex flex-col gap-[6px]" aria-current={i + 1 === n ? 'step' : undefined}>
-            <div aria-hidden="true" className={`h-[6px] rounded-[3px] ${i + 1 <= n ? 'bg-[var(--ag-brand-secondary)]' : 'bg-[var(--ag-border-card)]'}`} />
-            <div className={`text-[11px] ${i + 1 === n ? 'font-bold text-[var(--ag-brand-legible)]' : 'font-semibold text-[var(--ag-ink-600)]'}`}>{e}</div>
+          <li key={e} className="flex min-w-0 flex-col gap-[6px]" aria-current={i + 1 === n ? 'step' : undefined}>
+            <div aria-hidden="true" className={`h-[4px] rounded-[2px] ${i + 1 <= n ? 'bg-accion' : 'bg-sup2'}`} />
+            <div className={`truncate text-[12px] leading-[16px] ${i + 1 === n ? 'font-semibold text-enlace' : 'text-tinta2'}`}>{e}</div>
           </li>
         ))}
       </ol>
@@ -187,18 +194,18 @@ function pasoValido(paso: Paso, f: ReturnType<typeof useFunnel>, a: EstadoAvisos
 
 function Cabecera({ paso, conClinica, guardando, alTerminarDespues }: { paso: Paso; conClinica: boolean; guardando: boolean; alTerminarDespues: () => void }) {
   return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-[16px] sm:gap-[14px]">
-        <Link href="/agenda" className="inline-flex min-h-[44px] sm:min-h-[40px] items-center gap-[6px] text-[14px] sm:text-[13px] text-[var(--ag-ink-600)] no-underline">
-          <ChevronLeft size={18} aria-hidden="true" /> Agenda
+    <div className="flex flex-col gap-[6px]">
+      <div className="flex items-center justify-between gap-[12px]">
+        <Link href="/agenda" className="-ml-[4px] inline-flex h-[44px] items-center gap-[2px] pr-[4px] text-[13px] font-semibold leading-[18px] text-enlace no-underline ih:h-[36px] esc:h-[36px]">
+          <ChevronLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Agenda
         </Link>
         {paso < 4 && (
           <button type="button" disabled={guardando} onClick={alTerminarDespues}
-            className="min-h-[44px] sm:min-h-[40px] cursor-pointer border-0 bg-transparent px-[4px] text-[14px] sm:text-[13px] text-[var(--ag-ink-600)] underline">Terminar después</button>
+            className="-mr-[4px] h-[44px] cursor-pointer border-0 bg-transparent px-[4px] text-[14px] font-semibold text-enlace disabled:text-tinta3 ih:h-[36px] esc:h-[36px]">Terminar después</button>
         )}
       </div>
       {paso !== 4 && <Avance paso={paso} conClinica={conClinica} />}
-    </>
+    </div>
   )
 }
 
@@ -207,9 +214,9 @@ function Pie({ paso, primero, valido, guardando, alAtras, alContinuar }: {
 }) {
   if (paso === 4) return null
   return (
-    <div className="flex flex-wrap items-center justify-between gap-[12px] pt-[8px]">
-      <div>{paso > primero && <button type="button" className={BOTON_BLANCO} onClick={alAtras}>Atrás</button>}</div>
-      <button type="button" className={`${BOTON_AZUL} px-[32px] sm:px-[26px] disabled:bg-[var(--ag-border-card)] disabled:text-[var(--ag-ink-600)] disabled:opacity-100`}
+    <div className="flex items-center justify-end gap-[8px] pt-[8px]">
+      {paso > primero && <button type="button" className={`${BOTON_BLANCO} mr-auto ih:mr-0 iv:mr-0 esc:mr-0`} onClick={alAtras}>Atrás</button>}
+      <button type="button" className={`${BOTON_AZUL} flex-1 ih:flex-none iv:flex-none esc:flex-none ih:px-[24px] iv:px-[24px] esc:px-[24px]`}
         disabled={!valido || guardando} onClick={alContinuar}>
         {guardando ? 'Guardando…' : paso === 3 ? 'Terminar' : 'Continuar'}
       </button>
@@ -219,8 +226,8 @@ function Pie({ paso, primero, valido, guardando, alAtras, alContinuar }: {
 
 function PasoAvisos({ avisos, puedeAdministrar }: { avisos: EstadoAvisos; puedeAdministrar: boolean }) {
   return (
-    <section className="flex flex-col gap-[20px] sm:gap-[16px]" aria-labelledby="primera-vez-titulo">
-      <div className="flex flex-col gap-[8px]">
+    <section className="flex flex-col gap-[24px] ih:gap-[28px] iv:gap-[28px] esc:gap-[28px]" aria-labelledby="primera-vez-titulo">
+      <div className="flex flex-col gap-[6px]">
         <h1 id="primera-vez-titulo" className={TITULO_PASO}>¿Mandamos avisos por correo?</h1>
         <p className={SUB_PASO}>Ya dejamos lo más útil listo. Puedes cambiarlo cuando quieras.</p>
       </div>
@@ -236,7 +243,7 @@ function useNavegacion(p: Props, f: ReturnType<typeof useFunnel>) {
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [enlace, setEnlace] = useState<EnlaceCierre>({ estado: 'cargando' })
-  const irA = (n: Paso) => { setError(null); setPaso(n); window.scrollTo({ top: 0 }) }
+  const irA = (n: Paso) => { setError(null); setPaso(n) }
 
   async function guardarActual(): Promise<boolean> {
     if (paso === 4 || paso === 3) return true
@@ -272,16 +279,30 @@ function useNavegacion(p: Props, f: ReturnType<typeof useFunnel>) {
   return { paso, guardando, error, enlace, irA, continuar, terminarDespues }
 }
 
+/** Al cambiar de paso, el principio del asistente a la vista (no en el primer pintado). Mueve el contenedor que se
+    desplaza de verdad (`<main>` en la app), no la ventana. Sin animación: el paso nuevo entra ya arriba. */
+function useArribaAlCambiarDePaso(paso: Paso) {
+  const raiz = useRef<HTMLDivElement | null>(null)
+  const previo = useRef(paso)
+  useEffect(() => {
+    if (previo.current === paso) return
+    previo.current = paso
+    raiz.current?.scrollIntoView({ block: 'start', behavior: 'auto' })
+  }, [paso])
+  return raiz
+}
+
 export default function PrimeraVez(p: Props) {
   const f = useFunnel(p)
   const n = useNavegacion(p, f)
   const { paso } = n
+  const raiz = useArribaAlCambiarDePaso(paso)
   const horarios = p.consultorios.map(c => {
     const e = f.elecciones[c.id]
     return e?.modo === 'propio' ? e.propio : p.horarioClinica
   })
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-[28px] sm:gap-[24px] pb-[64px] sm:pb-[54px] pt-[8px]" data-primera-vez={paso}>
+    <div ref={raiz} className="mx-auto flex w-full max-w-[680px] scroll-mt-[16px] flex-col gap-[20px] pb-[56px] pt-[4px] ih:max-w-[601px] iv:max-w-[600px]" data-primera-vez={paso}>
       <Cabecera paso={paso} conClinica={p.conClinica} guardando={n.guardando} alTerminarDespues={() => void n.terminarDespues()} />
       {paso === 0 && <PasoClinica eleccion={f.clinica} alCambiar={f.setClinica} />}
       {paso === 1 && (
