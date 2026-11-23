@@ -1,0 +1,207 @@
+### distinto function public.agenda_restablecer_configuracion(pg_catalog.uuid,pg_catalog.uuid)
+  − clínica (tanda H, punto 10): ┃ propio, la herencia de G4) ┃ NULL, tanda I punto 3),
+  + clínica: ┃ propio) ┃ NULL),
+### solo_b function public.agenda_v2_encendida(pg_catalog.uuid)
+  − 
+  + La única lectura común del interruptor de la agenda v2 de una clínica. Sin fila = false (falla cerrado). INVOKER a propósito: con la sesión lee con la RLS de agenda_ajustes (sólo la clínica propia); dentro de una SECURITY DEFINER, como su dueño. No la hagas DEFINER. Sin EXECUTE para anon.
+### distinto function public.aviso_clinica_de_confirmacion()
+  − Tanda L (punto 13): ┃ (índice de I5).
+  + Agenda v2: ┃ (avisos_clinica_pendiente_key).
+### distinto function public.cita_asignacion_google()
+  − Agenda (tanda I, punto 10): pone
+  + Pone
+### distinto function public.cita_movimiento_google_registrar(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone)
+  − Tanda J (punto 10): registra
+  + Registra
+### distinto function public.cita_nombre_saludo(pg_catalog.uuid,pg_catalog.uuid)
+  − v2 (integración M):
+  + v2:
+### distinto function public.cita_proteger_atendida()
+  − Agenda (tanda H punto 22; tanda I punto 1):
+  + Agenda:
+### distinto function public.cita_proteger_bloqueo()
+  − Agenda (tanda L, punto 6): ┃ hoy) ┃ queda (K punto 5).
+  + Agenda: ┃ siempre) ┃ queda.
+### distinto function public.cita_proteger_borrado()
+  − v2 (corrección de seguridad, punto 3): ┃ cancela (B3/D6).
+  + v2: ┃ cancela.
+### distinto function public.cita_proteger_cierre()
+  − v2 (tanda I, punto 12; tanda L, punto 9):
+  + v2:
+### distinto function public.cita_proteger_eleccion()
+  − Agenda (tanda I, punto 9): ┃ (Google ┃ restablece, C5).
+  + Agenda: ┃ (la sincronización con Google ┃ el cambio ┃ restablece el evento).
+### distinto function public.cita_proteger_reserva()
+  − v2 (corrección de seguridad, punto 4):
+  + v2:
+### distinto function public.cita_reagendar_clinica(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)
+  − (tanda I, punto 9):
+  + v2:
+### distinto function public.cita_reagendar_oferta(pg_catalog.uuid,pg_catalog.text)
+  − E6:
+  + v2:
+### distinto function public.cita_recordatorios_pendientes(integer)
+  − Igual que cita_correos_pendientes (E4) más ┃ agenda_ajustes.recordatorio_encendido (tanda H, punto 9).
+  + Sólo clínicas con la agenda v2 encendida, la puerta S3 (gcal_sync_clinica_habilitada) y ┃ agenda_ajustes.recordatorio_encendido.
+### distinto function public.cita_rsvp_google(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text[])
+  − Agenda E9:
+  + 
+### distinto function public.cita_tiene_nota_ligada(pg_catalog.uuid,pg_catalog.uuid)
+  − Agenda (tanda H, punto 22):
+  + Agenda:
+### distinto function public.gcal_aplicar_evento(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,timestamp with time zone,pg_catalog.text,boolean,timestamp with time zone,timestamp with time zone,boolean,pg_catalog.text,boolean,pg_catalog.text,boolean)
+  − ligada (C2, ampliado en D4).
+  + ligada.
+### distinto function public.gcal_bloqueo_aplicar(pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.uuid,pg_catalog.text,timestamp with time zone,boolean,timestamp with time zone,timestamp with time zone,pg_catalog.date,pg_catalog.date)
+  − Tanda K (punto 6): lo
+  + Lo
+### distinto function public.gcal_citas_por_evento(pg_catalog.uuid,pg_catalog.text[],pg_catalog.uuid[])
+  − Google (C2, ampliado en D4).
+  + Google.
+### distinto function public.gcal_sync_frescura(pg_catalog.uuid)
+  − D11:
+  + 
+### distinto function public.log_cita_change()
+  − (C2), ┃ (E1/E6), google_rsvp (E9);
+  + y google_rsvp (sincronización con Google), ┃ (confirmación y reagendo por enlace);
+### distinto function public.proteger_reserva_enlaces()
+  − reserva_enlaces (D1; alta sólo por service_role desde la corrección de seguridad 7a). ┃ service_role; ┃ vez;
+  + reserva_enlaces. ┃ service_role (el código y su hash los calcula el servidor con RESERVA_SECRETO); ┃ vez (también service_role), sin reactivar; ┃ Quien la reemplace parte de este cuerpo.
+### distinto function public.rate_limit_espera(pg_catalog.text,integer,integer)
+  − Tanda K (K2, punto 10): segundos
+  + Segundos
+### distinto function public.reagendar_por_enlace(pg_catalog.text,pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)
+  − E6: ┃ (D3)
+  + v2:
+### distinto function public.reserva_codigo_verificar(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)
+  − (D3; K2): ┃ reemplazado (K2, punto 10):
+  + fijo: ┃ reemplazado:
+### distinto function public.reserva_contacto_estado(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text)
+  − médico (D2, cambiado en seg1).
+  + médico.
+### distinto function public.reserva_contexto(pg_catalog.text,pg_catalog.text,pg_catalog.text)
+  − (D3; G2 añadió consultorio_id y principal a cada tipo; j2 el estado 'agotado' del único). ┃ juntos; ┃ enlace (j2):
+  + (estado vigente | usado | caducado | agotado). ┃ juntos, con consultorio_id y principal; ┃ enlace:
+### distinto function public.reserva_empalmes_registrar(pg_catalog.uuid,pg_catalog.uuid[])
+  − D11: registra
+  + Registra
+### solo_a function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)
+  − Agenda v2 (corrección de seguridad, punto 7a): emite un enlace de reserva. Sólo service_role (POST /api/agenda/enlaces, con el código derivado de RESERVA_SECRETO). p_actor = quien lo pide, comprobado con la regla de las policies de reserva_enlaces. Fijo: revoca el vigente y emite otro, atómico. Único: emite (la vigencia la congela el disparador).
+  + 
+### distinto function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text)
+  − reserva (seg 7a; j2 añadió p_correo y p_correo_hmac, los dos o ninguno, sólo en el único). ┃ policies.
+  + reserva. ┃ policies de reserva_enlaces con p_actor. Fijo: revoca el vigente y emite otro, atómico. Único: emite (la vigencia la congela el disparador), con p_correo y p_correo_hmac, los dos o ninguno.
+### distinto function public.reserva_espera_reenvio(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,integer)
+  − Tanda K (K2, punto 10): segundos
+  + Segundos
+### distinto function public.reserva_ocupacion(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone)
+  − reserva (D3, cambiado en seg1 y k1): ┃ no_show, y sus bloqueos (agenda_bloqueos). k1 (tanda K, punto 4): las ┃ de appointments ya NO ocupan.
+  + reserva: ┃ no_show (las ┃ no ocupan), y sus bloqueos (agenda_bloqueos). ┃ o pausado
+### distinto function public.reservar_por_enlace(pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)
+  − enlace (D3, cambiada en seg1, i2, j2 y k1). ┃ fija de G2) ┃ pública de D5); ┃ k1 (tanda K): ocupa ┃ seg1: en ┃ i2: ┃ j2 (tanda J, punto 3): en ┃ propio de i2, ┃ j2-b:
+  + enlace. ┃ fija) ┃ pública); ┃ Ocupa ┃ En ┃ En ┃ propio,
+### distinto table column public.agenda_ajustes.correo_reserva_clinica
+  − Tanda I (punto 20): correo ┃ de UPDATE de B1).
+  + Correo ┃ agenda_ajustes_update).
+### distinto table column public.agenda_ajustes.recordatorio_encendido
+  − correo (tanda H, punto 9). ┃ de UPDATE de B1).
+  + correo. ┃ agenda_ajustes_update).
+### distinto table column public.appointments.cerrada_en
+  − horario (tanda I, punto 12). ┃ cita» (tanda L, punto 9).
+  + horario. ┃ cita».
+### distinto table column public.appointments.google_asignacion
+  − Agenda (tanda I, punto 10): qué
+  + Qué
+### distinto table column public.appointments.reserva_aviso_version
+  − reserva (D3).
+  + reserva.
+### distinto table column public.appointments.reserva_canal
+  − enlace (D). ┃ (B3) ┃ Google (C-d). ┃ Google (S1).
+  + enlace. ┃ Google. ┃ Google.
+### distinto table column public.appointments.reserva_correo_hmac
+  − enlace (D1): ┃ EXCEPCIÓN (i2): ┃ j2: en el único, el correo es el que escribió la clínica en el enlace.
+  + enlace: ┃ En el único, el correo es el que escribió la clínica en el enlace. EXCEPCIÓN:
+### distinto table column public.appointments.reserva_enlace_id
+  − cita (D1).
+  + cita.
+### distinto table column public.appointments.reserva_nombre
+  − todavía (D1). ┃ (gcal_citas_por_evento, D4)
+  + todavía. ┃ (gcal_citas_por_evento)
+### distinto table column public.appointments.reserva_reagendados
+  − Agenda E6: posición
+  + Posición ┃ Única reserva_* con DEFAULT (cita_proteger_reserva lo tolera).
+### distinto table column public.appointments.reserva_tel_hmac
+  − candado (D2)
+  + bloqueo manual
+### distinto table column public.appointments.sustituida_por
+  − v2 (tanda I, punto 12):
+  + v2:
+### distinto table column public.appointments.tipo_cita_id
+  − cita (agenda B6). ┃ nulo, D1). ┃ (D3)
+  + cita. ┃ nulo).
+### distinto table column public.clinicas.timezone
+  − K3 (punto 12): huso
+  + Huso
+### distinto table column public.consultorios.horario_propio
+  − Desde 20261119130000 ┃ (true)
+  + Al crearse esta columna, ┃ una vez ┃ (true; respaldo en respaldos.consultorios_horario_20261119)
+### distinto table column public.consultorios.horario_revisado_en
+  − v2 (tanda I, punto 3): ┃ en 20261119130000,
+  + v2: ┃ al crearse la columna,
+### distinto table column public.reserva_enlaces.agotado_en
+  − j2: el
+  + El
+### distinto table column public.reserva_enlaces.correo
+  − j2: el correo
+  + Correo
+### distinto table column public.reserva_enlaces.correo_hmac
+  − j2:
+  + 
+### distinto table column public.reserva_enlaces.intentos
+  − j2: llamadas
+  + Llamadas
+### distinto table column public.reserva_enlaces.pausado_en
+  − K3 (punto 14): el
+  + El
+### distinto table column public.tipos_cita.consultorio_id
+  − general (agenda G2).
+  + general.
+### distinto table column public.tipos_cita.principal
+  − médico (agenda G2):
+  + médico:
+### distinto table public.agenda_bloqueos
+  − Tanda K (sección A): un ┃ Spinus sólo pide confirmación.
+  + Un ┃ Spinus, con la v2 encendida, ninguna cita ni evento entra ni se mueve a él (cita_proteger_bloqueo, HINT agenda_horario_bloqueado).
+### distinto table public.avisos_clinica
+  − Tanda I (punto 19): ┃ enlace, cancelación ┃ paciente, ┃ asignar,
+  + Agenda v2: ┃ enlace; cancelación, confirmación ┃ paciente; ┃ asignar; ┃ Google; movimiento rechazado de
+### distinto table public.cita_confirmaciones
+  − Enlace ┃ paciente (agenda E1). ┃ CONVENIO (dimensión 16):
+  + Agenda v2: enlace ┃ paciente. ┃ CONVENIO:
+### distinto table public.cita_correos
+  − Envíos ┃ cita (agenda E4 y G3): ┃ CONVENIO (dimensión 16): ┃ cita_correos_pendientes
+  + Agenda v2: envíos ┃ cita: ┃ CONVENIO: ┃ cita_recordatorios_pendientes
+### distinto table public.cita_reagendos
+  − Reagendados ┃ enlace (agenda E6):
+  + Agenda v2: reagendados ┃ enlace:
+### distinto table public.gcal_movimientos_rechazados
+  − Tanda J (punto 10): un ┃ (cita_proteger_eleccion, I2).
+  + Un ┃ (cita_proteger_eleccion).
+### distinto table public.gcal_sync_estado
+  − clínica (bloque C).
+  + clínica.
+### distinto table public.reserva_empalmes_google
+  − D11: pares ┃ propósito (ver la migración 20261116120000);
+  + Pares ┃ propósito;
+### distinto table public.reserva_enlaces
+  − reserva (agenda D1).
+  + reserva. ┃ Los emite sólo service_role (reserva_enlace_emitir).
+### distinto table public.reserva_incidencias
+  − (candado D2). ┃ Desde seg1 el
+  + (el candado). ┃ El
+### distinto table public.tipos_cita
+  − clínica (agenda B6).
+  + clínica.
+### distinto table respaldos.consultorios_horario_20261119
+  − (20261119130000, punto 10 ┃ Angel). ┃ (ver VUELTA ATRÁS en el archivo).
+  + (backfill ┃ 20261201120000_agenda_f1). ┃ (lo usa la reversa de F1).
