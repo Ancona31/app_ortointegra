@@ -6153,6 +6153,33 @@ ejerce con el conjunto fundido, pero queda en el código:
 **Cuándo:** después de aplicar el conjunto en producción, en un commit propio que
 retire la rama, sus dos casos de prueba y, si Angel quiere, el comentario.
 
+### AG-DT-264 — Los empalmes con reservas pendientes de registrar viven sólo en memoria
+
+**Estado:** abierta, **prioridad media** (decisión de Angel, 2026-11-22). Lo
+importado o movido desde Google en una página se junta en `pasada.movidas`
+(`src/lib/gcalSincronizacion.ts`) y `avisarEmpalmes` lo manda a
+`reserva_empalmes_registrar`. El par no se vuelve a detectar en otra pasada: si
+esa RPC falla, el aviso de empalme a la clínica se pierde. La tanda W lo mitigó
+sin migración: dos reintentos con 200 ms de pausa, sólo si queda presupuesto de
+la pasada (en la reserva pública, `TIEMPO_GOOGLE_MS`, 4 s) y la señal no se
+abortó; si aun así falla, `errores`, un `logger.warn` con la clínica y los ids
+de las citas, y `Sentry.captureMessage` con la clínica y los ids.
+
+Dos límites de esa mitigación, comprobados al hacerla:
+
+* **Hoy no hay Sentry de servidor:** no existe `instrumentation.ts`
+  (`sentry.server.config.ts`, cabecera), así que la llamada no envía nada hasta
+  que se encienda. Lo único que queda es el registro de Vercel.
+* **El filtro de PII redacta los uuid** (`src/lib/sentryPiiFilter.ts:19`,
+  `UUID_RE`, aplicado a `extra` en la línea 134): el día que se encienda,
+  llegarán `[ID-REDACTADO]`. No se tocó el filtro.
+
+**Arreglo de fondo:** guardar los pendientes en la base (una cola por clínica
+que la pasada siguiente reintenta antes de avanzar), con su migración y su
+auditoría.
+
+**Cuándo:** en su propia rama, después de producción.
+
 ---
 
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
