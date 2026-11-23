@@ -1107,10 +1107,9 @@ modales) se pintan en `body`, fuera de la raíz: tampoco lo ven.
   «nombre … estado» / «hora · huso · teléfono · consultorio» (el salto es el
   `::before` de la caja); tres con las observaciones (≥ 54 px). La píldora del
   estado es icono en círculo de 18 (`IconoEstadoCita`, decorativo) + texto
-  12/600, sin marco. Semana conserva su escalera por tier (`tierDeTarjeta`): con
-  la franja a 40 px, 30 min = `tiny`, 45 = `compact`, 60+ = `full`.
-* **Rejilla:** `--ag-slot-h` = `--cal-h / 2` (40 px; 24 con «Densidad
-  compacta», como antes); la tarjeta del calendario ya no envuelve la barra:
+  12/600, sin marco. Semana conserva su escalera por tier (`tierDeTarjeta`).
+* **Rejilla:** el alto de franja NO cambia (36/42/48 por alto de ventana, 24
+  con «Densidad compacta»: ver «Pendiente»); la tarjeta del calendario ya no envuelve la barra:
   `.agenda-fc` es transparente y sólo `.fc-view-harness` es tarjeta (`--sup`,
   radio 16 · 18 `ih`/`iv` · 20 `esc`); barra nativa, controles y leyenda sobre el
   fondo; horas 12/16 `--tinta2`; sin línea de media hora; cabecera «LUN» 12/600 +
@@ -1140,7 +1139,7 @@ modales) se pintan en `body`, fuera de la raíz: tampoco lo ven.
   tonal de 36 con «+» (por CSS: el `aria-label` no cambia); mini mes con hoy en
   `--enlace` y el día a la vista relleno.
 * **`agenda/loading.tsx`:** tarjeta `bg-sup` sin borde ni sombra, banda en
-  `--navy`, horas de `--cal-h`.
+  `--navy`; horas de `--ag-slot-h` como antes.
 
 **Pendiente (de otros sub-bloques o del dueño):**
 * **«3 días» en el conmutador:** la vista no existe todavía y añadirla toca
@@ -1152,6 +1151,14 @@ modales) se pintan en `body`, fuera de la raíz: tampoco lo ven.
   el riel / píldora flotante / barra según formato) NO está: exige mover
   controles entre filas y al menú «···» (AG8) y rehacer la banda móvil. Hoy:
   piel nueva sobre el reparto de M3 y la banda de siempre.
+* **80 px por hora (`--cal-h`) NO se aplica.** Se probó re-apuntando
+  `--ag-slot-h` en la raíz v2 y `agenda-g2-turnos` «arrastrar una cita la deja
+  en el turno más cercano» falló 2 de 3 veces (la cita cayó a las 13:30 en vez de
+  las 14:15): `data-agenda-v2` pasa a «encendida» DESPUÉS de que FullCalendar
+  mida la rejilla y su caché de posiciones se queda con el alto viejo, así que un
+  arrastre real también caería mal. Revertido (3 de 3 en verde). Para AG2:
+  declarar el alto antes del primer pintado o llamar a `updateSize()` al leer el
+  interruptor, y volver a pasar `agenda-g2-turnos` y `agenda-arrastre`.
 * `--cal-hw` (columna de horas por formato) no se aplica: FullCalendar mide el
   eje por su contenido.
 * El bloque NO lleva el icono de estado de 13 px ni el chip de estado de las

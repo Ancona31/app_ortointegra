@@ -6554,10 +6554,15 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 /* La franja del sistema sigue a la banda: con la v2, el navy del kit. */
 body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil)::before { background: var(--navy); }
 
-/* ── La rejilla (PIEZAS §3): 80 px por hora (40 por franja de media hora), 48
-   con «Densidad compacta» (la regla de la densidad, más arriba, gana por ir
-   con su propio atributo). ── */
-.agenda-raiz[data-agenda-v2="encendida"]:not([data-densidad="compacta"]) { --ag-slot-h: calc(var(--cal-h) / 2); }
+/* ── La rejilla (PIEZAS §3) ──
+   ⚠️ EL ALTO DE HORA NO PASA AÚN A `--cal-h` (80 px). Se probó re-apuntando
+   `--ag-slot-h` en esta raíz y el arrastre cayó en la hora equivocada
+   (`agenda-g2-turnos` «arrastrar una cita…», 2 de 3): el atributo
+   `data-agenda-v2` pasa a «encendida» DESPUÉS de que FullCalendar mida la
+   rejilla, y su caché de posiciones se queda con el alto de antes. Hacerlo bien
+   pide declararlo antes del primer pintado o llamar a `updateSize()` al leer el
+   interruptor (AG2). Hasta entonces la franja sigue en 36/42/48 por alto de
+   ventana. */
 
 /* La tarjeta del calendario deja de envolver la barra: la barra y los avisos
    van sobre el fondo de la página y sólo la rejilla es tarjeta (`--sup`, sin

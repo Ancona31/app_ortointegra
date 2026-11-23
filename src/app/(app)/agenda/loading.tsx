@@ -17,9 +17,9 @@ import { Skeleton } from '@/components/ui/Skeleton'
  *     dibujaba `4.32rem` por hora. Desde el 2026-08-25 la franja sale de
  *     `--ag-slot-h` —36, 42 o 48 px según el ALTO de ventana—, o sea 72, 84 o
  *     96 px por hora. Ahora se lee el token en vez de copiar su valor: así este
- *     archivo ya no puede volver a quedarse atrás. (B13 · AG1: el token es
- *     `--cal-h`, 80 px por hora, y la tarjeta y la banda son las del rediseño:
- *     `--sup` sin borde ni sombra y el navy del kit.)
+ *     archivo ya no puede volver a quedarse atrás. (B13 · AG1: la tarjeta y
+ *     la banda son las del rediseño: `--sup` sin borde ni sombra y el navy del
+ *     kit.)
  *   · **El móvil.** Dibujaba el toolbar de escritorio en todos los anchos. Por
  *     debajo de `lg` no hay toolbar: `headerToolbar` va en `false` y lo sustituye
  *     la banda azul, y las vistas de Semana y Día son LISTAS, no rejilla.
@@ -127,14 +127,14 @@ export default function AgendaLoading() {
               </div>
             ))}
           </div>
-          {/* Horas. El alto sale de `--cal-h` (B13 · AG1: 80 px por hora en la
-              agenda del rediseño; era `--ag-slot-h` × 2). Leerlo en vez de
-              copiarlo es lo que impide que este bloque vuelva a desfasarse. */}
+          {/* Horas. El alto sale de `--ag-slot-h`, que es media hora: por eso el
+              ×2. Leerlo en vez de copiarlo es lo que impide que este bloque
+              vuelva a desfasarse cuando el token cambie de valor o de tramo. */}
           <div>
             {HORAS.map(h => (
               <div
                 key={h}
-                className="flex border-b border-linea last:border-b-0 h-[var(--cal-h,80px)]"
+                className="flex border-b border-linea last:border-b-0 h-[calc(var(--ag-slot-h,36px)*2)]"
               >
                 <div className="w-14 flex-shrink-0 flex justify-end pr-2 pt-1">
                   <Skeleton className="h-2.5 w-8" />
