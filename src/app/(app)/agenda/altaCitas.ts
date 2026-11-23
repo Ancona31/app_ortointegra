@@ -41,7 +41,8 @@ type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
    propósito, igual que en `guardadoCitas.ts` (A2.5.7): es la misma cosa
    estructural para el compilador y no hace falta un tipo compartido para
    que coincidan. */
-type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => void } | null
+/* B13 · AG5: `verbo` (y su icono) sólo con la v2 (§29.4). */
+type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => void; verbo?: string; icono?: 'aviso' } | null
 
 /**
  * ¿El gesto cayó en la BANDA DE TODO EL DÍA de Semana o Día, y no en una celda
@@ -268,6 +269,8 @@ export function crearAltaCitas({
     if (aviso) {
       setConfirm({
         message: aviso,
+        /* B13 · AG5 (§29.4): «Agendar» con la v2; apagada, «Aceptar» como siempre. */
+        ...(agendaV2 ? { verbo: 'Agendar', icono: 'aviso' as const } : {}),
         onConfirm: () => { setConfirm(null); abrir() },
         onCancel:  () => setConfirm(null),
       })

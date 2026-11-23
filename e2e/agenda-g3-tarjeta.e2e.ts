@@ -185,7 +185,7 @@ test('confirmada: Reagendar | Editar | No asistió, y «No asistió» pregunta y
   const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
   await t2.getByRole('toolbar').getByRole('button', { name: 'No asistió', exact: true }).click()
   aviso = page.getByRole('dialog', { name: /no asistió\?/ })
-  await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  await aviso.getByRole('button', { name: 'No asistió' }).click()
   expect((await put).request().postDataJSON()).toMatchObject({ status: 'no_show' })
   await expect.poll(() => sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('no_show')
 })
@@ -234,7 +234,7 @@ test('cancelada y no asistió: «Darle otra cita» (y «Reasignar el horario» l
   /* Si sale un aviso (empalme u horario), se acepta: aquí no se prueba. */
   const aviso = page.getByRole('dialog', { name: /Se empalma|fuera de/i })
   const res = await Promise.race([post, aviso.waitFor({ timeout: 4000 }).then(async () => {
-    await aviso.getByRole('button', { name: 'Aceptar' }).click()
+    await aviso.getByRole('button', { name: 'Guardar' }).click()
     return post
   }).catch(() => post)])
   const enviado = res.request().postDataJSON() as Record<string, unknown>

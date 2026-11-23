@@ -33,6 +33,7 @@ import BurbujaAlta, { type MasOpcionesBurbuja, type MedicoBurbuja } from '@/comp
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import AyudaAtajos from '@/components/agenda/AyudaAtajos'
 import ConvertirEnCita, { type EleccionConversion } from '@/components/agenda/ConvertirEnCita'
+import type { PropsConfirmacion } from '@/components/agenda/ConfirmModal'
 import { useAtajosAgenda } from '@/app/(app)/agenda/useAtajosAgenda'
 import { useDeslizarPeriodo } from '@/app/(app)/agenda/useDeslizarPeriodo'
 import { useTarjetaAlPasar } from '@/app/(app)/agenda/useTarjetaAlPasar'
@@ -60,7 +61,7 @@ import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
 import { guardarAtajosEncendidos, leerAtajosEncendidos, type AccionAtajo, type AlmacenPreferencia } from '@/lib/agenda/atajosAgenda'
 import type { CitaEncontrada } from '@/lib/agenda/buscarCitasPaciente'
 import {
-  pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
+  ETIQUETA_ACCION, pideConfirmacion, puedeIniciarConsulta, textoDeConfirmacion, type AccionTarjeta, type QuienMira,
 } from '@/lib/agenda/accionesTarjeta'
 import { correoParaConfirmacion, motivoSinCorreo, motivoSinWhatsApp, telefonoParaWhatsApp } from '@/lib/agenda/whatsappCita'
 
@@ -75,7 +76,8 @@ export type CalendarApiV2 = ReturnType<InstanceType<typeof FullCalendar>['getApi
 const ESPERA_CITA_MS = 6000
 /* Misma forma que el `useState` de `AgendaCliente.tsx`, duplicada a propósito
    como en `guardadoCitas.ts` y `altaCitas.ts`. */
-type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => void } | null
+/* B13 · AG5: la alerta del catálogo con verbo (§29.3–§29.4, `ConfirmModal`). */
+type ConfirmState = (Pick<PropsConfirmacion, 'message' | 'onConfirm' | 'onCancel' | 'verbo' | 'secundario' | 'icono'>) | null
 
 /** Lo que la agenda le presta para guardar: sus mismas funciones. */
 export interface GuardadoV2 {
@@ -200,7 +202,7 @@ function useDependenciasGuardado(p: PropsInteraccionesV2): DependenciasGuardado 
     },
     mensajeEmpalme,
     confirmar: (message) => new Promise<boolean>(resolver => setConfirm({
-      message,
+      message, verbo: 'Guardar', icono: 'aviso',
       onConfirm: () => { setConfirm(null); resolver(true) },
       onCancel: () => { setConfirm(null); resolver(false) },
     })),
@@ -357,9 +359,21 @@ function ejecutarAccion(a: AccionTarjeta, cita: Appointment, x: ContextoAccion):
   if (!pideConfirmacion(a)) { hacer(); return }
   setConfirm({
     message: textoDeConfirmacion(a, cita),
+    ...botonesDeConfirmacion(a),
     onConfirm: () => { setConfirm(null); hacer() },
     onCancel: () => setConfirm(null),
   })
+}
+
+/**
+ * B13 · AG5 (§29.3–§29.4) · Los botones de la alerta de cada acción que pregunta
+ * (`pideConfirmacion`): el principal con el verbo de la burbuja y «Volver» cuando
+ * lo que se confirma es cancelar algo.
+ */
+function botonesDeConfirmacion(a: AccionTarjeta): Pick<PropsConfirmacion, 'verbo' | 'secundario' | 'icono'> {
+  if (a === 'cancelar') return { verbo: ETIQUETA_ACCION.cancelar, secundario: 'Volver', icono: 'cancelar' }
+  if (a === 'no-asistio') return { verbo: ETIQUETA_ACCION['no-asistio'], icono: 'no-asistio' }
+  return { verbo: ETIQUETA_ACCION[a], icono: 'eliminar' }
 }
 
 interface PropsCapaTarjeta {

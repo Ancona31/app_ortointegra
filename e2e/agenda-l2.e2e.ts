@@ -93,7 +93,7 @@ test('Eliminar cita: pregunta, «Cancelar» no hace nada; «Aceptar» la quita d
     await t.getByRole('button', { name: 'Eliminar cita', exact: true }).click()
     aviso = page.getByRole('dialog', { name: texto })
     const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${id}/quitar`) && r.request().method() === 'POST')
-    await aviso.getByRole('button', { name: 'Aceptar' }).click()
+    await aviso.getByRole('button', { name: 'Eliminar cita' }).click()
     expect((await post).status()).toBe(200)
     await expect(cajaDe(page, 'Prueba 07')).toHaveCount(0)
     await expect(cajaDe(vecina, 'Prueba 07')).toHaveCount(0)

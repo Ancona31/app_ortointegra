@@ -469,9 +469,9 @@ test('encendido: las observaciones de la burbuja se guardan en la cita y no viaj
      médicos», elige otra hora. */
   await clicEnFranja(page, DIA_LABORABLE_LIBRE, '13:00')
   const b = burbuja(page)
-  const avisoHorario = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Aceptar' }) })
+  const avisoHorario = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Agendar' }) })
   await expect(b.or(avisoHorario).first()).toBeVisible({ timeout: 30_000 })
-  if (await avisoHorario.count()) await avisoHorario.getByRole('button', { name: 'Aceptar' }).click()
+  if (await avisoHorario.count()) await avisoHorario.getByRole('button', { name: 'Agendar' }).click()
   await elegirPaciente(b, 'Prueba 22')
   await b.getByRole('button', { name: 'Añadir observaciones' }).click()
   await b.getByRole('textbox', { name: 'Observaciones' }).fill(obs)
@@ -479,7 +479,7 @@ test('encendido: las observaciones de la burbuja se guardan en la cita y no viaj
   await b.getByRole('button', { name: 'Guardar', exact: true }).click()
   const aviso = page.getByRole('dialog', { name: /Se empalma/ })
   await expect(aviso.or(b.getByText('Cita agendada', { exact: true })).first()).toBeVisible({ timeout: 60_000 })
-  if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  if (await aviso.count()) await aviso.getByRole('button', { name: 'Guardar' }).click()
   const id = ((await (await post).json()) as { appointment: { id: string } }).appointment.id
   expect(sqlLocal(`select notes from public.appointments where id = :'id'`, { id })).toBe(obs)
   const ev = await esperarLigada(id)

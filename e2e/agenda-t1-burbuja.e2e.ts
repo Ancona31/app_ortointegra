@@ -97,7 +97,7 @@ async function guardarEnBurbuja(page: Page): Promise<void> {
   const aviso = page.getByRole('dialog', { name: /Se empalma/ })
   const hecho = burbuja(page).getByText('Cita agendada', { exact: true })
   await expect(aviso.or(hecho).first()).toBeVisible()
-  if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  if (await aviso.count()) await aviso.getByRole('button', { name: 'Guardar' }).click()
 }
 
 test('punto 2: un paciente que no existe se registra desde la burbuja (con consentimiento) y queda elegido', async ({ page }) => {

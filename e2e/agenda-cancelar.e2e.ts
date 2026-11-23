@@ -132,7 +132,7 @@ test('encendido: la X del paciente también cancela, con su propio aviso', async
   await expect(aviso).toBeVisible()
 
   const resp = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
-  await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  await aviso.getByRole('button', { name: 'Cancelar cita' }).click()
   expect((await resp).ok()).toBeTruthy()
   await expect(tarjetaDe(page, '15:40')).toHaveClass(/ag-ev-status--cancelled/)
   expect(estadoEnBase(id)).toBe('cancelled')

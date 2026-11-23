@@ -100,7 +100,7 @@ test('formulario: médico, consultorio, día y hora deshabilitados con su porqu�
   await modal.locator('input[type="time"]').nth(1).fill('17:45')
   await modal.getByRole('button', { name: 'Guardar' }).click()
   // La base compartida puede tener otras citas a esa hora (B7 sólo avisa): se acepta.
-  const empalme = page.getByRole('button', { name: 'Aceptar', exact: true })
+  const empalme = page.getByRole('dialog').filter({ hasText: 'Se empalma' }).getByRole('button', { name: 'Guardar', exact: true })
   await expect(modal.or(empalme).first()).toBeVisible()
   if (await empalme.isVisible().catch(() => false)) await empalme.click()
   await expect(modal).toBeHidden()
@@ -175,7 +175,7 @@ test('estirar: el fin se estira y se guarda; desde arriba se rechaza con el avis
   // redimensionaba. Se centra antes en su contenedor.
   await tarjeta(page).evaluate(el => el.scrollIntoView({ block: 'center' }))
   await redimensionarFinEvento(page, tarjeta(page), 30)
-  const empalme = page.getByRole('button', { name: 'Aceptar', exact: true })
+  const empalme = page.getByRole('dialog').filter({ hasText: 'Se empalma' }).getByRole('button', { name: 'Guardar', exact: true })
   await expect.poll(async () => (await empalme.isVisible().catch(() => false)) || duracionDe(c.citaId) !== '30').toBe(true)
   if (await empalme.isVisible().catch(() => false)) await empalme.click()
   await expect.poll(() => duracionDe(c.citaId)).not.toBe('30')

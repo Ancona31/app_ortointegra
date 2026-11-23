@@ -1957,6 +1957,8 @@ export default function AppointmentModal({
           + 'Seguirá en la agenda como cancelada, y en el calendario de Google de quien esté invitado '
           + 'quedará marcada como cancelada. ¿Deseas cancelarla?'
         }
+        /* B13 · AG6 (§29.3–§29.4): con la v2, el verbo y «Volver». */
+        {...(agendaV2 ? { verbo: 'Cancelar cita', secundario: 'Volver', icono: 'cancelar' as const } : {})}
         onConfirm={() => { setQuitarPaciente(false); void handleCancelarCita() }}
         onCancel={() => setQuitarPaciente(false)}
       />
@@ -1969,6 +1971,7 @@ export default function AppointmentModal({
           + 'que recibirá el aviso de cancelación. No se puede deshacer — habría que agendarla '
           + 'de nuevo desde cero. ¿Deseas continuar?'
         }
+        {...(agendaV2 ? { verbo: 'Eliminar cita', icono: 'eliminar' as const } : {})}
         onConfirm={() => { setQuitarPaciente(false); void handleDelete() }}
         onCancel={() => setQuitarPaciente(false)}
       />
@@ -1981,6 +1984,7 @@ export default function AppointmentModal({
     {avisoHorario && (
       <ConfirmModal
         message={avisoHorario}
+        {...(agendaV2 ? { verbo: 'Guardar', icono: 'aviso' as const } : {})}
         onConfirm={() => { setAvisoHorario(null); void seguirTrasHorario() }}
         onCancel={() => setAvisoHorario(null)}
       />
@@ -1991,6 +1995,7 @@ export default function AppointmentModal({
     {avisoEmpalme && (
       <ConfirmModal
         message={avisoEmpalme.mensaje}
+        {...(agendaV2 ? { verbo: 'Guardar', icono: 'aviso' as const } : {})}
         onConfirm={() => { const ids = avisoEmpalme.ids; setAvisoEmpalme(null); void guardar(ids) }}
         onCancel={() => setAvisoEmpalme(null)}
       />

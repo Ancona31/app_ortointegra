@@ -20,10 +20,11 @@
  *   · Un clic: sin confirmación, en el momento (lo pidió Angel). El error se
  *     dice debajo, en `role="alert"`.
  */
-import { useState, type CSSProperties, type ReactElement } from 'react'
+import { useId, useState, type CSSProperties, type ReactElement } from 'react'
 import { marcarNoEsCita } from '@/lib/agenda/noEsCita'
 
 export const TEXTO_NO_ES_CITA = '¿No es una cita?'
+export const AYUDA_NO_ES_CITA = 'Dejarlo como evento sin paciente: deja de pedir que se ligue'
 
 interface Props {
   citaId: string
@@ -35,6 +36,7 @@ interface Props {
 export default function BotonNoEsCita({ citaId, alHecho, className, style }: Props): ReactElement {
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const idAyuda = useId()
   async function pulsar(): Promise<void> {
     if (enviando) return
     setEnviando(true)
@@ -44,13 +46,16 @@ export default function BotonNoEsCita({ citaId, alHecho, className, style }: Pro
     if (r.ok) { alHecho(); return }
     setError(r.motivo)
   }
+  /* B13 · AG7 (CALMA §29.7): la explicación, que antes sólo vivía en `title`, se ve bajo el botón
+     y lo describe (`aria-describedby`). El error, en el rojo del kit. */
   return (
     <span className="inline-flex flex-col items-end">
       <button type="button" onClick={() => void pulsar()} disabled={enviando} aria-busy={enviando}
-        title="Dejarlo como evento sin paciente: deja de pedir que se ligue" className={className} style={style}>
+        aria-describedby={idAyuda} className={className} style={style}>
         {TEXTO_NO_ES_CITA}
       </button>
-      {error && <span role="alert" className="text-[12px] text-red-600">{error}</span>}
+      <span id={idAyuda} className="text-right text-[12px] leading-4 text-tinta2">{AYUDA_NO_ES_CITA}</span>
+      {error && <span role="alert" className="text-[12px] font-semibold text-mal-tinta">{error}</span>}
     </span>
   )
 }

@@ -127,7 +127,7 @@ test('el aviso de fuera de horario se mide en la hora de Tijuana: +1 h no avisa,
   /* Si cae encima de otra cita de admin.a, el aviso de empalme (no el de horario) se acepta. */
   const empalme = page.getByRole('dialog').filter({ hasText: 'Se empalma' })
   if (await empalme.waitFor({ timeout: 2000 }).then(() => true, () => false)) {
-    await empalme.getByRole('button', { name: 'Aceptar' }).click()
+    await empalme.getByRole('button', { name: 'Guardar' }).click()
   }
   await expect.poll(() => sqlLocal(`select to_char(start_time at time zone :'tz', 'HH24:MI') from public.appointments where id = :'a'`,
     { tz: TIJUANA, a: citaId })).toBe('10:00')

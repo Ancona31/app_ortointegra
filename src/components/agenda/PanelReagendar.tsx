@@ -45,11 +45,14 @@ export const TEXTO_REAGENDAR = {
   no_enviado: 'La cita se reagendó, pero el correo no salió. Avísale por WhatsApp.',
 } as const
 
-const CLASE_CAMPO = 'w-full px-3 py-2.5 max-md:py-3 text-sm rounded-xl border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] text-[var(--ag-text)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] focus:border-[var(--ag-input-focus-border)] ag-transicion-color'
-const CLASE_ETIQUETA = 'block text-[11px] font-bold uppercase tracking-[.06em] mb-2'
-const CLASE_BOTON = 'h-10 px-4 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)] disabled:opacity-50'
+/* B13 · AG5 · las piezas del catálogo (maqueta `ag-form`, vista 3 «Reagendar»): campo relleno `--sup2`
+   sin borde (44/16 en táctil, 40/15 en computadora, contorno `--enlace` al enfocar), rótulo 13/600,
+   botones `.k-b` (quieto y principal) y textos 13–14 con los tokens del kit. */
+const CLASE_CAMPO = 'w-full h-11 esc:h-10 px-3 text-base esc:text-[15px] rounded-xl border-0 bg-sup2 text-tinta focus:outline-2 focus:outline-enlace ag-transicion-color'
+const CLASE_ETIQUETA = 'block text-[13px] leading-[18px] font-semibold mb-1.5'
+const CLASE_BOTON = 'k-b k-b-capa k-b-quieto'
 /* La pinta de «Guardar» del formulario. */
-const CLASE_PRIMARIO = 'h-10 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-50 hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))]'
+const CLASE_PRIMARIO = 'k-b k-b-capa k-b-prim'
 
 function leerTexto(d: unknown, k: string): string {
   if (typeof d !== 'object' || d === null) return ''
@@ -120,13 +123,13 @@ export default function PanelReagendar({ cita, consultorios, alTerminar, alVolve
   }
 
   return (
-    <div data-testid="panel-reagendar" className="rounded-xl border p-3 flex flex-col gap-3" style={{ borderColor: 'var(--ag-input-border)' }}>
+    <div data-testid="panel-reagendar" className="rounded-2xl bg-fondo p-4 flex flex-col gap-3">
       {fase.tipo === 'hecho'
         ? <Hecho cita={cita} aviso={fase.aviso} alTerminar={alTerminar} />
         : <>
             <CamposReagendar consultorios={consultorios} consultorioId={consultorioId} fecha={fecha} hora={hora}
               bloqueado={fase.tipo !== 'datos'} setConsultorioId={setConsultorioId} setFecha={setFecha} setHora={setHora} />
-            <p className="text-[12.5px] leading-relaxed" style={{ color: 'var(--ag-muted)' }}>
+            <p className="text-[13px] leading-[18px] text-tinta2">
               {conCorreo ? TEXTO_REAGENDAR.conCorreo : TEXTO_REAGENDAR.sinCorreo}
             </p>
             <Pasos fase={fase} revisar={revisar} alVolver={alVolver} confirmar={() => void enviar([])}
@@ -146,17 +149,17 @@ function CamposReagendar(p: PropsCampos): ReactElement {
   return (
     <div className="grid grid-cols-2 gap-3">
       <div className="col-span-2">
-        <label htmlFor="reagendar-consultorio" className={CLASE_ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>Consultorio nuevo</label>
+        <label htmlFor="reagendar-consultorio" className={CLASE_ETIQUETA} style={{ color: 'var(--tinta2)' }}>Consultorio nuevo</label>
         <select id="reagendar-consultorio" value={p.consultorioId} disabled={p.bloqueado} onChange={e => p.setConsultorioId(e.target.value)} className={CLASE_CAMPO}>
           {p.consultorios.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
       </div>
       <div>
-        <label htmlFor="reagendar-fecha" className={CLASE_ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>Día nuevo</label>
+        <label htmlFor="reagendar-fecha" className={CLASE_ETIQUETA} style={{ color: 'var(--tinta2)' }}>Día nuevo</label>
         <input id="reagendar-fecha" type="date" autoFocus value={p.fecha} disabled={p.bloqueado} onChange={e => p.setFecha(e.target.value)} className={CLASE_CAMPO} />
       </div>
       <div>
-        <label htmlFor="reagendar-hora" className={CLASE_ETIQUETA} style={{ color: 'var(--ag-muted2)' }}>Hora nueva</label>
+        <label htmlFor="reagendar-hora" className={CLASE_ETIQUETA} style={{ color: 'var(--tinta2)' }}>Hora nueva</label>
         <input id="reagendar-hora" type="time" step={900} value={p.hora} disabled={p.bloqueado} onChange={e => p.setHora(e.target.value)} className={CLASE_CAMPO} />
       </div>
     </div>
@@ -171,13 +174,12 @@ interface PropsPasos {
 }
 
 function Pasos({ fase, revisar, alVolver, confirmar, aceptar, corregir }: PropsPasos): ReactElement {
-  const fantasma = { color: 'var(--ag-muted)' }
   if (fase.tipo === 'datos') {
     return (
       <>
-        {fase.error && <p role="alert" className="text-[12.5px] font-semibold text-red-500">{fase.error}</p>}
+        {fase.error && <p role="alert" className="text-[13px] leading-[18px] font-semibold text-mal-tinta">{fase.error}</p>}
         <div className="flex gap-2 justify-end">
-          <button type="button" onClick={alVolver} className={CLASE_BOTON} style={fantasma}>Volver</button>
+          <button type="button" onClick={alVolver} className={CLASE_BOTON}>Volver</button>
           <button type="button" onClick={revisar} className={CLASE_PRIMARIO}>Revisar cambio</button>
         </div>
       </>
@@ -187,9 +189,9 @@ function Pasos({ fase, revisar, alVolver, confirmar, aceptar, corregir }: PropsP
     : '¿Reagendar la cita con estos datos? El paciente eligió los anteriores al reservar.'
   return (
     <>
-      <p role="alert" className="text-[12.5px] font-semibold" style={{ color: 'var(--ag-text)' }}>{texto}</p>
+      <p role="alert" className="text-sm font-semibold text-tinta">{texto}</p>
       <div className="flex gap-2 justify-end">
-        <button type="button" onClick={corregir} disabled={fase.tipo === 'enviando'} className={CLASE_BOTON} style={fantasma}>Corregir</button>
+        <button type="button" onClick={corregir} disabled={fase.tipo === 'enviando'} className={CLASE_BOTON}>Corregir</button>
         <button type="button" disabled={fase.tipo === 'enviando'} className={CLASE_PRIMARIO}
           onClick={() => (fase.tipo === 'empalme' ? aceptar(fase.lista, fase.aceptados) : confirmar())}>
           {fase.tipo === 'enviando' ? 'Reagendando…' : 'Sí, reagendar y avisar'}
@@ -202,12 +204,12 @@ function Pasos({ fase, revisar, alVolver, confirmar, aceptar, corregir }: PropsP
 function Hecho({ cita, aviso, alTerminar }: { cita: Appointment; aviso: Aviso; alTerminar: () => void }): ReactElement {
   return (
     <>
-      <p role="status" className="text-[12.5px] font-semibold" style={{ color: 'var(--ag-text)' }}>{TEXTO_REAGENDAR[aviso]}</p>
+      <p role="status" className="text-sm font-semibold text-tinta">{TEXTO_REAGENDAR[aviso]}</p>
       {aviso !== 'enviado' && (
         <BotonWhatsAppCita citaId={cita.id} tipo="enlace" marcadoEn={null} confirmada={cita.status === 'confirmed'} />
       )}
       <div className="flex justify-end">
-        <button type="button" onClick={alTerminar} className={CLASE_BOTON} style={{ color: 'var(--ag-muted)' }}>Cerrar</button>
+        <button type="button" onClick={alTerminar} className={CLASE_BOTON}>Cerrar</button>
       </div>
     </>
   )

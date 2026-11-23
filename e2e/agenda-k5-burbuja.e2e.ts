@@ -72,7 +72,7 @@ test('procedencia: la «G» a color en la de Google, el eslabón en la ligada po
   await aLaSemana(page)
 
   let t = await abrir(page, google)
-  await expect(t.locator('.ag-burbuja-origen').first()).toHaveText('Llegó de Google Calendar')
+  await expect(t.locator('.ag-burbuja-origen').first()).toHaveText('Agendada desde Google Calendar')
   await expect(t.locator('.ag-burbuja-origen path[fill="#4285F4"]')).toHaveCount(1)
   const sinExp = t.getByRole('button', { name: 'Sin expediente: este paciente aún no tiene expediente' })
   await sinExp.hover()
@@ -82,7 +82,7 @@ test('procedencia: la «G» a color en la de Google, el eslabón en la ligada po
   await expect(t).toHaveCount(0)
 
   t = await abrir(page, 'Prueba 05')
-  await expect(t.locator('[data-burbuja-enlace]')).toHaveText('La apartó con tu enlace')
+  await expect(t.locator('[data-burbuja-enlace]')).toHaveText('Reservó por enlace')
   await expect(t.locator('[data-burbuja-enlace] .ag-icono-enlace')).toBeVisible()
   await expect(t.getByRole('button', { name: /^Sin expediente/ })).toHaveCount(0)
 })

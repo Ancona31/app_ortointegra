@@ -19,7 +19,6 @@
  */
 import { useEffect, useRef, useState, type ReactElement } from 'react'
 import ModalShell from '@/components/ui/ModalShell'
-import { BOTON_PRIMARIO, BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
 import { horaEnTZ } from '@/lib/agenda/fechasAgenda'
 import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
 import type { CitaPorAsistir } from '@/lib/agenda/asistenciaServidor'
@@ -68,16 +67,17 @@ interface PropsFila { cita: CitaPorAsistir; zonaVisor: string; responder: (cita:
 function FilaAsistencia({ cita, zonaVisor, responder, ocupada }: PropsFila): ReactElement {
   const cuando = cuandoDeFila(cita.start_time, zonaVisor)
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 py-2.5" data-asistencia-cita={cita.id}>
+    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3" data-asistencia-cita={cita.id}>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold" style={{ color: 'var(--ag-text)' }}>{cita.nombre}</p>
-        <p className="text-xs" style={{ color: 'var(--ag-muted2)' }}>{cuando}</p>
+        <p className="truncate text-[15px] leading-5 font-semibold text-tinta">{cita.nombre}</p>
+        <p className="text-[13px] leading-[18px] tabular-nums text-tinta2">{cuando}</p>
       </div>
       <div className="flex gap-2">
-        {/* El nombre accesible dice de quién: en la lista se repiten. */}
-        <button type="button" className={BOTON_PRIMARIO} disabled={ocupada} aria-label={`Sí asistió: ${cita.nombre}, ${cuando}`}
+        {/* El nombre accesible dice de quién: en la lista se repiten. B13 · AG5: los botones del
+            catálogo, «Sí asistió» tonal y «No asistió» quieto (maqueta `ag-burbuja`, vista 2). */}
+        <button type="button" className="k-b k-b-capa k-b-tonal" disabled={ocupada} aria-label={`Sí asistió: ${cita.nombre}, ${cuando}`}
           onClick={() => responder(cita, 'attended')}>Sí asistió</button>
-        <button type="button" className={BOTON_SECUNDARIO} disabled={ocupada} aria-label={`No asistió: ${cita.nombre}, ${cuando}`}
+        <button type="button" className="k-b k-b-capa k-b-quieto" disabled={ocupada} aria-label={`No asistió: ${cita.nombre}, ${cuando}`}
           onClick={() => responder(cita, 'no_show')}>No asistió</button>
       </div>
     </li>
@@ -102,9 +102,10 @@ export default function PreguntaAsistencia({ pendientes, cambiarEstado, zonaViso
     <ModalShell
       open onClose={despues} title="¿Asistió el paciente?"
       subtitle="Más de 48 horas y sin nota clínica."
-      footer={<div className="flex justify-end px-5 py-3"><button ref={despuesRef} type="button" className={BOTON_SECUNDARIO} onClick={despues}>Decidir después</button></div>}
+      maxWidth="max-w-[480px]"
+      footer={<div className="flex justify-end px-6 py-3 iv:justify-center"><button ref={despuesRef} type="button" className="k-b k-b-capa k-b-quieto" onClick={despues}>Decidir después</button></div>}
     >
-      <ul className="divide-y px-5" style={{ borderColor: 'var(--ag-border-card)' }} aria-label="Citas por cerrar">
+      <ul className="divide-y divide-linea px-6" aria-label="Citas por cerrar">
         {citas.map(c => (
           <FilaAsistencia key={c.id} cita={c} zonaVisor={zonaVisor} responder={responder} ocupada={enVuelo !== null} />
         ))}

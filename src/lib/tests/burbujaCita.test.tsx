@@ -41,15 +41,16 @@ describe('burbujaDeTarjeta: qué va en cada sitio', () => {
     const d = burbujaDeTarjeta({ ...CON, status: 'confirmed' }, true, TODO)
     expect(d.rejilla).toEqual(['reagendar', 'editar', 'no-asistio'])
   })
-  it('cancelada: «Darle otra cita» de principal, «Reasignar el horario» de secundario y «Eliminar cita» en el pie (tanda L, punto 9); no asistió: sólo «Darle otra cita»', () => {
+  /* B13 · AG5 (maqueta `ag-burbuja`): TODAS las burbujas llevan la fila «Editar» (la del lápiz). */
+  it('cancelada: «Darle otra cita» de principal, «Reasignar el horario» y «Editar» de filas y «Eliminar cita» en el pie (tanda L, punto 9); no asistió: «Darle otra cita» y «Editar»', () => {
     const c = burbujaDeTarjeta({ ...CON, status: 'cancelled' }, true, TODO)
-    expect(c).toMatchObject({ principal: 'reagendar-cita', rejilla: ['reasignar'], pie: ['eliminar-cita'], ayuda: 'Esta cita se canceló. Su horario quedó libre.' })
+    expect(c).toMatchObject({ principal: 'reagendar-cita', rejilla: ['reasignar', 'editar'], pie: ['eliminar-cita'], ayuda: 'Esta cita se canceló. Su horario quedó libre.' })
     const n = burbujaDeTarjeta({ ...CON, status: 'no_show' }, true, TODO)
-    expect(n).toMatchObject({ principal: 'reagendar-cita', rejilla: [], pie: [], ayuda: 'El paciente no llegó a esta cita.' })
+    expect(n).toMatchObject({ principal: 'reagendar-cita', rejilla: ['editar'], pie: [], ayuda: 'El paciente no llegó a esta cita.' })
   })
-  it('atendida: «Ver la consulta» (si puede abrir expedientes); editar, con los tres puntos', () => {
+  it('atendida: «Ver la consulta» (si puede abrir expedientes); la fila «Editar» y el lápiz', () => {
     const d = burbujaDeTarjeta({ ...CON, status: 'attended' }, true, { ...TODO, puedeVerExpediente: true })
-    expect(d).toMatchObject({ principal: 'ver-expediente', rejilla: [], pie: [] })
+    expect(d).toMatchObject({ principal: 'ver-expediente', rejilla: ['editar'], pie: [] })
     expect(burbujaDeTarjeta({ ...CON, status: 'attended' }, true, TODO).principal).toBeNull()
   })
   it('Confirmar: cada una si aplica (WhatsApp, correo, marcar) y, sin ninguna, no hay «Confirmar»', () => {
@@ -106,24 +107,25 @@ const pintar = (c: Partial<Appointment>, enlacePropio = true): string => renderT
     props={{ cita: { ...CITA, ...c }, zonaVisor: 'America/Merida', puedeIniciarConsulta: true, alAccion: () => undefined, enlacePropio }} />)
 
 describe('lo que pinta', () => {
-  it('eslabón permanente: ligada también dice «La apartó con tu enlace», sin expediente tachado', () => {
+  /* B13 · AG5 (CALMA §28, textos unificados): «Reservó por enlace», sea o no el enlace de quien mira. */
+  it('eslabón permanente: ligada también dice «Reservó por enlace», sin expediente tachado', () => {
     const html = pintar({ reserva_canal: 'unico' })
-    expect(html).toContain('La apartó con tu enlace')
+    expect(html).toContain('Reservó por enlace')
     expect(html).toContain('ag-icono-enlace')
     expect(html).not.toContain('Sin expediente')
-    expect(pintar({ reserva_canal: 'unico' }, false)).toContain('La apartó con el enlace de reserva')
+    expect(pintar({ reserva_canal: 'unico' }, false)).toContain('Reservó por enlace')
   })
   it('sin expediente: el botón con su nombre (y nada de píldoras «Por ligar»)', () => {
     const html = pintar({ reserva_canal: 'fijo', paciente_id: null, pacientes: null, reserva_nombre: 'Lucía' })
     expect(html).toContain('aria-label="Sin expediente: este paciente aún no tiene expediente"')
     expect(html).not.toMatch(/Por ligar/i)
   })
-  it('G a color: «Llegó de Google Calendar» con la «G» de cuatro tintas', () => {
+  it('G a color: «Agendada desde Google Calendar» (CALMA §28) con la «G» de cuatro tintas', () => {
     const html = pintar({ origen: 'google' })
-    expect(html).toContain('Llegó de Google Calendar')
+    expect(html).toContain('Agendada desde Google Calendar')
     expect(html).toContain('fill="#4285F4"')
   })
-  it('sin engrane: los tres puntos «Más opciones de la cita» y la ✕', () => {
+  it('sin engrane: el lápiz «Más opciones de la cita» (CALMA §29.5) y la ✕', () => {
     const html = pintar({})
     expect(html).not.toContain('Configuración de la cita')
     expect(html).toContain('aria-label="Más opciones de la cita"')

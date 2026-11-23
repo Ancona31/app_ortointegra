@@ -115,7 +115,7 @@ async function puntoAlFondo(page: Page): Promise<{ x: number; y: number }> {
 async function abrirBurbujaAlFondo(page: Page): Promise<Locator> {
   await avanzarASemanasVacias(page)
   const b = burbuja(page)
-  const aviso = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Aceptar' }) })
+  const aviso = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Agendar' }) })
   /* Con la rejilla quieta, el punto se busca y se pulsa; si aun así el clic no abre nada (una
      precarga que repinta justo entonces), se repite con el punto de nuevo. Nunca se pulsa otra
      vez con la burbuja o el aviso ya abiertos: el segundo clic la cerraría. */
@@ -127,7 +127,7 @@ async function abrirBurbujaAlFondo(page: Page): Promise<Locator> {
     }
     await expect(b.or(aviso).first()).toBeVisible({ timeout: 5000 })
   }).toPass({ timeout: 45000 })
-  if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  if (await aviso.count()) await aviso.getByRole('button', { name: 'Agendar' }).click()
   await expect(b).toBeVisible()
   return b
 }

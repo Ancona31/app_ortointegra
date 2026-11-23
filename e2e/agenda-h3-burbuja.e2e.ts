@@ -245,7 +245,7 @@ test('punto 14: las observaciones de la burbuja son discretas, opcionales y se g
     await b.getByRole('button', { name: 'Guardar', exact: true }).click()
     const aviso = page.getByRole('dialog', { name: /Se empalma/ })
     await expect(aviso.or(b.getByText('Cita agendada', { exact: true })).first()).toBeVisible()
-    if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
+    if (await aviso.count()) await aviso.getByRole('button', { name: 'Guardar' }).click()
     const id = ((await (await post).json()) as { appointment: { id: string } }).appointment.id
     expect(sqlLocal(`select notes from public.appointments where id = :'id'`, { id })).toBe(OBS)
   } finally {
