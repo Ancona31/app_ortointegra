@@ -367,12 +367,14 @@ test.describe('escritorio · paso 2', () => {
   })
 
   test('F1.7 · dos citas simultáneas con «Todos»: mismo ancho y el nombre nunca queda en una inicial', async ({ page }) => {
-    const inicio = `${DIA_LABORABLE_LIBRE}T07:00:00-06:00`
+    // AG-DT-256: con paciente, en la semana siguiente (de lunes a viernes la guarda la señalaba en la actual).
+    const inicio = `${DIA_FUTURO_LIBRE}T07:00:00-06:00`
     const ids = [citaSql(CORREO.adminA, 'Simultánea F uno', inicio, 30, 0), citaSql(CORREO.medicoA, 'Simultánea F dos', inicio, 30, 1)]
     try {
       await irAAgenda(page)
+      await pasarASemanaSiguiente(page)
       await selectFiltroMedico(page).selectOption({ label: 'Todos los médicos' })
-      const tarjetas = page.locator(`.fc-timegrid-col[data-date="${DIA_LABORABLE_LIBRE}"] .fc-timegrid-event`)
+      const tarjetas = page.locator(`.fc-timegrid-col[data-date="${DIA_FUTURO_LIBRE}"] .fc-timegrid-event`)
         .filter({ has: page.locator('[data-cita-id]') })
         .filter({ has: page.locator(`.ag-tarjeta-hora-inicio`, { hasText: /^07:00$/ }) })
       await expect(tarjetas).toHaveCount(2)

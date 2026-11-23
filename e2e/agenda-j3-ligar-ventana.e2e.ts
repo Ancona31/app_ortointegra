@@ -241,7 +241,8 @@ test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador 
   const nombre = tituloUnico('Elsa Escudo J3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
   await abrirDashboard(page)
-  await renglon(page, nombre).getByRole('button', { name: /Ligar/ }).click()
+  /* Rediseño B5: si otra cita ocupa la pieza principal («en curso»), ésta es una fila de «Después» y sus acciones van en la hoja. */
+  await (await accionesDe(page, nombre)).getByRole('button', { name: /Ligar/ }).click()
   const v = ventana(page)
   const seguir = v.getByRole('button', { name: 'Ligar e iniciar consulta' })
   expect(await clicsTrasDobleClic(page, seguir, () => expect(v.getByRole('textbox', { name: 'Buscar paciente existente' })).toBeVisible())).toBe(1)
