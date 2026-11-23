@@ -272,7 +272,7 @@ $fn$;
 REVOKE EXECUTE ON FUNCTION public.cita_proteger_bloqueo() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.cita_proteger_bloqueo() TO anon, authenticated, service_role;
 COMMENT ON FUNCTION public.cita_proteger_bloqueo() IS
-  'Agenda: con la v2 encendida, ninguna fila de appointments entra ni se mueve (inicio, fin o médico) a un periodo que se solape con un bloqueo de su médico (agenda_bloqueos). 42501, HINT agenda_horario_bloqueado, mensaje literal de Angel. Fuera: postgres/supabase_admin, service_role con spinus.via = google (lo de Google entra como siempre) y el alta de service_role con reserva_canal (reservar_por_enlace ya lo rechaza). Lo que ya estaba dentro se queda. INVOKER: lee agenda_bloqueos con la RLS de quien escribe.';
+  'Agenda: con la v2 encendida, ninguna fila de appointments entra ni se mueve (inicio, fin o médico) a un periodo que se solape con un bloqueo de su médico (agenda_bloqueos). 42501, HINT agenda_horario_bloqueado, mensaje literal de Angel. Fuera: postgres/supabase_admin, service_role con spinus.via = google (lo de Google entra como siempre) y el alta de service_role con reserva_canal (reservar_por_enlace ya lo rechaza). Lo que ya estaba dentro se queda. INVOKER: lee agenda_bloqueos con la RLS de quien escribe. LÍMITE ACEPTADO (auditoría ronda 1, A7; decisión de Angel): el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa: el alta de una cita por el personal no toma el candado 1790, así que una reserva por enlace o un bloqueo confirmados a la vez pueden dejar dos citas en el turno o una cita dentro del bloqueo.';
 
 -- 2.3 · La atendida con nota ligada no cambia de estado, no se mueve y no se
 --       borra, con la v2 encendida o apagada; tampoco para service_role.
