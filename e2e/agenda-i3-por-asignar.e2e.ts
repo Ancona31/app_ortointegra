@@ -114,7 +114,8 @@ async function abrirDashboard(page: Page): Promise<void> {
 
 /* Tanda K, puntos 17 y 18: la palabra «Por ligar» es ahora el expediente tachado (nombre accesible
    «Sin expediente») y el eslabón con su texto «Por enlace». Rediseño B5: el expediente tachado lleva
-   además el texto a la vista (`[data-marca-sin-expediente]`). */
+   además el texto a la vista (`[data-marca-sin-expediente]`); su nombre accesible sigue siendo
+   «Sin expediente» (`role="img"`), y se comprueba (auditoría final, H13). */
 test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de quien reservó, el expediente tachado y el eslabón; apagada, no', async ({ page, browser }) => {
   const nombre = tituloUnico('Lucía Reserva I3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
@@ -122,10 +123,13 @@ test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de 
   await abrirDashboard(page)
   await expect(renglon(page, nombre)).toBeVisible()
   await expect(renglon(page, nombre).locator('[data-marca-sin-expediente]')).toBeVisible()
+  await expect(renglon(page, nombre).locator('[data-marca-sin-expediente]')).toHaveAttribute('role', 'img')
+  await expect(renglon(page, nombre).locator('[data-marca-sin-expediente]')).toHaveAccessibleName(/Sin expediente/)
   await expect(renglon(page, nombre).getByText('Por enlace', { exact: true })).toBeVisible()
   await enContextoNuevo(browser, SESION.secretariaA, async (p) => {
     await abrirDashboard(p)
     await expect(renglon(p, nombre).locator('[data-marca-sin-expediente]')).toBeVisible()
+    await expect(renglon(p, nombre).locator('[data-marca-sin-expediente]')).toHaveAccessibleName(/Sin expediente/)
   })
   interruptorAgenda('A', false)
   await abrirDashboard(page)
@@ -141,6 +145,7 @@ test('punto 10 · fila: la por asignar sale con el título de Google; «¿No es 
   await abrirDashboard(page)
   const fila = renglon(page, titulo)
   await expect(fila.locator('[data-marca-sin-expediente]')).toBeVisible()
+  await expect(fila.locator('[data-marca-sin-expediente]')).toHaveAccessibleName(/Sin expediente/)
   await expect(fila.getByText('Por enlace', { exact: true })).toHaveCount(0)
   await expect(proximas(page).getByText(yaEvento)).toHaveCount(0)
   const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${id}/no-es-cita`) && r.request().method() === 'POST')
