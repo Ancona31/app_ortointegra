@@ -28,8 +28,8 @@ export const TARJETA = 'rounded-[16px] bg-sup p-4 text-tinta ih:rounded-[20px] i
 
 /**
  * El estado que pinta el dashboard. Las consultas sólo dejan pasar agendadas y
- * confirmadas; cualquier otro valor sale como «Agendada», igual que hacía
- * `StatusChip` (su catch-all).
+ * confirmadas; cualquier otro valor sale como «Agendada» (el comodín de
+ * siempre).
  */
 export function estadoDe(status: string): Status {
   return status === 'confirmed' ? 'confirmed' : 'scheduled'

@@ -2,10 +2,8 @@
  * Avatar.tsx — círculo con las iniciales de una persona (CALMA §3 y §11).
  *
  * Primitiva del rediseño (B2). Dibuja `.k-avatar` de `sistema.css` y le pone
- * uno de los pares de `PALETA_AVATAR`, que vive AQUÍ desde B2:
- * `components/dashboard/paletaAvatar.ts` quedó como reexportación para no
- * tocar a sus cuatro consumidores (`CabeceraPaciente`, `UltimosPacientes`,
- * `ProximasCitas`, `AtendidosRecientemente`).
+ * uno de los pares de `PALETA_AVATAR`, que vive AQUÍ desde B2 (la antigua
+ * `components/dashboard/paletaAvatar.ts` se borró en B15, sin consumidores).
  *
  * ⚠️ SON DIEZ PARES Y NO LOS SEIS DEL PLAN. El PLAN (§3, B2) habla de «6
  * pares», que es lo que dibujan las maquetas; la app tiene diez (`--sp-avatar-*`
@@ -31,9 +29,8 @@ import type { CSSProperties, ReactElement } from 'react'
  * distintos: con diez pares y cuatro puestos no hay repetición posible.
  *
  * ⚠️ LOS NOMBRES DE TOKEN VAN ESCRITOS ENTEROS, no interpolados
- * (`var(--sp-avatar-${n}-bg)`). Es la garantía que explica `StatusChip.tsx:19`:
- * un token que no exista no da error de compilación ni de runtime, deja el
- * elemento transparente y nadie se entera. Escritos así, un token fantasma se
+ * (`var(--sp-avatar-${n}-bg)`): un token que no exista no da error de
+ * compilación ni de runtime, deja el elemento transparente y nadie se entera. Escritos así, un token fantasma se
  * encuentra buscándolo en `spinus-tokens.css`, y renombrar la familia rompe
  * aquí de forma localizable.
  *
