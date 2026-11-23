@@ -951,6 +951,35 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   comentarios que aún nombran `StatusChip` en `globals.css`, `ui/Avatar.tsx` y
   `lib/agenda/tiposAgenda.ts` (piezas fuera de alcance).
 
+### Correcciones de la auditoría final · notas (2026-11-23)
+
+Sobre `0b1f32ad`, hallazgos de front de `AUDITORIA-FINAL` (medidos antes y
+después con `elementFromPoint`, `scrollWidth` y contraste, en los cinco
+formatos; franjas de `tel` emuladas por CDP):
+
+* **H1 escrito:** la hoja resta también el relleno de abajo de `.app-contenido`
+  y los avisos que la siguen, y re-mide al aparecer uno; el pie va por encima
+  de la hoja (`z-index: 3` sólo en el escrito). «Imprimir» y «Plantilla»
+  pulsables recién abierto y al fondo en los 5 formatos y en `tel` con y sin
+  franjas (antes: tapados al abrir en todos, y al fondo en `tel` con franjas);
+  el aviso de faltantes se ve.
+* **H2 imagen:** en estrecho la falta larga baja de renglón (ext: desborde
+  346 → 322; nombre 0 → 119 px; tel 17 → 119).
+* **H3 `ih`:** `.nav-barra-medio` se ensancha 8 por lado (208 = tarjeta).
+* **H4/H5 suplementos:** rótulo de la dosis a su medida (campo 126 → 192); el
+  nombre sin detalle usa el renglón; el desplegable pasa bajo el pie (z 1).
+* **H6:** pestañas del expediente en `ext` con hueco 4 (292 → 290 en 290).
+* **H7:** «+ Documento» en `ext`: 14 px y columnas a su contenido (104 en 91 →
+  94 en 103).
+* **H8:** días de la semana y «—» de signos vacíos en `--tinta2` (2,80 → 5,39:1
+  claro; 5,25 → 8,28 oscuro). `--tinta3` no cambia de valor.
+* **H9:** avatar del encabezado con área de 44 (`::after`); «Actualizar» con
+  área de `--k-toque`; filas de pendientes a 37 en `esc`. Las filas del cajón
+  (`ext`/`tel`/`iv`) siguen en 33: fuera de lo pedido.
+* **H13/H14:** e2e i3/k5 vuelven a comprobar «Sin expediente» por nombre
+  accesible; comentarios de `Avatar.tsx` y `PiezasCita.tsx` corregidos.
+* **H10/H11** a `DEUDA_TECNICA.md` (RED-DT-21, RED-DT-22). H12 sin tocar.
+
 ## Estado al cierre de pantallas y formularios
 
 * **Hecho:** cimientos, primitivas, capas, navegación por formato (B1–B4);
@@ -968,5 +997,5 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   sin lectura); la negrita del PDF del escrito sale en peso 500; las e2e que
   dependen de la hora («¿Asistió el paciente?», citas de «mañana») fallan de
   noche; el Storage local no tiene el cubo de PDF (`Bucket not found`), así que
-  la descarga desde la lista no se probó en local; en suplementos el
-  desplegable del buscador abierto puede tapar el pie (como en la maqueta).
+  la descarga desde la lista no se probó en local. (El desplegable de
+  suplementos ya no tapa el pie: corrección H5.)
