@@ -6593,7 +6593,6 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 :root[data-formato="esc"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-view-harness { border-radius: var(--r-tarjeta-ancha); }
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-scrollgrid,
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-scrollgrid-section > * { border-color: var(--cal-linea); }
-.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-scrollgrid { border: 0; }
 
 /* Columna de horas: 12/16 tabular `--tinta2`. Sin líneas de media hora. */
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-timegrid-slot-label-cushion {
@@ -6611,12 +6610,19 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 .agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead { align-items: center; }
 .agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-dow { font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-hoy { display: none; }
-.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-num { font-size: 17px; line-height: 22px; font-weight: 600; }
+/* ⚠️ LA CABECERA Y LA FILA DE TODO EL DÍA NO CAMBIAN DE ALTO (35 y 24 px a
+   1280×800, como con la v2 apagada), por prudencia: FullCalendar mide la
+   rejilla ANTES de que el atributo pase a «encendida» (con el alto de franja
+   eso sí rompía el arrastre, ver «La rejilla» abajo). El número lleva el alto
+   de línea de antes y el círculo de hoy se sale de él con margen negativo; los
+   chips de todo el día siguen en 20 px. */
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-num { font-size: 17px; line-height: 18px; font-weight: 600; }
 .agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-num--hoy {
   display: inline-grid;
   place-items: center;
   min-width: 28px;
   height: 28px;
+  margin-block: -5px;
   padding: 0 4px;
   border-radius: var(--r-pildora);
   background: var(--cal-hoy-num);
@@ -6624,17 +6630,18 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 }
 
 /* «Todo el día» (el eje de la fila de todo el día): 12 px en dos líneas, como
-   la maqueta; a 12 px en una línea no cabe en los 60 del eje. Los chips de esa
-   fila, 24 de alto con el título a 12/600 y radio 7. */
+   la maqueta (a 12 px en una línea no cabe en los 60 del eje), con un alto de
+   línea que no hace crecer la fila (ver la nota de la cabecera). Los chips de
+   esa fila siguen en 20 de alto, con el título a 12 y radio 7. */
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timegrid .fc-timegrid-axis-cushion {
   font-size: 12px;
-  line-height: 14px;
+  line-height: 11px;
   font-weight: 600;
   color: var(--tinta2);
   white-space: normal;
   text-align: center;
 }
-.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-banda { height: 24px; border-radius: 7px; }
+.agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-banda { border-radius: 7px; }
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .ag-banda-titulo { font-size: 12px; }
 
 /* Hoy: la columna con el 5 % de la acción; la cabecera no se tiñe. */

@@ -1118,7 +1118,9 @@ modales) se pintan en `body`, fuera de la raíz: tampoco lo ven.
   `.agenda-fc` es transparente y sólo `.fc-view-harness` es tarjeta (`--sup`,
   radio 16 · 18 `ih`/`iv` · 20 `esc`); barra nativa, controles y leyenda sobre el
   fondo; horas 12/16 `--tinta2`; sin línea de media hora; cabecera «LUN» 12/600 +
-  número 17/600, hoy en círculo de 28 `--cal-hoy-num` (el «· HOY» se oculta a la
+  número 17/600 (con el alto de línea de antes: cabecera y fila de todo el día
+  miden lo mismo que con la v2 apagada, 35 y 24 px), hoy en círculo de 28
+  `--cal-hoy-num` (el «· HOY» se oculta a la
   vista; sigue en el DOM); columna de hoy `--cal-hoy` sin anillo; hora actual
   2 px `--cal-ahora` con píldora 20/12/700 en `--sup`; fuera de horario
   `--cal-fuera` al 88 % (deja ver las líneas); bloqueo rayado 135° 1,5/9 con
