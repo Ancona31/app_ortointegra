@@ -410,6 +410,26 @@ la base. Antes de abortar, el `globalSetup` apagó la v2 de la Semilla A
 (sólo esa fila, la que había cambiado). **Hay que repetir la batería entera**
 cuando la base quede libre.
 
+### Repetición entera (batería 5) [C]
+
+Con autorización para reiniciar la base local: se paró el `next start` de
+:3000 y se recreó la base con `~/spinus-fusion/ensayo-e1/perf/base.sh 14`
+(historial 14). **Lunes 2026-11-23, de 10:02:21 a 10:28:39**, sobre `d7486b0c`:
+el build es de ese árbol, no hay archivos de `src/` más nuevos que
+`.next/BUILD_ID` y `git diff d7486b0c HEAD -- src e2e` sale vacío. Se usó
+`next start -p 3001` y `npx playwright test` una vez, sin editar nada.
+La semilla corrió limpia: 6 almacenes, 0 clínicas que borrar. Evidencias en
+`~/spinus-fusion/ensayo-r/bateria-2/` (`e2e.log`, `salida.txt`, `resumen.txt`,
+`guarda.txt`, `commit.txt`, `srv-3001.log`, `test-results/`, `reintentos/`).
+
+**Resultado: 637 pasan, 1 falla, 0 no corren, 494 se saltan (salida 1).**
+**La guarda dice «ninguna prueba dejó citas que dependan del día de la corrida».**
+La falla es `[escritorio] agenda-empalme.e2e.ts:238` «rejilla encendido:
+redimensionar hasta otra cita también avisa»: no aparece el diálogo del
+empalme (`:246`). Es la conocida AG-DT-257, de la prueba. Sola
+(`--workers=1`), falla 1 vez de 3 con el mismo error y pasa 2. No se corrigió
+ni se repitió la batería.
+
 ## Estado al cerrar [C]
 
 Base local: 14 migraciones (`base.sh 14`: 5 + deriva + las 9 con `aplicar.sh`),
