@@ -21,7 +21,7 @@ const h = vi.hoisted(() => ({
   responder: (() => ({ data: null, error: null })) as (rpc: string, args: Record<string, unknown>) => Respuesta,
   correos: [] as Correo[],
   envio: { ok: true, modo: 'captura' } as ResultadoEnvio,
-  enlace: { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' } as { id: string; codigo: string; url: string } | null,
+  enlace: { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' } as { id: string; codigo: string; url: string } | null | 'error',
   emisiones: [] as Array<[string, string, string | null]>,
 }))
 
@@ -34,7 +34,12 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/confirmacion/enlaceConfirmacion', () => ({
   emitirEnlaceConfirmacion: vi.fn(async (clinica: string, cita: string, autor: string | null) => {
     h.emisiones.push([clinica, cita, autor])
-    return h.enlace
+    return h.enlace === 'error' ? null : h.enlace
+  }),
+  // Oleada 3, arreglo 4: la que distingue «no aplica» de «error».
+  emitirEnlaceParaCorreo: vi.fn(async (clinica: string, cita: string, autor: string | null) => {
+    h.emisiones.push([clinica, cita, autor])
+    return h.enlace ?? 'no_aplica'
   }),
 }))
 vi.mock('@/lib/correo/transporte', async (importOriginal) => {
@@ -187,6 +192,17 @@ describe('GET /api/cron/recordatorios — el recorrido', () => {
     await GET(peticion(BUENA))
     expect(h.correos).toEqual([])
     expect(marcas().map((m) => [m.p_estado, m.p_motivo])).toEqual([['omitido', 'sin_enlace'], ['omitido', 'sin_enlace']])
+  })
+
+  /* Oleada 3, arreglo 4 (orden de Angel): «un error pasajero de la base no cierra el envío como
+     "omitido"; queda para reintento». `fallido` con motivo distinto de `duplicado` lo vuelve a
+     tomar `cita_correo_tomar` (F4, hasta 3 intentos) y lo vuelve a listar
+     `cita_recordatorios_pendientes`. Mutación en rojo: volver a `if (!enlace) return omitido`. */
+  it('el enlace no se pudo emitir por un error: fallido/sin_enlace (se reintenta), sin mandar', async () => {
+    h.enlace = 'error'
+    await GET(peticion(BUENA))
+    expect(h.correos).toEqual([])
+    expect(marcas().map((m) => [m.p_estado, m.p_motivo])).toEqual([['fallido', 'sin_enlace'], ['fallido', 'sin_enlace']])
   })
 
   it('transporte falla: fallido/transporte; 409 de idempotencia: fallido/duplicado', async () => {

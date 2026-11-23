@@ -34,7 +34,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 const { codigoDeConfirmacion } = await import('@/lib/reserva/secretos')
 const {
-  emitirEnlaceConfirmacion, resolverEnlaceConfirmacion, responderEnlaceConfirmacion, revocarEnlaceConfirmacion, urlDeConfirmacion,
+  emitirEnlaceConfirmacion, emitirEnlaceParaCorreo, resolverEnlaceConfirmacion, responderEnlaceConfirmacion, revocarEnlaceConfirmacion, urlDeConfirmacion,
 } = await import('@/lib/confirmacion/enlaceConfirmacion')
 
 const SECRETO = 'c3'.repeat(32)
@@ -237,5 +237,36 @@ describe('urlDeConfirmacion', () => {
     expect(urlDeConfirmacion(c)).toBe(`http://localhost:3001/confirmar/${c}`)
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://spinus.prueba/otra/ruta')
     expect(urlDeConfirmacion(c)).toBeNull()
+  })
+})
+
+/* Oleada 3, arreglo 4: los correos (recordatorio, confirmación) necesitan saber si «no hay enlace»
+   es porque no aplica (no se reintenta) o porque algo falló (se reintenta). */
+describe('emitirEnlaceParaCorreo', () => {
+  it('con enlace, el mismo que emitirEnlaceConfirmacion', async () => {
+    responder = emisionNueva
+    const e = await emitirEnlaceParaCorreo(CLINICA, CITA, null)
+    expect(typeof e === 'object' && e.url).toMatch(URL_CONFIRMAR)
+  })
+
+  it('no aplica: la base no da fila (cita pasada, interruptor…), sin secreto o sin URL base', async () => {
+    responder = () => ({ data: { r_id: null, r_codigo_hash: null }, error: null })
+    expect(await emitirEnlaceParaCorreo(CLINICA, CITA, null)).toBe('no_aplica')
+    vi.stubEnv('RESERVA_SECRETO', '')
+    expect(await emitirEnlaceParaCorreo(CLINICA, CITA, null)).toBe('no_aplica')
+  })
+
+  it('error: la RPC falla o lanza, o falla la revocación tras rotar el secreto', async () => {
+    responder = () => ({ data: null, error: { code: '40001', message: 'x' } })
+    expect(await emitirEnlaceParaCorreo(CLINICA, CITA, null)).toBe('error')
+    lanzar = true
+    expect(await emitirEnlaceParaCorreo(CLINICA, CITA, null)).toBe('error')
+    lanzar = false
+    responder = (rpc) => rpc === 'cita_confirmacion_emitir'
+      ? { data: { r_id: VIGENTE, r_codigo_hash: 'f'.repeat(64) }, error: null }
+      : { data: null, error: { code: '57014', message: 'x' } }
+    expect(await emitirEnlaceParaCorreo(CLINICA, CITA, null)).toBe('error')
+    // La de siempre sigue devolviendo null en los dos casos (WhatsApp y comprobante no cambian).
+    expect(await emitirEnlaceConfirmacion(CLINICA, CITA, null)).toBeNull()
   })
 })
