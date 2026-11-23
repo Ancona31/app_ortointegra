@@ -353,7 +353,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     }
   })
   if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
-  if (vivos.length === 0) faltantes.push({ clave: 'estudios', nombre: 'un estudio con tipo y región', est: { clave: claves[0], campo: 'buscar' } })
+  if (vivos.length === 0) faltantes.push({ clave: 'estudios', nombre: 'Un estudio con tipo y región', est: { clave: claves[0], campo: 'buscar' } })
 
   function irA(f: Faltante) {
     if (f.est) { abrirEn(f.est.clave, f.est.campo); return }
