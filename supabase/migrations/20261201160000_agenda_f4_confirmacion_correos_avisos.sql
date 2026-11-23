@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Agenda v2 · F4 — confirmación por enlace, reagendar, correos de cita y
--- avisos de la clínica (archivo fundido, 5.º de 6)
+-- avisos de la clínica
 -- ═══════════════════════════════════════════════════════════════════════
 -- QUÉ HACE
 --   · cita_confirmaciones: el enlace de confirmación de cada cita y la última
@@ -15,7 +15,14 @@
 --   · avisos_clinica (7 tipos) con aviso_clinica_revisar y los seis
 --     aviso_clinica_de_*, colgados de appointments, cita_confirmaciones,
 --     cita_reagendos, reserva_empalmes_google y gcal_movimientos_rechazados.
--- DEPENDE DE (lo comprueba el pre-vuelo; aborta si falta)
+--
+-- DE QUÉ DEPENDE (lo comprueba el pre-vuelo; aborta si falta)
+--   · Orden: después de F1, F5a, F3 y F2; antes de F5b. PostgreSQL 17
+--     (producción: 17.6).
+--   · Rol: postgres, como current_user (dueño de las tablas y de las funciones
+--     DEFINER de los avisos; no hace falta que sea superusuario). En Supabase,
+--     el usuario postgres.<ref> del pooler; desde supabase_admin, SET ROLE
+--     postgres. Con otro rol aborta: las funciones quedarían con otro dueño.
 --   · F1: agenda_ajustes (agenda_v2_encendida, recordatorio_horas,
 --     recordatorio_encendido, candado_reagendados), agenda_v2_encendida(uuid)
 --     INVOKER y log_cita_change() con 'enlace_paciente' en su lista c_vias.
@@ -24,25 +31,32 @@
 --     gcal_movimientos_rechazados.
 --   · F3: appointments.reserva_*, reserva_enlaces (con pausado_en) y
 --     reservar_por_enlace(…14…).
---   · main: clinicas.suspendida, clinica_no_suspendida() (md5 normalizado
---     588de29d: contexto, responder, oferta y reagendar copian su predicado
---     con la clínica por parámetro), get_clinica_id() DEFINER,
---     log_tabla_change(), profiles, pacientes, consultorios y audit_log.
--- APLICACIÓN: como postgres (dueño de las funciones DEFINER y de las tablas),
---   de una vez, con psql -v ON_ERROR_STOP=1 o en el SQL Editor. Una sola
---   transacción. RE-EJECUCIÓN: ABORTA LIMPIO en el pre-vuelo si ya existe
---   cualquier objeto de F4; no se deja nada a medias.
--- BLOQUEOS (lock_timeout 5 s): las FK nuevas y los CREATE TRIGGER toman SHARE
---   ROW EXCLUSIVE un instante sobre appointments, clinicas, profiles,
---   reserva_empalmes_google y gcal_movimientos_rechazados (frena escrituras de
---   citas un instante, no lecturas). Tablas nuevas vacías: índices
---   instantáneos. El resto es catálogo.
--- RIESGO: medio. Abre dos caminos SIN sesión que escriben appointments con
---   service_role (responder y reagendar_por_enlace) y cuelga un disparador
---   AFTER INSERT de appointments: si fallara, fallaría el alta de la cita que
---   lo dispara (misma transacción).
--- CÓMO SE DESHACE: supabase/reversas/20261201160000_agenda_f4_confirmacion_correos_avisos_reversa.sql
---   (aborta si alguna de las cuatro tablas tiene filas: respaldar antes).
+--   · main: clinicas.suspendida, clinica_no_suspendida() (contexto, responder,
+--     oferta y reagendar copian su predicado con la clínica por parámetro: se
+--     exige su cuerpo por md5 con los espacios normalizados, 588de29d…),
+--     get_clinica_id() DEFINER, log_tabla_change(), profiles, pacientes,
+--     consultorios y audit_log.
+--   · Ninguna comprobación depende del search_path de la sesión (probado con
+--     '', public y "$user", public, extensions).
+--
+-- RIESGO: medio.
+--   · Abre dos caminos SIN sesión que escriben appointments con service_role
+--     (responder y reagendar_por_enlace) y cuelga un disparador AFTER INSERT de
+--     appointments: si fallara, fallaría el alta de la cita que lo dispara.
+--   · Bloqueos (lock_timeout 5 s; si no los obtiene, aborta sin cambiar nada):
+--     las FK hacia appointments, clinicas y profiles y los disparadores sobre
+--     appointments, reserva_empalmes_google y gcal_movimientos_rechazados
+--     toman SHARE ROW EXCLUSIVE sobre esas tablas HASTA EL COMMIT (frena sus
+--     escrituras, no sus lecturas). Por eso van al final (paso 11): las tablas
+--     nuevas, sus funciones y sus disparadores propios se crean antes sin
+--     tocar ninguna tabla existente. Tablas nuevas vacías: índices y
+--     validación de las FK instantáneos.
+--   · Si falla: una sola transacción; no queda nada a medias.
+--   · SEGUNDA PASADA: ABORTA LIMPIO en el pre-vuelo (error y salida ≠ 0) si ya
+--     existe cualquier objeto de F4, sin tocar nada. No es re-ejecutable a
+--     propósito: sus CREATE no llevan IF NOT EXISTS.
+--   · Vuelta atrás: supabase/reversas/20261201160000_agenda_f4_confirmacion_correos_avisos_reversa.sql
+--     (se niega si alguna de las cuatro tablas tiene filas, salvo confirmación).
 --
 -- CONTRATOS QUE ESTE ARCHIVO CUMPLE (no cambiar sin el otro lado)
 --   · spinus.via = 'enlace_paciente' lo ponen SÓLO cita_confirmacion_responder
@@ -72,7 +86,10 @@ SET LOCAL statement_timeout = '60s';
 -- ---------------------------------------------------------------------
 DO $pre$
 DECLARE
-  -- md5(prosrc con espacios normalizados) de clinica_no_suspendida() (main), la que se copia.
+  -- md5 de clinica_no_suspendida() (main), la que se copia, con cada tramo de
+  -- espacios (\r y \n incluidos) reducido a uno: en producción su cuerpo
+  -- lleva fines de línea \r\n (md5 exacto bff6c203…) y el del repo \n
+  -- (a2dcfa8f…); normalizado, los dos dan éste.
   c_no_susp CONSTANT text := '588de29d551f6d474eb24346748e1148';
   c_mias CONSTANT text[] := ARRAY['aviso_clinica_de_cita', 'aviso_clinica_de_confirmacion', 'aviso_clinica_de_empalme',
     'aviso_clinica_de_movimiento_google', 'aviso_clinica_de_reagendo', 'aviso_clinica_de_respuesta', 'aviso_clinica_revisar',
@@ -81,9 +98,10 @@ DECLARE
     'cita_reagendar_clinica', 'cita_reagendar_oferta', 'cita_recordatorios_pendientes', 'reagendar_por_enlace'];
   v_falta text;
   v_p     oid;
+  v_md5   text;
 BEGIN
   IF current_user <> 'postgres' THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: aplicar como postgres (es %). Las funciones DEFINER de los avisos tienen que ser de postgres.', current_user;
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: hay que aplicar como el rol postgres (current_user es %). En Supabase: conéctate con el usuario postgres.<ref> del pooler; desde supabase_admin, SET ROLE postgres. Las tablas y las funciones DEFINER de los avisos tienen que ser de postgres.', current_user;
   END IF;
 
   -- Re-ejecución: ABORTA LIMPIO si ya hay algo de F4.
@@ -145,15 +163,16 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.agenda_ajustes'::regclass AND contype IN ('u', 'p')
                       AND conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.agenda_ajustes'::regclass
                                                                          AND attname = 'clinica_id')]) THEN
-    -- Con estas tres, «NOT agenda_v2_encendida(x)» dice lo mismo que el
-    -- «NOT EXISTS (… AND j.agenda_v2_encendida)» que sustituye.
+    -- Con estas tres, «NOT agenda_v2_encendida(x)» dice lo mismo que leer
+    -- agenda_ajustes en línea: sin fila, o con la columna en false, es «apagada».
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinicas.suspendida o agenda_ajustes.agenda_v2_encendida admiten NULL, o agenda_ajustes.clinica_id no es único.';
   END IF;
 
   -- main.
-  IF (SELECT md5(regexp_replace(p.prosrc, '\s+', ' ', 'g')) FROM pg_proc p
-       WHERE p.oid = to_regprocedure('public.clinica_no_suspendida()')) IS DISTINCT FROM c_no_susp THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_no_suspendida() no es la que copian contexto, responder, oferta y reagendar. Revisar la copia antes de aplicar.';
+  SELECT md5(regexp_replace(p.prosrc, '\s+', ' ', 'g')) INTO v_md5 FROM pg_catalog.pg_proc p
+   WHERE p.oid = to_regprocedure('public.clinica_no_suspendida()');
+  IF v_md5 IS DISTINCT FROM c_no_susp THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: clinica_no_suspendida() no es la que copian contexto, responder, oferta y reagendar (md5 normalizado encontrado: %, esperado: %). Revisar la copia antes de aplicar.', coalesce(v_md5, 'la función no existe'), c_no_susp;
   END IF;
   IF NOT coalesce((SELECT prosecdef FROM pg_proc WHERE oid = to_regprocedure('public.get_clinica_id()')), false)
      OR to_regprocedure('public.log_tabla_change()') IS NULL OR to_regprocedure('auth.uid()') IS NULL THEN
@@ -198,6 +217,8 @@ $pre$;
 
 -- ---------------------------------------------------------------------
 -- 2 · cita_confirmaciones: el enlace Y la respuesta del paciente.
+--     (Las FK de las cuatro tablas hacia clinicas, appointments y profiles
+--     se añaden en el paso 11, por los bloqueos: ver la cabecera.)
 -- ---------------------------------------------------------------------
 -- EL CÓDIGO NO SE GUARDA: se deriva como HMAC(subllave «confirmacion» de
 -- RESERVA_SECRETO, 'confirmacion:' || id) (src/lib/reserva/secretos.ts) y aquí
@@ -222,9 +243,6 @@ CREATE TABLE public.cita_confirmaciones (
   created_at          timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT cita_confirmaciones_pkey PRIMARY KEY (id),
   CONSTRAINT cita_confirmaciones_codigo_key UNIQUE (codigo_hash),
-  CONSTRAINT cita_confirmaciones_clinica_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
-  CONSTRAINT cita_confirmaciones_cita_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id) ON DELETE RESTRICT,
-  CONSTRAINT cita_confirmaciones_creado_por_fkey FOREIGN KEY (creado_por) REFERENCES public.profiles(id) ON DELETE SET NULL,
   CONSTRAINT cita_confirmaciones_codigo_check CHECK (codigo_hash ~ '^[0-9a-f]{64}$'),
   -- Exactamente uno de los dos vínculos (IS NOT NULL explícito: un CHECK que da NULL pasa).
   CONSTRAINT cita_confirmaciones_vinculo_check CHECK ((paciente_id IS NOT NULL) <> (reserva_correo_hmac IS NOT NULL)),
@@ -259,7 +277,7 @@ CREATE POLICY cita_confirmaciones_select ON public.cita_confirmaciones FOR SELEC
                       WHERE a.id = cita_confirmaciones.appointment_id AND a.clinica_id = public.get_clinica_id()));
 
 COMMENT ON TABLE public.cita_confirmaciones IS
-  'Enlace de confirmación por cita y la última respuesta del paciente (agenda E1). El código NO se guarda: HMAC(subllave confirmacion de RESERVA_SECRETO, ''confirmacion:''||id); aquí sólo sha256. Uno vigente por cita; se revoca, nunca se borra. CONVENIO (dimensión 16): paciente_id SIN FK a propósito (ver la migración); el enlace vale si coincide con el paciente vigente de la cita o, en una cita por ligar, con su reserva_correo_hmac (cita_confirmacion_coincide). Sólo escriben las funciones cita_confirmacion_*; rotar RESERVA_SECRETO invalida todos.';
+  'Agenda v2: enlace de confirmación por cita y la última respuesta del paciente. El código NO se guarda: HMAC(subllave confirmacion de RESERVA_SECRETO, ''confirmacion:''||id); aquí sólo sha256. Uno vigente por cita; se revoca, nunca se borra. CONVENIO: paciente_id SIN FK a propósito (ver la migración); el enlace vale si coincide con el paciente vigente de la cita o, en una cita por ligar, con su reserva_correo_hmac (cita_confirmacion_coincide). Sólo escriben las funciones cita_confirmacion_*; rotar RESERVA_SECRETO invalida todos.';
 COMMENT ON COLUMN public.cita_confirmaciones.paciente_id IS
   'Paciente al que se emitió el enlace. SIN FK a propósito: una FK RESTRICT impediría borrar pacientes sin historial y SET NULL/CASCADE no se permiten. Exactamente uno de paciente_id / reserva_correo_hmac. Si el paciente de la cita cambia o se borra, el enlace deja de coincidir y deja de valer.';
 COMMENT ON COLUMN public.cita_confirmaciones.respuesta IS
@@ -280,9 +298,6 @@ CREATE TABLE public.cita_reagendos (
   -- Una cita se reagenda UNA vez; una cita nueva viene de UNA.
   CONSTRAINT cita_reagendos_origen_key UNIQUE (cita_origen_id),
   CONSTRAINT cita_reagendos_nueva_key UNIQUE (cita_nueva_id),
-  CONSTRAINT cita_reagendos_clinica_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
-  CONSTRAINT cita_reagendos_origen_fkey FOREIGN KEY (cita_origen_id) REFERENCES public.appointments(id) ON DELETE RESTRICT,
-  CONSTRAINT cita_reagendos_nueva_fkey FOREIGN KEY (cita_nueva_id) REFERENCES public.appointments(id) ON DELETE RESTRICT,
   CONSTRAINT cita_reagendos_confirmacion_fkey FOREIGN KEY (confirmacion_id) REFERENCES public.cita_confirmaciones(id) ON DELETE RESTRICT,
   CONSTRAINT cita_reagendos_numero_check CHECK (numero BETWEEN 1 AND 100),
   CONSTRAINT cita_reagendos_distintas_check CHECK (cita_origen_id <> cita_nueva_id)
@@ -304,7 +319,7 @@ CREATE POLICY cita_reagendos_select ON public.cita_reagendos FOR SELECT TO authe
                       WHERE a.id = cita_reagendos.cita_nueva_id AND a.clinica_id = public.get_clinica_id()));
 
 COMMENT ON TABLE public.cita_reagendos IS
-  'Reagendados por enlace (agenda E6): cita cancelada por el paciente con su enlace de confirmación → cita reservada con el enlace fijo del mismo médico. numero = reserva_reagendados de la nueva; tope agenda_ajustes.candado_reagendados. Sólo escribe reagendar_por_enlace; nunca se borra.';
+  'Agenda v2: reagendados por enlace: cita cancelada por el paciente con su enlace de confirmación → cita reservada con el enlace fijo del mismo médico. numero = reserva_reagendados de la nueva; tope agenda_ajustes.candado_reagendados. Sólo escribe reagendar_por_enlace; nunca se borra.';
 
 -- ---------------------------------------------------------------------
 -- 4 · cita_correos: un renglón por (cita, tipo, inicio_cita).
@@ -332,8 +347,6 @@ CREATE TABLE public.cita_correos (
   updated_at     timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT cita_correos_pkey PRIMARY KEY (id),
   CONSTRAINT cita_correos_llave_key UNIQUE (appointment_id, tipo, inicio_cita),
-  CONSTRAINT cita_correos_clinica_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
-  CONSTRAINT cita_correos_cita_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id) ON DELETE RESTRICT,
   -- IS NOT NULL explícito en cada CHECK: un CHECK que evalúa a NULL pasa.
   CONSTRAINT cita_correos_tipo_check CHECK (tipo IS NOT NULL AND tipo IN ('comprobante', 'recordatorio', 'confirmacion')),
   CONSTRAINT cita_correos_estado_check CHECK (estado IS NOT NULL AND estado IN ('enviando', 'enviado', 'fallido', 'omitido')),
@@ -362,7 +375,7 @@ CREATE POLICY cita_correos_select ON public.cita_correos FOR SELECT TO authentic
                       WHERE a.id = cita_correos.appointment_id AND a.clinica_id = public.get_clinica_id()));
 
 COMMENT ON TABLE public.cita_correos IS
-  'Envíos de correo de cita (agenda E4 y G3): recordatorio, comprobante y confirmacion (el correo de confirmación que el personal manda desde la agenda, con o sin Google). Llave (cita, tipo, inicio_cita): mover la cita da un recordatorio y una confirmación nuevos; una sola confirmación por inicio (salvo fallo, hasta 3 intentos). SIN destinatario ni contenido. Sólo escriben cita_correo_tomar y cita_correo_marcar. CONVENIO (dimensión 16): la expresión del destinatario está en cita_recordatorios_pendientes y en cita_correo_tomar (van juntas); el correo se compone determinista de la fila porque Resend exige el mismo cuerpo con la misma Idempotency-Key (<tipo>/<id>). fallido/duplicado no se reintenta; máximo 3 intentos. Un comprobante enviado, o enviando hace menos de 10 min, impide el recordatorio del mismo inicio; una confirmación, no. La ventana de agenda_ajustes.recordatorio_horas (y el margen de 1 h) sólo se exige al recordatorio; comprobante y confirmacion valen para cualquier cita futura.';
+  'Agenda v2: envíos de correo de cita: recordatorio, comprobante y confirmacion (el correo de confirmación que el personal manda desde la agenda, con o sin Google). Llave (cita, tipo, inicio_cita): mover la cita da un recordatorio y una confirmación nuevos; una sola confirmación por inicio (salvo fallo, hasta 3 intentos). SIN destinatario ni contenido. Sólo escriben cita_correo_tomar y cita_correo_marcar. CONVENIO: la expresión del destinatario está en cita_recordatorios_pendientes y en cita_correo_tomar (van juntas); el correo se compone determinista de la fila porque Resend exige el mismo cuerpo con la misma Idempotency-Key (<tipo>/<id>). fallido/duplicado no se reintenta; máximo 3 intentos. Un comprobante enviado, o enviando hace menos de 10 min, impide el recordatorio del mismo inicio; una confirmación, no. La ventana de agenda_ajustes.recordatorio_horas (y el margen de 1 h) sólo se exige al recordatorio; comprobante y confirmacion valen para cualquier cita futura.';
 COMMENT ON COLUMN public.cita_correos.inicio_cita IS
   'start_time de la cita cuando se tomó el envío. Si la cita se mueve, la hora nueva es otra llave y tiene su propio recordatorio.';
 COMMENT ON COLUMN public.cita_correos.testigo IS
@@ -387,7 +400,6 @@ CREATE TABLE public.avisos_clinica (
   revisado_en   timestamptz,
   revisado_por  uuid,
   CONSTRAINT avisos_clinica_pkey PRIMARY KEY (id),
-  CONSTRAINT avisos_clinica_clinica_id_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
   -- ⚠️ La misma lista que TIPOS_AVISO (src/lib/avisos/avisosClinica.ts). Un
   -- tipo nuevo va aquí antes que en el código: leerAvisosClinica pide sólo
   -- los tipos que conoce y salta fila a fila el que no.
@@ -428,7 +440,7 @@ CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authe
   WITH CHECK (clinica_id = public.get_clinica_id() AND revisado_por = auth.uid());
 
 COMMENT ON TABLE public.avisos_clinica IS
-  'Tanda I (punto 19): lo que pasó en la agenda sin que nadie de la clínica lo hiciera (reserva por enlace, cancelación y reagendado del paciente, evento de Google por asignar, empalme con Google). Se conserva hasta que alguien del personal lo revisa (revisado_en/revisado_por) y después queda como registro. Sólo la escriben los disparadores aviso_clinica_de_* (dueño postgres); el personal sólo marca revisado. Sin FK a appointments a propósito (como reserva_empalmes_google): el lector cruza con appointments.';
+  'Agenda v2: lo que pasó en la agenda sin que nadie de la clínica lo hiciera (reserva por enlace; cancelación, confirmación y reagendado del paciente; evento de Google por asignar; empalme con Google; movimiento rechazado de Google). Se conserva hasta que alguien del personal lo revisa (revisado_en/revisado_por) y después queda como registro. Sólo la escriben los disparadores aviso_clinica_de_* (dueño postgres); el personal sólo marca revisado. Sin FK a appointments a propósito (como reserva_empalmes_google): el lector cruza con appointments.';
 
 -- ---------------------------------------------------------------------
 -- 6 · Funciones de la confirmación. Todas INVOKER; las que leen o escriben
@@ -551,8 +563,8 @@ BEGIN
   IF NOT public.agenda_v2_encendida(v_c.clinica_id) THEN
     RETURN NULL;
   END IF;
-  -- Clínica suspendida = no disponible (auditoría de E1, hallazgo 1). Es
-  -- clinica_no_suspendida() con la clínica del enlace en vez de get_clinica_id().
+  -- Clínica suspendida = no disponible. Es clinica_no_suspendida() con la
+  -- clínica del enlace en vez de get_clinica_id().
   IF NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = v_c.clinica_id AND NOT k.suspendida) THEN
     RETURN NULL;
   END IF;
@@ -619,7 +631,7 @@ BEGIN
    FOR UPDATE;
   IF NOT FOUND OR v_c.revocado_en IS NOT NULL
      OR NOT public.agenda_v2_encendida(p_clinica_id)
-     -- Suspendida = no disponible, como en contexto (auditoría de E1, hallazgo 1).
+     -- Suspendida = no disponible, como en contexto.
      OR NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = p_clinica_id AND NOT k.suspendida) THEN
     r_resultado := 'invalido'; RETURN NEXT; RETURN;
   END IF;
@@ -650,7 +662,7 @@ BEGIN
      WHERE id = v_c.id AND clinica_id = p_clinica_id;
     r_resultado := 'confirmada';
   ELSE
-    -- §2: hasta 1 hora antes. A T-1h exacto ya no.
+    -- Hasta 1 hora antes. A T-1h exacto ya no.
     IF v_a.start_time - interval '1 hour' <= v_ahora THEN
       r_resultado := 'fuera_de_plazo'; RETURN NEXT; RETURN;
     END IF;
@@ -689,7 +701,7 @@ BEGIN
   IF p_clinica_id IS NULL OR p_codigo_hash IS NULL OR p_codigo_hash !~ '^[0-9a-f]{64}$' THEN
     r_motivo := 'no_aplica'; RETURN NEXT; RETURN;
   END IF;
-  -- Suspendida = no disponible (el cierre de E1).
+  -- Suspendida = no disponible.
   IF NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = p_clinica_id AND NOT k.suspendida) THEN
     r_motivo := 'no_aplica'; RETURN NEXT; RETURN;
   END IF;
@@ -720,7 +732,7 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.cita_reagendar_oferta(uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.cita_reagendar_oferta(uuid, text) TO service_role;
 COMMENT ON FUNCTION public.cita_reagendar_oferta(uuid, text) IS
-  'Agenda E6: ¿se ofrece reagendar la cita de este enlace de confirmación? STABLE, sólo service_role. Clínica suspendida, apagada o sin respuesta cancelo: no_aplica.';
+  'Agenda v2: ¿se ofrece reagendar la cita de este enlace de confirmación? STABLE, sólo service_role. Clínica suspendida, apagada o sin respuesta cancelo: no_aplica.';
 
 -- Reagendar por el paciente: valida el enlace de confirmación y la cita de
 -- origen y llama a reservar_por_enlace (F3) en la MISMA transacción (con su
@@ -750,7 +762,7 @@ BEGIN
    WHERE c.codigo_hash = p_confirmacion_hash AND c.clinica_id = p_clinica_id AND c.revocado_en IS NULL
    FOR UPDATE;
   IF NOT FOUND OR v_c.respuesta IS DISTINCT FROM 'cancelo'
-     -- Suspendida = no disponible (el cierre de E1).
+     -- Suspendida = no disponible.
      OR NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = p_clinica_id AND NOT k.suspendida) THEN
     r_resultado := 'reagendar_invalido'; RETURN NEXT; RETURN;
   END IF;
@@ -791,12 +803,12 @@ BEGIN
     p_clinica_id, p_codigo_hash, p_consultorio_id, p_tipo_cita_id, p_inicio, p_nombre, p_telefono, p_correo,
     p_tel_hmac, p_correo_hmac, p_ficha_hmac, p_aviso_version, p_aviso_sha256, p_client_id) x;
   IF v_r.r_resultado = 'repetida' THEN
-    -- D3 reconoció un envío que NO es el reagendado de este origen (ése lo
+    -- reservar_por_enlace reconoció un envío que NO es el reagendado de este origen (ése lo
     -- atrapa la idempotencia de arriba): no se da por reagendado.
     r_resultado := 'reagendar_invalido'; RETURN NEXT; RETURN;
   END IF;
   IF v_r.r_resultado = 'ok' THEN
-    -- Lo hizo la persona por el enlace de su cita (lista blanca de E1).
+    -- Lo hizo la persona por el enlace de su cita (valor de la lista blanca c_vias).
     PERFORM set_config('spinus.via', 'enlace_paciente', true);
     UPDATE public.appointments SET reserva_reagendados = v_a.reserva_reagendados + 1
      WHERE id = v_r.r_cita_id AND clinica_id = p_clinica_id;
@@ -814,7 +826,7 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.reagendar_por_enlace(text, uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.reagendar_por_enlace(text, uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid) TO service_role;
 COMMENT ON FUNCTION public.reagendar_por_enlace(text, uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid) IS
-  'Agenda E6: valida el enlace de confirmación y la cita de origen y llama a reservar_por_enlace (D3) en la misma transacción; con ok, reserva_reagendados = origen + 1 (via enlace_paciente) y anota cita_reagendos. Sólo service_role.';
+  'Agenda v2: valida el enlace de confirmación y la cita de origen y llama a reservar_por_enlace en la misma transacción; con ok, reserva_reagendados = origen + 1 (via enlace_paciente) y anota cita_reagendos. Sólo service_role.';
 
 -- Reagendar por la clínica, para una cita reservada por enlace (la única vía
 -- que deja pasar el candado de elección, cita_proteger_eleccion de F5b, por
@@ -887,7 +899,7 @@ BEGIN
          start_time = p_inicio, end_time = p_fin, updated_at = now()
    WHERE id = p_cita_id AND clinica_id = p_clinica_id
   RETURNING updated_at INTO r_updated_at;
-  -- set_config(…, true) dura hasta el fin de la TRANSACCIÓN (E6): se vacía ya.
+  -- set_config(…, true) dura hasta el fin de la TRANSACCIÓN: se vacía ya.
   PERFORM set_config('spinus.reagendar_cita', '', true);
 
   -- Además de cita_editada ('system') de log_cita_change: quién reagendó y qué campos. Nunca valores.
@@ -901,7 +913,7 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.cita_reagendar_clinica(uuid, uuid, uuid, uuid, timestamptz, timestamptz, timestamptz) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.cita_reagendar_clinica(uuid, uuid, uuid, uuid, timestamptz, timestamptz, timestamptz) TO service_role;
 COMMENT ON FUNCTION public.cita_reagendar_clinica(uuid, uuid, uuid, uuid, timestamptz, timestamptz, timestamptz) IS
-  'Agenda (tanda I, punto 9): «Reagendar» de la clínica para una cita reservada por enlace. Sólo service_role (POST /api/appointments/[id]/reagendar, que después avisa al paciente). Repite la regla de appointments_update con p_actor (de p_clinica_id: médico de la cita, médico administrador o secretaria). Cita por enlace, agendada o confirmada, sin empezar y sin todo el día; hora nueva futura; consultorio activo del MISMO médico (nunca cambia el médico); p_esperado = updated_at que vio la pantalla (NULL = sin comprobar). Escribe consultorio con su instantánea, inicio, fin y updated_at con el GUC spinus.reagendar_cita (lo reconoce cita_proteger_eleccion) y lo vacía. Audita cita_reagendada_clinica a nombre del actor con los nombres de los campos. Resultados: ok, sin_cambio, apagado, sin_permiso, no_aplica, estado_no_admite, pasada, modificada, hora_pasada, consultorio_invalido.';
+  'Agenda v2: «Reagendar» de la clínica para una cita reservada por enlace. Sólo service_role (POST /api/appointments/[id]/reagendar, que después avisa al paciente). Repite la regla de appointments_update con p_actor (de p_clinica_id: médico de la cita, médico administrador o secretaria). Cita por enlace, agendada o confirmada, sin empezar y sin todo el día; hora nueva futura; consultorio activo del MISMO médico (nunca cambia el médico); p_esperado = updated_at que vio la pantalla (NULL = sin comprobar). Escribe consultorio con su instantánea, inicio, fin y updated_at con el GUC spinus.reagendar_cita (lo reconoce cita_proteger_eleccion) y lo vacía. Audita cita_reagendada_clinica a nombre del actor con los nombres de los campos. Resultados: ok, sin_cambio, apagado, sin_permiso, no_aplica, estado_no_admite, pasada, modificada, hora_pasada, consultorio_invalido.';
 
 -- ---------------------------------------------------------------------
 -- 8 · Correos de cita.
@@ -1070,7 +1082,7 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.cita_nombre_saludo(uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.cita_nombre_saludo(uuid, uuid) TO service_role;
 COMMENT ON FUNCTION public.cita_nombre_saludo(uuid, uuid) IS
-  'Agenda v2 (integración M): el nombre del saludo del recordatorio. El paciente ligado y, si no, el de la reserva. Sólo service_role.';
+  'Agenda v2: el nombre del saludo del recordatorio. El paciente ligado y, si no, el de la reserva. Sólo service_role.';
 
 -- ---------------------------------------------------------------------
 -- 9 · Avisos. aviso_clinica_revisar es INVOKER (un revisado no se vuelve a
@@ -1153,7 +1165,7 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.aviso_clinica_de_confirmacion() FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.aviso_clinica_de_confirmacion() TO anon, authenticated, service_role;
 COMMENT ON FUNCTION public.aviso_clinica_de_confirmacion() IS
-  'Tanda L (punto 13): deja el aviso confirmacion_paciente cuando el paciente confirma su cita por su enlace (cita_confirmacion_responder escribe respuesta = confirmo). Uno sin revisar por cita (índice de I5). La confirmación del personal no pasa por aquí.';
+  'Agenda v2: deja el aviso confirmacion_paciente cuando el paciente confirma su cita por su enlace (cita_confirmacion_responder escribe respuesta = confirmo). Uno sin revisar por cita (avisos_clinica_pendiente_key). La confirmación del personal no pasa por aquí.';
 
 -- cita_reagendos AFTER INSERT: reetiqueta el reserva_enlace que acaba de dejar
 -- la cita NUEVA en la misma transacción.
@@ -1215,7 +1227,7 @@ REVOKE EXECUTE ON FUNCTION public.aviso_clinica_de_movimiento_google() FROM PUBL
 GRANT  EXECUTE ON FUNCTION public.aviso_clinica_de_movimiento_google() TO anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------
--- 10 · Disparadores.
+-- 10 · Disparadores de las tablas nuevas.
 -- ---------------------------------------------------------------------
 CREATE TRIGGER audit_cita_confirmaciones
   AFTER INSERT OR UPDATE OR DELETE ON public.cita_confirmaciones
@@ -1232,14 +1244,6 @@ CREATE TRIGGER audit_avisos_clinica
 CREATE TRIGGER trg_avisos_clinica_revisar
   BEFORE UPDATE ON public.avisos_clinica
   FOR EACH ROW EXECUTE FUNCTION public.aviso_clinica_revisar();
-CREATE TRIGGER trg_appointments_aviso_clinica
-  AFTER INSERT ON public.appointments
-  FOR EACH ROW
-  -- ⚠️ 'por_asignar' es la marca de cita_asignacion_google (F2): la misma que
-  -- cambioPuedeAvisar y esPorAsignar (src). Si cambia quién queda por
-  -- asignar, cambian los tres. El WHEN ahorra la llamada en toda otra alta.
-  WHEN (NEW.reserva_enlace_id IS NOT NULL OR NEW.google_asignacion = 'por_asignar')
-  EXECUTE FUNCTION public.aviso_clinica_de_cita();
 CREATE TRIGGER trg_cita_confirmaciones_aviso_clinica
   AFTER UPDATE OF respuesta ON public.cita_confirmaciones
   FOR EACH ROW
@@ -1256,6 +1260,36 @@ CREATE TRIGGER trg_cita_confirmaciones_aviso_confirmacion
 CREATE TRIGGER trg_cita_reagendos_aviso_clinica
   AFTER INSERT ON public.cita_reagendos
   FOR EACH ROW EXECUTE FUNCTION public.aviso_clinica_de_reagendo();
+
+-- ---------------------------------------------------------------------
+-- 11 · Lo que toca tablas EXISTENTES, al final: cada FK toma SHARE ROW
+--      EXCLUSIVE sobre la tabla referida y cada CREATE TRIGGER sobre la suya,
+--      hasta el COMMIT (sus escrituras esperan; sus lecturas no). Dejarlo aquí
+--      acorta ese tiempo a estas sentencias, el post-vuelo y el COMMIT. Las
+--      tablas nuevas están vacías: validar las FK no recorre nada.
+-- ---------------------------------------------------------------------
+ALTER TABLE public.cita_confirmaciones
+  ADD CONSTRAINT cita_confirmaciones_clinica_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT cita_confirmaciones_cita_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT cita_confirmaciones_creado_por_fkey FOREIGN KEY (creado_por) REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE public.cita_reagendos
+  ADD CONSTRAINT cita_reagendos_clinica_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT cita_reagendos_origen_fkey FOREIGN KEY (cita_origen_id) REFERENCES public.appointments(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT cita_reagendos_nueva_fkey FOREIGN KEY (cita_nueva_id) REFERENCES public.appointments(id) ON DELETE RESTRICT;
+ALTER TABLE public.cita_correos
+  ADD CONSTRAINT cita_correos_clinica_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT,
+  ADD CONSTRAINT cita_correos_cita_fkey FOREIGN KEY (appointment_id) REFERENCES public.appointments(id) ON DELETE RESTRICT;
+ALTER TABLE public.avisos_clinica
+  ADD CONSTRAINT avisos_clinica_clinica_id_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT;
+
+CREATE TRIGGER trg_appointments_aviso_clinica
+  AFTER INSERT ON public.appointments
+  FOR EACH ROW
+  -- ⚠️ 'por_asignar' es la marca de cita_asignacion_google (F2): la misma que
+  -- cambioPuedeAvisar y esPorAsignar (src). Si cambia quién queda por
+  -- asignar, cambian los tres. El WHEN ahorra la llamada en toda otra alta.
+  WHEN (NEW.reserva_enlace_id IS NOT NULL OR NEW.google_asignacion = 'por_asignar')
+  EXECUTE FUNCTION public.aviso_clinica_de_cita();
 CREATE TRIGGER trg_reserva_empalmes_aviso_clinica
   AFTER INSERT ON public.reserva_empalmes_google
   FOR EACH ROW EXECUTE FUNCTION public.aviso_clinica_de_empalme();
@@ -1264,7 +1298,7 @@ CREATE TRIGGER trg_gcal_movimientos_aviso_clinica
   FOR EACH ROW EXECUTE FUNCTION public.aviso_clinica_de_movimiento_google();
 
 -- ---------------------------------------------------------------------
--- 11 · Post-vuelo. Aborta (y deshace TODO) si algo no quedó como debe.
+-- 12 · Post-vuelo. Aborta (y deshace TODO) si algo no quedó como debe.
 -- ---------------------------------------------------------------------
 DO $post$
 DECLARE
@@ -1380,7 +1414,7 @@ $post$;
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 12 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
+-- 13 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
 -- ---------------------------------------------------------------------
 SELECT t.n, t.comprobacion, t.valor, t.esperado,
        CASE WHEN t.valor = t.esperado THEN 'OK' ELSE 'REVISAR' END AS estado

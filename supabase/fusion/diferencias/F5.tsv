@@ -10,3 +10,15 @@ distinto	comentario	table public.agenda_bloqueos	el COMMENT de k1 decía «dentr
 solo_b	funcion	public.agenda_v2_encendida(p_clinica_id uuid)	colateral del ensayo: la crea F1 (20261201120000); ref-originales no la tiene
 solo_b	permiso	funcion public.agenda_v2_encendida(p_clinica_id uuid) → *	colateral del ensayo: permisos de la pieza de F1 (authenticated, service_role y el dueño)
 distinto	funcion	public.agenda_bloqueo_preparar()	C1: poda de dos comentarios del cuerpo («B3», «ver la cabecera»); md5 f1f887ec → dc778b4c. Mismo código
+# C3 (correcciones previas al ensayo, 2026-11-22): poda de comentarios. Comprobado comparando el conjunto con y sin la poda sobre un clon de la foto de producción: sólo estas diferencias de texto (más las de arriba marcadas «además»).
+distinto	comentario	function public.cita_proteger_atendida()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_bloqueo()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_borrado()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_cierre()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_eleccion()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_reserva()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_tiene_nota_ligada(pg_catalog.uuid,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table column public.appointments.cerrada_en	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table column public.appointments.sustituida_por	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	funcion	public.cita_proteger_atendida()	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_proteger_cierre()	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica

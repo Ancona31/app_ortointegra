@@ -1,22 +1,34 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- REVERSA de F4 (20261201160000_agenda_f4_confirmacion_correos_avisos.sql)
 -- ═══════════════════════════════════════════════════════════════════════
--- Quita TODOS los objetos de F4 y sólo ésos: los 3 disparadores que F4 cuelga
--- de tablas ajenas, sus 4 tablas (con sus índices, policies, disparadores y
--- comentarios) y sus funciones, también cita_correos_pendientes si existe (la
--- dejaban las migraciones originales; el archivo fundido ya no la crea).
--- Supone que F5b ya se deshizo (la reversa del conjunto va en orden inverso
--- de bloques); ningún objeto de F1, F2, F3 ni F5 depende de los de F4 en el
--- catálogo, así que no hay que tocar nada ajeno.
--- NO DESTRUYE DATOS: aborta si cualquiera de las 4 tablas tiene filas. Antes,
--- respaldar y vaciar a mano, p. ej.:
---   CREATE TABLE respaldos.cita_confirmaciones_AAAAMMDD AS SELECT * FROM public.cita_confirmaciones;
---   (ídem cita_reagendos, cita_correos, avisos_clinica). Lo que ya escribió la
---   auditoría (audit_log) se queda: audit_log no se toca.
--- Como postgres, de una vez. Re-ejecutable (IF EXISTS): una segunda pasada no
--- hace nada. Bloqueos: SHARE ROW EXCLUSIVE / ACCESS EXCLUSIVE un instante
--- sobre appointments, reserva_empalmes_google y gcal_movimientos_rechazados
--- (DROP TRIGGER) y sobre las tablas que se borran.
+-- QUÉ HACE: quita TODOS los objetos de F4 y sólo ésos: los 3 disparadores que
+--   F4 cuelga de tablas ajenas, sus 4 tablas (con sus índices, FK, policies,
+--   disparadores y comentarios) y sus funciones; también
+--   cita_correos_pendientes si existiera (no la crea F4, pero el post-vuelo
+--   de F4 exige que no esté).
+-- DE QUÉ DEPENDE: rol postgres. Va después de la reversa de F5b (orden inverso
+--   de bloques); ningún objeto de F1, F2, F3 ni F5 depende de los de F4 en el
+--   catálogo.
+-- QUÉ SE PIERDE MIENTRAS TANTO: la confirmación por enlace, el reagendar por
+--   el paciente y por la clínica, los correos de cita y los avisos de la
+--   clínica. Con la v2 encendida y la app nueva desplegada esas rutas fallan:
+--   apaga antes la v2.
+-- DATOS: si alguna de las 4 tablas tiene filas (enlaces de confirmación y sus
+--   respuestas, reagendados, registro de correos, avisos), la reversa SE NIEGA
+--   sin tocar nada. Lo que ya escribió la auditoría (audit_log) se queda en
+--   cualquier caso. Para seguir de todos modos (tras respaldar, p. ej.
+--     CREATE TABLE respaldos.cita_confirmaciones_AAAAMMDD AS SELECT * FROM public.cita_confirmaciones;
+--   e ídem las otras tres), confírmalo en la MISMA transacción:
+--       BEGIN;
+--       SET LOCAL spinus.reversa_con_datos = 'si';
+--       \i supabase/reversas/20261201160000_agenda_f4_confirmacion_correos_avisos_reversa.sql
+--   (el BEGIN de este archivo avisa «ya hay una transacción en curso» y sigue
+--   en la tuya; su COMMIT la cierra).
+-- RIESGO / BLOQUEOS: SHARE ROW EXCLUSIVE sobre appointments, clinicas,
+--   profiles, reserva_empalmes_google y gcal_movimientos_rechazados (DROP
+--   TRIGGER y las FK que se van con las tablas) hasta el COMMIT; lock_timeout
+--   5 s (si no los obtiene, aborta sin cambiar nada). Una sola transacción.
+-- SEGUNDA PASADA: no hace nada y sale bien (IF EXISTS).
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -26,20 +38,27 @@ SET LOCAL statement_timeout = '60s';
 
 DO $pre$
 DECLARE
-  v_t text;
-  v_n bigint;
+  v_t     text;
+  v_n     bigint;
+  v_filas text;
 BEGIN
   IF current_user <> 'postgres' THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: aplicar como postgres (es %).', current_user;
+    RAISE EXCEPTION 'REVERSA ABORTADA: hay que correrla como el rol postgres (current_user es %).', current_user;
   END IF;
   FOREACH v_t IN ARRAY ARRAY['avisos_clinica', 'cita_correos', 'cita_reagendos', 'cita_confirmaciones'] LOOP
     IF to_regclass('public.' || v_t) IS NOT NULL THEN
       EXECUTE format('SELECT count(*) FROM public.%I', v_t) INTO v_n;
       IF v_n > 0 THEN
-        RAISE EXCEPTION 'PRE-VUELO FALLÓ: public.% tiene % filas. Respaldar y vaciar antes (ver cabecera); la reversa no borra datos.', v_t, v_n;
+        v_filas := concat_ws(', ', v_filas, v_t || ' ' || v_n);
       END IF;
     END IF;
   END LOOP;
+  IF v_filas IS NOT NULL THEN
+    IF coalesce(current_setting('spinus.reversa_con_datos', true), '') <> 'si' THEN
+      RAISE EXCEPTION 'REVERSA ABORTADA: hay datos de la v2 que se perderían (%). Respáldalos y, si aun así quieres seguir, repite con SET LOCAL spinus.reversa_con_datos = ''si'' en la misma transacción (ver la cabecera).', v_filas;
+    END IF;
+    RAISE WARNING 'REVERSA CON DATOS (spinus.reversa_con_datos = si): se borran las filas de %.', v_filas;
+  END IF;
 END
 $pre$;
 
