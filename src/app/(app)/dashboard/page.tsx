@@ -45,7 +45,7 @@ const HUECO = {
 
 /* Los botones de la cabecera de acciones: tonal el de «Nueva consulta» (el
    primario de la pantalla es «Iniciar consulta») y `--sup` los demás. */
-const BOTON_ACCION = 'k-b h-11 min-w-0 px-3 ih:h-10 esc:h-10'
+const BOTON_ACCION = 'k-b h-11 min-w-0 px-3 ext:px-1 ext:text-[14px] ih:h-10 esc:h-10'
 const BOTON_SUP = `${BOTON_ACCION} bg-sup text-tonal-tinta`
 
 /** «Iniciar consulta» y el expediente de una cita con paciente, en la pieza principal o en la hoja. */
@@ -81,14 +81,16 @@ function AccionesCita({ cita, enCurso, donde, alIniciar }: {
   )
 }
 
-/** Las acciones de la cabecera: buscador y los cuatro botones (tres en ext, CALMA §17). */
+/** Las acciones de la cabecera: buscador y los cuatro botones (tres en ext, CALMA §17).
+ *  En ext los tres no caben a partes iguales a 15 px («+ Documento» medía 104 en
+ *  91, auditoría H7): 14 px y columnas a su contenido, que se reparten el sobrante. */
 function CabeceraAcciones({ onBuscar, onConsulta, onDocumento }: {
   onBuscar: () => void; onConsulta: () => void; onDocumento: () => void
 }): ReactElement {
   return (
     <div className={`${HUECO.acciones} flex flex-col gap-3`}>
       <BuscadorPaciente onAbrir={onBuscar} />
-      <div className="order-2 grid grid-cols-2 gap-2 ext:grid-cols-3 ih:grid-cols-4 iv:grid-cols-4">
+      <div className="order-2 grid grid-cols-2 gap-2 ext:grid-cols-[auto_auto_auto] ext:gap-1.5 ih:grid-cols-4 iv:grid-cols-4">
         {/* En ext la da el «+» del riel (`Sidebar.tsx`): no se repite aquí. */}
         <button type="button" onClick={onConsulta} className={`${BOTON_ACCION} bg-tonal text-tonal-tinta ext:hidden`}>
           <Plus aria-hidden="true" className="size-[18px] ih:hidden iv:hidden" /> Nueva consulta
@@ -117,7 +119,7 @@ function Corto({ icono, largo, corto }: { icono: ReactNode; largo: string; corto
   return (
     <>
       <span className="contents ext:hidden">{icono}{largo}</span>
-      <span className="hidden items-center gap-1 ext:inline-flex"><Plus aria-hidden="true" className="size-4" />{corto}</span>
+      <span className="hidden items-center gap-0.5 ext:inline-flex"><Plus aria-hidden="true" className="size-3.5" />{corto}</span>
     </>
   )
 }
