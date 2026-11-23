@@ -327,7 +327,9 @@ seguro de `DERIVA.md` §0), la versión (es 17.6), los índices inválidos ajeno
 ## 6. Cómo se probó (2026-11-22)
 
 **Sobre el clon de la foto real (agente QL, la versión de hoy).** Contenedor
-propio `clon-spinus-ql-a` (127.0.0.1:54371), `clonar-desde-foto.sh` con
+propio (`clon-spinus-ql-a`, 127.0.0.1:54371; repetido tras el reinicio del
+equipo en clones nuevos, el último `clon-spinus-ql-e`, con el mismo resultado),
+`clonar-desde-foto.sh` con
 `esperadas-clon.tsv`: 14 diferencias, todas esperadas. `correr-conteos.sh`
 contra él como `postgres` no superusuario (contraseña por stdin,
 `CONTEOS_RED=host`): **78 filas, 73 OK, 5 INFO, 0 AVISO, 0 ALTO**, salida 0.
