@@ -68,6 +68,11 @@ MODO="${1:-}"
 #  · statement_timeout 120 s: tope para lo que no fija el suyo (1, 2, T y las
 #    reversas de TRUNCATE). Desde PostgreSQL 13 cuenta POR SENTENCIA también
 #    dentro de un texto de varias.
+#  · Se quedan A PROPÓSITO a nivel de sesión (A15, ronda 2): sólo hacen más
+#    estricta la conexión. Si el pooler la reutilizara sin limpiarla, quien la
+#    herede tendría, como mucho, un plazo más corto: nunca un permiso de más. La
+#    confirmación de pérdida de datos de una reversa, en cambio, NO va aquí (ver
+#    correr_sql): no puede sobrevivir a la petición que la usa.
 SESION_SQL="SET idle_in_transaction_session_timeout = '10s'; SET lock_timeout = '5s'; SET statement_timeout = '120s'"
 # Un argumento de la línea de órdenes no puede pasar de 128 KiB en Linux
 # (MAX_ARG_STRLEN = 131072 bytes); F3, el mayor, tiene ~100 KB.
@@ -231,7 +236,7 @@ COMMIT;"
   t0=$(date +%s.%N)
   if pg psql -X -q -v ON_ERROR_STOP=1 -P pager=off -At -c "$SESION_SQL" -c "$sql" > "$salida" 2>&1; then
     t1=$(date +%s.%N)
-    grep '^humo:' "$salida"
+    grep '^humo:' "$salida" || true
     echo "   aceptada; $(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f s", b-a}') de punta a punta (arranque del contenedor incluido). No se escribió nada."
   else
     cat "$salida"
@@ -270,8 +275,22 @@ correr_sql() {  # $1 = ruta relativa a supabase/; $2 = «con-datos» para confir
   bytes=$(wc -c < "$REPO/supabase/$1")
   (( bytes < MAX_BYTES )) || die "supabase/$1 tiene $bytes bytes: no cabe en una sola petición (-c, máximo $MAX_BYTES). No se aplicó nada; consultar."
   sql="$(<"$REPO/supabase/$1")"
-  # Ajuste de SESIÓN (no del archivo): las reversas leen current_setting('spinus.reversa_con_datos').
-  [[ "${2:-}" == con-datos ]] && pre="$pre; SET spinus.reversa_con_datos = 'si'"
+  # Confirmación de pérdida de datos de una reversa (A15, ronda 2 de la
+  # auditoría): NO con un SET de sesión, que viviría lo que la conexión (y el
+  # pooler puede reutilizarla). Va con SET LOCAL en una transacción que abre la
+  # MISMA petición, delante del archivo: el BEGIN del archivo avisa «there is
+  # already a transaction in progress» y sigue dentro de ella (lo que su
+  # cabecera documenta), las guardas leen current_setting('spinus.reversa_con_datos',
+  # true) dentro de esa transacción, y el ajuste muere con ella: en el COMMIT del
+  # archivo si sale bien y en el ROLLBACK si falla. Exige que lo primero del
+  # archivo, quitados comentarios y líneas vacías, sea su BEGIN.
+  if [[ "${2:-}" == con-datos ]]; then
+    [[ "$(grep -v -E '^[[:space:]]*(--.*)?$' "$REPO/supabase/$1" | head -n 1 || true)" == "BEGIN;" ]] \
+      || die "supabase/$1 no empieza por BEGIN;: no puedo confirmar la pérdida de datos dentro de su transacción. No se corrió nada."
+    sql="BEGIN;
+SET LOCAL spinus.reversa_con_datos = 'si';
+$sql"
+  fi
   set +e
   pg psql -X -v ON_ERROR_STOP=1 -P pager=off -c "$pre" \
      -c "SELECT 'sesión: idle_in_transaction_session_timeout=' || current_setting('idle_in_transaction_session_timeout')
@@ -283,9 +302,15 @@ correr_sql() {  # $1 = ruta relativa a supabase/; $2 = «con-datos» para confir
   return "$rc"
 }
 
-registrar() {  # $1 = versión; $2 = applied|reverted
-  ( cd "$REPO" && "${CLI[@]}" migration repair --status "$2" "$1" --db-url "$URL" ) 2>&1 \
-    | grep -v -e 'new version of Supabase CLI' -e 'We recommend updating' | tee -a "$LOG"
+registrar() {  # $1 = versión; $2 = applied|reverted. Nunca mata el guion: quien llama comprueba el historial.
+  # A16 (ronda 2): con pipefail, un «grep -v» que no deja pasar ninguna línea
+  # devuelve 1 y set -e terminaba el guion en silencio con la versión ya
+  # registrada. Ahora el código de la CLI se guarda aparte y el filtro no cuenta.
+  local salida rc=0
+  salida="$(cd "$REPO" && "${CLI[@]}" migration repair --status "$2" "$1" --db-url "$URL" 2>&1)" || rc=$?
+  { printf '%s\n' "$salida" | grep -v -e 'new version of Supabase CLI' -e 'We recommend updating' || true; } | tee -a "$LOG"
+  (( rc == 0 )) || echo "AVISO: migration repair salió con $rc (arriba lo que dijo); compruebo el historial." | tee -a "$LOG"
+  return 0
 }
 
 # Tras un fallo de la IDA: pregunta al catálogo y dice qué quedó (A2).
@@ -348,7 +373,7 @@ revertir_una() {  # $1 = nombre de la migración sin .sql; $2 = «con-datos» si
   leer "Para DESHACERLA escribe REVERTIR $v; cualquier otra cosa para parar: "
   [[ "$RESP" == "REVERTIR $v" ]] || die "parado antes de la reversa de $1."
   if ! correr_sql "$f" "${2:-}"; then
-    grep -q 'reversa_con_datos' "$ULTIMA_SALIDA" \
+    [[ -z "${2:-}" ]] && grep -q 'REVERSA.*ABORTADA.*reversa_con_datos' "$ULTIMA_SALIDA" \
       && die "la reversa de $1 se NEGÓ por datos que la comprobación previa no vio (¿se escribieron después?). No tocó nada. Repite «reversa» desde el principio: volverá a preguntar."
     tras_fallo_reversa "$1" "$v"
   fi

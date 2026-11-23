@@ -237,12 +237,22 @@ encendido.
 - [ ] Los conteos en OK (paso 3), corridos por Angel **ese mismo día**, justo
       antes de aplicar: el conteo previo del 2026-11-22 no vale por sí solo.
 - [ ] **Orden explícita de Angel**, ese día.
-- [ ] **Se aplica a una hora sin consulta** (decisión de Angel): ninguna
+- [ ] **Se aplica a una hora sin consulta** (decisión de Angel; la elige él el
+      día y la apunta en el campo «Hora elegida» del paso 3): ninguna
       clínica atendiendo ni agendando. Aunque con el guion nuevo la ventana con
       `appointments` cerrada es de decenas de milisegundos (§5), código y base
       se tocan en la misma sesión y, si algo sale mal, hay que poder parar sin
       nadie en consulta.
 - [ ] Nadie más desplegando ni tocando la base.
+- [ ] **ANTES de fusionar a `main` y desplegar el código (paso 4): confirmar que
+      la integración de Supabase con GitHub sigue SIN CONECTAR** (panel de
+      Supabase → Settings → Integrations; comprobado por Angel el 2026-11-22: no
+      está conectada). Si estuviera conectada, podría aplicar las migraciones
+      sola al subir a `main`, sin pasar por `aplicar.sh` ni por sus rejillas, y
+      habría que desconectarla ANTES de fusionar. Va antes del despliegue del
+      código, no antes de la base, porque el orden es código primero. (Dato de
+      Angel, mismo día: la integración de Vercel tampoco está instalada; por eso
+      las variables del §6.2 se ponen a mano en Vercel.)
 - [ ] Las variables de Vercel del §6.2 preparadas (generadas en la terminal de
       Angel, sin escribirlas en ningún archivo), **`CRON_SECRET` incluida: se
       pone ANTES de desplegar** (§6.2).
@@ -349,6 +359,9 @@ de consultorios la da F1.11: 18).
 **Este conteo hay que REPETIRLO justo antes de aplicar** (el mismo
 `correr-conteos.sh`, el mismo día, después del paso 5 y antes del 6).
 
+> **Hora elegida (la escribe Angel el día de aplicar; fuera del horario de
+> consulta de las clínicas):** `____:____`, del día `____ / ____ / ______`.
+>
 > **Justo antes de empezar el paso 6 (orden de Angel): las filas de sesiones y
 > candados abiertos.** En la rejilla de ese conteo repetido, mirar **G.14**
 > (otras sesiones con una transacción abierta hace más de 60 s), **G.15**
@@ -420,7 +433,8 @@ Qué mirar, además:
 - [ ] Anotar cuál es el despliegue de producción ACTUAL (el de `main`): es al
       que se vuelve si el paso 5 falla.
 
-Desplegar la rama (el merge a `main` y el despliegue los hace Angel). Con este
+Antes de fusionar: la casilla de la integración de Supabase con GitHub del
+paso 0 (sin conectar). Desplegar la rama (el merge a `main` y el despliegue los hace Angel). Con este
 despliegue **nacen las dos tareas programadas**: `main` no tiene `crons` en
 `vercel.json` (comprobado: `git show main:vercel.json` sólo trae
 `buildCommand`); la rama trae `google-sync` cada 10 min y `recordatorios` cada
@@ -904,9 +918,7 @@ espera de hasta 5 s. [C-CA: F3 con un candado ajeno, en el ensayo.]
    día desde el paso 3 (conteos) con `aplicar.sh aplicar`, que sigue donde se
    quedó.
 
-(Los 2 minutos y las 3 veces son una propuesta de este agente: lo bastante para
-que acabe una transacción normal de la app, que dura milisegundos, y poco para
-no alargar la sesión; Angel puede cambiarlos.)
+(Los 2 minutos y las 3 repeticiones, aprobados por Angel.)
 
 Causas de fallo, por el mensaje del servidor:
 
@@ -1014,8 +1026,16 @@ el historial:
   (sin él la reversa de F1 no podría devolver el horario).
 - **DATOS** — lo que cada reversa se negaría a perder (las mismas cuentas que su
   pre-vuelo). Se enseña **la lista entera, una vez**, y se pide escribir
-  `PERDER DATOS`; con eso las siete corren con `SET spinus.reversa_con_datos =
-  'si'` en su sesión. Cualquier otra respuesta para sin tocar nada.
+  `PERDER DATOS`; con eso cada una de las siete corre con la confirmación
+  **dentro de su propia transacción** (A15, ronda 2): la petición es
+  `BEGIN; SET LOCAL spinus.reversa_con_datos = 'si';` + el archivo, cuyo propio
+  `BEGIN` avisa «there is already a transaction in progress» y sigue dentro (lo
+  que documenta su cabecera). La confirmación muere con esa transacción —en su
+  `COMMIT` si sale bien, en el `ROLLBACK` si falla—, así que no sobrevive en la
+  conexión aunque el pooler la reutilice. `aplicar.sh` exige que el archivo
+  empiece por `BEGIN;` (lo cumplen las 9 reversas). Cualquier otra respuesta para
+  sin tocar nada. (Los tres plazos de sesión de §2 sí se quedan en la conexión,
+  a propósito: sólo la hacen más estricta.)
 
 Así ya no puede pasar lo que vio el auditor: quitar T y F5b y descubrir en F4
 que no se puede seguir, con la v2 sin sus candados. [C-CA: con la v2 encendida
@@ -1175,6 +1195,23 @@ Las ventanas de candado de §5.0 y los cortes de §5.2 se midieron con el SQL de
 la fase 1; con una petición por archivo, las sentencias que añadió la ronda 1 no
 las cambian (es tiempo de servidor) — DEDUCIDO, no se volvieron a medir.
 
+**Fase 3 de CA (ronda 2 de la auditoría, A15 y A16) [C-CA, 2026-11-22]**, sobre
+`clon-spinus-ca-3`; salidas en `~/spinus-fusion/ensayo-ca/fase3-20261122-231300/`:
+- **A15:** tras una reversa confirmada que PASA (T), en la misma conexión la
+  confirmación ya no está (`current_setting` vacío) y la reversa de F5b sin
+  confirmar se NIEGA por la cancelada cerrada; tras una confirmada que FALLA
+  (F2 con F4 puesta), la transacción queda abortada, tras su `ROLLBACK` la
+  confirmación ya no está y la de F4 se NIEGA por el aviso. Con el `SET` de
+  sesión de antes, la confirmación sí sobrevivía (`[si]`). `aplicar.sh reversa`
+  con datos: sin confirmar, nada tocado; con `PERDER DATOS`, las 7 en verde (7
+  avisos «already a transaction in progress», los esperados).
+- **A16:** con una CLI que sólo imprime la línea que `registrar` filtra, el guion
+  viejo salió con 1 en silencio (sin ✓ ni ALTO) con la versión ya registrada; el
+  nuevo siguió, comprobó el historial y terminó «Las 9 aplicadas y registradas».
+- Ida → reversa con datos → reversa-truncate → ida, en verde y sin REVISAR; los
+  fallos de A2 (después del `COMMIT`, aplicada sin registrar, REVISAR, historial
+  ilegible), A5 y A8, igual que en la fase 1.
+
 **Lo que no se ensayó:**
 
 - El pooler real (Supavisor): cómo presenta la rejilla y los NOTICE de una
@@ -1206,19 +1243,20 @@ Compute confirmado por Angel; se mira el panel en el paso 4).
    los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Si se toca
    cualquier migración o reversa, se regenera en el mismo commit:
    `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* > supabase/produccion/plan/huellas.sha256`.
-2. **§15, el tramo de «más del 20 % y hasta el 50 % más lenta»:** SIN DEFINIR
-   POR ANGEL (el coordinador se lo pregunta).
-3. **§15, el fragmento de la consola:** pendiente de probar en un navegador
+2. **§15, el fragmento de la consola:** pendiente de probar en un navegador
    real; lo prueba el agente del ensayo principal.
-4. **La hora sin consulta** (§4, paso 0; §8.1 si hay que dejarlo para otra):
-   la pone Angel. Y la pausa y el número de repeticiones de §8.1 (2 min, 3 veces)
-   son una propuesta de CA que Angel puede cambiar.
-5. **El pooler real** no se puede ensayar sin producción: el día lo dicen la
+3. **La hora sin consulta** (§4, paso 0; §8.1 si hay que dejarlo para otra):
+   la elige Angel el día de aplicar (campo «Hora elegida» del paso 3).
+4. **El pooler real** no se puede ensayar sin producción: el día lo dicen la
    prueba de humo de petición grande y la ida y vuelta de `aplicar.sh estado`
    (§4, paso 3). Si la prueba de humo sale «NO aceptada», no se aplica.
-6. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
+5. Después de aplicar de verdad: la línea `-- ESTADO · PRODUCCIÓN` de cada uno de
    los 9 archivos, con fecha y comprobación (`AUDITORIA-MIGRACIONES.md` §7), en
    un commit. Cambia sus huellas: es lo esperado.
+6. **Confirmar, antes de fusionar a `main`, que la integración de Supabase con
+   GitHub sigue sin conectar** (Settings → Integrations; sin conectar el
+   2026-11-22, según Angel): conectada, podría aplicar las migraciones sola al
+   subir a `main`, sin `aplicar.sh` ni rejillas (§4, paso 0).
 7. Dónde correr de forma automática la comprobación periódica de los privilegios
    por omisión (`COMPROBACION-POSTERIOR.md` §10; `DEUDA_TECNICA.md` AG-DT-270):
    lo decide Angel. A mano, la consulta ya está.
@@ -1338,18 +1376,24 @@ pocas solicitudes más (el trozo de la campana y del engrane, que sólo se
 descarga con la v2, y `GET /api/agenda/por-confirmar` con los avisos); nada de
 peticiones nuevas para pintar la rejilla.
 
-**Qué se hace con el resultado (decisión de Angel, literal; se compara la
-mediana «después» con la mediana «antes» de encender):** «igual o más rápida:
-se sigue; hasta un 20 % más lenta: no se apaga, pero no se enciende en ninguna
-otra clínica hasta saber la causa; más de un 50 % más lenta, o con errores: se
-apaga en mi clínica y se investiga.»
+**Qué se hace con el resultado (decisión de Angel, literal):** «igual o más
+rápida que antes de encender: se sigue; más lenta, hasta un 50 %: no se apaga,
+pero no se enciende en ninguna otra clínica hasta saber la causa; más de un 50 %
+más lenta, o con errores: se apaga en mi clínica y se investiga. Se compara
+contra la mediana de «Carga» medida ANTES de encender, con el mismo
+procedimiento, equipo y red. Una medición rara no cuenta: se repite la tanda de
+5.»
 
-| Resultado (mediana después frente a mediana antes) | Qué se hace |
+| Mediana de «Carga» después, frente a la de antes | Qué se hace |
 |---|---|
 | igual o más rápida | se sigue |
-| hasta un 20 % más lenta | no se apaga; **no se enciende en ninguna otra clínica** hasta saber la causa |
-| **más del 20 % y hasta el 50 % más lenta** | **SIN DEFINIR POR ANGEL (el coordinador se lo pregunta)** |
+| más lenta, hasta un 50 % | no se apaga; **no se enciende en ninguna otra clínica** hasta saber la causa |
 | más de un 50 % más lenta, **o con errores** | se apaga en la clínica de Angel y se investiga |
+
+La cifra que decide es la mediana de **«Carga»** (*Load*) del punto 3; las demás
+columnas de la tabla sirven para buscar la causa. Si una recarga sale muy
+distinta de las otras cuatro (una medición rara), no cuenta: se repite la tanda
+entera de 5.
 
 «Errores» = filas en rojo (4xx/5xx) en la pestaña Red que antes no salían, o
 avisos de error en la página. Para apagar: `agenda_ajustes.agenda_v2_encendida =

@@ -6433,6 +6433,111 @@ migración vaya a necesitar sobre `appointments` (un `LOCK TABLE … IN ACCESS
 EXCLUSIVE MODE NOWAIT` con reintentos, como F1), a costa de alargar la ventana
 de ACCESS EXCLUSIVE; es decisión de Angel junto con A1.
 
+### AG-DT-274 — Los códigos de verificación de la reserva no tienen plazo de conservación, y el tope de emisión sólo vive en la app
+
+**Estado:** abierta, **prioridad ALTA — resolver antes de encender la v2 en
+otras clínicas** (decisión de Angel, 2026-11-22: plazo de **30 días**, aplicado
+por una **tarea automática**; **NO se construye ahora**). Origen: auditoría
+independiente, ronda 2, A14 (`supabase/produccion/auditoria/RONDA-2.md`).
+
+**Qué pasa.** Cada petición de código de la reserva por enlace inserta una fila
+en `public.reserva_verificaciones` (`reserva_codigo_emitir`,
+`supabase/migrations/20261201140000_agenda_f3_reserva_enlace.sql`, §10) y nada
+la borra ni la caduca: la tabla no tiene DELETE para nadie salvo el dueño, y
+`trg_reserva_verificaciones_sin_truncate` (T) impide vaciarla con TRUNCATE.
+Guarda el `correo_hmac` de quien pidió el código, también si nunca reservó: una
+conservación indefinida de un seudónimo de datos personales (minimización). No es
+un fallo de seguridad. Además, **`reserva_codigo_emitir` no tiene tope propio**:
+el único freno a la emisión son los límites de `src/lib/reserva/limitesReserva.ts`
+(`codigo`: 3 por correo y hora, 10 por IP, 5 por dispositivo; y los 30 s entre
+códigos del mismo enlace y correo, `REENVIO_CODIGO_S` con
+`reserva_espera_reenvio`), que aplica la ruta; quien llame a la función con
+`service_role` por otro camino no tiene límite.
+
+**Qué guarda cada fila** (columnas de fecha: `created_at`, `caduca_en` —el
+código—, `verificado_en`, `ficha_caduca_en` —la ficha, 30 min tras verificar—,
+`consumida_en`): `clinica_id`, `enlace_id` (FK compuesta a `reserva_enlaces`,
+RESTRICT), `correo_hmac`, `codigo_hmac`, `intentos`, `ficha_hmac`. Ninguna otra
+tabla apunta a `reserva_verificaciones`.
+
+**Otras tablas con el HMAC del correo de alguien que quizá nunca reservó**
+(DEDUCIDO leyendo F3 y la foto):
+- `reserva_enlaces.correo` y `correo_hmac` del enlace de un solo uso: el correo
+  lo teclea la clínica al emitir, **en claro**, y se queda aunque la persona no
+  reserve nunca. Es del mismo plazo y de la misma revisión legal.
+- `ip_rate_limits.ruta` (de `main`) lleva `reserva:codigo:correo:<hmac>`; la
+  propia `rate_limit_intento` borra las filas de una ruta al volver a usarla
+  pasada la ventana, pero las de una ruta que no vuelve se quedan.
+- `reserva_incidencias.correo_hmac` (y `tel_hmac`) y
+  `appointments.reserva_correo_hmac` **no**: son de alguien que SÍ reservó
+  (cuelgan de una cita, FK RESTRICT) y alimentan el candado; su plazo es el del
+  historial del candado (propuesto 12 meses, pendiente de la revisión legal,
+  `mejora_agendaV2.md` §10).
+- `reserva_contactos.clave_hmac`: bloqueos manuales de la clínica; no es esto.
+
+**Diseño propuesto (no construido):**
+1. **Qué se borra:** filas de `reserva_verificaciones` con `created_at < now() -
+   interval '30 days'` cuyo código ya no sirve (`caduca_en` y, si la hay,
+   `ficha_caduca_en` pasados; con 30 días lo están siempre). Si se decide lo
+   mismo para el único: vaciar `reserva_enlaces.correo`/`correo_hmac` de los
+   únicos caducados, revocados o agotados con más de 30 días (no se puede borrar
+   el enlace: lo apuntan citas y verificaciones con RESTRICT, y sin correo el
+   único ya no se puede usar, que es lo que se quiere).
+2. **La migración:** una función `public.reserva_verificaciones_purgar(p_dias
+   integer DEFAULT 30) RETURNS integer`, `SECURITY INVOKER`, `search_path = ''`,
+   que borre por lotes (p. ej. 5 000 por llamada, con `lock_timeout` corto) y
+   devuelva cuántas; `GRANT DELETE ON public.reserva_verificaciones TO
+   service_role` (o la función `SECURITY DEFINER` de `postgres` si se corre desde
+   `pg_cron`); y, si se quiere, el tope propio en `reserva_codigo_emitir` (p. ej.
+   negar más de N filas por enlace y correo en una hora, con el mismo `FOR
+   UPDATE` del enlace). Pre-vuelo y rejilla como las demás; pasa por
+   `supabase/AUDITORIA-MIGRACIONES.md`. Ninguna toca `audit_log` salvo para
+   escribir.
+3. **Quién lo corre — dos opciones:**
+   - **Tarea de Vercel** (como `google-sync` y `recordatorios`, que es como la
+     app hace hoy todo lo programado): una ruta `/api/cron/purgar-reserva` con
+     `CRON_SECRET`, una vez al día en `vercel.json`, que llama a la función con
+     `createAdminClient()` (`service_role`). Ojo con **AG-DT-268**: su
+     `maxDuration` por debajo de la frecuencia, y el borrado por lotes para que
+     una pasada quepa en el límite; si no cabe, la siguiente sigue.
+   - **`pg_cron`** (existe en producción: `pg_cron 1.6.4`, G.12/G.17 de los
+     conteos; hoy con 1 trabajo activo ajeno a la agenda): un `cron.schedule`
+     diario que llama a la función como `postgres`. No depende de Vercel ni de
+     `CRON_SECRET`, pero es el único trabajo de la agenda que viviría en la base
+     y no en `vercel.json`: hay que dejarlo escrito en ambos sitios.
+4. **Con qué rol:** `service_role` (Vercel) o `postgres` (`pg_cron`); nunca la
+   sesión.
+5. **Cómo se audita:** una fila en `audit_log` por pasada que borre algo
+   (`accion = 'reserva_verificaciones_purgadas'`, `user_id = 'system'`, sólo el
+   número de filas y el plazo: nunca HMAC ni ids de enlace).
+
+**Aviso de privacidad:** el aviso de la reserva (`src/lib/reserva/avisoReserva.ts`,
+PENDIENTE DE REVISIÓN LEGAL) tiene que decir cuánto se conservan estos datos;
+anotado en la lista para la revisión legal (`mejora_agendaV2.md` §7, fila
+«Texto legal»).
+
+### AG-DT-275 — Cambiar el rol de un médico con contactos bloqueados rompe su bloqueo y desbloqueo (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 2, A13,
+comprobado por el auditor; decisión de Angel: los roles son tres y la regla de A3
+se queda). Texto del auditor: «Tras A3, `reserva_contacto_marcar` deja de poder
+bloquear Y DESBLOQUEAR si el médico de la cita ya no tiene `role = 'medico'`»
+(`20261201140000_agenda_f3_reserva_enlace.sql`, la comprobación del INSERT de
+`proteger_reserva_contactos` y `reserva_contacto_marcar`, que hace `INSERT … ON
+CONFLICT DO UPDATE`: el disparador BEFORE INSERT corre también cuando la fila ya
+existe). «Con un contacto bloqueado de un médico, cambiar `profiles.role` de ese
+médico a `super_admin`; como secretaria, `select
+public.reserva_contacto_marcar('<cita>', 'desbloquear')` → `23514 El médico del
+contacto no pertenece a la clínica`.» Daño: «un paciente bloqueado a mano para un
+médico que cambió de rol no se puede desbloquear desde la pantalla
+(`src/app/api/agenda/reservas/contactos/route.ts:61`). Sólo si un médico con
+reservas por enlace cambia de rol; hoy es raro.» **Cómo se llegaría hoy:** sólo
+cambiando el rol a mano (SQL) o desde una herramienta de administración
+(spinus-consola); la app no lo ofrece. Quien cambie el rol de un médico con citas
+lo mira antes. Criterio del auditor si se arregla: la regla «médico de la
+clínica» se exige al CREAR la fila; bloquear o desbloquear un contacto que ya
+existe no depende del rol actual del médico, con una prueba que lo cubra.
+
 ---
 
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)

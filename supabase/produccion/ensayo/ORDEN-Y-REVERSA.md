@@ -25,7 +25,7 @@ Gestos del arnés, para admin (médico administrador), secretaria e invitado de
 la clínica Semilla A: abrir `/inicio`, `/agenda`, el expediente de un paciente;
 `GET /api/appointments`; cita CON paciente y SIN paciente: alta, editar notas,
 mover 1 h, confirmar, cancelar, borrar (y comprobar que la fila desapareció);
-alta de paciente; y, como admin, una cita con nota clínica ligada
+alta de paciente; y, como médico administrador, una cita con nota clínica ligada
 (`POST /api/consultas` con `appointment_id`) seguida de editar notas, moverla,
 cancelarla, volverla a agendada y borrarla.
 
@@ -93,7 +93,7 @@ Nota del montaje: la CLI crea `supabase/.temp/` en el repo al hacer el `repair`
 `nav-a-main*`). Línea base para comparar: el mismo arnés con `main` sobre la
 base VIEJA (`05x-arnes-main-base-vieja.txt`).
 
-| Gesto (admin, secretaria, invitado) | `main` + base vieja | `main` + base nueva |
+| Gesto (médico administrador, secretaria, médico invitado) | `main` + base vieja | `main` + base nueva |
 |---|---|---|
 | `/inicio`, `/agenda`, expediente, `GET /api/appointments` | 200 | 200 (agenda pintada en Chromium, sin errores de página) |
 | cita con y sin paciente: alta, notas, mover, confirmar, cancelar, borrar | 200; la fila desaparece | **igual** |
