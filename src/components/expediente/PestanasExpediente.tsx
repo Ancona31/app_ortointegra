@@ -44,8 +44,10 @@ export default function PestanasExpediente({ activa, conteos, onCambiar }: {
        ⚠️ «MEDICIONES Y ARCHIVOS» SÓLO EN `esc`. En los formatos estrechos la
        cuarta pestaña se rotula «Mediciones» (maqueta `final-expediente`) y su
        nombre accesible sigue siendo el completo. Las dos variantes van con CSS,
-       nunca con el formato leído en JS (hidratación). */
-    <div role="tablist" aria-label="Secciones del expediente" className="k-tabs">
+       nunca con el formato leído en JS (hidratación). En `ext` el hueco mínimo
+       baja a 4: con 8 la fila medía 292 en 290 y «Mediciones» quedaba cortada
+       sin indicio (auditoría H6). */
+    <div role="tablist" aria-label="Secciones del expediente" className="k-tabs ext:gap-1">
       {PESTANAS.map(p => {
         const esActiva = p.clave === activa
         const conteo = conteos[p.clave]
