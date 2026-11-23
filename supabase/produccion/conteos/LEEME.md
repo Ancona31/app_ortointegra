@@ -277,6 +277,10 @@ ve ya: T.1.
    `GET /rest/v1/pacientes?select=id&nombre=imatch.x&limit=0` → **200 y `[]`**
    (con `limit=0` no viaja ninguna fila). Un 400 con «operator» o «imatch»
    significa que no lo admite: no despliegues el código de la búsqueda.
+   **Con «base primero» (2026-11-23), en producción corre `main`, cuya búsqueda
+   no usa `imatch`**: el primer camino («en Agendar») no lo prueba hasta el día
+   del código (o en un preview de la rama); el segundo (la petición con
+   `imatch.x&limit=0`) sí vale ya, porque mira PostgREST y no la app.
 2. **Versión de PostgREST** (`imatch` existe desde la 10, según
    `mejora_agendaV2.md` §7; en local, la 14.5). ASUMIENDO que el proyecto expone
    la raíz OpenAPI: `curl -s "https://qpnegmmpneseirfyplbf.supabase.co/rest/v1/" -H "apikey: <clave anon>" | jq .info.version`.

@@ -99,7 +99,8 @@ cut -f1-5 ~/spinus-produccion-foto-despues/difs-antes-despues.tsv | sort \
 - **El `diff` tiene que salir vacío y escribir `IGUAL QUE EL ENSAYO`.** Una línea
   `<` es algo que el ensayo cambió y producción no; una `>`, algo que cambió en
   producción y no en el ensayo. Cualquiera: no se enciende nada y se investiga
-  (el código nuevo ya está desplegado y sigue sirviendo con la v2 apagada).
+  (con «base primero», producción sigue con el código de `main` y la v2 apagada;
+  `main` no usa nada de las 9, así que sigue sirviendo [C, E2 §5.4 (a)]).
 - Comparan foto con foto (las dos de `foto-produccion.sh`), así que las 14
   diferencias foto ↔ clon no aparecen aquí.
 
@@ -202,8 +203,11 @@ respaldados de F1, todos los consultorios).
 
 La app de siempre tiene que seguir igual. Sin datos de pacientes reales en
 ningún registro: sólo «sí/no» y cuentas. Se hace **después de aplicar las 9**
-(paso 6 del plan), con el código nuevo ya desplegado (paso 4). La versión corta
-de esto con la base vieja es el paso 5 del plan.
+(paso 6 del plan), **con el código de `main` en producción** («base primero»,
+2026-11-23). La versión con el código nuevo es la comprobación corta del día del
+código (plan §4-bis, C3). *(Antes: «con el código nuevo ya desplegado (paso
+4)»; sustituido.)* Lo que con `main` es distinto: la cita atendida con nota no se
+mueve ni se borra (500 con texto, plan §6.1): **no se prueba con una cita real**.
 
 Antes de empezar, una marca de tiempo (sólo lee):
 
@@ -222,11 +226,13 @@ docker run --rm -e PGPASSWORD public.ecr.aws/supabase/postgres:17.6.1.167 psql -
    semana siguiente): crearlo, arrastrarlo a otra hora y borrarlo.
 4. **Un expediente** de un paciente de prueba (o la cuenta demo): abre, se ven
    sus consultas y documentos.
-5. **Búsqueda de pacientes en «Agendar»** (código nuevo; usa `imatch` de
-   PostgREST): dos palabras de un paciente de prueba; lo encuentra y la consola
-   del navegador no tiene un 400.
-6. **Tareas de Vercel**: Schedules → Cron Jobs → View Logs de `google-sync` y
-   `recordatorios`: la primera invocación tras el despliegue responde 2xx, no 401.
+5. ~~**Búsqueda de pacientes en «Agendar»**~~ **No aplica el día de la base**:
+   la búsqueda de `main` no usa `imatch`. La prueba es del código nuevo (plan
+   §4-bis, C3; o, antes, en un preview). Si se quiere saber ya si PostgREST lo
+   admite, la petición sin datos de `../conteos/LEEME.md` §3, punto 1.
+6. ~~**Tareas de Vercel**~~ **No aplica el día de la base**: `main` no tiene
+   tareas programadas (`git show main:vercel.json`). Se mira el día del código
+   (plan §4-bis, C3: la primera invocación en 2xx, no 401).
 7. **La auditoría de citas está viva** (lo único nuevo con la v2 apagada), con
    la marca de arriba:
 
@@ -250,7 +256,10 @@ en la raíz ni en `src/`). Los fallos de las rutas de la agenda (`/api/reservar/
 de lo que corre en `after()` **sólo quedan en el registro de Vercel**: Project →
 Logs (filtrar por la ruta y por nivel `error`) y, para las tareas, Schedules →
 Cron Jobs → View Logs. Ahí se mira tras el humo del §7 y en los días
-siguientes. Los mensajes de la agenda no llevan datos de pacientes (regla del
+siguientes. **El día de la base** esas rutas no existen en producción (corre
+`main`): lo que se mira son `/api/appointments*` y `/api/consultas`; un 500 de
+`/api/appointments/[id]` al mover o borrar una cita atendida con nota es el
+esperado (plan §6.1) y `main` no lo deja en el registro [C, E2]. Los mensajes de la agenda no llevan datos de pacientes (regla del
 proyecto), pero el registro de Vercel no pasa por el filtro PII de Sentry: no
 copiar líneas de él a ningún documento sin mirarlas.
 
