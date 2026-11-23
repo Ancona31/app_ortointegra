@@ -1,6 +1,7 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { leerFormato } from '@/lib/formatoPantalla'
 import type { MedicamentoDB } from '@/data/medicamentos'
 import { buscarEnCatalogo } from '@/components/documentos/recetaCompacta'
 
@@ -32,6 +33,14 @@ export default function BuscadorMedicamento({ id, valor, onEscribir, onElegir, o
   const resultados = abierta ? buscarEnCatalogo(valor) : []
   const visible = abierta && valor.trim().length >= 2
   const total = resultados.length + 1
+  const listaRef = useRef<HTMLUListElement>(null)
+  // Cerca del pie, la lista cae bajo él (en `ih`/`esc` el pie va encima del
+  // formulario, `.sp-doc-formbody--pie-encima`): al abrirse se trae entera,
+  // como `MenuRequerimientos`. `tel`/`ext`/`iv`, como estaban.
+  useEffect(() => {
+    const f = leerFormato()
+    if (visible && (f === 'ih' || f === 'esc')) listaRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [visible])
 
   function elegir(k: number) {
     setAbierta(false)
@@ -68,7 +77,7 @@ export default function BuscadorMedicamento({ id, valor, onEscribir, onElegir, o
         placeholder="Busca por nombre comercial o genérico"
         className="sp-rx-fi" />
       {visible && (
-        <ul id={idLista} role="listbox" aria-label="Medicamentos del catálogo" className="sp-rx-lista">
+        <ul ref={listaRef} id={idLista} role="listbox" aria-label="Medicamentos del catálogo" className="sp-rx-lista">
           {resultados.map((m, k) => (
             <li key={`${m.nombre_comercial}·${m.presentacion}·${m.principio_activo}`} id={`${idLista}-${k}`}
               role="option" aria-selected={k === activo} className="sp-rx-op"

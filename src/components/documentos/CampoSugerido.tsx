@@ -14,7 +14,8 @@
  * filtra igual en Safari iOS.
  */
 
-import { useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { leerFormato } from '@/lib/formatoPantalla'
 import { filtrarSugerencias } from '@/components/documentos/honorariosLineas'
 
 interface Props {
@@ -36,6 +37,14 @@ export default function CampoSugerido(p: Props): ReactElement {
   const filtradas = filtrarSugerencias(p.sugerencias, p.value)
   const visible = abierto && filtradas.length > 0
   const idLista = `${p.id}-lista`
+  const listaRef = useRef<HTMLDivElement>(null)
+  // Cerca del pie, la lista cae bajo él (en `ih`/`esc` el pie va encima del
+  // formulario, `.sp-doc-formbody--pie-encima`): al abrirse se trae entera,
+  // como `MenuRequerimientos`. `tel`/`ext`/`iv`, como estaban.
+  useEffect(() => {
+    const f = leerFormato()
+    if (visible && (f === 'ih' || f === 'esc')) listaRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [visible])
 
   function elegir(valor: string): void {
     p.onChange(valor)
@@ -71,7 +80,7 @@ export default function CampoSugerido(p: Props): ReactElement {
         onBlur={() => setAbierto(false)} onKeyDown={tecla}
         className={p.className} />
       {visible && (
-        <div id={idLista} role="listbox" aria-label={p.etiqueta} className="sp-hon-lista">
+        <div ref={listaRef} id={idLista} role="listbox" aria-label={p.etiqueta} className="sp-hon-lista">
           {filtradas.map((s, i) => (
             <div key={s} id={`${idLista}-${i}`} role="option" aria-selected={i === activo} className="sp-hon-op"
               // onMouseDown y no onClick: el blur del campo llega antes que el

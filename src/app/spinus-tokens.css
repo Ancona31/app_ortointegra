@@ -2156,6 +2156,18 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 :where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-btn--primary {
   flex: 0 0 auto; min-width: 104px;
 }
+/* Pie siempre a la vista en receta, laboratorio y honorarios (`ih`/`esc`,
+   «A2» del dueño). El pie ya era `sticky`; lo que lo tapaba era el propio
+   formulario: la tarjeta de conceptos con el foco sube a `z-index: 2`
+   (`.sp-hon:focus-within`) y pintaba encima de «Imprimir» mientras se
+   tabulaba, y las listas de los buscadores (`z-index: 5`/`20`) caían sobre él
+   cerca del fondo. Aquí el pie queda por encima de todo el formulario; la
+   lista que se abre cerca de él la trae a la vista su buscador
+   (`BuscadorMedicamento`, `BuscadorEstudio`, `CampoSugerido`, como ya hacía
+   `MenuRequerimientos`), con el `scroll-padding-bottom` de `main`. Sólo en
+   estos tres formularios y sólo en `ih`/`esc`: `tel`/`ext`/`iv` y los otros
+   cinco, como estaban. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody--pie-encima > .sp-doc-actions { z-index: 6; }
 
 /* La cabecera del formulario (`.sp-doc-cab`) va FUERA de la capa: ver el
    bloque «Cabecera del formulario» tras el cierre de `@layer components`. */

@@ -440,7 +440,7 @@ export default function SolicitudLabForm({ pacienteInicial = '', diagnosticoInic
       {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
           está abierto: se apaga con display:none y el panel se monta como
           hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
-      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+      <div className="sp-doc-formbody sp-doc-formbody--pie-encima" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
       {plantillas.selector}
 

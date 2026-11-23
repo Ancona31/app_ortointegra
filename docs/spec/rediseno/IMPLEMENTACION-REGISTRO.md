@@ -1006,6 +1006,24 @@ formatos; franjas de `tel` emuladas por CDP):
   la página no» no cabe sin decidir qué más se pliega o se va arriba (p. ej. la
   hoja pegada del escrito, con la cabecera que sale por arriba). Pendiente de
   decisión del dueño.
+* **Pie fijo en receta, laboratorio y cotización/honorarios (`ih`/`esc`,
+  «A2» del dueño: la página sigue desplazando, sin lista desplazable).** Al
+  medir resultó que el pie YA era `sticky` en los tres: lo que lo hacía
+  desaparecer era el formulario. (1) En honorarios, con el foco en la tarjeta
+  de conceptos, `.sp-hon:focus-within` (`z-index: 2`) pintaba la tarjeta
+  ENCIMA del pie e «Imprimir» no se veía ni se podía pulsar mientras se
+  tabulaba (27 de 186 pasos de Tab en esc+ih, todos en honorarios). (2) Las
+  listas de los buscadores (`.sp-rx-lista` 5, `.sp-hon-lista` 20) abiertas
+  cerca del fondo caían sobre «Imprimir». Corrección: los tres formularios
+  marcan su cuerpo con `.sp-doc-formbody--pie-encima` y en `ih`/`esc` el pie
+  sube a `z-index: 6`; `BuscadorMedicamento`, `BuscadorEstudio` y
+  `CampoSugerido` traen su lista a la vista al abrirse (`scrollIntoView
+  nearest` con el `scroll-padding-bottom` de `main`, como
+  `MenuRequerimientos`), sólo en `ih`/`esc` (`leerFormato`). Fondo del pie sin
+  cambios (el translúcido con desenfoque de los demás pies). `tel`/`ext`/`iv` y
+  los otros cinco formularios: sin cambios (capturas comparadas). Tab: 0
+  fallos; «Imprimir» pulsable (`elementFromPoint`) en vacío, carga alta arriba
+  y al fondo y con la lista abierta junto al pie, claro y oscuro.
 
 ## Estado al cierre de pantallas y formularios
 

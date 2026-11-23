@@ -1,6 +1,7 @@
 'use client'
 
-import { useId, useState, type Ref } from 'react'
+import { useEffect, useId, useRef, useState, type Ref } from 'react'
+import { leerFormato } from '@/lib/formatoPantalla'
 import { Search } from 'lucide-react'
 import { buscarEstudios } from '@/components/documentos/estudiosPedidos'
 
@@ -32,6 +33,14 @@ export default function BuscadorEstudio({ id, pedidos, onAnadir, onQuitarUltimo,
   const visible = abierta && texto.trim().length >= 2
   const resultados = visible ? buscarEstudios(texto, pedidos) : []
   const total = resultados.length + 1
+  const listaRef = useRef<HTMLUListElement>(null)
+  // Cerca del pie, la lista cae bajo él (en `ih`/`esc` el pie va encima del
+  // formulario, `.sp-doc-formbody--pie-encima`): al abrirse se trae entera,
+  // como `MenuRequerimientos`. `tel`/`ext`/`iv`, como estaban.
+  useEffect(() => {
+    const f = leerFormato()
+    if (visible && (f === 'ih' || f === 'esc')) listaRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [visible])
 
   function elegir(k: number) {
     onAnadir(resultados[k] ?? texto.trim())
@@ -70,7 +79,7 @@ export default function BuscadorEstudio({ id, pedidos, onAnadir, onQuitarUltimo,
         placeholder="Busca un estudio o escribe uno y pulsa Enter"
         className="sp-rx-fi" />
       {visible && (
-        <ul id={idLista} role="listbox" aria-label="Estudios del catálogo" className="sp-rx-lista">
+        <ul ref={listaRef} id={idLista} role="listbox" aria-label="Estudios del catálogo" className="sp-rx-lista">
           {resultados.map((r, k) => (
             <li key={r} id={`${idLista}-${k}`} role="option" aria-selected={k === activo} className="sp-rx-op"
               onMouseDown={e => { e.preventDefault(); elegir(k) }} onMouseEnter={() => setActivo(k)}>
