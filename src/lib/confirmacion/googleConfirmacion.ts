@@ -47,7 +47,9 @@ export async function reflejarEnGoogle(c: CitaRespondida, actorId = 'enlace_paci
     const r = await conCalendarioSpinus(conexion, admin,
       (calendar, calendarId) => restablecerEnGoogle(c.clinicaId, calendar, calendarId, [{ citaId: c.citaId, eventId: c.eventId, etag: c.etag }]),
       { puedeReparar: false, actorId })
-    if (r && r.errores > 0) logger.warn('confirmacion', 'Google: la respuesta del paciente no se escribió; lo hará el sondeo')
+    // Oleada 3, arreglo 5: el sondeo es Google→Spinus y no reescribe en Google lo que aquí no salió;
+    // nadie lo reintenta (AG-DT-264). El texto no promete otra cosa.
+    if (r && r.errores > 0) logger.warn('confirmacion', 'Google: la respuesta del paciente no se escribió en Google y no se reintenta')
   } catch (err) {
     logger.warn('confirmacion', `Google: reflejo fallido (${err instanceof Error ? err.name : 'desconocido'})`)
   }
