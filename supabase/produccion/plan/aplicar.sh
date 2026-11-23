@@ -105,9 +105,18 @@ REVERSAS_TRUNCATE=(
   20261125170000_audit_log_sin_truncate
 )
 MAIN=(20260912190416 20260913 20260914 20260919 20260919230000)
+HUMO_OK=0; INCOHERENTES=0; PENDIENTES=0; FALTA_MAIN=0; CON_DATOS=""
 
 die() { echo "ALTO: $*" >&2; exit 1; }
 [[ "$MODO" =~ ^(estado|respaldo|aplicar|reversa|reversa-truncate)$ ]] || { sed -n '2,50p' "$0"; exit 2; }
+# G9 (ronda 2 del guion): dos aplicar.sh que escriben, a la vez en este equipo,
+# no. Cerrojo de archivo (flock) mientras dura el proceso; lo heredan sus hijos
+# (los contenedores de psql y la CLI), que son cortos y no arrancan servidores.
+CERROJO="${XDG_RUNTIME_DIR:-/tmp}/spinus-aplicar.lock"
+if [[ "$MODO" =~ ^(aplicar|reversa|reversa-truncate)$ ]]; then
+  exec 9>"$CERROJO"
+  flock -n 9 || die "ya hay otro aplicar.sh (aplicar o reversa) corriendo en este equipo (cerrojo $CERROJO). Espera a que termine; no corras dos a la vez."
+fi
 [[ -f "$REPO/supabase/config.toml" && -d "$REPO/supabase/migrations" ]] || die "córrelo desde el repo (no encuentro supabase/)."
 docker info >/dev/null 2>&1 || die "Docker no responde; enciéndelo primero."
 IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
@@ -123,7 +132,12 @@ leer() {  # $1 = aviso; $2 = s para no mostrar lo escrito. Deja la respuesta en 
 preparar() {
   case "$HOST" in
     127.0.0.1|localhost|::1)
-      echo "Destino: ENSAYO ($USUARIO@$HOST:$PUERTO/$BASE)." ;;
+      # G12: «local» son SÓLO estos tres literales. Un túnel o reenvío local
+      # (ssh -L, un proxy) hacia otra base pasaría por aquí como ENSAYO, sin
+      # pedir PRODUCCION: no se usa nunca un túnel hacia producción. El servidor
+      # no da una marca fiable de «soy producción» (un clon de la foto copia sus
+      # roles y su configuración), por eso no se le pregunta.
+      echo "Destino: ENSAYO ($USUARIO@$HOST:$PUERTO/$BASE). OJO: «local» = 127.0.0.1, localhost o ::1; por un túnel local hacia otra base NO se pediría PRODUCCION." ;;
     *)
       echo "Destino: PRODUCCIÓN ($USUARIO@$HOST:$PUERTO/$BASE)."
       [[ "$HOST" == "aws-0-us-west-2.pooler.supabase.com" ]] \
@@ -145,15 +159,28 @@ preparar() {
 }
 
 pg() {  # psql/pg_dump de la imagen local en un contenedor efímero; supabase/ montado sólo lectura.
-  # Sin -i a propósito: el contenedor no lee la entrada (las confirmaciones son de este script).
-  docker run --rm ${APL_RED:+--network "$APL_RED"} -v "$REPO/supabase:/s:ro" \
-    -e PGPASSWORD -e PGHOST -e PGPORT -e PGUSER -e PGDATABASE -e PGSSLMODE "$IMAGEN" "$@"
+  # G11 (ronda 2 del guion): la contraseña NO va con «-e PGPASSWORD», que la deja
+  # en la configuración del contenedor (docker inspect, Config.Env) mientras vive.
+  # Entra por la entrada estándar del contenedor (printf es interno de bash: no
+  # sale en ps) y el sh de dentro la lee y la exporta sólo al proceso de psql.
+  # La entrada del contenedor es esa tubería: no lee nada más (las
+  # confirmaciones son de este script).
+  printf '%s\n' "$PGPASSWORD" | docker run --rm -i ${APL_RED:+--network "$APL_RED"} -v "$REPO/supabase:/s:ro" \
+    -e PGHOST -e PGPORT -e PGUSER -e PGDATABASE -e PGSSLMODE "$IMAGEN" \
+    sh -c 'IFS= read -r PGPASSWORD; export PGPASSWORD; exec "$@" </dev/null' sh "$@"
 }
 q() { pg psql -X -q -At -v ON_ERROR_STOP=1 -c "$1"; }  # una consulta, salida cruda
 
-registradas() {  # versiones del historial, una por línea (vacío si la tabla no existe). Si no puede leer, DETIENE.
-  q "select case when to_regclass('supabase_migrations.schema_migrations') is null then ''
-       else (select string_agg(version, E'\n' order by version) from supabase_migrations.schema_migrations) end" \
+registradas() {  # versiones del historial, una por línea. Si no puede leerlo, o NO EXISTE la tabla, DETIENE.
+  # G6 (ronda 2 del guion): antes decía «vacío si la tabla no existe», pero un
+  # subselect que nombra la tabla falla al analizarse aunque el CASE no lo
+  # ejecute. Ahora la ausencia se pregunta aparte y es un ALTO propio: sin la
+  # tabla del historial no se aplica nada (plan §1: se para y se toma otra foto).
+  local hay
+  hay="$(q "select to_regclass('supabase_migrations.schema_migrations') is not null")" \
+    || die "no pude LEER el historial (supabase_migrations.schema_migrations). No sigo: sin él no sé qué está aplicado. Mira el error de arriba."
+  [[ "$hay" == t ]] || die "NO EXISTE supabase_migrations.schema_migrations en el destino. No sigo: el plan (§1) dice parar y tomar otra foto."
+  q "select coalesce(string_agg(version, E'\n' order by version), '') from supabase_migrations.schema_migrations" \
     || die "no pude LEER el historial (supabase_migrations.schema_migrations). No sigo: sin él no sé qué está aplicado. Mira el error de arriba."
 }
 # Uso SIEMPRE así, fuera de un «if»: hist="$(registradas)" || exit 1
@@ -207,6 +234,39 @@ aplicada() {  # $1 = versión
   echo nose
 }
 
+# Las 9, historial frente a catálogo (G1 y G4, ronda 2 del guion). Imprime una
+# línea por migración y deja en INCOHERENTES cuántas no cuadran:
+#   pendiente                  (ni registrada ni aplicada)
+#   aplicada y registrada
+#   ALTO aplicada SIN registrar (testigo sí, historial no)
+#   ALTO registrada SIN aplicar (historial sí, testigo no): el historial miente
+# $1 = historial ya leído. Si no puede preguntar al catálogo, DETIENE.
+testigos_todos() {  # una línea «versión|si|no» por cada una de las 9
+  local v filas=()
+  for v in "${MIGRACIONES[@]}"; do v="${v%%_*}"; filas+=("('$v', $(testigo_sql "$v"))"); done
+  q "select v || '|' || case when c then 'si' else 'no' end from (values $(IFS=,; echo "${filas[*]}")) x(v, c) order by v" \
+    || die "no pude preguntar al catálogo por los testigos de las 9. No sigo. Mira el error de arriba."
+}
+coherencia() {  # $1 = historial
+  local t linea v a r m
+  t="$(testigos_todos)" || exit 1
+  INCOHERENTES=0; PENDIENTES=0
+  for m in "${MIGRACIONES[@]}"; do
+    v="${m%%_*}"
+    linea="$(grep "^$v|" <<<"$t" || true)"; a="${linea#*|}"
+    en_historial "$v" "$1" && r=si || r=no
+    case "$r$a" in
+      sisi) echo "aplicada y registrada:      $m" ;;
+      nono) echo "pendiente:                  $m"; PENDIENTES=$((PENDIENTES + 1)) ;;
+      nosi) echo "ALTO aplicada SIN registrar: $m ($(testigo_nombre "$v") existe; no está en el historial). Qué hacer: plan §8, «aplicada sin registrar»."
+            INCOHERENTES=$((INCOHERENTES + 1)) ;;
+      sino) echo "ALTO registrada SIN aplicar: $m (está en el historial; $(testigo_nombre "$v") NO existe). Qué hacer: plan §8, «registrada sin aplicar»."
+            INCOHERENTES=$((INCOHERENTES + 1)) ;;
+      *)    echo "ALTO sin respuesta del catálogo: $m"; INCOHERENTES=$((INCOHERENTES + 1)) ;;
+    esac
+  done
+}
+
 ida_y_vuelta() {  # 5 × select 1 en una sesión; imprime la mediana en ms (lo que suma cada viaje por la red)
   pg psql -X -q -v ON_ERROR_STOP=1 -c '\timing on' -c 'select 1' -c 'select 1' -c 'select 1' -c 'select 1' -c 'select 1' 2>&1 \
     | awk '/^Time: /{print $2}' | sort -n | awk '{a[NR]=$1} END{if (NR) printf "%.1f ms (mediana de %d)\n", a[int((NR+1)/2)], NR; else print "no medida"}'
@@ -234,13 +294,15 @@ COMMIT;"
   salida="$DESTINO/humo-peticion-grande.salida.txt"
   echo "── prueba de humo de SÓLO LECTURA: no escribe nada (BEGIN TRANSACTION READ ONLY). Una petición de ~$mayor bytes, el tamaño del archivo mayor."
   t0=$(date +%s.%N)
+  HUMO_OK=0
   if pg psql -X -q -v ON_ERROR_STOP=1 -P pager=off -At -c "$SESION_SQL" -c "$sql" > "$salida" 2>&1; then
+    HUMO_OK=1
     t1=$(date +%s.%N)
     grep '^humo:' "$salida" || true
     echo "   aceptada; $(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f s", b-a}') de punta a punta (arranque del contenedor incluido). No se escribió nada."
   else
     cat "$salida"
-    echo "   ⚠️ NO aceptada (arriba el error). No se escribió nada. No apliques hasta saber por qué: plan §2."
+    echo "   ⚠️ NO aceptada (arriba el error). No se escribió nada. «aplicar» NO ofrecerá ninguna migración hasta que esta prueba pase (G3): plan §2."
   fi
 }
 
@@ -253,13 +315,15 @@ estado() {
             (select count(*) from public.clinicas), (select count(*) from public.audit_log)"
   local hist; hist="$(registradas)" || exit 1
   echo "── historial (supabase_migrations.schema_migrations)"
-  [[ -n "$hist" ]] && echo "$hist" || echo "(vacío o NO EXISTE la tabla: ver el plan, §1, antes de seguir)"
-  local v falta=0
-  for v in "${MAIN[@]}"; do en_historial "$v" "$hist" || { echo "FALTA de main: $v"; falta=1; }; done
-  for v in "${MIGRACIONES[@]}"; do
-    en_historial "${v%%_*}" "$hist" && echo "ya registrada: $v" || echo "pendiente:     $v"
-  done
-  return $falta
+  [[ -n "$hist" ]] && echo "$hist" || echo "(la tabla existe, pero está VACÍA: ver el plan, §1, antes de seguir)"
+  local v
+  FALTA_MAIN=0
+  for v in "${MAIN[@]}"; do en_historial "$v" "$hist" || { echo "FALTA de main: $v"; FALTA_MAIN=1; }; done
+  echo "── las 9: historial frente a catálogo (su objeto testigo)"
+  coherencia "$hist"
+  # Sale ≠ 0 si algo no está bien: falta main, la prueba de humo no pasó (G3) o
+  # alguna de las 9 no cuadra entre historial y catálogo (G1/G4).
+  (( FALTA_MAIN == 0 && HUMO_OK == 1 && INCOHERENTES == 0 ))
 }
 
 huella_ok() {  # $1 = ruta relativa al repo; compara con huellas.sha256 del plan
@@ -269,7 +333,19 @@ huella_ok() {  # $1 = ruta relativa al repo; compara con huellas.sha256 del plan
   [[ -n "$esperada" && "$esperada" == "$actual" ]]
 }
 
-correr_sql() {  # $1 = ruta relativa a supabase/; $2 = «con-datos» para confirmar la pérdida en una reversa.
+# G7 (ronda 2 del guion): psql escribe el ERROR (stderr, sin búfer) antes que
+# los resultados de la misma petición (stdout, con búfer), así que lo último que
+# se lee encima del «ALTO» parecen órdenes que salieron bien. Tras un fallo se
+# repite aquí, al final y bien visible, la línea del error.
+repetir_error() {
+  local e
+  e="$(grep -E '(ERROR|FATAL|PANIC):|server closed the connection|could not connect|connection to server' "$ULTIMA_SALIDA" 2>/dev/null | head -n 3 || true)"
+  echo "──────── EL ERROR (repetido; arriba puede salir antes que el resto de la salida):" >&2
+  echo "${e:-  (psql no escribió ninguna línea de error: mira $ULTIMA_SALIDA)}" >&2
+  echo "────────" >&2
+}
+
+correr_sql() {  # $1 = ruta relativa a supabase/; $2 = «con-datos» para confirmar la pérdida en una reversa; $3 = «reversa».
   local salida rc sql pre="$SESION_SQL" bytes
   salida="$DESTINO/$(basename "$1" .sql).salida.txt"
   bytes=$(wc -c < "$REPO/supabase/$1")
@@ -284,11 +360,31 @@ correr_sql() {  # $1 = ruta relativa a supabase/; $2 = «con-datos» para confir
   # true) dentro de esa transacción, y el ajuste muere con ella: en el COMMIT del
   # archivo si sale bien y en el ROLLBACK si falla. Exige que lo primero del
   # archivo, quitados comentarios y líneas vacías, sea su BEGIN.
-  if [[ "${2:-}" == con-datos ]]; then
+  #
+  # G2 (ronda 2 del guion): «la v2 apagada en TODAS las clínicas» (regla de
+  # Angel) se comprueba en la MISMA transacción de cada reversa, no sólo una vez
+  # al principio de la cadena: un bloque DO delante del archivo bloquea las
+  # escrituras de agenda_ajustes hasta el COMMIT (LOCK … IN SHARE MODE, con el
+  # lock_timeout de la sesión) y aborta sin tocar nada si alguna clínica la tiene
+  # encendida, diciendo cuáles. Si la tabla ya no existe (F1 deshecha), no mira.
+  if [[ "${3:-}" == reversa ]]; then
     [[ "$(grep -v -E '^[[:space:]]*(--.*)?$' "$REPO/supabase/$1" | head -n 1 || true)" == "BEGIN;" ]] \
-      || die "supabase/$1 no empieza por BEGIN;: no puedo confirmar la pérdida de datos dentro de su transacción. No se corrió nada."
+      || die "supabase/$1 no empieza por BEGIN;: no puedo poner la guarda de la v2 ni la confirmación dentro de su transacción. No se corrió nada."
+    local confirmacion=""
+    [[ "${2:-}" == con-datos ]] && confirmacion="SET LOCAL spinus.reversa_con_datos = 'si';"
     sql="BEGIN;
-SET LOCAL spinus.reversa_con_datos = 'si';
+$confirmacion
+DO \$aplicar_sh\$
+DECLARE v_ids text;
+BEGIN
+  IF to_regclass('public.agenda_ajustes') IS NOT NULL THEN
+    EXECUTE 'LOCK TABLE public.agenda_ajustes IN SHARE MODE';
+    EXECUTE 'SELECT string_agg(clinica_id::text, '', '' ORDER BY clinica_id) FROM public.agenda_ajustes WHERE agenda_v2_encendida' INTO v_ids;
+    IF v_ids IS NOT NULL THEN
+      RAISE EXCEPTION 'REVERSA PARADA POR aplicar.sh: la v2 está ENCENDIDA en estas clínicas: %. Apágala en TODAS antes de revertir. No se tocó nada.', v_ids;
+    END IF;
+  END IF;
+END \$aplicar_sh\$;
 $sql"
   fi
   set +e
@@ -315,6 +411,7 @@ registrar() {  # $1 = versión; $2 = applied|reverted. Nunca mata el guion: quie
 
 # Tras un fallo de la IDA: pregunta al catálogo y dice qué quedó (A2).
 tras_fallo_ida() {  # $1 = nombre; $2 = versión
+  repetir_error
   local a; a="$(aplicada "$2")"
   case "$a" in
     no)  die "$1 FALLÓ (ver arriba). El catálogo dice que NO quedó aplicada (no existe $(testigo_nombre "$2")) y NO se registró. Plan §8 (tabla de abortos)." ;;
@@ -327,7 +424,12 @@ aplicar_una() {  # $1 = nombre sin .sql
   local v="${1%%_*}" f="migrations/$1.sql" t0 t1 hist a
   echo; echo "════ $1"
   hist="$(registradas)" || exit 1
-  if en_historial "$v" "$hist"; then echo "ya está en el historial: se salta."; return 0; fi
+  if en_historial "$v" "$hist"; then
+    a="$(aplicada "$v")"
+    [[ "$a" == si ]] && { echo "ya está en el historial y aplicada ($(testigo_nombre "$v") existe): se salta."; return 0; }
+    [[ "$a" == no ]] && die "$1 está en el historial pero NO aplicada ($(testigo_nombre "$v") no existe): registrada SIN aplicar, el historial miente. No sigo. Plan §8, «registrada sin aplicar»."
+    die "no sé si $1 está aplicada (está en el historial): no pude preguntar al catálogo, o otra sesión de $USUARIO tiene una transacción abierta. No se corrió nada. Plan §8, «no lo sé»."
+  fi
   a="$(aplicada "$v")"
   [[ "$a" == si ]] && die "$1 no está en el historial pero YA está aplicada ($(testigo_nombre "$v") existe): aplicada sin registrar. No la vuelvo a correr. Plan §8, «aplicada sin registrar»."
   [[ "$a" == no ]] || die "no sé si $1 está aplicada: no pude preguntar al catálogo, o otra sesión de $USUARIO tiene una transacción abierta (G.14/G.15). No se corrió nada. Espera y repite; plan §8, «no lo sé»."
@@ -339,7 +441,8 @@ aplicar_una() {  # $1 = nombre sin .sql
   t1=$(date +%s.%N)
   echo "duración: $(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f s", b-a}') (arranque del contenedor incluido)" | tee -a "$LOG"
   if grep -Eq '\|[[:space:]]*REVISAR[[:space:]]*$' "$ULTIMA_SALIDA"; then
-    die "la rejilla de $1 tiene filas REVISAR. Quedó APLICADA (COMMIT hecho) pero NO registrada. No sigas; plan §8."
+    grep -E '\|[[:space:]]*REVISAR[[:space:]]*$' "$ULTIMA_SALIDA" >&2 || true
+    die "la rejilla de $1 tiene filas REVISAR (arriba). Quedó APLICADA (COMMIT hecho) pero NO registrada. No sigas; plan §8."
   fi
   grep -Eq '\|[[:space:]]*OK[[:space:]]*$' "$ULTIMA_SALIDA" || die "no veo la rejilla de $1 con filas OK. Quedó APLICADA (psql salió bien) pero NO se registra; revísalo (plan §8)."
   registrar "$v" applied
@@ -349,13 +452,24 @@ aplicar_una() {  # $1 = nombre sin .sql
 }
 
 aplicar() {
-  estado || { leer "Faltan versiones de main en el historial (plan §1). Escribe SEGUIR si ya lo decidiste: "; [[ "$RESP" == SEGUIR ]] || die "parado."; }
+  estado || true
+  (( HUMO_OK == 1 )) || die "la prueba de humo de petición grande NO pasó (arriba): no ofrezco ninguna migración (G3). Plan §2."
+  (( INCOHERENTES == 0 )) || die "historial y catálogo no cuadran en alguna de las 9 (arriba, «ALTO …»). No ofrezco ninguna migración hasta que cuadren. Plan §8."
+  if (( FALTA_MAIN )); then
+    leer "Faltan versiones de main en el historial (plan §1). Escribe SEGUIR si ya lo decidiste: "; [[ "$RESP" == SEGUIR ]] || die "parado."
+  fi
   local m; for m in "${MIGRACIONES[@]}"; do aplicar_una "$m"; done
-  echo; echo "Las 9 aplicadas y registradas. Sigue con COMPROBACION-POSTERIOR.md."
+  # Antes de decir «las 9»: que de verdad estén las 9 en el historial Y en el catálogo (G1).
+  local hist; hist="$(registradas)" || exit 1
+  echo; echo "── comprobación final: las 9, historial frente a catálogo"
+  coherencia "$hist"
+  (( INCOHERENTES == 0 && PENDIENTES == 0 )) || die "al terminar, historial y catálogo NO cuadran (arriba). No están las 9. Plan §8."
+  echo; echo "Las 9 aplicadas y registradas (historial y catálogo coinciden). Sigue con COMPROBACION-POSTERIOR.md."
 }
 
 # Tras un fallo de una REVERSA: pregunta al catálogo (A2).
 tras_fallo_reversa() {  # $1 = nombre; $2 = versión
+  repetir_error
   local a; a="$(aplicada "$2")"
   case "$a" in
     si)  die "la reversa de $1 FALLÓ (ver arriba). El catálogo dice que la migración SIGUE aplicada ($(testigo_nombre "$2") existe): la reversa no hizo nada. Plan §10.1." ;;
@@ -372,10 +486,21 @@ revertir_una() {  # $1 = nombre de la migración sin .sql; $2 = «con-datos» si
   huella_ok "supabase/$f" || die "la huella de supabase/$f no es la de huellas.sha256."
   leer "Para DESHACERLA escribe REVERTIR $v; cualquier otra cosa para parar: "
   [[ "$RESP" == "REVERTIR $v" ]] || die "parado antes de la reversa de $1."
-  if ! correr_sql "$f" "${2:-}"; then
-    [[ -z "${2:-}" ]] && grep -q 'REVERSA.*ABORTADA.*reversa_con_datos' "$ULTIMA_SALIDA" \
-      && die "la reversa de $1 se NEGÓ por datos que la comprobación previa no vio (¿se escribieron después?). No tocó nada. Repite «reversa» desde el principio: volverá a preguntar."
+  if ! correr_sql "$f" "${2:-}" reversa; then
+    if grep -q 'REVERSA PARADA POR aplicar.sh' "$ULTIMA_SALIDA"; then
+      repetir_error
+      die "la reversa de $1 NO se hizo: la v2 está ENCENDIDA en alguna clínica (arriba, cuáles). Apágala en TODAS y repite «reversa». No tocó nada (G2)."
+    fi
+    if [[ -z "${2:-}" ]] && grep -q 'REVERSA.*ABORTADA.*reversa_con_datos' "$ULTIMA_SALIDA"; then
+      repetir_error
+      die "la reversa de $1 se NEGÓ por datos que la comprobación previa no vio (¿se escribieron después?). No tocó nada. Repite «reversa» desde el principio: volverá a preguntar."
+    fi
     tras_fallo_reversa "$1" "$v"
+  fi
+  # G8 (ronda 2 del guion): la rejilla de una reversa se mira como la de la ida.
+  if grep -Eq '\|[[:space:]]*REVISAR[[:space:]]*$' "$ULTIMA_SALIDA"; then
+    grep -E '\|[[:space:]]*REVISAR[[:space:]]*$' "$ULTIMA_SALIDA" >&2 || true
+    die "la rejilla de la reversa de $1 tiene filas REVISAR (arriba). La reversa quedó HECHA (COMMIT) pero $v SIGUE en el historial. No sigas; plan §10."
   fi
   registrar "$v" reverted
   hist="$(registradas)" || exit 1
@@ -387,6 +512,7 @@ revertir_una() {  # $1 = nombre de la migración sin .sql; $2 = «con-datos» si
 reversa_previa() {  # imprime CON_DATOS=si|no en la última línea si se puede seguir; si no, se detiene
   local hist filas f v bloquea=() datos=()
   hist="$(registradas)" || exit 1
+  huella_ok "supabase/produccion/plan/reversa-previa.sql" || die "la huella de reversa-previa.sql no es la de huellas.sha256 (G10). No se tocó nada."
   filas="$(q "$(<"$DIR/reversa-previa.sql")")" || die "no pude correr la comprobación previa de las reversas (reversa-previa.sql). No se tocó nada."
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
@@ -413,8 +539,24 @@ reversa_previa() {  # imprime CON_DATOS=si|no en la última línea si se puede s
   fi
 }
 
+# Antes de la primera reversa: historial y catálogo cuadran para las 9 (A5,
+# ronda 2 del guion). Las guardas de ORDEN de las reversas (F5a: «funciones que
+# nombran agenda_bloqueos»; F3: «sigue F2»; F2: «quedan disparadores de F4»; F1:
+# «quedan objetos de bloques posteriores»; las de TRUNCATE: la nº 2 antes que la
+# nº 1 y T antes que la nº 2) no están en reversa-previa.sql a propósito: con el
+# historial coherente, el orden fijo de la cadena (T, F5b, F4, F2, F3, F5a, F1;
+# luego 20261126, 20261125) las cumple siempre. Lo que las rompería es una
+# versión aplicada sin registrar o registrada sin aplicar, y eso se para aquí.
+exigir_coherencia() {
+  local hist; hist="$(registradas)" || exit 1
+  coherencia "$hist"
+  (( INCOHERENTES == 0 )) || die "historial y catálogo NO cuadran (arriba): con eso el orden de la cadena no garantiza sus guardas. No se tocó nada. Plan §8."
+}
+
 reversa() {
   estado || true
+  echo; echo "── historial frente a catálogo antes de la cadena"
+  exigir_coherencia
   echo; echo "── comprobación previa de toda la cadena (sólo lee)"
   reversa_previa
   local m; for m in "${REVERSAS[@]}"; do revertir_una "$m" "$CON_DATOS"; done
@@ -422,13 +564,18 @@ reversa() {
 }
 
 reversa_truncate() {
-  local hist
+  local hist yo
   estado || true
+  exigir_coherencia
+  # Las dos de TRUNCATE no pasan por reversa-previa.sql: no se niegan por datos;
+  # sus guardas son de orden (arriba) y de dueño: se exige postgres aquí.
+  yo="$(q "select current_user")" || die "no puedo preguntar quién soy."
+  [[ "$yo" == postgres ]] || die "hay que correr las reversas de TRUNCATE como postgres (current_user es $yo). No se tocó nada."
   hist="$(registradas)" || exit 1
   en_historial 20261201180000 "$hist" \
     && die "T (20261201180000) sigue aplicada y usa prohibir_truncate(): deshaz antes la agenda (aplicar.sh reversa). No se tocó nada."
   echo "OJO: deshacer estas dos REABRE el TRUNCATE de los tres roles sobre audit_log y las tablas de public (plan §10.2)."
-  local m; for m in "${REVERSAS_TRUNCATE[@]}"; do revertir_una "$m"; done
+  local m; for m in "${REVERSAS_TRUNCATE[@]}"; do revertir_una "$m"; done   # con la guarda de la v2 de correr_sql
   echo; echo "Las dos de TRUNCATE deshechas."
 }
 
