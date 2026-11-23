@@ -52,6 +52,38 @@ export class CambioRechazadoPorLaBase extends Error {
 
 interface ErrorRpc { code?: string; message: string }
 
+/**
+ * Oleada 3, arreglo 3: cualquier otro fallo de una RPC, con el código de
+ * Postgres/PostgREST y el estado HTTP de la respuesta (0 = sin respuesta),
+ * para que `procesarPagina` distinga lo pasajero (`esFalloPasajeroDeLaBase`).
+ * El mensaje es el de siempre, sin el cuerpo de la fila.
+ */
+export class FalloDeLaBase extends Error {
+  constructor(rpc: string, readonly codigo: string, readonly estadoHttp: number, mensaje: string) {
+    super(`${rpc}: ${codigo || 'sin código'} ${mensaje.slice(0, 200)}`)
+    this.name = 'FalloDeLaBase'
+  }
+}
+
+/** Contención, cancelación, conexión y recursos de Postgres; y los de conexión y espera del pool de PostgREST. */
+const CODIGOS_PASAJEROS = new Set(['40001', '40P01', '55P03', '57014', 'PGRST000', 'PGRST001', 'PGRST002', 'PGRST003'])
+const CLASES_PASAJERAS = ['08', '53']
+
+/**
+ * ¿Repetir la página puede arreglarlo? Conservador y explícito:
+ *   · con código, SÓLO los de arriba (40001, 40P01, 55P03, 57014, clases 08 y
+ *     53, PGRST000-003). Todo lo demás —23xxx, 42xxx, P0001, 42501, XX000…—
+ *     es definitivo aunque llegue con un 500: repetirlo no lo arregla y
+ *     dejaría a la clínica sin sincronizar;
+ *   · sin código (PostgREST no contestó con su JSON), la red sin respuesta o
+ *     cortada (estado 0) o un 5xx de la pasarela.
+ */
+export function esFalloPasajeroDeLaBase(err: unknown): boolean {
+  if (!(err instanceof FalloDeLaBase)) return false
+  if (err.codigo) return CODIGOS_PASAJEROS.has(err.codigo) || CLASES_PASAJERAS.some((c) => err.codigo.startsWith(c))
+  return err.estadoHttp === 0 || err.estadoHttp >= 500
+}
+
 function comprobarClinica(clinicaId: string): string {
   const r = UUID.safeParse(clinicaId)
   if (!r.success) throw new Error('gcalSincronizacionBase: clinicaId no es un uuid')
@@ -61,13 +93,13 @@ function comprobarClinica(clinicaId: string): string {
 /** Llama a la RPC con `p_clinica_id` puesto y devuelve `data` o lanza. */
 async function llamar(rpc: string, clinicaId: string, args: Record<string, unknown>): Promise<unknown> {
   const p_clinica_id = comprobarClinica(clinicaId)
-  const { data, error } = await createAdminClient().rpc(rpc, { p_clinica_id, ...args })
+  const { data, error, status } = await createAdminClient().rpc(rpc, { p_clinica_id, ...args })
   if (error) {
     const e: ErrorRpc = error
     if (e.code && CODIGOS_AUSENTE.has(e.code)) throw new SincronizacionNoDisponible(rpc)
     // Sólo el candado de la reserva por enlace (su texto): otro 42501 (un permiso que falta) sigue siendo un fallo.
     if (e.code === '42501' && e.message.includes('reservada por enlace')) throw new CambioRechazadoPorLaBase(rpc)
-    throw new Error(`${rpc}: ${e.code ?? 'sin código'} ${e.message.slice(0, 200)}`)
+    throw new FalloDeLaBase(rpc, e.code ?? '', typeof status === 'number' ? status : 0, e.message)
   }
   return data
 }

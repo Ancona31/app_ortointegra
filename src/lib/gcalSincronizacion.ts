@@ -44,6 +44,7 @@ import {
 import {
   aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
   reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, registrarMovimientoRechazado, type Candado,
+  esFalloPasajeroDeLaBase,
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, RestablecimientoPendiente, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
@@ -55,6 +56,19 @@ const POR_PAGINA = 250
 /** W · reintentos del registro de empalmes y la pausa entre ellos (dentro del presupuesto). */
 const REINTENTOS_EMPALMES = 2
 const PAUSA_EMPALMES_MS = 200
+
+/**
+ * Oleada 3, arreglo 3: algún cambio de Google no se aplicó por un fallo
+ * PASAJERO de la base. Como `RestablecimientoPendiente`: se lanza al final de
+ * la página y antes de avanzar el token, para que la pasada siguiente (la del
+ * cron o la siguiente petición, con la espera creciente de C1) la repita.
+ */
+class AplicacionPendiente extends Error {
+  constructor() {
+    super('cambio de Google sin aplicar por un fallo pasajero de la base: se repite la página')
+    this.name = 'AplicacionPendiente'
+  }
+}
 
 export type EstadoSincronizacion = 'ok' | 'parcial' | 'omitida' | 'sin_acceso' | 'no_disponible' | 'error'
 
@@ -110,6 +124,7 @@ function statusDe(err: unknown): number | null {
 function codigoDeError(err: unknown): string {
   if (esCredencialInvalida(err)) return 'credencial'
   if (err instanceof RestablecimientoPendiente) return 'google_restablecer'
+  if (err instanceof AplicacionPendiente) return 'base_pendiente'
   const s = statusDe(err)
   if (s === 410) return 'google_410'
   if (s !== null && s >= 500) return 'google_5xx'
@@ -293,6 +308,7 @@ async function procesarPagina(
   const borradosSinFila = tareas.filter((t) => t.evento.status === 'cancelled' && !t.fila).map((t) => t.evento)
   pasada.r.errores += await aplicarBloqueosDePagina(conexion.clinicaId, pagina.calendarId, deBloqueo, borradosSinFila)
   const pendientes: PorRestablecer[] = []
+  let sinAplicarPasajeros = 0
   for (let i = 0; i < tareas.length; i += LOTE) {
     const lote = tareas.slice(i, i + LOTE)
     const hechos = await Promise.allSettled(lote.map((t) => ejecutar(pasada, pagina.calendarId, t.decision)))
@@ -300,6 +316,7 @@ async function procesarPagina(
       const { evento, decision } = lote[j]
       if (h.status === 'rejected') {
         pasada.r.errores += 1
+        if (esFalloPasajeroDeLaBase(h.reason)) sinAplicarPasajeros += 1
         logger.warn('GCalSync', `evento sin aplicar ${JSON.stringify({ clinica: conexion.clinicaId, evento: evento.id ?? null })}`)
       } else if (h.value && evento.id && (decision.tipo === 'rechazar' || decision.tipo === 'aplicar')) {
         pendientes.push({ citaId: decision.citaId, eventId: evento.id, etag: evento.etag ?? null })
@@ -317,6 +334,10 @@ async function procesarPagina(
   // no antes: lo importado y lo movido ya registró sus empalmes, que repetir
   // la página no volvería a detectar.
   if (restablecido.pendientes > 0) throw new RestablecimientoPendiente()
+  // Oleada 3, arreglo 3: lo mismo si la BASE falló por algo pasajero al
+  // aplicar un cambio de Google (un definitivo cuenta en `errores` y la página
+  // avanza, como antes). Repetirla es idempotente (ver `pedirPagina`).
+  if (sinAplicarPasajeros > 0) throw new AplicacionPendiente()
 }
 
 /**
