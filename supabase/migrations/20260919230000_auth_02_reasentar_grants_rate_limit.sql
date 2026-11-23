@@ -7,7 +7,14 @@
 -- ESTADO · LOCAL: APLICADA Y VERIFICADA — 2026-09-19
 --   `npx supabase db reset --local` desde cero, exit 0, y el `proacl` de
 --   las dos funciones quedó en `{postgres=X/postgres,service_role=X/postgres}`.
--- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR.
+-- ESTADO · PRODUCCIÓN: REGISTRADA Y SU ESTADO CONFIRMADO — 2026-11-22.
+--   Está en `supabase_migrations.schema_migrations` de producción, y la foto
+--   de estructura de ese día (`supabase/produccion/DERIVA.md`, §2) enseña
+--   lo que este archivo deja: las dos funciones con su firma, SECURITY
+--   DEFINER, dueño `postgres` y `proacl`
+--   `{postgres=X/postgres,service_role=X/postgres}`, sin `anon` ni
+--   `authenticated` ni PUBLIC. Como en producción es un no-op, la foto
+--   confirma el estado, no que se ejecutara: eso lo dice el historial.
 --
 -- ✅ AUDITADA — 2026-09-19, por `supabase/AUDITORIA-MIGRACIONES.md`.
 -- Veredicto: APTA.

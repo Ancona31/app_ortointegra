@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { config } from 'dotenv'
 import { SESION, interruptorAgenda, sqlLocal, soloEscritorio } from './ayudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * Recordatorio por correo (agenda E4, plan_E.md E10 caso 1). La tarea
@@ -81,14 +82,21 @@ test.beforeAll(() => {
   interruptorAgenda('A', true)
   f = prepararPaciente()
 })
-test.afterAll(() => {
+/* AG-DT-256 · la tarea manda lo de las próximas 24 h: estas citas tienen que ser de «ahora + N h» y, de
+   lunes a viernes, son de la semana visible. Se borran al terminar CADA prueba (antes, al final del
+   archivo): al acabar ya no disparan la ventana y la guarda las perdona con la anotación. */
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO, description: 'citas a ahora + N h; las borra el afterEach' } }
+test.afterEach(() => {
   // Las filas de E1 y E4 tienen FK RESTRICT a la cita y el rol de servicio no puede borrarlas.
   if (citas.length) {
     sqlLocal(`
       delete from public.cita_correos where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.cita_confirmaciones where appointment_id = any (string_to_array(:'ids', ',')::uuid[]);
       delete from public.appointments where id = any (string_to_array(:'ids', ',')::uuid[]);`, { ids: citas.join(',') })
+    citas.length = 0
   }
+})
+test.afterAll(() => {
   sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false where clinica_id = :'c';`, { c: f.clinicaId })
   interruptorAgenda('A', false)
 })
@@ -101,7 +109,7 @@ test('la ruta sin secreto da 401 sin cuerpo', async () => {
   await ctx.dispose()
 })
 
-test('una cita a +5 h con paciente con correo: UN correo con el enlace y sin nada clínico; repetir no manda otro', async () => {
+test('una cita a +5 h con paciente con correo: UN correo con el enlace y sin nada clínico; repetir no manda otro', A_PROPOSITO, async () => {
   const id = cita(5)
   const previos = await contarCorreos(f.correo, ASUNTO)
   expect(await dispararTarea()).toBe(200)
@@ -123,7 +131,7 @@ test('una cita a +5 h con paciente con correo: UN correo con el enlace y sin nad
   expect(await contarCorreos(f.correo, ASUNTO)).toBe(previos + 1)
 })
 
-test('evento sin paciente, cancelada o fuera de la ventana: ningún correo (todo el día: lo cubre e4_correos_cita.sql)', async () => {
+test('evento sin paciente, cancelada o fuera de la ventana: ningún correo (todo el día: lo cubre e4_correos_cita.sql)', A_PROPOSITO, async () => {
   cita(6, { paciente: null })
   cita(6, { status: 'cancelled' })
   cita(30)
@@ -133,7 +141,7 @@ test('evento sin paciente, cancelada o fuera de la ventana: ningún correo (todo
   expect(await contarCorreos(f.correo, ASUNTO)).toBe(previos)
 })
 
-test('con el interruptor apagado no sale nada', async () => {
+test('con el interruptor apagado no sale nada', A_PROPOSITO, async () => {
   interruptorAgenda('A', false)
   const id = cita(7)
   const previos = await contarCorreos(f.correo, ASUNTO)
@@ -146,7 +154,7 @@ test('con el interruptor apagado no sale nada', async () => {
 
 /* ── Tanda H, punto 9: el interruptor del RECORDATORIO, apagado de fábrica ── */
 
-test('H2 · con el recordatorio apagado la tarea no manda nada a esa clínica; al encenderlo, sí', async () => {
+test('H2 · con el recordatorio apagado la tarea no manda nada a esa clínica; al encenderlo, sí', A_PROPOSITO, async () => {
   sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false where clinica_id = :'c';`, { c: f.clinicaId })
   const id = cita(8)
   const previos = await contarCorreos(f.correo, ASUNTO)
@@ -160,7 +168,7 @@ test('H2 · con el recordatorio apagado la tarea no manda nada a esa clínica; a
   expect(sqlLocal(`select estado from public.cita_correos where appointment_id = :'id' and tipo = 'recordatorio';`, { id })).toBe('enviado')
 })
 
-test('H2 · con el recordatorio apagado, la confirmación que manda el personal con su botón sigue saliendo', async ({ browser }) => {
+test('H2 · con el recordatorio apagado, la confirmación que manda el personal con su botón sigue saliendo', A_PROPOSITO, async ({ browser }) => {
   sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = false where clinica_id = :'c';`, { c: f.clinicaId })
   const id = cita(30)
   const ctx = await browser.newContext({ baseURL: BASE_URL, storageState: SESION.adminA })

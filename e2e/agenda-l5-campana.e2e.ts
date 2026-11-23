@@ -1,9 +1,10 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { SESION, interruptorAgenda, soloEscritorio, sqlLocal, tituloUnico, toastConTexto } from './ayudas'
+import { DIA_FUTURO_FIJO, SESION, interruptorAgenda, soloEscritorio, sqlLocal, tituloUnico, toastConTexto } from './ayudas'
 import { abrirAgendaV2, tarjetaLectura } from './interaccionesAyudas'
 import { ipAlAzar } from './reservaPublicaAyudas' // además carga .env.local (RESERVA_SECRETO)
 import { codigoDeConfirmacion, hashDeCodigo } from '../src/lib/reserva/secretos'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * L5 · la campana de la agenda v2 (puntos 13 y 14 de Angel), con el
@@ -36,7 +37,11 @@ const pacientes: string[] = []
 
 test.beforeAll(() => { interruptorAgenda('A', true) })
 
-test.afterAll(() => {
+/* AG-DT-256 · lo que crea cada prueba se borra al terminar ESA prueba: la de 13 y 14 necesita una cita de
+   MAÑANA (entra en «Por confirmar»), que de lunes a viernes es de la semana visible; la guarda la perdona
+   (anotación) porque al acabar la prueba ya no está. */
+test.afterEach(() => {
+  if (citas.length === 0) return
   sqlLocal(`
     begin;
     set local session_replication_role = replica;
@@ -45,12 +50,14 @@ test.afterAll(() => {
     delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);
     delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
-    commit;`, { citas: citas.join(',') || '00000000-0000-0000-0000-000000000000', pacientes: pacientes.join(',') })
-  interruptorAgenda('A', false) // quien lo enciende, lo apaga (global-setup)
+    commit;`, { citas: citas.join(','), pacientes: pacientes.join(',') })
+  citas.length = 0
+  pacientes.length = 0
 })
+test.afterAll(() => { interruptorAgenda('A', false) }) // quien lo enciende, lo apaga (global-setup)
 
-/** Una cita de MAÑANA en Centro con su paciente y su enlace de confirmación (copia de la de I5). */
-function citaDeManana(hora: string, nombre: string): { cita: string; codigo: string } {
+/** Una cita de MAÑANA (o de `fecha`) en Centro con su paciente y su enlace de confirmación (copia de la de I5). */
+function citaDeManana(hora: string, nombre: string, fecha = ''): { cita: string; codigo: string } {
   const enlace = randomUUID()
   const codigo = codigoDeConfirmacion(enlace)
   if (!codigo) throw new Error('Falta RESERVA_SECRETO en .env.local')
@@ -59,14 +66,14 @@ function citaDeManana(hora: string, nombre: string): { cita: string; codigo: str
                values (${CL}, :'nombre', 'L5', '9990000156', 'l5.e2e@semilla.spinus.test') returning id),
          co as (select id, medico_id, nombre, timezone from public.consultorios
                  where clinica_id = ${CL} and nombre = 'Consultorio Centro (ficticio)'),
-         d as (select (((now() at time zone :'tz')::date + 1) + :'hora'::time) at time zone :'tz' as t),
+         d as (select (coalesce(nullif(:'fecha', '')::date, (now() at time zone :'tz')::date + 1) + :'hora'::time) at time zone :'tz' as t),
          a as (insert into public.appointments (clinica_id, paciente_id, medico_id, consultorio_id, title, start_time, end_time,
                                                 status, all_day, consultorio_nombre, consultorio_timezone, origen)
                select ${CL}, (select id from p), co.medico_id, co.id, :'nombre' || ' L5', d.t, d.t + interval '30 min',
                       'scheduled', false, co.nombre, co.timezone, 'spinus' from co, d returning id, paciente_id)
     insert into public.cita_confirmaciones (id, clinica_id, appointment_id, codigo_hash, paciente_id)
     select :'enlace', ${CL}, a.id, :'hash', a.paciente_id from a
-    returning appointment_id || '|' || paciente_id;`, { nombre, tz: TZ, hora, enlace, hash: hashDeCodigo(codigo) })
+    returning appointment_id || '|' || paciente_id;`, { nombre, tz: TZ, hora, enlace, hash: hashDeCodigo(codigo), fecha })
   const [cita = '', paciente = ''] = salida.split('|')
   citas.push(cita)
   pacientes.push(paciente)
@@ -110,7 +117,7 @@ async function cuentas(page: Page): Promise<{ n: number; m: number }> {
 const etiquetaDe = ({ n, m }: { n: number; m: number }): string =>
   `Por confirmar (${n}) y avisos (${m})${n + m > 0 ? `: ${n + m} ${n + m === 1 ? 'pendiente' : 'pendientes'}` : ''}`
 
-test('13 y 14: el paciente confirma por su enlace → emergente sin nombre, aviso con su nombre, la burbuja lo sigue; uno solo', async ({ page, playwright, baseURL }) => {
+test('13 y 14: el paciente confirma por su enlace → emergente sin nombre, aviso con su nombre, la burbuja lo sigue; uno solo', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'cita de mañana; la borra el afterEach' } }, async ({ page, playwright, baseURL }) => {
   const base = baseURL ?? ''
   const nombre = tituloUnico('Paciente L5 Confirma')
   const { cita, codigo } = citaDeManana('07:20', nombre)
@@ -161,7 +168,8 @@ test('13 y 14: el paciente confirma por su enlace → emergente sin nombre, avis
 })
 
 test('13: la confirmación marcada por el personal no genera aviso', async ({ page }) => {
-  const { cita } = citaDeManana('07:35', tituloUnico('Paciente L5 Personal'))
+  // AG-DT-256: no hace falta que sea de mañana (no mira «Por confirmar»): a la semana siguiente.
+  const { cita } = citaDeManana('07:35', tituloUnico('Paciente L5 Personal'), DIA_FUTURO_FIJO)
   await abrirAgendaV2(page)
   const r = await page.request.put(`/api/appointments/${cita}`, { data: { status: 'confirmed', client_id: randomUUID() } })
   expect(r.ok()).toBe(true)

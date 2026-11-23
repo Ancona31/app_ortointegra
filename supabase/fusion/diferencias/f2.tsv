@@ -1,0 +1,40 @@
+# Diferencias a propósito del bloque F2 (Google) entre la referencia (las 51 originales) y el conjunto fundido.
+# Formato de scripts/produccion/comparar-estructura.sh --esperadas: estado<TAB>tipo<TAB>clave<TAB>razón. A = referencia, B = fundido.
+# Comprobado en el ensayo «quitar lo mío y volver a ponerlo» (2026-11-22, contenedor spinus-f2-ref).
+# Las claves de función terminan en «(*»: los corchetes de text[] / uuid[] serían una clase en el glob.
+
+# — Cuerpos: el interruptor se lee con public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5) —
+distinto	funcion	public.gcal_sync_tomar(*	interruptor con agenda_v2_encendida(); además el comentario «(B1)» sin la tanda
+distinto	funcion	public.gcal_citas_por_evento(*	interruptor con agenda_v2_encendida(); además el comentario «(D4)» sin la tanda
+distinto	funcion	public.gcal_aplicar_evento(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.gcal_importar_evento(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.reserva_empalmes_registrar(*	interruptor con agenda_v2_encendida(); además sin «(auditoría 2026-11-12, hallazgo 1)» en un comentario
+distinto	funcion	public.cita_rsvp_google(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.cita_movimiento_google_registrar(*	interruptor con agenda_v2_encendida(); además el comentario «(I2)» sin la tanda
+distinto	funcion	public.gcal_bloqueo_aplicar(*	interruptor con agenda_v2_encendida()
+# — Cuerpo: texto del HINT —
+distinto	funcion	public.gcal_sync_clinica_habilitada(*	el HINT del P0001 apunta al archivo fundido y no a C1 (20261113120000), que sale de migrations/; la lógica y la comprobación de FORMA no cambian
+# — COMMENT sin la historia de las tandas («Tanda J (punto 10):», «D11:», «(C2, ampliado en D4)», «ver la migración 20261116120000») —
+distinto	comentario	function public.cita_asignacion_google(*	COMMENT sin «Agenda (tanda I, punto 10):»; mismo contenido
+distinto	comentario	function public.cita_movimiento_google_registrar(*	COMMENT sin «Tanda J (punto 10):»; mismo contenido
+distinto	comentario	function public.cita_rsvp_google(*	COMMENT sin «Agenda E9:»; mismo contenido
+distinto	comentario	function public.gcal_aplicar_evento(*	COMMENT sin «(C2, ampliado en D4)»; mismo contenido
+distinto	comentario	function public.gcal_bloqueo_aplicar(*	COMMENT sin «Tanda K (punto 6):»; mismo contenido
+distinto	comentario	function public.gcal_citas_por_evento(*	COMMENT sin «(C2, ampliado en D4)»; mismo contenido
+distinto	comentario	function public.gcal_sync_frescura(*	COMMENT sin «D11:»; mismo contenido
+distinto	comentario	function public.reserva_empalmes_registrar(*	COMMENT sin «D11:»; mismo contenido
+distinto	comentario	table column public.appointments.google_asignacion	COMMENT sin «Agenda (tanda I, punto 10):»; mismo contenido
+distinto	comentario	table public.gcal_movimientos_rechazados	COMMENT sin «Tanda J (punto 10):» ni «I2»; mismo contenido
+distinto	comentario	table public.gcal_sync_estado	COMMENT sin «(bloque C)»; mismo contenido
+distinto	comentario	table public.reserva_empalmes_google	COMMENT sin «D11:» ni «(ver la migración 20261116120000)», que deja de existir en migrations/; mismo contenido
+# — Orden de columnas de appointments (attnum) —
+distinto	columna	public.appointments.google_asignacion	orden: en las originales nace después de las 11 reserva_* (i3 > d1); fundido, F2 va antes que F3. Ningún código depende del ordinal (PostgREST y to_jsonb usan nombres)
+distinto	publicacion_tabla	supabase_realtime ← public.appointments	la lista de columnas de la publicación sigue el orden de columnas (misma causa); son las mismas columnas
+# — COLATERAL DEL ENSAYO de F2 (no aparecen con los seis archivos en orden; E0 no las necesita) —
+distinto	columna	public.appointments.cerrada_en	COLATERAL DEL ENSAYO: al quitar y volver a poner google_asignacion queda al final y cerrada_en sube un ordinal
+distinto	columna	public.appointments.sustituida_por	COLATERAL DEL ENSAYO: misma causa que cerrada_en
+solo_b	funcion	public.agenda_v2_encendida(*	COLATERAL DEL ENSAYO: la función común de F1 (ENCARGO §5), puesta a mano antes de aplicar F2 porque la referencia no la tiene; va en la lista de F1
+solo_b	permiso	funcion public.agenda_v2_encendida(*	COLATERAL DEL ENSAYO: permisos de esa función de F1
+solo_b	comentario	table column public.reserva_empalmes_google.cita_reserva_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.reserva_empalmes_google.cita_otra_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.gcal_movimientos_rechazados.cita_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)

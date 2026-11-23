@@ -4,6 +4,7 @@ import {
   CORREO, SESION, arrastrarEventoPorMinutos, diaDeLaSemana, enContextoNuevo, interruptorAgenda, irAAgenda,
   pestanaConfig, sinPendientesAgenda, soloEscritorio, sqlLocal, toastConTexto,
 } from './ayudas'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 import { abrirAgendaV2, burbuja, elegirPaciente, preguntaAsistencia, tarjetaLectura } from './interaccionesAyudas'
 import { crearCitaPorLigar, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
@@ -27,6 +28,9 @@ const creadas: string[] = []
 let desde = ''
 
 test.beforeAll(() => { desde = marcaE2e() })
+/* AG-DT-256: las dos pruebas del punto 11 necesitan citas de hace más de 48 h; el `afterEach` las borra. */
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO } }
+
 // Encendida en A por omisión (otra e2e la deja apagada); las de «v2 apagada» la apagan ellas.
 test.beforeEach(() => { interruptorAgenda('A', true) })
 test.afterEach(() => {
@@ -191,7 +195,7 @@ const filaDe = (v: Locator, id: string): Locator => v.locator(`[data-asistencia-
 
 /* MUTACIONES: `HORAS_SIN_PREGUNTAR` en 46 → rojo (sale la de hace 47 h); `alcanceDeAsistencia`
    devolviendo '' a todos → rojo (la médica invitada ve las del administrador). */
-test('11 · una ventana con las de hace más de 48 h sin nota; «Sí asistió», «No asistió» y «Decidir después»', async ({ page, browser }) => {
+test('11 · una ventana con las de hace más de 48 h sin nota; «Sí asistió», «No asistió» y «Decidir después»', A_PROPOSITO, async ({ page, browser }) => {
   const vieja = cita({ correo: CORREO.adminA, inicio: haceHoras(49), apellidos: 'Prueba 21', estado: 'scheduled', minutos: 30 })
   const confirmada = cita({ correo: CORREO.adminA, inicio: haceHoras(60), apellidos: 'Prueba 22', estado: 'confirmed', minutos: 30 })
   const reciente = cita({ correo: CORREO.adminA, inicio: haceHoras(47), apellidos: 'Prueba 23', estado: 'scheduled', minutos: 30 })
@@ -242,7 +246,7 @@ test('11 · una ventana con las de hace más de 48 h sin nota; «Sí asistió»,
 })
 
 /* Con la v2 apagada no se pregunta nada (y nada cambia). */
-test('11 · v2 apagada: no sale la ventana', async ({ page }) => {
+test('11 · v2 apagada: no sale la ventana', A_PROPOSITO, async ({ page }) => {
   const vieja = cita({ correo: CORREO.adminA, inicio: haceHoras(49), apellidos: 'Prueba 21', estado: 'scheduled', minutos: 30 })
   interruptorAgenda('A', false)
   await irAAgenda(page)

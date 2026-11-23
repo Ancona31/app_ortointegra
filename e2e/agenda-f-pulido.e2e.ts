@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { hoyEnTZ } from '../src/lib/dates'
 import { COMPACTAR_AL_ABRIR } from '../src/lib/agenda/ventanaRejilla'
-import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_FIJO, DIA_LABORABLE_LIBRE, diaDeLaSemana, sqlLocal, selectFiltroMedico } from './ayudas'
+import { irAAgenda, eventoConTexto, SESION, CORREO, DIA_LABORABLE_FIJO, DIA_LABORABLE_LIBRE, DIA_FUTURO_LIBRE, diaDeLaSemana, pasarASemanaSiguiente, sqlLocal, selectFiltroMedico } from './ayudas'
 
 /**
  * Bloque F §1 · pulido visual que sale directo, sin interruptor (diseño en
@@ -80,8 +80,9 @@ test.describe('escritorio', () => {
      sábado por la tarde) la semana entera ya pasó. Pone también su agendada,
      el jueves a las 15:00, y fija el día (el lunes) para la vista Día. */
   test('F1.8 · en Semana no se escribe el estado; queda el glifo, distinto para agendada y confirmada', async ({ page }) => {
-    const confirmada = citaSql(CORREO.adminA, 'F1.8 glifo', `${DIA_LABORABLE_LIBRE}T12:00:00-06:00`, 30, 0)
-    const agendada = citaSql(CORREO.adminA, 'F1.8 agendada', `${DIA_LABORABLE_LIBRE}T15:00:00-06:00`, 45, 1)
+    // AG-DT-256: con paciente, en la semana siguiente (`glifosDeSemana` pasa a ella).
+    const confirmada = citaSql(CORREO.adminA, 'F1.8 glifo', `${DIA_FUTURO_LIBRE}T12:00:00-06:00`, 30, 0)
+    const agendada = citaSql(CORREO.adminA, 'F1.8 agendada', `${DIA_FUTURO_LIBRE}T15:00:00-06:00`, 45, 1)
     sqlLocal(`update public.appointments set status = 'confirmed' where id = :'id'`, { id: confirmada })
     try {
       await glifosDeSemana(page)
@@ -93,6 +94,7 @@ test.describe('escritorio', () => {
   async function glifosDeSemana(page: Page): Promise<void> {
     await fijarDia(page, LUNES)
     await irAAgenda(page)
+    await pasarASemanaSiguiente(page)
     await expect(page.locator('.fc-timeGridWeek-view .ag-tarjeta-desc-estado:visible')).toHaveCount(0)
     /* `innerText` y no `hasText`: éste lee también lo que está en `display: none`. */
     const textos = await page.locator('.fc-timeGridWeek-view .ag-tarjeta').evaluateAll(els => els.map(e => (e as HTMLElement).innerText))
@@ -427,8 +429,13 @@ test.describe('teléfono · paso 2', () => {
      abría en el LUNES. Ahora, al fondo (lo más cerca de hoy).
      MUTACIÓN: en `desplazarListaAHoy`, devolver `false` sin mover cuando no hay
      cabecera de hoy ni posterior → «arriba» (rojo). */
+  /* AG-DT-256 · el domingo de DOS semanas atrás, no el de la anterior: el de la anterior es
+     «ayer» un lunes, y una cita de «hace unas horas» de otra prueba cae en él si la batería
+     corre el lunes de madrugada (E1, 2026-11-23 00:53: la de `confirmacion-enlace` a −2 h quedó el
+     domingo 22:53 y aquí salió «el domingo tiene citas»). La semilla llena esa semana igual
+     (de −4 a +4, lunes a viernes) y nunca el domingo; ninguna prueba escribe 8 días atrás. */
   test('F1.12 · el domingo, sin citas de hoy en adelante, la lista abre al fondo y no en el lunes', async ({ page }) => {
-    const domingo = diaDeLaSemana(-1, 6)
+    const domingo = diaDeLaSemana(-2, 6)
     await posicionDeLaLista(page, domingo)
     await expect.poll(() => page.evaluate((iso) => {
       const sc = document.querySelector<HTMLElement>('.fc-listWeek-view .fc-scroller')

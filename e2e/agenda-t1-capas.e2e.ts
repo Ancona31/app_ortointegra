@@ -46,18 +46,45 @@ async function dentroDeLaVentana(page: Page, capa: Locator): Promise<void> {
 }
 
 /**
- * El centro de la franja de media hora MÁS BAJA que se ve entera en la rejilla,
- * en un punto libre de citas y no tapado (la barra «Agendar» de la tableta
- * tapa el fondo del desplazable). Antes, adelante hasta pasar la semana +2 que
- * siembra la semilla (cuatro semanas en escritorio, ocho periodos de tres días
- * en la tableta): días futuros y casi vacíos.
+ * Adelante hasta pasar la semana +2 que siembra la semilla (cuatro semanas en
+ * escritorio, ocho periodos de tres días en la tableta): días futuros y casi
+ * vacíos, sin nada que dependa del día de la corrida.
  */
-async function puntoAlFondo(page: Page): Promise<{ x: number; y: number }> {
+async function avanzarASemanasVacias(page: Page): Promise<void> {
   const siguiente = page.locator('.fc-next-button, [aria-label="Periodo siguiente"]').first()
   const tresDias = await page.locator('.fc-timeGridTresDias-view').count() > 0
   for (let i = 0; i < (tresDias ? 8 : 4); i++) await siguiente.click()
   await expect(page.locator('.fc-timegrid-col[data-date]').first()).toBeVisible()
-  const p = await page.evaluate(() => {
+}
+
+/**
+ * La rejilla QUIETA: sin carga visible y con las mismas columnas y citas durante 400 ms
+ * seguidos. `aria-busy` (= `ag-cargando`, que apaga los punteros) llega 150 ms DESPUÉS de
+ * empezar a cargar (`UMBRAL_CARGA_MS`), así que un «no está cargando» suelto no basta: tras
+ * los clics de «siguiente», la búsqueda podía hallar la franja antes de que la carga apagara
+ * los punteros, y el clic caía en la rejilla atenuada (o en una repintada) sin abrir nada.
+ */
+async function rejillaQuieta(page: Page): Promise<void> {
+  let firma = ''
+  let desde = 0
+  await expect.poll(async () => {
+    const f = await page.evaluate(() => {
+      const fc = document.querySelector('.agenda-fc')
+      const cols = Array.from(document.querySelectorAll('.fc-timegrid-col[data-date]')).map(c => c.getAttribute('data-date')).join(',')
+      return `${fc?.getAttribute('aria-busy') ?? 'sin-rejilla'}|${cols}|${document.querySelectorAll('.fc-event').length}`
+    })
+    if (f !== firma) { firma = f; desde = Date.now() }
+    return f.startsWith('false|') && Date.now() - desde >= 400
+  }, { timeout: 15000, intervals: [100] }).toBe(true)
+}
+
+/**
+ * El centro de la franja de media hora MÁS BAJA que se ve entera en la rejilla,
+ * en un punto libre de citas y no tapado (la barra «Agendar» de la tableta
+ * tapa el fondo del desplazable).
+ */
+async function puntoAlFondo(page: Page): Promise<{ x: number; y: number }> {
+  const buscar = (): Promise<{ x: number; y: number } | null> => page.evaluate(() => {
     const filas = Array.from(document.querySelectorAll<HTMLElement>('td.fc-timegrid-slot-lane')).map(f => f.getBoundingClientRect())
     const cols = Array.from(document.querySelectorAll<HTMLElement>('.fc-timegrid-col[data-date]'))
     for (const fila of filas.reverse()) {
@@ -75,17 +102,31 @@ async function puntoAlFondo(page: Page): Promise<{ x: number; y: number }> {
     }
     return null
   })
+  /* Mientras la semana carga, `.ag-cargando` apaga los punteros de la rejilla y `elementFromPoint`
+     no la ve: en un equipo rápido la búsqueda llegaba antes que las citas y no encontraba ninguna
+     franja (falló 3 veces en el equipo nuevo, 2026-11-21). Se repite hasta que la rejilla responde. */
+  let p: { x: number; y: number } | null = null
+  await expect.poll(async () => { p = await buscar(); return p !== null }, { timeout: 10000 }).toBe(true).catch(() => {})
   if (!p) throw new Error('puntoAlFondo: no hay franja libre al fondo de la rejilla')
   return p
 }
 
 /** Clic en el punto; si sale el aviso de fuera de horario (la última franja suele estarlo), se acepta. */
 async function abrirBurbujaAlFondo(page: Page): Promise<Locator> {
-  const p = await puntoAlFondo(page)
-  await page.mouse.click(p.x, p.y)
+  await avanzarASemanasVacias(page)
   const b = burbuja(page)
   const aviso = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Aceptar' }) })
-  await expect(b.or(aviso).first()).toBeVisible()
+  /* Con la rejilla quieta, el punto se busca y se pulsa; si aun así el clic no abre nada (una
+     precarga que repinta justo entonces), se repite con el punto de nuevo. Nunca se pulsa otra
+     vez con la burbuja o el aviso ya abiertos: el segundo clic la cerraría. */
+  await expect(async () => {
+    if (await b.or(aviso).count() === 0) {
+      await rejillaQuieta(page)
+      const p = await puntoAlFondo(page)
+      await page.mouse.click(p.x, p.y)
+    }
+    await expect(b.or(aviso).first()).toBeVisible({ timeout: 5000 })
+  }).toPass({ timeout: 45000 })
   if (await aviso.count()) await aviso.getByRole('button', { name: 'Aceptar' }).click()
   await expect(b).toBeVisible()
   return b

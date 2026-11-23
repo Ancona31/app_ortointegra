@@ -26,7 +26,7 @@ const h = vi.hoisted(() => ({
   rpc: [] as Array<{ fn: string; args: Record<string, unknown> }>,
   toma: [] as Array<Record<string, unknown>>,
   errorToma: null as { code: string } | null,
-  enlace: { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' } as { id: string; codigo: string; url: string } | null,
+  enlace: { id: 'e', codigo: 'c', url: 'https://spinus.prueba/confirmar/AbCdEfGhIjKlMnOpQrStUv' } as { id: string; codigo: string; url: string } | null | 'error',
   correos: [] as Array<Record<string, unknown>>,
   envioOk: true,
   auditorias: [] as Array<Record<string, unknown>>,
@@ -55,7 +55,10 @@ vi.mock('@/lib/supabase/admin', () => ({
     },
   }),
 }))
-vi.mock('@/lib/confirmacion/enlaceConfirmacion', () => ({ emitirEnlaceConfirmacion: async () => h.enlace }))
+vi.mock('@/lib/confirmacion/enlaceConfirmacion', () => ({
+  emitirEnlaceConfirmacion: async () => (h.enlace === 'error' ? null : h.enlace),
+  emitirEnlaceParaCorreo: async () => h.enlace ?? 'no_aplica',
+}))
 vi.mock('@/lib/correo/transporte', () => ({
   enviarCorreo: async (c: Record<string, unknown>) => { h.correos.push(c); return h.envioOk ? { ok: true, modo: 'captura' } : { ok: false, modo: 'resend', motivo: 'fallo' } },
 }))
@@ -222,6 +225,18 @@ describe('POST /api/agenda/correo — envío', () => {
     const res = await POST(post({ cita_id: CITA }))
     expect(res.status).toBe(503)
     expect(h.correos).toEqual([])
+  })
+
+  /* Oleada 3, arreglo 4: un ERROR al emitir el enlace no cierra la confirmación como «omitido»
+     (que dejaba la cita en 409 `no_disponible` para siempre): queda `fallido`/`sin_enlace`, la ruta
+     responde 502 `no_enviado` (reintentable) y la base la vuelve a dar al pulsar otra vez. */
+  it('error al emitir el enlace → 502 no_enviado (fallido/sin_enlace, reintentable), sin mandar', async () => {
+    h.enlace = 'error'
+    const res = await POST(post({ cita_id: CITA }))
+    expect(res.status).toBe(502)
+    expect(await res.json()).toEqual({ error: 'no_enviado' })
+    expect(h.correos).toEqual([])
+    expect(h.rpc.find(r => r.fn === 'cita_correo_marcar')?.args).toMatchObject({ p_estado: 'fallido', p_motivo: 'sin_enlace' })
   })
 
   it('sin enlace → 503 sin mandar (omitido); transporte caído → 502 (fallido, reintentable)', async () => {

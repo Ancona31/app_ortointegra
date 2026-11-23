@@ -74,7 +74,11 @@ test('flujo completo con el enlace fijo: código leído de Mailpit, reserva y co
 
   const cita = citaDe(p.correo)
   expect(cita).toMatchObject({ status: 'scheduled', pacienteNulo: true, canal: 'fijo', title: p.nombre })
-  expect(citasEnTurno(e, inicio ?? '')).toHaveLength(1)
+  /* Lo que ocupa el turno es la reserva y sólo ella. Una CANCELADA no ocupa (por eso la página ofrece el
+     turno), y la semilla, que se calcula desde hoy, puede dejar una justo en el primer turno de la semana
+     siguiente (pasó en E1, el lunes 2026-11-23: «Mon 30 08:00 cancelled»): no es de esta prueba. */
+  const activas = citasEnTurno(e, inicio ?? '').filter(c => !c.endsWith(':cancelled'))
+  expect(activas).toEqual([`${cita?.id}:scheduled`])
 
   // El comprobante (D8), capturado: sin el tipo de cita, sin el teléfono de la persona, sin notas.
   const comprobante = await esperarCorreo(p.correo, 'Tu cita con')

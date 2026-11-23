@@ -2,7 +2,7 @@ import { test, expect, request, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import {
   irAAgenda, soloEscritorio, SESION, diaDeLaSemana, tituloUnico, toastConTexto,
-  observarEcosRealtime, selectFiltroMedico, ventanasVecinasDeLaSemilla, esUnaDeEstasVentanas,
+  observarEcosRealtime, selectFiltroMedico, ventanasVecinasDeLaSemilla, ventanasDeLaSemilla, esUnaDeEstasVentanas,
 } from './ayudas'
 
 /**
@@ -67,12 +67,18 @@ test('volver a una semana ya vista no pide /api/appointments y las citas están'
   await expect(page.locator('.fc-event', { hasText: EVENTO_ACTUAL }).first()).toBeVisible()
   await irASemana(page, 'next', EVENTO_SIGUIENTE)
 
-  const peticiones = contarGetCitas(page)
+  /* Se cuentan sólo las peticiones de lo YA VISTO (W-1, W y W+1: lo sembrado y lo recorrido). La
+     precarga de W+1 pide W+2 por su cuenta, y eso es lo correcto: en un equipo rápido salía justo
+     después de empezar a contar y la prueba la tomaba por una petición de más (2026-11-21). */
+  const yaVistas = ventanasDeLaSemilla()
+  const pedidas: string[] = []
+  const ver = (r: { url(): string; method(): string }): void => { if (esGetCitas(r)) pedidas.push(r.url()) }
+  page.on('request', ver)
   await irASemana(page, 'prev', EVENTO_ACTUAL)
   // «No ocurrió nada» no tiene evento: un respiro corto para lo que pudiera salir.
   await page.waitForTimeout(500)
-  peticiones.parar()
-  expect(peticiones.veces()).toBe(0)
+  page.off('request', ver)
+  expect(pedidas.filter(u => esUnaDeEstasVentanas(u, yaVistas))).toEqual([])
 })
 
 test('una cita propia vacía la caché: al volver a su semana se pregunta y la cita sigue', async ({ page }) => {
@@ -158,20 +164,19 @@ test('precarga en ocioso: tras pintar W+1 llega W+2 sola, y pasar ahí no pide n
   await selectFiltroMedico(page).selectOption({ label: 'Todos los médicos' })
   await expect(page.locator('.fc-event', { hasText: EVENTO_ACTUAL }).first()).toBeVisible()
 
-  await irASemana(page, 'next', EVENTO_SIGUIENTE) // W+1: petición real; W ya estaba cacheada
-
   /* Tras pintar W+1 la precarga trae, EN SERIE, W (ya cacheada — no pide) y
      W+2 (sí pide). Se espera esa respuesta antes de medir el salto siguiente,
      o se estaría esperando la MISMA petición que esto viene a demostrar que
-     ya no hace falta. */
-  const respuestaPrecarga = await page.waitForResponse(esRespuestaCitas, { timeout: 5000 })
-  expect(respuestaPrecarga.ok()).toBeTruthy()
-  /* ⚠️ NO BASTA CON QUE SEA «LA PRIMERA RESPUESTA QUE LLEGÓ»: tiene que ser
-     justo la de W+2 —calculada aparte, no leída de la propia respuesta—, o
-     esta prueba validaría cualquier petición que hubiera salido primero,
-     viniera o no de la precarga que dice probar. */
+     ya no hace falta.
+     ⚠️ SE ESPERA JUSTO LA DE W+2 —su rango, calculado aparte, no leído de la
+     propia respuesta—, y la espera se arma ANTES de navegar. «La primera
+     respuesta que llegue» no vale: cambiar el filtro deja en vuelo la precarga
+     de la semana de partida (W-1), que puede contestar después de pulsar
+     «siguiente» (pasó 1 de cada 40 en el equipo nuevo, 2026-11-21). */
   const rangoW2 = [ventanasVecinasDeLaSemilla()[1]] // W-2, W+2 — el segundo es W+2
-  expect(esUnaDeEstasVentanas(respuestaPrecarga.url(), rangoW2)).toBe(true)
+  const esperaW2 = page.waitForResponse(r => esRespuestaCitas(r) && esUnaDeEstasVentanas(r.url(), rangoW2), { timeout: 10000 })
+  await irASemana(page, 'next', EVENTO_SIGUIENTE) // W+1: petición real; W ya estaba cacheada
+  expect((await esperaW2).ok()).toBeTruthy()
   await page.waitForTimeout(100) // el `guardarCitas` que sigue al `.json()` de la respuesta
 
   /* ⚠️ NO SE CUENTA «CUALQUIER» PETICIÓN DESPUÉS DE ÉSTA: pintar W+2 dispara
@@ -187,6 +192,36 @@ test('precarga en ocioso: tras pintar W+1 llega W+2 sola, y pasar ahí no pide n
   await page.waitForTimeout(300)
   page.off('request', verPedidas)
   expect(pedidas.filter(u => esUnaDeEstasVentanas(u, rangoW2))).toEqual([])
+})
+
+/* Defecto encontrado en el equipo nuevo (2026-11-21): si se navega mientras la
+ * precarga de la semana ANTERIOR sigue en vuelo, la de la vista nueva no se
+ * programaba (`programarPrecarga` veía «una traída en vuelo» y esperaba un
+ * `eventsSet` que una precarga nunca emite) y W+2 no llegaba hasta otra
+ * navegación. Aquí no depende de la velocidad del equipo: la petición de W-1
+ * se RETIENE hasta después de navegar.
+ */
+test('precarga: navegar con la precarga de la vista anterior en vuelo no pierde la de W+2', async ({ page }) => {
+  const [wMenos1] = ventanasDeLaSemilla()
+  const rangoW2 = [ventanasVecinasDeLaSemilla()[1]]
+  let soltar: () => void = () => {}
+  const retenida = new Promise<void>((resolve) => { soltar = resolve })
+  await irAAgenda(page)
+  await page.route(u => u.pathname === '/api/appointments' && esUnaDeEstasVentanas(u.toString(), [wMenos1]), async (ruta) => {
+    await retenida
+    await ruta.continue()
+  })
+
+  /* Cambiar el filtro vacía lo sembrado: W se vuelve a pedir y su precarga
+     trae W+1 y después W-1, que se queda retenida. */
+  const pideWMenos1 = page.waitForRequest(r => esGetCitas(r) && esUnaDeEstasVentanas(r.url(), [wMenos1]), { timeout: 10000 })
+  await selectFiltroMedico(page).selectOption({ label: 'Todos los médicos' })
+  await pideWMenos1
+
+  const pideW2 = page.waitForRequest(r => esGetCitas(r) && esUnaDeEstasVentanas(r.url(), rangoW2), { timeout: 5000 })
+  await irASemana(page, 'next', EVENTO_SIGUIENTE) // con W-1 todavía en vuelo
+  soltar()
+  await pideW2 // la precarga de W+1 se programó de todos modos
 })
 
 /* ⚠️ GRAVE de la revisión independiente — reproducido y corregido: el mapa

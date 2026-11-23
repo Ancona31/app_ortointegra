@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  soloEscritorio, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, irAAgenda, modalCita, tituloUnico,
+  soloEscritorio, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, irAAgenda, pasarASemanaSiguiente, modalCita, tituloUnico,
 } from './ayudas'
 import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
@@ -39,7 +39,7 @@ test.afterAll(() => {
 
 const TZ = 'America/Merida'
 const LEJOS = diaDeLaSemana(5, 2)
-const JUEVES = diaDeLaSemana(0, 3)
+const JUEVES = diaDeLaSemana(1, 3) // AG-DT-256: el de la semana siguiente (citas con paciente)
 
 const MEDICOS = {
   admin: { correo: 'admin.a@semilla.spinus.test', consultorio: 'Consultorio Centro (ficticio)' },
@@ -169,6 +169,7 @@ test('API apagado: tipo_cita_id se ignora en el alta y en la edición', async ({
 
 async function abrir(page: Page, estado: 'encendida' | 'apagada'): Promise<void> {
   await irAAgenda(page)
+  await pasarASemanaSiguiente(page) // AG-DT-256: semana siguiente
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', estado)
   /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
   if (estado === 'encendida') await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')

@@ -150,6 +150,12 @@ function g(): GoogleFalso {
   return google
 }
 
+/** Ninguna pasada de A tiene el candado (o el que tenga ya caducó). */
+function candadoLibre(): boolean {
+  return sqlLocal(`select count(*) from public.gcal_sync_estado e join public.clinicas c on c.id = e.clinica_id
+                    where c.nombre = :'clinica' and e.candado is not null and e.candado_hasta > now()`, { clinica: CLINICA_A }) === '0'
+}
+
 /** Fija la última sincronización buena de A (y quita el candado y la espera creciente). */
 function ultimaBuenaHace(segundos: number): void {
   sqlLocal(`update public.gcal_sync_estado e
@@ -335,11 +341,21 @@ test('3 · Google falla o tarda: reserva con la última buena de hace 10 min; co
 
 test('4 · un evento de Google que se empalma con una reserva por enlace: un aviso, auditado, sin repetir, y en el panel', async ({ page }) => {
   const t = turnoNuevo()
+  /* Lo que se prueba es UNA pasada que ve el evento nuevo. Antes de crearlo, que no quede nada en
+     marcha que pueda verlo antes que ella (batería E1, 2026-11-23: el evento salió importado, la
+     pasada de la prueba respondió `cambios: 0` y el par no llegó nunca):
+     · la pasada que la prueba 3 dejó viva tras su tope (`mantenerViva`, en `after()`) suelta el
+       candado al terminar: se espera a que lo suelte ANTES de que `ultimaBuenaHace` lo borre;
+     · la reserva crea su propio evento en Google en un `after()`: se espera a que lo ligue. */
+  await expect.poll(candadoLibre, { message: 'una pasada anterior sigue con el candado', timeout: 30_000 }).toBe(true)
   ultimaBuenaHace(0)
   const r = await reservarEn(emitirEnlace(e, 'unico').codigo, t.inicio)
   expect(r.status, JSON.stringify(r.cuerpo)).toBe(201)
   const reserva = citaPorCorreo(r.correo)
   expect(reserva).not.toBe('')
+  await expect.poll(() => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva }),
+    { message: 'la reserva no ligó su evento de Google', timeout: 60_000 }).not.toBe('')
+  await expect.poll(candadoLibre, { message: 'la pasada de la reserva sigue con el candado', timeout: 30_000 }).toBe(true)
 
   const ev = eventoEn(t, 'Junta encima D11')
   ultimaBuenaHace(120)
@@ -348,8 +364,20 @@ test('4 · un evento de Google que se empalma con una reserva por enlace: un avi
   expect(importadas(ev)).toBe('1')
   const avisos = (): string => sqlLocal(`select count(*) from public.reserva_empalmes_google where cita_reserva_id = :'r'`, { r: reserva })
   const auditadas = (): string => sqlLocal(`select count(*) from public.audit_log where accion = 'reserva_empalme_google' and registro_id = :'r'`, { r: reserva })
-  expect(avisos()).toBe('1')
-  expect(auditadas()).toBe('1')
+  /* Se espera el par en vez de contarlo en el acto (falló una vez en la batería con 0 y sola
+     pasa siempre). La ruta espera la escritura de punta a punta, pero `ultimaBuenaHace` quita
+     el candado: otra pasada viva puede importar el evento primero (y la de esta petición ya no
+     lo ve como nuevo) y registrar el par un instante después. Lo que se prueba no cambia: un
+     par y una auditoría. Si no llega, lo recibido dice si la pasada contó el fallo en el log
+     (`avisarEmpalmes` se lo traga y la ruta responde `ok` igual). */
+  const falloEnLog = (): string => {
+    try {
+      return readFileSync('test-results/next-dev-3002.log', 'utf8').includes('empalmes con reservas sin registrar') ? '|fallo en el log' : ''
+    } catch { return '' }
+  }
+  await expect.poll(() => `${avisos()}|${auditadas()}${falloEnLog()}`, {
+    message: `par del empalme tras el sondeo (respuesta: ${JSON.stringify(s1)})`, timeout: 15_000,
+  }).toBe('1|1')
 
   // Resincronizar (y mover el evento sin dejar de empalmarse) no repite.
   const corrido = new Date(Date.parse(t.inicio) + 5 * 60_000).toISOString()

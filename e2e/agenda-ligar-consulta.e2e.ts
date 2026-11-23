@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import {
-  CORREO, SESION, DIA_LABORABLE_LIBRE, enContextoNuevo, interruptorAgenda, irAAgenda, modalCita, soloEscritorio, sqlLocal,
+  CORREO, SESION, DIA_FUTURO_LIBRE, enContextoNuevo, interruptorAgenda, irAAgenda, pasarASemanaSiguiente, modalCita, soloEscritorio, sqlLocal,
 } from './ayudas'
 import { editarDesdeTarjeta } from './interaccionesAyudas'
 import { clicEnTarjeta, crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e, type CitaPorLigar } from './reservaAyudas'
@@ -45,13 +45,14 @@ test.afterEach(() => {
 
 function cita(nombre: string): CitaPorLigar {
   return crearCitaPorLigar({
-    correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '17:00', TZ), minutos: 30,
+    correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '17:00', TZ), minutos: 30,
     nombre, canal: 'unico',
   })
 }
 
 async function abrirCita(page: Page, nombre: string): Promise<void> {
   await irAAgenda(page)
+  await pasarASemanaSiguiente(page) // AG-DT-256: semana siguiente
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-agenda-v2', 'encendida')
   /* F3: con v2 las interacciones van en un chunk diferido; un clic antes de que llegue abriría el modal directo. */
   await expect(page.locator('.agenda-raiz')).toHaveAttribute('data-interacciones-v2', 'listas')

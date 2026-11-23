@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { interruptorAgenda, sqlLocal } from './ayudas'
 import { esperarCorreo } from './mailpit'
 import { marcaE2e, limpiarReservasE2e } from './reservaAyudas'
-import { api, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turnosLibres, type Escenario } from './reservaPublicaAyudas'
+import { api, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, primerTurnoDeLaSemanaSiguiente, reservar, turnosLibres, type Escenario } from './reservaPublicaAyudas'
 
 /**
  * Tanda H1 (2026-11-15): cuatro puntos de Angel sobre /reservar, /confirmar y
@@ -151,7 +151,8 @@ test('punto 3: con UN consultorio, «Lugar» sale con él ya elegido y su direcc
 
     await expect(pasoActual(page)).toHaveText('Día y hora')
     await expect(page.locator('[data-direccion]')).toHaveText(uno.direccion)
-    await page.locator('button[data-inicio]').first().click()
+    // AG-DT-256: la reserva es por ligar; en la semana siguiente, nunca en la de hoy.
+    await primerTurnoDeLaSemanaSiguiente(page)
     await page.getByRole('button', { name: 'Continuar' }).click()
     await expect(pasoActual(page)).toHaveText(/Tus datos/)
     await expect(page.locator('[data-direccion]')).toHaveText(uno.direccion)

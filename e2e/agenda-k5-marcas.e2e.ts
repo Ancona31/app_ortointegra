@@ -1,8 +1,9 @@
 import { test, expect, type Page } from '@playwright/test'
-import { CORREO, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, tituloUnico } from './ayudas'
+import { CORREO, DIA_FUTURO_FIJO, SESION, diaDeLaSemana, interruptorAgenda, sqlLocal, tituloUnico } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2 } from './interaccionesAyudas'
 import { crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * Tanda K, sección E, puntos 17–20 de Angel: las marcas de procedencia de la agenda v2.
@@ -28,6 +29,10 @@ const DOMINGO = diaDeLaSemana(4, 6)
 let desde = ''
 let aparcados: string[] = []
 test.beforeAll(() => { aparcados = aparcarEnlacesVigentes(); desde = marcaE2e() })
+/* AG-DT-256 · lo de reserva que crea cada prueba se borra al terminar ESA prueba (no al final del
+   archivo): «Próximas citas» necesita una por ligar de dentro de minutos y la guarda sólo perdona lo
+   que ya no está cuando la prueba acaba. */
+test.afterEach(() => { limpiarReservasE2e(desde) })
 test.afterAll(() => {
   try { limpiarReservasE2e(desde); borrarGoogle() } finally { devolverEnlaces(aparcados); interruptorAgenda('A', false) }
 })
@@ -129,7 +134,7 @@ test.describe('rejilla', () => {
   })
 })
 
-test('Próximas citas: la ligada por enlace conserva el eslabón con su texto y no lleva el expediente tachado', async ({ page }) => {
+test('Próximas citas: la ligada por enlace conserva el eslabón con su texto y no lleva el expediente tachado', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'ligada de dentro de minutos; la borra el afterEach' } }, async ({ page }) => {
   const pronto = (m: number): string => new Date(Math.ceil((Date.now() + m * 60_000) / 60_000) * 60_000).toISOString()
   const { citaId } = crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(6), minutos: 20, nombre: tituloUnico('K5M Hoy'), canal: 'unico' })
   ligar(citaId, 'Prueba 06')
@@ -152,15 +157,19 @@ test('Próximas citas: la ligada por enlace conserva el eslabón con su texto y 
    → rojo con la v2; borrar `.ag-marcas-v2 { display: none; }` → rojo apagada. */
 test('teléfono: la lista del día enseña el eslabón y el expediente tachado sólo con la v2', async ({ page }) => {
   test.skip(test.info().project.name !== 'telefono', 'la lista del día es la vista del teléfono')
-  const pronto = (m: number): string => new Date(Math.ceil((Date.now() + m * 60_000) / 60_000) * 60_000).toISOString()
+  /* AG-DT-256 · la por ligar va a la semana siguiente (antes, a dentro de 8 min): para las marcas de la
+     lista da igual el día, y en la semana de hoy dispararía «¿Asistió el paciente?» de viernes a domingo. */
   const nombre = tituloUnico('K5M Lista')
-  crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(8), minutos: 20, nombre, canal: 'unico' })
+  crearCitaPorLigar({ correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_FUTURO_FIJO, '10:00', TZ), minutos: 20, nombre, canal: 'unico' })
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
+  await page.getByRole('button', { name: 'Periodo siguiente' }).click()
   const fila = page.locator('.fc-list-event', { hasText: nombre }).first()
   await expect(fila.getByRole('img', { name: 'Sin expediente' })).toBeVisible()
   await expect(fila.getByRole('img', { name: 'Agendada por enlace' })).toBeVisible()
   interruptorAgenda('A', false)
   await abrirAgendaApagada(page)
+  await page.getByRole('button', { name: 'Periodo siguiente' }).click()
+  await expect(page.locator('.fc-list-event', { hasText: nombre }).first()).toBeVisible()
   await expect(page.locator('.fc-list-event', { hasText: nombre }).first().locator('.ag-marcas')).toBeHidden()
 })

@@ -225,6 +225,12 @@ export function useFuentesAgenda({
   citasIncompletasRef.current = citasIncompletas
   const precargaRef = useRef<PrecargaEnCurso | null>(null)
   const ultimaClavePrecargadaRef = useRef<string | null>(null)
+  /* La vista que se quedó sin programar porque había una traída en vuelo. Si
+     esa traída era otra PRECARGA, no deja ningún `eventsSet` al resolver:
+     quien reintenta es `ejecutarPrecarga` al terminar (defecto del 2026-11-21:
+     navegar con la precarga anterior en vuelo perdía la de la vista nueva). */
+  const vistaSinPrecargarRef = useRef<ViewApi | null>(null)
+  const programarPrecargaRef = useRef<(vista: ViewApi) => void>(() => {})
 
   /* ── Refetch al cambiar el filtro de médico ─────────────
      Se dispara DESPUÉS del commit del estado (no en el onChange síncrono),
@@ -516,6 +522,7 @@ export function useFuentesAgenda({
     if (precargaRef.current) { precargaRef.current.cancelado = true; cancelarOcioso(precargaRef.current.idle) }
     precargaRef.current = null
     ultimaClavePrecargadaRef.current = null
+    vistaSinPrecargarRef.current = null
   }
 
   /*
@@ -548,7 +555,9 @@ export function useFuentesAgenda({
   function programarPrecarga(vista: ViewApi): void {
     if (!VISTAS_PRECARGABLES.has(vista.type)) { cancelarPrecargaEnCurso(); return }
     if (!profile || hayGestoEnCurso(gestoEnCursoRef) || citasIncompletas) return
-    if (citasEnVueloRef.current.size > 0 || semillaPendienteRef.current) return
+    if (citasEnVueloRef.current.size > 0) { vistaSinPrecargarRef.current = vista; return }
+    if (semillaPendienteRef.current) return
+    vistaSinPrecargarRef.current = null
     const filtroActual = filtroSincronoRef.current ?? filtroEfectivo
     if (filtroActual === null) return
     const rango = rangoQuePedir({ startStr: vista.currentStart.toISOString(), endStr: vista.currentEnd.toISOString() })
@@ -561,6 +570,7 @@ export function useFuentesAgenda({
     token.idle = enOcioso(() => void ejecutarPrecarga(rango, filtroActual, profileId, token))
     precargaRef.current = token
   }
+  programarPrecargaRef.current = programarPrecarga
 
   /*
    * W+1 y W-1 EN SERIE —nunca en paralelo, para no competir con la traída
@@ -585,14 +595,19 @@ export function useFuentesAgenda({
   async function ejecutarPrecarga(
     rango: { startStr: string; endStr: string }, filtro: string, profileId: string, token: PrecargaEnCurso,
   ): Promise<void> {
-    for (const paso of [semanaSiguiente(rango), semanaAnterior(rango)]) {
-      if (token.cancelado || hayGestoEnCurso(gestoEnCursoRef) || citasIncompletasRef.current) return
-      if (leerCitas(claveCitas(profileId, filtro, paso.startStr, paso.endStr))) continue
-      try {
-        await traerCitasDeduplicado(paso.startStr, paso.endStr, filtro, profileId, citasEnVueloRef.current)
-      } catch {
-        return
+    try {
+      for (const paso of [semanaSiguiente(rango), semanaAnterior(rango)]) {
+        if (token.cancelado || hayGestoEnCurso(gestoEnCursoRef) || citasIncompletasRef.current) return
+        if (leerCitas(claveCitas(profileId, filtro, paso.startStr, paso.endStr))) continue
+        try {
+          await traerCitasDeduplicado(paso.startStr, paso.endStr, filtro, profileId, citasEnVueloRef.current)
+        } catch {
+          return
+        }
       }
+    } finally {
+      const pendiente = vistaSinPrecargarRef.current
+      if (pendiente) programarPrecargaRef.current(pendiente)
     }
   }
 

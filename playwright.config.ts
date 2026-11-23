@@ -20,7 +20,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: [['list']],
+  /* `guardaAsistencia`: tras cada prueba, ninguna cita que dependa del día de
+     la corrida (AG-DT-256). Sólo lee la base local. */
+  reporter: [['list'], ['./e2e/guardaAsistencia.ts']],
   globalSetup: './e2e/global-setup.ts',
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:3001',

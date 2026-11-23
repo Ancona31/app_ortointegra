@@ -5,6 +5,7 @@ import {
 import { abrirAgendaV2, editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
 import { crearCitaPorLigar, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * Tanda I · agente I3. Puntos 8, 10 y 22 de Angel, contra la base local:
@@ -115,8 +116,10 @@ async function abrirDashboard(page: Page): Promise<void> {
 /* Tanda K, puntos 17 y 18: la palabra «Por ligar» es ahora el expediente tachado (nombre accesible
    «Sin expediente») y el eslabón con su texto «Por enlace». Rediseño B5: el expediente tachado lleva
    además el texto a la vista (`[data-marca-sin-expediente]`); su nombre accesible sigue siendo
-   «Sin expediente» (`role="img"`), y se comprueba (auditoría final, H13). */
-test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de quien reservó, el expediente tachado y el eslabón; apagada, no', async ({ page, browser }) => {
+   «Sin expediente» (`role="img"`), y se comprueba (auditoría final, H13).
+   AG-DT-256 · «Próximas citas» lista las siguientes: la por ligar es de dentro de minutos (`pronto`) y no
+   puede ir a la semana siguiente. El `afterEach` la borra antes de que la prueba termine: la anotación. */
+test('punto 8: con la v2, la por ligar sale en Próximas citas con el nombre de quien reservó, el expediente tachado y el eslabón; apagada, no', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'por ligar de dentro de minutos; la borra el afterEach' } }, async ({ page, browser }) => {
   const nombre = tituloUnico('Lucía Reserva I3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
   interruptorAgenda('A', true)

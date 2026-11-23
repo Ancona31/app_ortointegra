@@ -1,0 +1,107 @@
+# A: originales del tag fusion-originales
+b0_auditoria_citas	PASA
+b1_ajustes_agenda	PASA
+b5_horario_propio	PASA
+b6_tipos_cita	PASA
+c1_gcal_sync_estado	PASA
+c2_gcal_aplicar	PASA
+c4_gcal_flujo	PASA
+d11_sync_antes_de_reservar	PASA
+d1_enlaces_reserva	PASA
+d2_candado_reserva	PASA
+d3_reservar_por_enlace	PASA
+d4_gcal_por_ligar	PASA
+d6_cita_por_ligar	PASA
+e1_confirmacion_enlace	PASA
+e4_correos_cita	PASA
+e6_reagendar	PASA
+e9_rsvp_google	PASA
+g2b_tipos_cita_update	PASA
+g2_duracion_consulta	PASA
+g3_correo_confirmacion	PASA
+h2_recordatorio_interruptor	PASA
+h2_restablecer_configuracion	PASA
+h5_atendida_con_nota	PASA
+i2_candado_eleccion	PASA
+i2_unico_sin_correo	PASA
+i3_por_asignar_google	PASA
+i4_atendida_movida	PASA
+i4_cancelada_cerrada	PASA
+i4_horario_revisado	PASA
+i5_avisos_clinica	PASA
+j2_unico_tope_correo	PASA
+j4_aviso_google_reserva	PASA
+k1_bloqueos	PASA
+k2_espera_codigo	PASA
+k3_enlace_pausado	PASA
+l1_bloqueo_total	PASA
+l2_quitar_cancelada	PASA
+l5_aviso_confirmacion	PASA
+l_integracion_disparadores	PASA
+m_audit_log_sin_truncate	PASA
+m_saludo_recordatorio	FALLA	psql:<stdin>:80: ERROR:  MS: la semilla no tiene una cita con paciente en A
+p_public_sin_truncate	PASA
+seg1_candado_correo	PASA
+seg_borrado_cita	PASA
+seg_columnas_reserva	PASA
+seg_emision_enlaces	PASA
+# B: supabase/pruebas-sql actuales
+b0_auditoria_citas	PASA
+b1_ajustes_agenda	PASA
+b5_horario_propio	PASA
+b6_tipos_cita	PASA
+c1_gcal_sync_estado	PASA
+c2_gcal_aplicar	PASA
+c4_gcal_flujo	PASA
+d11_sync_antes_de_reservar	PASA
+d1_enlaces_reserva	PASA
+d2_candado_reserva	PASA
+d3_reservar_por_enlace	PASA
+d4_gcal_por_ligar	PASA
+d6_cita_por_ligar	PASA
+e1_confirmacion_enlace	PASA
+e4_correos_cita	PASA
+e6_reagendar	PASA
+e9_rsvp_google	PASA
+g2b_tipos_cita_update	PASA
+g2_duracion_consulta	PASA
+g3_correo_confirmacion	PASA
+h2_recordatorio_interruptor	PASA
+h2_restablecer_configuracion	PASA
+h5_atendida_con_nota	PASA
+i2_candado_eleccion	PASA
+i2_unico_sin_correo	PASA
+i3_por_asignar_google	PASA
+i4_atendida_movida	PASA
+i4_cancelada_cerrada	PASA
+i4_horario_revisado	PASA
+i5_avisos_clinica	PASA
+j2_unico_tope_correo	PASA
+j4_aviso_google_reserva	PASA
+k1_bloqueos	PASA
+k2_espera_codigo	PASA
+k3_enlace_pausado	PASA
+l1_bloqueo_total	PASA
+l2_quitar_cancelada	PASA
+l5_aviso_confirmacion	PASA
+l_integracion_disparadores	PASA
+m_audit_log_sin_truncate	PASA
+m_saludo_recordatorio	FALLA	psql:<stdin>:80: ERROR:  MS: la semilla no tiene una cita con paciente en A
+p_public_sin_truncate	PASA
+seg1_candado_correo	PASA
+seg_borrado_cita	PASA
+seg_columnas_reserva	PASA
+seg_emision_enlaces	PASA
+# originales (5 que cambiaron) contra B
+d1_enlaces_reserva	FALLA	psql:<stdin>:263: ERROR:  function public.reserva_enlace_regenerar_fijo(unknown, unknown, text) does not exist
+e4_correos_cita	FALLA	psql:<stdin>:165: ERROR:  function public.cita_correos_pendientes(integer) does not exist
+j2_unico_tope_correo	FALLA	psql:<stdin>:217: ERROR:  function "public.reserva_enlace_emitir(uuid, uuid, uuid, uuid, text, text, text)" does not exist
+k3_enlace_pausado	FALLA	psql:<stdin>:109: ERROR:  function public.reserva_enlace_emitir(unknown, unknown, uuid, unknown, text, text, unknown) does not exist
+seg_emision_enlaces	FALLA	psql:<stdin>:90: ERROR:  function public.reserva_enlace_regenerar_fijo(uuid, unknown, text) does not exist
+# actuales (5 que cambiaron) contra A
+d1_enlaces_reserva	FALLA	psql:<stdin>:264: ERROR:  Los enlaces de reserva los emite el servidor
+e4_correos_cita	PASA
+j2_unico_tope_correo	FALLA	psql:<stdin>:217: ERROR:  j2 caso 6 emitir de 7 args: dio false, esperaba true
+k3_enlace_pausado	PASA
+seg_emision_enlaces	FALLA	psql:<stdin>:91: ERROR:  Los enlaces de reserva los emite el servidor
+# m_saludo_recordatorio con semilla-minima.sql: PASA en A y en B (misma prueba en los dos lados)

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { SESION, interruptorAgenda, modalCita, soloEscritorio } from './ayudas'
-import { abrirAgendaApagada, abrirAgendaV2, decidirDespues, preguntaAsistencia } from './interaccionesAyudas'
+import { abrirAgendaApagada, abrirAgendaV2 } from './interaccionesAyudas'
 
 /**
  * Integración de la tanda K (defecto que destapó K4, punto 22) · La SALIDA ANIMADA del modal de la
@@ -43,6 +43,5 @@ test('v2 apagada: el modal se va sin salida animada (como antes del proyecto)', 
 test('v2 encendida: el modal sale con su animación (control)', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
-  if (await preguntaAsistencia(page).isVisible()) await decidirDespues(page)
   expect(await cerrarYVigilar(page)).toBe(true)
 })

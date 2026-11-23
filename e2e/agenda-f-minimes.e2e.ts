@@ -86,6 +86,10 @@ test('encendido: el desplegable de la barra, con teclado; conserva la vista Sema
   await expect(page.locator(`.fc-timegrid-col[data-date="${lunesDe(despues ?? '')}"]`)).toBeVisible()
 
   await boton.click()
+  /* Se espera a que el desplegable esté abierto ANTES de pulsar Escape. Sin esto, en un equipo
+     rápido Escape llegaba antes de que se montara: «0 diálogos» pasaba en falso, el desplegable
+     se abría después y el foco no volvía al botón (falló 2 de 2 en el equipo nuevo, 2026-11-21). */
+  await expect(dialogo).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: 'Elegir fecha' })).toHaveCount(0)
   await expect(boton).toBeFocused()

@@ -1,10 +1,11 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import {
-  CORREO, SESION, DIA_LABORABLE_LIBRE, enContextoNuevo, eventoConTexto, interruptorAgenda, modalCita, soloEscritorio, sqlLocal, tituloUnico,
+  CORREO, SESION, DIA_FUTURO_LIBRE, pasarASemanaSiguiente, enContextoNuevo, eventoConTexto, interruptorAgenda, modalCita, soloEscritorio, sqlLocal, tituloUnico,
 } from './ayudas'
 import { abrirAgendaV2, editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
 import { crearCitaPorLigar, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * Tanda J · agente J3. Puntos 6, 7, 8 y 12 de Angel, contra la base local:
@@ -49,6 +50,11 @@ test.afterEach(() => {
     delete from public.pacientes where apellidos = :'ap';`, { ap: APELLIDOS_NUEVO })
 })
 test.afterAll(() => { interruptorAgenda('A', false) })
+
+/* AG-DT-256 · «Próximas citas» lista las siguientes del médico: la por ligar tiene que ser de dentro de
+   minutos (`pronto`), no puede ir a la semana siguiente. El `afterEach` la borra (`limpiarReservasE2e`) antes de
+   que la prueba termine, así que al acabar ya no dispara la ventana: la guarda la perdona con esta anotación. */
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO, description: 'por ligar de dentro de minutos; la borra el afterEach' } }
 
 /** Dentro de `minutos`, redondeado al minuto: la primera de «Próximas citas» del Dr. Admin. */
 function pronto(minutos: number): string {
@@ -101,7 +107,7 @@ function registro(page: Page): Locator {
   return page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
 }
 
-test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta»; elegir un paciente liga y abre la nota', async ({ page, browser }) => {
+test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta»; elegir un paciente liga y abre la nota', A_PROPOSITO, async ({ page, browser }) => {
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Lucía Reserva J3')
   const c = crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
@@ -155,9 +161,10 @@ test('punto 7 · tarjeta: abre la ventana; «Registrar paciente nuevo» con los 
   interruptorAgenda('A', true)
   const nombre = `Zoila ${APELLIDOS_NUEVO}`
   const c = crearCitaPorLigar({
-    correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:00', TZ), minutos: 30, nombre, canal: 'fijo',
+    correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '18:00', TZ), minutos: 30, nombre, canal: 'fijo',
   })
   await abrirAgendaV2(page)
+  await pasarASemanaSiguiente(page) // AG-DT-256: semana siguiente
   await eventoConTexto(page, nombre).click({ position: { x: 8, y: 8 } })
   await tarjetaLectura(page).getByRole('button', { name: 'Ligar expediente e iniciar', exact: true }).click()
   const v = ventana(page)
@@ -187,11 +194,12 @@ test('punto 7 · campana: el aviso de una reserva abre la ventana; la de Google 
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Rosa Aviso J3')
   const c = crearCitaPorLigar({
-    correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:30', TZ), minutos: 30, nombre, canal: 'unico',
+    correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '18:30', TZ), minutos: 30, nombre, canal: 'unico',
   })
   const titulo = tituloUnico('Valoración Google J3')
-  const g = filaGoogle(titulo, fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '19:30', TZ))
+  const g = filaGoogle(titulo, fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '19:30', TZ))
   await abrirAgendaV2(page)
+  await pasarASemanaSiguiente(page) // AG-DT-256: semana siguiente
   const abrirAviso = async (id: string): Promise<void> => {
     await page.locator('[data-campana]').first().click()
     const capa = page.getByRole('dialog', { name: 'Por confirmar y avisos' })
@@ -228,7 +236,7 @@ async function clicsTrasDobleClic(page: Page, boton: Locator, tras: () => Promis
   return page.evaluate(() => (window as unknown as { __clicsJ3: number }).__clicsJ3)
 }
 
-test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador ni, al cancelar el alta, en la ventana', async ({ page }) => {
+test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador ni, al cancelar el alta, en la ventana', A_PROPOSITO, async ({ page }) => {
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Elsa Escudo J3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
@@ -246,8 +254,9 @@ test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador 
 test('punto 8: editando una reserva por enlace no salen los botones de duración; con paciente sí', async ({ page }) => {
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Iván Duración J3')
-  crearCitaPorLigar({ correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '17:00', TZ), minutos: 30, nombre, canal: 'fijo' })
+  crearCitaPorLigar({ correo: CORREO.adminA, inicio: fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '17:00', TZ), minutos: 30, nombre, canal: 'fijo' })
   await abrirAgendaV2(page)
+  await pasarASemanaSiguiente(page) // AG-DT-256: semana siguiente
   await eventoConTexto(page, nombre).click({ position: { x: 8, y: 8 } })
   await editarDesdeTarjeta(page)
   const m = modalCita(page, 'Editar cita')
@@ -274,7 +283,7 @@ test('punto 12: tipo de 30 min y cita de 50: la tarjeta y el formulario dicen 50
       start_time, end_time, status, origen, gcal_sync_status, tipo_cita_id, tipo_cita_nombre)
     select m.clinica_id, m.id, m.co, m.nombre, m.timezone, pa.id, :'titulo', :'ini'::timestamptz, :'ini'::timestamptz + interval '50 minutes',
            'scheduled', 'spinus', 'pending', t.id, t.nombre from m, t, pa returning id`,
-  { correo: CORREO.adminA, titulo, ini: fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '10:00', TZ) })
+  { correo: CORREO.adminA, titulo, ini: fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '10:00', TZ) })
   // El enlace profundo de I5 abre la tarjeta de ESA cita (la semilla tiene otras de Prueba 07).
   await page.goto(`/agenda?cita=${id}`)
   await expect(tarjetaLectura(page).getByText(/50 min/)).toBeVisible()

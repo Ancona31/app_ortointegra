@@ -1,0 +1,518 @@
+
+######## agenda_restablecer_configuracion(uuid,uuid)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -36,3 +36,3 @@
+#   -  -- El horario de partida de la v2: el de la clínica COPIADO y propio, la
+#   -  -- herencia de G4 (20261119130000). La única fuente sigue siendo el consultorio.
+#   -  -- Tanda I (punto 3): queda POR REVISAR hasta que su médico lo confirme.
+#   +  -- El horario de partida de la v2: el de la clínica COPIADO y propio, la misma
+#   +  -- herencia del backfill de los consultorios. La única fuente sigue siendo el
+#   +  -- consultorio, y queda POR REVISAR hasta que su médico lo confirme.
+
+######## cita_confirmacion_contexto(text)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -12,3 +12,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = v_c.clinica_id AND j.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(v_c.clinica_id) THEN
+ RETURN NULL;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -14 +14 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = v_c.clinica_id AND j.agenda_v2_encendida) THEN
+#   +  IF NOT public.agenda_v2_encendida(v_c.clinica_id) THEN
+
+######## cita_confirmacion_emitir(uuid,uuid,uuid,text,uuid)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -8,3 +8,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
++IF NOT public.agenda_v2_encendida(p_clinica_id)
+ OR NOT public.gcal_sync_clinica_habilitada(p_clinica_id) THEN
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -10 +10 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id)
+
+######## cita_confirmacion_responder(uuid,text,text)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -13,3 +13,3 @@
+ IF NOT FOUND OR v_c.revocado_en IS NOT NULL
+-OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
++OR NOT public.agenda_v2_encendida(p_clinica_id)
+ OR NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = p_clinica_id AND NOT k.suspendida) THEN
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -15 +15 @@
+#   -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+#   +     OR NOT public.agenda_v2_encendida(p_clinica_id)
+
+######## cita_correo_tomar(uuid,uuid,text,uuid)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -20 +20 @@
+#   -         -- ⚠️ Destinatario: la MISMA expresión que cita_correos_pendientes.
+#   +         -- ⚠️ Destinatario: la MISMA expresión que cita_recordatorios_pendientes.
+
+######## cita_movimiento_google_registrar(uuid,uuid,timestamp with time zone)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -4,3 +4,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN false;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -6 +6 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+#   @@ -9 +9 @@
+#   -  -- El criterio de cita_proteger_eleccion (I2): de ESTA clínica, por enlace y sin empezar.
+#   +  -- El criterio de cita_proteger_eleccion: de ESTA clínica, por enlace y sin empezar.
+
+######## cita_proteger_bloqueo()
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -16,4 +16,3 @@
+ AND b.inicio < NEW.end_time AND b.fin > NEW.start_time)
+-AND EXISTS (SELECT 1 FROM public.agenda_ajustes j
+-WHERE j.clinica_id = NEW.clinica_id AND j.agenda_v2_encendida) THEN
++AND public.agenda_v2_encendida(NEW.clinica_id) THEN
+ RAISE EXCEPTION 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.'
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -6 +6,4 @@
+#   -  -- K punto 5: lo que ya estaba dentro se queda; sólo cuenta entrar (alta, o mover inicio, fin o médico).
+#   +  -- Lo que ya estaba dentro se queda; sólo cuenta entrar (alta, o mover inicio,
+#   +  -- fin o médico). Este atajo y la lista de columnas del disparador son lo que
+#   +  -- deja cerrar una cancelada dentro de un bloqueo y editar lo que ya estaba
+#   +  -- dentro: no los quites.
+#   @@ -11 +14 @@
+#   -  -- Lo de Google entra como hoy (C2/D4), y la reserva por enlace ya rechaza los bloqueos ella misma.
+#   +  -- Lo de Google entra como siempre, y la reserva por enlace ya rechaza los bloqueos ella misma.
+#   @@ -20,2 +23 @@
+#   -     AND EXISTS (SELECT 1 FROM public.agenda_ajustes j
+#   -                  WHERE j.clinica_id = NEW.clinica_id AND j.agenda_v2_encendida) THEN
+#   +     AND public.agenda_v2_encendida(NEW.clinica_id) THEN
+
+######## cita_proteger_borrado()
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -7,4 +7,3 @@
+ END IF;
+-IF EXISTS (SELECT 1 FROM public.agenda_ajustes j
+-WHERE j.clinica_id = OLD.clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
++IF public.agenda_v2_encendida(OLD.clinica_id) THEN
+ RAISE EXCEPTION 'Una cita con paciente o por ligar no se borra: se cancela'
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -9,2 +9 @@
+#   -  IF EXISTS (SELECT 1 FROM public.agenda_ajustes j
+#   -              WHERE j.clinica_id = OLD.clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
+#   +  IF public.agenda_v2_encendida(OLD.clinica_id) THEN
+
+######## cita_proteger_eleccion()
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -4,4 +4,3 @@
+ IS NOT DISTINCT FROM (OLD.medico_id, OLD.consultorio_id, OLD.start_time, OLD.all_day)
+-OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j
+-WHERE j.clinica_id = OLD.clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
++OR NOT public.agenda_v2_encendida(OLD.clinica_id) THEN
+ RETURN NEW;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -6,2 +6 @@
+#   -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j
+#   -                     WHERE j.clinica_id = OLD.clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
+#   +     OR NOT public.agenda_v2_encendida(OLD.clinica_id) THEN
+
+######## cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -10,3 +10,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ r_resultado := 'apagado'; RETURN NEXT; RETURN;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -12 +12 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+
+######## cita_rsvp_google(uuid,uuid,text,text,text[])
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -13,3 +13,3 @@
+ IF cardinality(v_correos) = 0
+-OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
++OR NOT public.agenda_v2_encendida(p_clinica_id)
+ OR NOT EXISTS (SELECT 1 FROM public.clinica_conexiones_google g
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -15 +15 @@
+#   -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+#   +     OR NOT public.agenda_v2_encendida(p_clinica_id)
+
+######## gcal_aplicar_evento(uuid,uuid,timestamp with time zone,text,text,timestamp with time zone,text,boolean,timestamp with time zone,timestamp with time zone,boolean,text,boolean,text,boolean)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -18,3 +18,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN 0;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -20 +20 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+
+######## gcal_bloqueo_aplicar(uuid,text,text,uuid,text,timestamp with time zone,boolean,timestamp with time zone,timestamp with time zone,date,date)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -15,3 +15,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN 0;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -18 +18 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+
+######## gcal_citas_por_evento(uuid,text[],uuid[])
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -7,3 +7,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -9 +9 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+#   @@ -18 +18 @@
+#   -         -- Una cita POR LIGAR (D4): el nombre de quien reservó, sin apellidos
+#   +         -- Una cita POR LIGAR: el nombre de quien reservó, sin apellidos
+
+######## gcal_importar_evento(uuid,text,text,text,timestamp with time zone,text,timestamp with time zone,timestamp with time zone,boolean,text,text,uuid)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -15,3 +15,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN NULL;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -17 +17 @@
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+
+######## gcal_sync_clinica_habilitada(uuid)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -21,3 +21,3 @@
+ RAISE EXCEPTION 'gcal_sync_clinica_habilitada: % ya no tiene la forma que se sabe evaluar por clínica', v_puerta
+-USING ERRCODE = 'P0001', HINT = 'Revisar C1 (20261113120000) contra la definición nueva; no se adivina.';
++USING ERRCODE = 'P0001', HINT = 'Revisar gcal_sync_clinica_habilitada (20261201150000_agenda_f2_google) contra la definición nueva; no se adivina.';
+ END IF;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -23 +23 @@
+#   -        USING ERRCODE = 'P0001', HINT = 'Revisar C1 (20261113120000) contra la definición nueva; no se adivina.';
+#   +        USING ERRCODE = 'P0001', HINT = 'Revisar gcal_sync_clinica_habilitada (20261201150000_agenda_f2_google) contra la definición nueva; no se adivina.';
+
+######## gcal_sync_tomar(uuid,uuid,text,integer,integer)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -6,4 +6,3 @@
+ END IF;
+-IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes a
+-WHERE a.clinica_id = p_clinica_id AND a.agenda_v2_encendida) THEN
++IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -8,3 +8,2 @@
+#   -  -- Detrás del interruptor (B1). agenda_ajustes sólo se LEE.
+#   -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes a
+#   -                  WHERE a.clinica_id = p_clinica_id AND a.agenda_v2_encendida) THEN
+#   +  -- Detrás del interruptor de la clínica. agenda_ajustes sólo se LEE.
+#   +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+
+######## log_cita_change()
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -6 +6,3 @@
+#   -  -- C2 'google' · E1/E6 'enlace_paciente' · E9 'google_rsvp'. Sólo éstos, sólo sin sesión.
+#   +  -- 'google' y 'google_rsvp' los pone la sincronización con Google; 'enlace_paciente',
+#   +  -- la confirmación y el reagendo por enlace. Sólo éstos, sólo sin sesión. Un literal
+#   +  -- nuevo exige migración.
+
+######## rate_limit_espera(text,integer,integer)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -13 +13 @@
+#   -  -- `<` y no `<=`: rate_limit_intento cuenta `created_at >= now() - ventana` (auditoría H3).
+#   +  -- `<` y no `<=`: rate_limit_intento cuenta `created_at >= now() - ventana`.
+
+######## reserva_codigo_emitir(uuid,uuid,text,text)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -6,4 +6,4 @@
+ IF NOT EXISTS (SELECT 1 FROM public.reserva_enlaces e
+-JOIN public.agenda_ajustes j ON j.clinica_id = e.clinica_id AND j.agenda_v2_encendida
+-WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.clase = 'fijo' AND e.revocado_en IS NULL AND e.pausado_en IS NULL)
++WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.clase = 'fijo' AND e.revocado_en IS NULL AND e.pausado_en IS NULL
++AND public.agenda_v2_encendida(e.clinica_id))
+ OR NOT public.gcal_sync_clinica_habilitada(p_clinica_id) THEN
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -8,2 +8,2 @@
+#   -                   JOIN public.agenda_ajustes j ON j.clinica_id = e.clinica_id AND j.agenda_v2_encendida
+#   -                  WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.clase = 'fijo' AND e.revocado_en IS NULL AND e.pausado_en IS NULL)
+#   +                  WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.clase = 'fijo' AND e.revocado_en IS NULL AND e.pausado_en IS NULL
+#   +                    AND public.agenda_v2_encendida(e.clinica_id))
+
+######## reserva_codigo_verificar(uuid,uuid,text,text,text)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -18 +18 @@
+#   -    -- K2 (punto 10): el código de un correo ANTERIOR (lo invalidó un reenvío) no cuenta como equivocado.
+#   +    -- El código de un correo ANTERIOR (lo invalidó un reenvío) no cuenta como equivocado.
+
+######## reserva_contacto_estado(uuid,uuid,text,text)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -18 +18 @@
+#   -  -- Automático: cancelaciones e inasistencias SÓLO por el correo (seg1). El
+#   +  -- Automático: cancelaciones e inasistencias SÓLO por el correo. El
+
+######## reserva_empalmes_registrar(uuid,uuid[])
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -8,3 +8,3 @@
+ IF cardinality(p_citas) = 0
+-OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
++OR NOT public.agenda_v2_encendida(p_clinica_id) THEN
+ RETURN 0;
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -10 +10 @@
+#   -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+#   +     OR NOT public.agenda_v2_encendida(p_clinica_id) THEN
+#   @@ -27,2 +27 @@
+#   -       -- terminar); si no, este r es el único representante posible
+#   -       -- (auditoría 2026-11-12, hallazgo 1).
+#   +       -- terminar); si no, este r es el único representante posible.
+
+######## reserva_enlace_emitir(uuid,uuid,uuid,uuid,text,text,text,text,text)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -5 +5 @@
+#   -     -- j2: el correo del único, los dos juntos; el fijo nunca lleva.
+#   +     -- El correo del único: los dos juntos; el fijo nunca lleva.
+#   @@ -9 +9 @@
+#   -  -- La regla de las policies de reserva_enlaces (lista A, 16) con el actor en lugar de auth.uid().
+#   +  -- La regla de las policies de reserva_enlaces, con el actor en lugar de auth.uid().
+
+######## reserva_espera_reenvio(uuid,uuid,text,integer)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -16 +16 @@
+#   -  -- `least`: created_at lo sella clock_timestamp() en otra transacción y puede ir por delante de now() (auditoría 1).
+#   +  -- `least`: created_at lo sella clock_timestamp() en otra transacción y puede ir por delante de now().
+
+######## reserva_ocupacion(uuid,uuid,timestamp with time zone,timestamp with time zone)
+# código sin comentarios ni espacios: CAMBIA
+--- A
++++ B
+@@ -2,3 +2,2 @@
+ FROM public.reserva_enlaces e
+-JOIN public.agenda_ajustes j ON j.clinica_id = e.clinica_id AND j.agenda_v2_encendida
+ CROSS JOIN LATERAL (
+@@ -17,2 +16,3 @@
+ WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.revocado_en IS NULL AND e.pausado_en IS NULL
++AND public.agenda_v2_encendida(e.clinica_id)
+ AND p_hasta > p_desde AND p_hasta - p_desde <= interval '15 days'
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -2,2 +2,3 @@
+#   -  -- k1 (tanda K): lo que tiene hora y no está cancelado ni faltó (lo de TODO
+#   -  -- EL DÍA ya no ocupa, punto 4) y los bloqueos del médico (punto 2).
+#   +  -- Lo que tiene hora y no está cancelado ni faltó (lo de TODO EL DÍA no
+#   +  -- ocupa) y los bloqueos del médico. La misma condición de empalme que
+#   +  -- reservar_por_enlace.
+#   @@ -6 +6,0 @@
+#   -    JOIN public.agenda_ajustes j ON j.clinica_id = e.clinica_id AND j.agenda_v2_encendida
+#   @@ -20,0 +21 @@
+#   +     AND public.agenda_v2_encendida(e.clinica_id)
+
+######## reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -11,2 +11,2 @@
+#   -  -- j2 (punto 3): el correo que cuenta. En el ÚNICO, el que escribió la
+#   -  -- clínica al emitir el enlace (o ninguno); en el FIJO, el verificado.
+#   +  -- El correo que cuenta. En el ÚNICO, el que escribió la clínica al emitir
+#   +  -- el enlace (o ninguno); en el FIJO, el verificado.
+#   @@ -15 +15 @@
+#   -  -- j2 (punto 3): intentos que admite un enlace único (ver la cabecera).
+#   +  -- Intentos que admite un enlace único (ver el contador, abajo).
+#   @@ -19 +19 @@
+#   -  -- i2: p_correo y p_correo_hmac son opcionales, pero LOS DOS JUNTOS.
+#   +  -- p_correo y p_correo_hmac son opcionales, pero LOS DOS JUNTOS.
+#   @@ -70,5 +70,8 @@
+#   -  -- j2 (punto 3): el ÚNICO cuenta cada intento que llega aquí (un reenvío del
+#   -  -- mismo client_id ya salió arriba como 'repetida' y no cuenta). Agotado, no
+#   -  -- sirve más y no dice por qué. El intento número c_tope_unico es el último:
+#   -  -- lo marca agotado al empezar, y si reserva queda además usado. Bajo el
+#   -  -- FOR UPDATE del enlace: dos intentos a la vez se cuentan los dos.
+#   +  -- El ÚNICO cuenta cada intento que llega aquí (un reenvío del mismo
+#   +  -- client_id ya salió arriba como 'repetida' y no cuenta). Agotado, no sirve
+#   +  -- más y no dice por qué. El intento número c_tope_unico es el último: lo
+#   +  -- marca agotado al empezar, y si reserva queda además usado. Bajo el FOR
+#   +  -- UPDATE del enlace: dos intentos a la vez se cuentan los dos.
+#   +  -- DESDE AQUÍ NADA PUEDE LANZAR una excepción que provoque quien reserva: la
+#   +  -- excepción desharía el conteo. Por eso lo que sigue son comprobaciones que
+#   +  -- devuelven un resultado, y el INSERT de la cita va en su propio bloque.
+#   @@ -86,4 +89,4 @@
+#   -    -- Auditoría de j2 (H1): un client_id que ya usó OTRA cita haría fallar el
+#   -    -- INSERT de abajo (índice único) y la excepción desharía este conteo: con
+#   -    -- él se probarían teléfonos sin gastar el enlace. Se corta aquí, ANTES de
+#   -    -- mirar nada de la persona, y el intento queda contado.
+#   +    -- Un client_id que ya usó OTRA cita haría fallar el INSERT de abajo
+#   +    -- (índice único) y la excepción desharía este conteo: con él se probarían
+#   +    -- teléfonos sin gastar el enlace. Se corta aquí, ANTES de mirar nada de la
+#   +    -- persona, y el intento queda contado.
+#   @@ -97,0 +101 @@
+#   +  -- El interruptor se lee junto con los ajustes: no usa agenda_v2_encendida().
+#   @@ -106,0 +111 @@
+#   +  -- service_role no pasa por appointments_gates_insert: ésta es la puerta de suscripción.
+#   @@ -120,0 +126,2 @@
+#   +  -- No mira el consultorio del tipo: qué tipos valen en cada consultorio lo
+#   +  -- decide el servidor antes de llamar (tiposDelConsultorio).
+#   @@ -135,7 +142,6 @@
+#   -  -- k1 (tanda K, punto 4): lo de TODO EL DÍA ya no ocupa en el enlace (un
+#   -  -- «Congreso» de todo el día no significa que no consulte); lo que tiene hora
+#   -  -- sí, como siempre. Punto 2: un bloqueo del médico (agenda_bloqueos) ocupa,
+#   -  -- sin excepción, con el mismo solape. Los dos son EXISTS: no lanzan, así
+#   -  -- que nada nuevo después del contador del único puede reventar. El bloqueo
+#   -  -- se escribe bajo el mismo candado 1790 (agenda_bloqueo_preparar): uno
+#   -  -- confirmado antes de este candado se ve aquí (READ COMMITTED).
+#   +  -- Empalme (la misma condición que reserva_ocupacion): lo de TODO EL DÍA no
+#   +  -- ocupa en el enlace (un «Congreso» de todo el día no significa que no
+#   +  -- consulte); lo que tiene hora sí. Un bloqueo del médico (agenda_bloqueos)
+#   +  -- ocupa, sin excepción, con el mismo solape. Los dos son EXISTS: no lanzan.
+#   +  -- El bloqueo se escribe bajo el mismo candado 1790: uno confirmado antes de
+#   +  -- este candado se ve aquí (READ COMMITTED).
+#   @@ -153,4 +159,4 @@
+#   -  -- seg1 (punto 1): en el fijo, el correo verificado se exige ANTES de mirar
+#   -  -- nada de la persona. j2: v_correo_hmac es p_correo_hmac en el fijo. Sin ficha, la respuesta y el trabajo son los mismos
+#   -  -- para cualquier teléfono. i2: sin correo, el fijo no reserva (lo mismo que
+#   -  -- una ficha que no casa).
+#   +  -- En el fijo, el correo verificado se exige ANTES de mirar nada de la
+#   +  -- persona (v_correo_hmac es p_correo_hmac en el fijo): sin ficha, la
+#   +  -- respuesta y el trabajo son los mismos para cualquier teléfono. Sin
+#   +  -- correo, el fijo no reserva (lo mismo que una ficha que no casa).
+#   @@ -171,4 +177,5 @@
+#   -  -- seg1 (puntos 2 y 6): lo automático (cancelaciones e inasistencias, «1
+#   -  -- activa») decide por el CORREO; el bloqueo MANUAL de la clínica, por
+#   -  -- teléfono o correo, y corta también el enlace único. i2: sin correo,
+#   -  -- p_correo_hmac es NULL y decide sólo el teléfono (el bloqueo manual).
+#   +  -- Lo automático (cancelaciones e inasistencias, «1 activa») decide por el
+#   +  -- CORREO; el bloqueo MANUAL de la clínica, por teléfono o correo, y corta
+#   +  -- también el enlace único. Sin correo, v_correo_hmac es NULL y decide sólo
+#   +  -- el teléfono (el bloqueo manual). A PROPÓSITO: un «bloqueado» delata que la
+#   +  -- clínica bloqueó a mano ese teléfono (AG-DT-28).
+#   @@ -177,4 +184,4 @@
+#   -    -- j2 (punto 3): en el ÚNICO, «bloqueado» agota el enlace. Es el intento que
+#   -    -- revela algo de la persona (AG-DT-28): con esto un único deja probar UN
+#   -    -- teléfono, no uno tras otro (AG-DT-101). El que no está bloqueado reserva
+#   -    -- y gasta el enlace, así que de un único sale como mucho una respuesta.
+#   +    -- En el ÚNICO, «bloqueado» agota el enlace: es el intento que revela algo
+#   +    -- de la persona, así que un único deja probar UN teléfono, no uno tras
+#   +    -- otro. El que no está bloqueado reserva y gasta el enlace, así que de un
+#   +    -- único sale como mucho una respuesta.
+#   @@ -195,2 +202,4 @@
+#   -  -- i2: el id lo pone la función para que la reserva SIN correo lleve, en el
+#   -  -- mismo INSERT, su seudónimo propio (ver la cabecera de la migración).
+#   +  -- El id lo pone la función para que la reserva SIN correo lleve, en el
+#   +  -- mismo INSERT, su seudónimo propio: sha256('reserva-sin-correo:' || id) en
+#   +  -- hex. No es el HMAC de ningún correo y no sirve para buscar a la persona
+#   +  -- (para eso está el teléfono); sólo cumple appointments_reserva_check.
+#   @@ -198,4 +207,5 @@
+#   -  -- j2-b: el INSERT va en su propio bloque. Si otra transacción que este candado no
+#   -  -- serializa (otro médico) confirma antes una cita con el mismo client_id, el índice
+#   -  -- único revienta aquí; sin el bloque, la excepción desharía también el conteo del
+#   -  -- único de arriba y ese intento no contaría. Sólo se atrapa ESE índice; lo demás sube.
+#   +  -- El INSERT va en su propio bloque. Si otra transacción que este candado no
+#   +  -- serializa (otro médico) confirma antes una cita con el mismo client_id, el
+#   +  -- índice único revienta aquí (el EXISTS de arriba no ve lo no confirmado);
+#   +  -- sin el bloque, la excepción desharía también el conteo del único. Sólo se
+#   +  -- atrapa ESE índice; lo demás sube. No lo «simplifiques» quitando el bloque.

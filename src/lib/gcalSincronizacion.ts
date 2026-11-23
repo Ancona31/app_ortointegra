@@ -44,6 +44,7 @@ import {
 import {
   aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
   reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, registrarMovimientoRechazado, type Candado,
+  esFalloPasajeroDeLaBase,
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, RestablecimientoPendiente, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
@@ -52,6 +53,22 @@ import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
 export const DIAS_VENTANA_COMPLETA = 30
 const LOTE = 5
 const POR_PAGINA = 250
+/** W · reintentos del registro de empalmes y la pausa entre ellos (dentro del presupuesto). */
+const REINTENTOS_EMPALMES = 2
+const PAUSA_EMPALMES_MS = 200
+
+/**
+ * Oleada 3, arreglo 3: algún cambio de Google no se aplicó por un fallo
+ * PASAJERO de la base. Como `RestablecimientoPendiente`: se lanza al final de
+ * la página y antes de avanzar el token, para que la pasada siguiente (la del
+ * cron o la siguiente petición, con la espera creciente de C1) la repita.
+ */
+class AplicacionPendiente extends Error {
+  constructor() {
+    super('cambio de Google sin aplicar por un fallo pasajero de la base: se repite la página')
+    this.name = 'AplicacionPendiente'
+  }
+}
 
 export type EstadoSincronizacion = 'ok' | 'parcial' | 'omitida' | 'sin_acceso' | 'no_disponible' | 'error'
 
@@ -107,6 +124,7 @@ function statusDe(err: unknown): number | null {
 function codigoDeError(err: unknown): string {
   if (esCredencialInvalida(err)) return 'credencial'
   if (err instanceof RestablecimientoPendiente) return 'google_restablecer'
+  if (err instanceof AplicacionPendiente) return 'base_pendiente'
   const s = statusDe(err)
   if (s === 410) return 'google_410'
   if (s !== null && s >= 500) return 'google_5xx'
@@ -290,6 +308,7 @@ async function procesarPagina(
   const borradosSinFila = tareas.filter((t) => t.evento.status === 'cancelled' && !t.fila).map((t) => t.evento)
   pasada.r.errores += await aplicarBloqueosDePagina(conexion.clinicaId, pagina.calendarId, deBloqueo, borradosSinFila)
   const pendientes: PorRestablecer[] = []
+  let sinAplicarPasajeros = 0
   for (let i = 0; i < tareas.length; i += LOTE) {
     const lote = tareas.slice(i, i + LOTE)
     const hechos = await Promise.allSettled(lote.map((t) => ejecutar(pasada, pagina.calendarId, t.decision)))
@@ -297,6 +316,7 @@ async function procesarPagina(
       const { evento, decision } = lote[j]
       if (h.status === 'rejected') {
         pasada.r.errores += 1
+        if (esFalloPasajeroDeLaBase(h.reason)) sinAplicarPasajeros += 1
         logger.warn('GCalSync', `evento sin aplicar ${JSON.stringify({ clinica: conexion.clinicaId, evento: evento.id ?? null })}`)
       } else if (h.value && evento.id && (decision.tipo === 'rechazar' || decision.tipo === 'aplicar')) {
         pendientes.push({ citaId: decision.citaId, eventId: evento.id, etag: evento.etag ?? null })
@@ -314,6 +334,10 @@ async function procesarPagina(
   // no antes: lo importado y lo movido ya registró sus empalmes, que repetir
   // la página no volvería a detectar.
   if (restablecido.pendientes > 0) throw new RestablecimientoPendiente()
+  // Oleada 3, arreglo 3: lo mismo si la BASE falló por algo pasajero al
+  // aplicar un cambio de Google (un definitivo cuenta en `errores` y la página
+  // avanza, como antes). Repetirla es idempotente (ver `pedirPagina`).
+  if (sinAplicarPasajeros > 0) throw new AplicacionPendiente()
 }
 
 /**
@@ -345,18 +369,48 @@ async function confirmarPorRsvps(
  * (el aviso lo lee el panel «Por confirmar» de la agenda, canal de E8). Sólo
  * lo que de verdad cambió (`importar` con fila nueva, `aplicar` con puntas
  * que prendió): repetir una página o resincronizar no vuelve a avisar. Un
- * fallo cuenta en `errores` y no tumba la página; sin la migración de D11,
- * no hace nada.
+ * fallo no tumba la página; sin la migración de D11, no hace nada.
+ *
+ * W · como el par no se vuelve a detectar en otra pasada, un fallo se
+ * reintenta `REINTENTOS_EMPALMES` veces con una pausa corta, sólo si queda
+ * presupuesto (el de la reserva pública es `TIEMPO_GOOGLE_MS`) y la señal no
+ * se abortó. Si aun así falla: `errores`, el registro (con los ids, para
+ * recuperarlo a mano) y Sentry. El arreglo de fondo es AG-DT-264.
  */
 async function avisarEmpalmes(pasada: Pasada): Promise<void> {
   const ids = pasada.movidas.splice(0)
   if (ids.length === 0) return
+  const clinica = pasada.conexion.clinicaId
+  for (let intento = 0; ; intento += 1) {
+    try {
+      await registrarEmpalmesReserva(clinica, ids)
+      return
+    } catch (err) {
+      if (err instanceof SincronizacionNoDisponible) return
+      const quedaTiempo = pasada.ahora() + PAUSA_EMPALMES_MS <= pasada.limite && !pasada.op.senal?.aborted
+      if (intento >= REINTENTOS_EMPALMES || !quedaTiempo) break
+    }
+    await new Promise((ok) => setTimeout(ok, PAUSA_EMPALMES_MS))
+  }
+  pasada.r.errores += 1
+  logger.warn('GCalSync', `empalmes con reservas sin registrar ${JSON.stringify({ clinica, citas: ids })}`)
+  await avisarSentryEmpalmes(clinica, ids)
+}
+
+/**
+ * W · el aviso perdido, a Sentry: la clínica y las citas, nada más. El SDK se
+ * carga sólo aquí y con `import()`, como en `global-error.tsx`: un import
+ * estático metería `@sentry/node` en el arranque de cada función. OJO: hoy no
+ * hay Sentry de servidor (sin `instrumentation.ts`, ver
+ * `sentry.server.config.ts`), así que esto no envía nada hasta que se
+ * encienda; y su `beforeSend` (`sentryPiiFilter`) redacta los uuid.
+ */
+async function avisarSentryEmpalmes(clinica: string, citas: string[]): Promise<void> {
   try {
-    await registrarEmpalmesReserva(pasada.conexion.clinicaId, ids)
-  } catch (err) {
-    if (err instanceof SincronizacionNoDisponible) return
-    pasada.r.errores += 1
-    logger.warn('GCalSync', `empalmes con reservas sin registrar ${JSON.stringify({ clinica: pasada.conexion.clinicaId })}`)
+    const Sentry = await import('@sentry/nextjs')
+    Sentry.captureMessage('GCalSync: empalmes con reservas sin registrar', { level: 'error', extra: { clinica, citas } })
+  } catch {
+    // Sin el SDK no hay más que hacer: ya quedó en el registro.
   }
 }
 

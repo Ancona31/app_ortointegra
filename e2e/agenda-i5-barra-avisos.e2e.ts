@@ -9,6 +9,7 @@ import {
 } from './reservaPublicaAyudas'
 import { limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { codigoDeConfirmacion, hashDeCodigo } from '../src/lib/reserva/secretos'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * I5 · la barra de la agenda v2, la campana y los «Avisos» (puntos 13 a 20 de
@@ -67,7 +68,11 @@ test.beforeAll(async () => {
   libres = await turnosLibres(e, emitirEnlace(e, 'unico').codigo, 42)
 })
 
-test.afterAll(() => {
+/* AG-DT-256 · las citas «del personal» (`citaDeManana`) son de MAÑANA: «Por confirmar» sólo lista ésas,
+   y de lunes a viernes son de la semana visible. Se borran al terminar CADA prueba (no al final del
+   archivo), así que al acabar ya no disparan la ventana y la guarda las perdona (anotación de 16-17). */
+function borrarCitasPersonal(): void {
+  if (citasPersonal.length === 0 && pacientes.length === 0) return
   sqlLocal(`
     begin;
     set local session_replication_role = replica;
@@ -77,8 +82,16 @@ test.afterAll(() => {
     delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);
     delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
-    update public.agenda_ajustes set correo_reserva_clinica = false where clinica_id = ${CL};
     commit;`, { citas: citasPersonal.join(',') || '00000000-0000-0000-0000-000000000000', pacientes: pacientes.join(',') })
+  citasPersonal.length = 0
+  pacientes.length = 0
+}
+
+test.afterEach(() => { borrarCitasPersonal() })
+
+test.afterAll(() => {
+  borrarCitasPersonal()
+  sqlLocal(`update public.agenda_ajustes set correo_reserva_clinica = false where clinica_id = ${CL};`)
   limpiarReservasE2e(desde)
   cerrarEscenario()
 })
@@ -258,7 +271,7 @@ for (const [nombre, ancho, alto] of [['teléfono', 390, 844], ['tableta', 820, 1
 
 /* ── 16 y 17: la campana y las filas de «Por confirmar» ────────────────── */
 
-test('16-17: punto rojo con pendientes; WhatsApp y correo en el mismo sitio en todas las filas; el estado en una línea debajo', async ({ page }) => {
+test('16-17: punto rojo con pendientes; WhatsApp y correo en el mismo sitio en todas las filas; el estado en una línea debajo', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'citas de mañana; las borra el afterEach' } }, async ({ page }) => {
   const ambos = citaDeManana('06:00', tituloUnico('I5 Ambos'), '9990000151', 'i5.ambos@semilla.spinus.test', new Date().toISOString())
   const correo = citaDeManana('06:15', tituloUnico('I5 Correo'), null, 'i5.correo@semilla.spinus.test', null)
   await abrirAgendaV2(page)

@@ -1,5 +1,8 @@
 -- Agenda E4 — registro de correos de cita: listado, toma con testigo,
--- reintentos y cierre (20261115140000_agenda_e4_correos_cita.sql).
+-- reintentos y cierre (hoy en 20261201160000_agenda_f4_confirmacion_correos_avisos.sql).
+-- El listado es cita_recordatorios_pendientes (la de E4 más el interruptor
+-- recordatorio_encendido, que aquí va encendido en las cuatro clínicas para
+-- probar lo mismo que con la retirada cita_correos_pendientes).
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en
 -- rollback: no deja nada en la base ni depende de la semilla. Todo es UNA
 -- transacción, así que now() no avanza: los «10 minutos» se simulan
@@ -32,11 +35,11 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000e4c003', 
  where id = '00000000-0000-4000-8000-000000e4b008';
 update public.profiles set clinica_id = '00000000-0000-4000-8000-000000e4c005', es_admin_de_clinica = true
  where id = '00000000-0000-4000-8000-000000e4b005';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio_horas) values
-  ('00000000-0000-4000-8000-000000e4c001', true, 24),
-  ('00000000-0000-4000-8000-000000e4c002', true, 24),
-  ('00000000-0000-4000-8000-000000e4c003', false, 24),
-  ('00000000-0000-4000-8000-000000e4c005', true, 2);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio_horas, recordatorio_encendido) values
+  ('00000000-0000-4000-8000-000000e4c001', true, 24, true),
+  ('00000000-0000-4000-8000-000000e4c002', true, 24, true),
+  ('00000000-0000-4000-8000-000000e4c003', false, 24, true),
+  ('00000000-0000-4000-8000-000000e4c005', true, 2, true);
 insert into public.pacientes (id, clinica_id, nombre, apellidos, email, activo) values
   ('00000000-0000-4000-8000-000000e4f001', '00000000-0000-4000-8000-000000e4c001', 'Paciente', 'Uno', 'uno@prueba.local', true),
   ('00000000-0000-4000-8000-000000e4f002', '00000000-0000-4000-8000-000000e4c001', 'Paciente', 'Inactivo', 'inactivo@prueba.local', false),
@@ -125,7 +128,7 @@ create function pg_temp.listado() returns setof uuid language plpgsql as $$
 begin
   perform pg_temp.servicio();
   set local role service_role;
-  return query select r_cita_id from public.cita_correos_pendientes(500)
+  return query select r_cita_id from public.cita_recordatorios_pendientes(500)
                 where r_clinica_id::text like '00000000-0000-4000-8000-000000e4c%';
   reset role;
 end $$;
@@ -353,7 +356,7 @@ declare v_rol text; v_fn text; n integer;
 begin
   foreach v_rol in array array['anon', 'authenticated'] loop
     foreach v_fn in array array[
-        'select public.cita_correos_pendientes(10)',
+        'select public.cita_recordatorios_pendientes(10)',
         'select public.cita_correo_tomar(''00000000-0000-4000-8000-000000e4c001'', ''00000000-0000-4000-8000-000000e4a002'', ''recordatorio'', gen_random_uuid())',
         'select public.cita_correo_marcar(gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), ''enviado'', null)'] loop
       begin

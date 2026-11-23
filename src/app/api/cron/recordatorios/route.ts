@@ -39,8 +39,11 @@ import { logger } from '@/lib/logger'
 
 // Vercel lo pide para que cada invocación ejecute la función (Cron Jobs, «Troubleshooting»).
 export const dynamic = 'force-dynamic'
-// Segundos. El presupuesto de abajo deja 15 s de margen para el último envío.
-export const maxDuration = 60
+// Segundos. Por debajo, con margen, de los 10 min tras los que otra ejecución
+// puede volver a tomar un envío «enviando» (`cita_correo_tomar`, F4) y de la
+// frecuencia de `vercel.json` (15 min): AG-DT-268. El presupuesto de abajo
+// deja 75 s de margen para el último envío.
+export const maxDuration = 120
 
 /** Presupuesto de la ejecución, en ms. */
 const PRESUPUESTO_MS = 45_000

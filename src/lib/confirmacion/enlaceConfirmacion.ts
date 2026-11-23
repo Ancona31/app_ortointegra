@@ -120,17 +120,20 @@ export function urlDeReservaConCodigo(enlace: string, digitos: string, origen: s
   return `${base}/reservar/${enlace}${consulta}#codigo=${digitos}`
 }
 
-async function emitirUnaVez(clinicaId: string, citaId: string, creadoPor: string | null): Promise<{ id: string; hash: string } | null> {
+/** Oleada 3, arreglo 4: `no_aplica` = la base (o la configuración) dice que no hay enlace; `error` = algo falló. */
+type SinEnlace = 'no_aplica' | 'error'
+
+async function emitirUnaVez(clinicaId: string, citaId: string, creadoPor: string | null): Promise<{ id: string; hash: string } | SinEnlace> {
   const id = randomUUID()
   const codigo = codigoDeConfirmacion(id)
-  if (!codigo) return null
+  if (!codigo) return 'no_aplica'
   const r = await llamar('cita_confirmacion_emitir', {
     p_clinica_id: clinicaId, p_cita_id: citaId, p_id: id, p_codigo_hash: hashDeCodigo(codigo), p_creado_por: creadoPor,
   }, true)
-  if (!r.ok) return null
+  if (!r.ok) return 'error'
   const p = EmisionSchema.safeParse(r.data)
-  if (!p.success) { logger.error(TAG, 'cita_confirmacion_emitir: forma inesperada'); return null }
-  return p.data.r_id && p.data.r_codigo_hash ? { id: p.data.r_id, hash: p.data.r_codigo_hash } : null
+  if (!p.success) { logger.error(TAG, 'cita_confirmacion_emitir: forma inesperada'); return 'error' }
+  return p.data.r_id && p.data.r_codigo_hash ? { id: p.data.r_id, hash: p.data.r_codigo_hash } : 'no_aplica'
 }
 
 /**
@@ -144,21 +147,35 @@ async function emitirUnaVez(clinicaId: string, citaId: string, creadoPor: string
  * código ya no se puede derivar: se revoca y se emite uno nuevo, una vez.
  */
 export async function emitirEnlaceConfirmacion(clinicaId: string, citaId: string, creadoPor: string | null): Promise<EnlaceConfirmacion | null> {
-  if (!secretoDisponible() || baseUrl() === null) return null
-  if (!UUID.safeParse(clinicaId).success || !UUID.safeParse(citaId).success) return null
+  const e = await emitirEnlaceParaCorreo(clinicaId, citaId, creadoPor)
+  return typeof e === 'string' ? null : e
+}
+
+/**
+ * Oleada 3, arreglo 4 (orden de Angel): lo mismo que `emitirEnlaceConfirmacion`,
+ * pero sin enlace dice POR QUÉ: `no_aplica` (sin secreto o sin URL base, o la
+ * base no da fila: la cita no lo admite) o `error` (la RPC falló o lanzó, una
+ * forma inesperada, la revocación tras rotar el secreto no salió, o el código
+ * no coincide). El recordatorio y la confirmación manual cierran un `error`
+ * como `fallido`, que la base vuelve a tomar; `no_aplica`, como `omitido`.
+ * Nunca lanza.
+ */
+export async function emitirEnlaceParaCorreo(clinicaId: string, citaId: string, creadoPor: string | null): Promise<EnlaceConfirmacion | SinEnlace> {
+  if (!secretoDisponible() || baseUrl() === null) return 'no_aplica'
+  if (!UUID.safeParse(clinicaId).success || !UUID.safeParse(citaId).success) return 'no_aplica'
   const autor = creadoPor !== null && UUID.safeParse(creadoPor).success ? creadoPor : null
   for (let intento = 0; intento < 2; intento++) {
     const e = await emitirUnaVez(clinicaId, citaId, autor)
-    if (!e) return null
+    if (typeof e === 'string') return e
     const codigo = codigoDeConfirmacion(e.id)
     if (codigo && hashDeCodigo(codigo) === e.hash) {
       const url = urlDeConfirmacion(codigo)
-      return url ? { id: e.id, codigo, url } : null
+      return url ? { id: e.id, codigo, url } : 'no_aplica'
     }
-    if (intento === 0 && !(await revocarEnlaceConfirmacion(clinicaId, citaId))) return null
+    if (intento === 0 && !(await revocarEnlaceConfirmacion(clinicaId, citaId))) return 'error'
   }
   logger.error(TAG, 'cita_confirmacion_emitir: el código emitido no coincide con el guardado')
-  return null
+  return 'error'
 }
 
 /**

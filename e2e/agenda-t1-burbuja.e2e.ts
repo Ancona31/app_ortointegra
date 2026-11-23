@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { SESION, diaDeLaSemana, interruptorAgenda, modalCita, soloEscritorio, sqlLocal } from './ayudas'
-import { abrirAgendaV2, burbuja, clicEnFranja, decidirDespues, elegirPaciente, tarjetaLectura } from './interaccionesAyudas'
+import { abrirAgendaV2, burbuja, clicEnFranja, elegirPaciente, tarjetaLectura } from './interaccionesAyudas'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
 /**
@@ -34,7 +35,12 @@ const TZ = 'America/Merida'
 const MARTES = diaDeLaSemana(3, 1)
 const MIERCOLES = diaDeLaSemana(3, 2)
 const JUEVES = diaDeLaSemana(3, 3)
-const VIERNES_PASADO = diaDeLaSemana(-3, 4)
+/* AG-DT-256: la cita «pasada» es la de AYER a las 14:40. Siempre es pasada y nunca tiene más de
+   48 h, así que no dispara «¿Asistió el paciente?» (antes iba tres semanas atrás, la disparaba
+   siempre y la prueba la cerraba con «Decidir después»). Si ayer cae en la semana anterior (hoy
+   es lunes), la prueba retrocede una semana. */
+const AYER = new Date(Date.parse(`${new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date())}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+const AYER_ES_OTRA_SEMANA = AYER < diaDeLaSemana(0, 0)
 const NUEVO = { nombre: 'Zoila', apellidos: 'Burbujat Uno' }
 const creadas: string[] = []
 
@@ -176,13 +182,14 @@ test('punto 13: con el evento de Google en camino, «Invitar por correo» abre l
   await expect(b).toHaveCount(0)
 })
 
-test('punto 4: en una cita PASADA, atendida o de todo el día la tarjeta no ofrece WhatsApp; en una futura, sí', async ({ page }) => {
+/* La anotación: la cita de AYER no dispara la ventana hoy (menos de 48 h), pero la guarda mira el
+   final del domingo y la vería; el `afterEach` la borra. */
+test('punto 4: en una cita PASADA, atendida o de todo el día la tarjeta no ofrece WhatsApp; en una futura, sí', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'cita de ayer, relativa a ahora; se borra al terminar' } }, async ({ page }) => {
   interruptorAgenda('A', true)
-  const pasada = await alta(page, VIERNES_PASADO, '14:40', 'Prueba 23')
+  const pasada = await alta(page, AYER, '14:40', 'Prueba 23')
   const futura = await alta(page, JUEVES, '15:20', 'Prueba 24')
   await abrirAgendaV2(page)
-  await decidirDespues(page)
-  for (let i = 0; i < 3; i++) await page.locator('.fc-prev-button').click()
+  if (AYER_ES_OTRA_SEMANA) await page.locator('.fc-prev-button').click()
   await page.locator('.fc-event', { hasText: 'Prueba 23' }).first().click()
   await expect(tarjetaLectura(page)).toBeVisible()
   /* Tanda K, punto 21: el WhatsApp va dentro de «Confirmar» (que sigue con «Marcar como confirmada»). */
@@ -190,7 +197,7 @@ test('punto 4: en una cita PASADA, atendida o de todo el día la tarjeta no ofre
   await expect(tarjetaLectura(page).getByRole('button', { name: 'Marcar como confirmada' })).toBeVisible()
   await expect(tarjetaLectura(page).locator(`[data-whatsapp-cita="${pasada}"]`)).toHaveCount(0)
   await page.keyboard.press('Escape')
-  await page.locator('.fc-today-button').click()
+  if (AYER_ES_OTRA_SEMANA) await page.locator('.fc-today-button').click() // en la semana de hoy, «Hoy» está deshabilitado
   await aLaSemanaMasTres(page)
   const cita = page.locator('.fc-event', { hasText: 'Prueba 24' }).first()
   await cita.click()
@@ -200,7 +207,6 @@ test('punto 4: en una cita PASADA, atendida o de todo el día la tarjeta no ofre
   sqlLocal(`update public.appointments set status = 'attended' where id = :'id'`, { id: futura })
   await page.reload()
   await abrirAgendaV2(page)
-  await decidirDespues(page)
   await aLaSemanaMasTres(page)
   await page.locator('.fc-event', { hasText: 'Prueba 24' }).first().click()
   await expect(tarjetaLectura(page)).toBeVisible()

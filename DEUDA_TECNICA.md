@@ -5940,45 +5940,620 @@ Lo que queda abierto de este punto es la base combinada con
 
 ### AG-DT-256 — E2e que dependen de la hora o del día de la corrida
 
-**Estado:** abierta, parcialmente arreglada (cierre de la tanda M, 2026-11-19).
-Una prueba que se salta o cambia según la hora no prueba nada a esa hora.
-**Arreglado en el cierre M:** `agenda-google-dos-sentidos` (la fila editable,
-I3 y T3 pasan al jueves de la semana siguiente; prueba nueva de un evento ya
-pasado) y las 8 de `agenda-eleccion-i2` (ya no se saltan de noche). El reloj
-simulado de Playwright (`page.clock`) **no sirve** para casi ninguna: quien
-decide pasado/futuro es el servidor (`Date.now()`) o Postgres (`now()`), no el
-navegador. La técnica que sí sirve es la semana siguiente (`diaDeLaSemana(1, d)`
-y `.fc-next-button`) o borrar lo que se crea.
+**Estado:** arreglada en lo que se conoce, **también entre semana: comprobado un
+lunes** (2026-11-23, 03:11–03:36, sobre `7af5775e`: 635 pasan, 0 fallan, guarda en
+verde; `supabase/produccion/ensayo/ENSAYO-PRINCIPAL.md`, «Batería tras corregir
+las pruebas»). Quedan los restos de AG-DT-258 a AG-DT-260. Una prueba que se salta
+o cambia según la hora no prueba nada a esa hora.
 
-**Pendiente (inventario, sin arreglar):**
+**El lunes 2026-11-23 (E1) la guarda la puso en rojo con 51 citas**: las pruebas
+que crean citas «para mañana» o «dentro de N horas» sólo salían verdes en fin de
+semana. Arreglo (sólo en `e2e/`, sin tocar la guarda): las reservas de la página
+pública toman el primer turno de la «Semana siguiente»
+(`primerTurnoDeLaSemanaSiguiente`); lo que por su naturaleza es de mañana o de
+dentro de horas («Por confirmar», recordatorios, carrera a T−1h, cita «pasada»,
+«Próximas citas») se crea y se borra DENTRO de cada prueba, con la anotación
+`asistencia-a-proposito` (ahora también en `h4-por-confirmar`, `whatsapp-manual`,
+`l5-campana`, `i5-barra-avisos`, `recordatorios`, `husos-dos-consultorios`,
+`confirmacion-enlace`, `k5-marcas`, `j3-ligar-ventana` e `i3-por-asignar`); y lo
+que no lo necesitaba, a la semana siguiente. `agenda-f-pulido` F1.12 mira el
+domingo de la semana −2. **No comprobado:** una corrida de martes a viernes ni
+una que cruce la medianoche (AG-DT-260 sigue igual). Un 429 sin causa encontrada
+en `husos-dos-consultorios` prueba 2, 1 de 6 corridas sueltas.
 
-* **La ventana «¿Asistió el paciente?»** (`src/lib/agenda/asistenciaServidor.ts`,
-  `HORAS_SIN_PREGUNTAR = 48`, reloj del servidor) tapa la rejilla al abrir la
-  agenda v2 si hay citas agendadas/confirmadas con paciente o reserva que
-  empezaron hace más de 48 h. La alimentan citas que las e2e crean en la semana
-  visible y no borran: `agenda-citas.e2e.ts:27` y `:124` (miércoles 10:05 y
-  15:20), `agenda-cancelar.e2e.ts:159` (jueves 16:20), y además las propias de
-  `agenda-cancelar` (`:87`, `:122`), `agenda-por-ligar` (`:63`, `:114`, `:133`,
-  `:153`), `agenda-ligar-consulta` (`:69`, `:103`, `:128`),
-  `agenda-j3-ligar-ventana` (`:138`, `:170`, `:230`, `:247`),
-  `agenda-reflejo-nota` (`:94`, viernes 12:00) y la burbuja H3 de
-  `agenda-google-dos-sentidos` (jueves 13:00). **De viernes a domingo** caerían
-  casi todas las e2e de la v2 que corren después y no cierran esa ventana
-  (`agenda-i4.e2e.ts:194` cuenta filas exactas). Arreglo: mover esas altas a la
-  semana +1 o borrarlas al terminar; y, de red, que `abrirAgendaV2` pulse
-  «Decidir después» si la ventana sale. No se comprobó corriendo en fin de
-  semana: es lectura del código.
-* `aviso-cancelacion.e2e.ts:56` y `:75`: la cita va a `now() + 3 h`; el domingo
-  desde las 21:00 cae en la semana siguiente y no se ve (falta el
-  `.fc-next-button` que ya usa `whatsapp-manual.e2e.ts:65`).
-* `agenda-movil.e2e.ts:59`: `test.skip` el día 1 del mes si el miércoles aún no
-  llega. Ésta sí la decide el navegador (`useResumenVisible.ts`): se puede fijar
-  con `page.clock` en el último día del mes anterior (nunca en el futuro).
-* Sospechas de borde: `agenda-f-tableta.e2e.ts:55` (necesita una cita futura a
-  la vista), `agenda-h4-por-confirmar` (si el archivo cruza la medianoche),
-  `confirmacion-enlace.e2e.ts:345` (`test.skip` sin turnos en 3–70 h), y toda la
-  semana 0 si la batería cruza la medianoche del domingo (`LUNES_VISIBLE` se fija
-  al cargar `e2e/ayudas.ts`).
+**Qué pasaba.** El sábado 2026-11-21 la batería cayó en cadena: una cita con
+paciente (o por ligar) que una prueba crea el miércoles o el jueves de la semana
+visible tiene, de viernes a domingo, más de 48 h, y la v2 abre «¿Asistió el
+paciente?» (`asistenciaServidor.ts`) al cargar la agenda. La ventana tapa la
+rejilla y todo lo que corre después cae por tiempo (17 de las 18 primeras fallas).
+
+**El arreglo, de raíz y sin pulsar «Decidir después»:**
+
+* **Fechas fijas respecto de la corrida.** Toda cita con paciente o por ligar va
+  en la semana SIGUIENTE (`DIA_FUTURO_FIJO`, `DIA_FUTURO_LIBRE` e
+  `irAAgendaSiguiente` / `pasarASemanaSiguiente` de `e2e/ayudas.ts`):
+  `agenda-citas`, `agenda-cancelar`, `agenda-por-ligar`, `agenda-ligar-consulta`,
+  `agenda-j3-ligar-ventana`, `agenda-tipos-cita`, `agenda-reflejo-nota`,
+  `agenda-google-dos-sentidos` («un borrado en Google») y `agenda-f-pulido` F1.8.
+  Los eventos sin paciente no tienen asistencia y siguen en la semana visible.
+* **`agenda-t1-burbuja` punto 4:** la cita «pasada» es la de AYER (nunca más de
+  48 h), no la de hace tres semanas; ya no abre la ventana. `agenda-k-salida-modal`
+  perdió su «Decidir después» condicional.
+* **`aviso-cancelacion`:** la cita va el jueves siguiente, no a `now() + 3 h` (el
+  domingo desde las 21:00 caía en otra semana). **`agenda-movil`:** el día 1 del
+  mes usa ayer en vez de saltarse (comprobado con una mutación temporal, «hoy es
+  2026-11-01»). **`whatsapp-manual`:** «mañana» se calcula una vez y con ella se
+  siembra la cita y se decide la semana.
+* **La guarda `e2e/guardaAsistencia.ts`** (un reporter de `playwright.config.ts`,
+  sólo lee): al empezar, durante cada prueba (una vez por segundo) y al terminar
+  cada una aplica la regla de la ventana con el reloj en el FINAL DEL DOMINGO. Lo
+  que una prueba deje y la dispararía ese día pone la corrida en rojo y nombra la
+  prueba, se corra el día que se corra. Probada en rojo con una cita de hace 72 h
+  (exit 1). Sólo perdona, a las pruebas con la anotación `asistencia-a-proposito`
+  (`agenda-i4` punto 11 y `agenda-t1-burbuja` punto 4), lo que ya no dispara la
+  ventana cuando la prueba termina.
+
+**Cómo se comprobó sin mover el reloj.** La guarda sale limpia en la batería
+entera; y la batería corrió dos veces en fin de semana, una empezando el sábado a
+las 23:45 (cruzó la medianoche) y otra el domingo a las 00:14: 634 pasan y 1 falla
+conocida (AG-DT-257), que no depende del día.
+
+**Lo que la guarda NO ve:** una cita que vive menos de un segundo; las pruebas que
+dependen del día por otra cosa que la ventana (AG-DT-259, AG-DT-260); y una
+batería que cruce la medianoche del domingo al lunes (`LUNES_VISIBLE` se fija al
+cargar `e2e/ayudas.ts`).
+
+**De paso, carreras de las pruebas que este equipo (más rápido) destapó**, todas
+arregladas en la prueba y ninguna del día: `agenda-cache-rangos` («precarga en
+ocioso» y «semana ya vista» esperaban «la primera petición que salga»),
+`agenda-filtro` (lo mismo), `agenda-f-minimes` (Escape antes de que se montara el
+desplegable), `agenda-t1-capas` (buscaba la franja con la rejilla aún cargando) y
+`whatsapp-manual` (dependía de pulsar antes de que llegara el chunk de la v2). La
+de la precarga sí era de la app: `programarPrecarga` no reintentaba cuando la
+traída en vuelo era otra precarga (`6409de96`).
+
+### AG-DT-257 — `agenda-empalme` «redimensionar hasta otra cita también avisa» falla en el equipo nuevo
+
+**Estado:** abierta. **Es la prueba, no la app:** Angel lo probó a mano el
+2026-11-22 (la cita se alarga, la vecina no se mueve y sale «Se empalma con
+«Paciente Prueba 04» (12:00–13:00). ¿Guardar de todos modos?»). La prueba NO se
+salta ni se desactiva: la batería da «634 pasan, 1 falla conocida».
+
+* **Frecuencia:** corriendo el archivo solo, 5 de 5 rojas (y todas las de
+  después de cada intento de arreglo, 3 por intento). En cinco baterías completas pasó una vez. Ya fallaba antes
+  de cualquier cambio del 2026-11-21 (corrida de detección, archivo por archivo).
+* **Qué se ve:** tras `redimensionarFinEvento(…, 'Prueba 10', '14:05', 30)` no sale
+  el aviso. En la base: una corrida dejó «Prueba 10» intacta (14:05–14:25) y
+  MOVIÓ 30 min la cita vecina («Prueba 09», de 14:40 a 15:10: el gesto la agarró a
+  ella); las demás no movieron nada.
+* **Medido a mano** (script con la misma sesión, 1440×900): la tarjeta mide
+  28 px (y 644–672), el asa 8 px (y 668–676) y bajo su centro está el asa
+  (`elementsFromPoint`: `fc-event-resizer-end` > `fc-timegrid-slot-lane`).
+* **Probado y revertido, sin efecto:** (1) separar la vecina a las 15:00 y estirar
+  45 min; (2) llevar el puntero al asa con `resizer.hover()` (se agota a los 30 s:
+  el asa deja de recibir el puntero); (3) lo de AG-DT-200: esperar a que la caja
+  del asa esté quieta (dos lecturas iguales a 150 ms) y agarrarla a 1/4 de su
+  alto, dentro de la tarjeta.
+* **Sin comprobar (hipótesis):** que la rejilla se desplace entre medir y pulsar
+  (AG-DT-68, la barra que crece 44 px), que el asa dependa del `:hover` de la
+  tarjeta y se pierda al mover el puntero, o las fuentes de Ubuntu 26.04. Falta una
+  traza del gesto paso a paso (`.fc-event-mirror`, qué elemento recibe el
+  `mousedown`).
+
+### AG-DT-258 — Dos e2e fallan si su archivo se corre solo
+
+**Estado:** abierta, sin arreglar (decisión de Angel, 2026-11-22). En la batería
+pasan; solas, no: dependen de lo que deja un archivo anterior.
+
+* `agenda-f-buscador.e2e.ts:99` («las citas que devuelve la búsqueda son sólo
+  suyas»): `pacienteCompartido: la semilla no tiene un paciente con citas de los
+  dos médicos`.
+* `reserva-anticipacion.e2e.ts:143`: lee `agenda_ajustes.anticipacion_min_horas`
+  de una fila que, sola, no existe (`invalid input syntax for type integer: ""`).
+
+### AG-DT-259 — `agenda-t1-burbuja` punto 4: la rama del lunes no se ha corrido
+
+**Estado:** abierta. La cita «pasada» es la de ayer; si hoy es lunes, ayer es de
+la semana anterior y la prueba retrocede una semana (`AYER_ES_OTRA_SEMANA`) y
+vuelve con «Hoy». Esa rama sólo se ejecuta en lunes: escrita, no corrida.
+
+### AG-DT-260 — `whatsapp-manual` si su archivo cruza la medianoche
+
+**Estado:** abierta. Su cita tiene que ser «de mañana» (es lo que lista «Por
+confirmar»), así que no puede ir a una fecha fija. Si el archivo empieza antes de
+la medianoche y sigue después, la cita pasa a ser «de hoy» para el servidor y
+deja de estar en la lista. Quien decide es el reloj del servidor: `page.clock` no
+sirve. Lo mismo, como sospecha, para `agenda-h4-por-confirmar`.
+
+### AG-DT-261 — `feature/limites-ajustables` fuera del paquete de producción
+
+**Estado:** abierta, aplazada (decisión de Angel, 2026-11-22: «fuera de este
+paquete. Se completa después, en su propia fase. Anota en la deuda lo que le
+falta.»). La rama (punta remota `e76973cd`, nace de `a58419fb` de `main`) trae
+tres migraciones, `20261014120000` (P1, EXECUTE de PUBLIC), `20261014130000`
+(P1b, permisos de 7 funciones DEFINER) y `20261014140000` (P2, `ajuste_*` de
+`clinicas` y `limite_efectivo`), y el código de P3. Estado y veredicto completo
+en `supabase/fusion/LIMITES-AJUSTABLES.md` (agente I): **NO COMPLETA**. Su
+código y Vitest pasan (700/700, `tsc` limpio salvo los tipos de `next typegen`)
+y mezcla sin conflictos con `feature/agenda-v2-produccion`. Le falta:
+
+1. **Auditoría de las tres `20261014…`** contra `supabase/AUDITORIA-MIGRACIONES.md`:
+   - las cabeceras dicen «PENDIENTE DE APLICAR» en local y en producción;
+   - no tienen auditoría independiente anotada;
+   - sin `BEGIN`/`COMMIT` (dimensión 2);
+   - sin `lock_timeout` (dimensión 6); P2 hace `ALTER TABLE clinicas` y
+     `CREATE TRIGGER` sobre `clinicas`;
+   - sin rejilla ni post-vuelo (dimensiones 5 y 18); P2 sin pre-vuelo;
+   - sin vuelta atrás (dimensión 7);
+   - sin fila en `mejora_agendaV2.md` §7.1.
+2. **La lista del caso 3 de `p1_permisos_funciones.sql`** sigue con las 10 de
+   producción. Al fusionarla hay que pegar la lista final en el mismo commit:
+   `CLAUDE.md` («Agenda v2», tanda H) la da en 49 funciones con el conjunto
+   fundido; el documento de I calcula 48 a 51 según lo que se retirara en la
+   fusión (§3.2). Con la lista de la rama, `p1` da rojo seguro en la base
+   combinada.
+3. **Correr `p1`, `p1b`, `p2` y `p3`** en una base combinada y aislada (no la
+   local compartida). No se han corrido sobre el conjunto de ahora
+   (`LIMITES-AJUSTABLES.md` §2).
+4. **Aclarar el texto de RN-1** del «Contrato con spinus-consola» que la rama
+   añade a `CLAUDE.md` («o 5 pacientes o menos contando los dados de baja»): el
+   cuerpo vigente de `clinica_tiene_acceso()` no tiene esa condición. Y decir
+   si P4–P6, que citan sus cabeceras, son parte de la rama (el plan que citan no
+   está en el repo).
+
+Con 1 a 3 resueltos, el documento de I dice que puede entrar **antes** del
+bloque fundido, por fecha (`20261014` < `20261201`).
+
+### AG-DT-262 — `log_cita_change` cuesta ~505 µs por UPDATE de una cita
+
+**Estado:** abierta, sin hacer (decisión de Angel, 2026-11-22: «no ahora. A la
+deuda, con tus números.»). Medido por el agente F5 en la oleada 2
+(`supabase/fusion/notas/F5.md` §5.4 y §5.7; los scripts en
+`supabase/fusion/notas/F5/`; los números no los volví a medir).
+
+* **Cómo se midió** (`medir-disparadores.{sql,sh}` + `resumir-medicion.py`): por
+  operación, 2 000 sentencias de una fila (más 300 de calentamiento) en una
+  transacción con ROLLBACK, mediana; y `EXPLAIN (ANALYZE)` sobre 2 000 filas
+  para el tiempo por disparador. Una clínica, un médico, un paciente, v2
+  encendida, 5 bloqueos lejos. 3 vueltas alternando tres clones («antes» =
+  originales, «F5» = fundido, «unión» = la variante de abajo).
+* **El número:** `audit_appointments_update` (F1, `log_cita_change()`) cuesta
+  **~505 µs por UPDATE**, «la mitad de la sentencia» y el mayor costo de guardar
+  una cita. Para comparar, en la misma medición: `proteger_reserva` ~55 µs por
+  UPDATE de sesión, `horario_bloqueado` ~75 µs por alta o movimiento con sesión.
+  Sentencias enteras con sesión (`authenticated`, F5): notas 907 µs, PUT con la
+  fila 920, mueve 986, estado 922, alta 848.
+* **La causa que señala F5 (deducida, leyendo):** el `(to_jsonb(OLD) -> n.key)`
+  dentro del `WHERE` sobre `jsonb_each(to_jsonb(NEW))` convierte la fila OLD
+  entera por cada columna (~45 veces); y el WHEN de `audit_appointments_update`
+  hace otras dos conversiones completas.
+* **La propuesta:** calcular `to_jsonb(OLD)` (y `to_jsonb(NEW)`) una sola vez en
+  una variable. «Debería dejar el mismo resultado; a medir por F1»: no se ha
+  medido ni escrito. Al tocarla, respetar las reglas de `log_cita_change()` de
+  `CLAUDE.md` (sólo nombres de columna; la lista de columnas técnicas va en la
+  función y en el WHEN, juntas; `via` sólo de `c_vias`).
+* **Lo que NO se hace: unir los disparadores de `appointments`** (F5.md §5.6,
+  «se midió, no conviene»). La variante `notas/F5/variante-union.sql` (B2 + B3
+  de UPDATE + B5 + B6 en un `trg_appointments_proteger_cambios`, B3 de DELETE
+  dentro de B4), en µs por fila de los BEFORE, F5 → unión:
+  - estado: 58.7 → 74.3 con sesión, 3.8 → 12.4 con `service_role`;
+  - PUT con la fila: 59.9 → 74.5 con sesión, 5.5 → 12.5 con `service_role`;
+  - lo que ahorra (una llamada en el alta y al mover) son 2–4 µs, dentro del
+    ruido;
+  - en su primera versión cambió el mensaje que ve `anon` en 2 de 4 130 casos
+    («permission denied for table agenda_bloqueos» en vez del rechazo de la
+    RLS);
+  - y rompería nombres que miran las pruebas y `CLAUDE.md`
+    (`l_integracion_disparadores.sql` caso 3; `trg_appointments_proteger_atendida`,
+    `_borrado`, `horario_bloqueado`…).
+
+### AG-DT-263 — La caída a la emisora de 7 argumentos, rama muerta
+
+**Estado:** abierta, se deja como está (decisión de Angel, 2026-11-22: «no la
+toques. Se retira después de producción.»). El conjunto fundido sólo crea
+`reserva_enlace_emitir` de 9 argumentos (`20261201140000`, línea 741); la de 7
+se retiró en la fusión (AG-DT-137). La tolerancia que cae en ella ya no se
+ejerce con el conjunto fundido, pero queda en el código:
+
+* `src/app/api/agenda/enlaces/route.ts:120-132` (`emitirEnBase`): si la de 9 da
+  PGRST202 y el único va SIN correo, emite con la de 7
+  (`admin.rpc('reserva_enlace_emitir', args)`, línea 131; el aviso del
+  `logger.warn`, línea 130).
+* Su prueba, `src/lib/tests/enlacesSinMigracionJ2.test.ts`: los casos «emitir
+  sin correo cae en la firma de 7 argumentos» (línea 85) y «emitir CON correo
+  no cae en la de 7…» (línea 93); el simulador del PGRST202, línea 57.
+* `src/lib/confirmacion/recordatorios.ts:19`, el comentario «No vuelvas a llamar
+  a `cita_correos_pendientes` (la de E4, sin interruptor).». La función sigue
+  retirada (el conjunto fundido no la crea, y ningún otro archivo de `src` la
+  nombra); el comentario se queda.
+
+**Cuándo:** después de aplicar el conjunto en producción, en un commit propio que
+retire la rama, sus dos casos de prueba y, si Angel quiere, el comentario.
+
+### AG-DT-264 — Los empalmes con reservas pendientes de registrar viven sólo en memoria
+
+**Estado:** abierta, **prioridad media** (decisión de Angel, 2026-11-22);
+ampliada en la oleada 3 (2026-11-22) con los demás reflejos y correos que se
+pierden sin reintento: **resolver antes de encender la v2 en otras clínicas**.
+Lo importado o movido desde Google en una página se junta en `pasada.movidas`
+(`src/lib/gcalSincronizacion.ts`) y `avisarEmpalmes` lo manda a
+`reserva_empalmes_registrar`. El par no se vuelve a detectar en otra pasada: si
+esa RPC falla, el aviso de empalme a la clínica se pierde. La tanda W lo mitigó
+sin migración: dos reintentos con 200 ms de pausa, sólo si queda presupuesto de
+la pasada (en la reserva pública, `TIEMPO_GOOGLE_MS`, 4 s) y la señal no se
+abortó; si aun así falla, `errores`, un `logger.warn` con la clínica y los ids
+de las citas, y `Sentry.captureMessage` con la clínica y los ids.
+
+Dos límites de esa mitigación, comprobados al hacerla:
+
+* **Hoy no hay Sentry de servidor:** no existe `instrumentation.ts`
+  (`sentry.server.config.ts`, cabecera), así que la llamada no envía nada hasta
+  que se encienda. Lo único que queda es el registro de Vercel.
+* **El filtro de PII redacta los uuid** (`src/lib/sentryPiiFilter.ts:19`,
+  `UUID_RE`, aplicado a `extra` en la línea 134): el día que se encienda,
+  llegarán `[ID-REDACTADO]`. No se tocó el filtro.
+
+**Ampliación (oleada 3, 2026-11-22; orden de Angel): lo que tampoco se
+reintenta.** Líneas comprobadas abriendo cada archivo, DESPUÉS de los arreglos
+de la oleada 3:
+
+* **(a) Reflejos hacia Google que pueden quedar a medias.** Todos corren en un
+  `after()`, una sola vez; si Google falla, queda el `registrarFalloGCal` o un
+  `logger.warn` y nada más:
+  - reagendar de la clínica y confirmar/cancelar por el enlace del paciente:
+    `src/app/api/appointments/[id]/reagendar/route.ts:144` y
+    `src/app/api/confirmar/[codigo]/route.ts:89`, los dos por `reflejarEnGoogle`
+    (`src/lib/confirmacion/googleConfirmacion.ts:42-56`), que no marca
+    `gcal_sync_status`. Su aviso decía «lo hará el sondeo», que era falso (el
+    sondeo es Google→Spinus y sólo mira eventos que cambiaron EN Google): la
+    oleada 3 corrigió el texto, no el comportamiento;
+  - bloqueos: `src/app/api/agenda/bloqueos/route.ts:50`,
+    `src/app/api/agenda/bloqueos/[id]/route.ts:63` (editar) y `:84` (quitar),
+    con `src/lib/agenda/bloqueosGoogle.ts:69-73` (`vinculoActual`), `:76-98`
+    (`empujarBloqueo`) y `:101-122` (`borrarBloqueoEnGoogle`);
+  - borrar una cita: `src/app/api/appointments/[id]/route.ts:1548-1573` (el
+    evento queda vivo en el calendario del médico);
+  - editar: los `after()` de `src/app/api/appointments/[id]/route.ts:1018`
+    (alta del evento al editar) y `:1204` (cambio del evento).
+* **(b) El comprobante de la reserva** que queda en `enviando` (la función se
+  corta entre el envío y el cierre) o en `fallido` (el transporte falló):
+  `src/lib/reserva/comprobanteReserva.ts:81-87`. Nadie vuelve a tomar un
+  `comprobante`: sólo lo pide el `after()` de la reserva, una vez. Lo único que
+  llega después es el recordatorio, si la clínica lo tiene encendido.
+* **(c) El correo a la clínica por cada reserva**, sin rastro si falla: la
+  opción y los destinatarios se leen tragándose el error
+  (`src/lib/reserva/correoClinicaReserva.ts:87-91` y `:94-102`: un error cuenta
+  como «apagado» o «sin destinatarios» y no sale nada, sin registro), y los
+  envíos de `:113` sólo quedan contados en la descripción del `logAudit`; uno
+  que falla no se reintenta.
+* **(d) Los otros tres sitios de la sincronización con el mismo patrón** que el
+  arreglo 3 de la oleada 3 no cubre (ese arreglo sólo hace que un fallo
+  PASAJERO de la base al aplicar una decisión no avance la página, como el
+  restablecimiento de la tanda J):
+  - `avisarMovimientoRechazado` (`src/lib/gcalSincronizacion.ts:486-495`): un
+    fallo cuenta en `errores` y el aviso de la campana se pierde;
+  - los RSVP (`confirmarPorRsvps`, `src/lib/gcalSincronizacion.ts:349-364`,
+    llamada en `:331`): lo mismo con la confirmación por `accepted`;
+  - los bloqueos de la página (`src/lib/gcalSincronizacionBloqueos.ts:64-67`):
+    un fallo al aplicar un bloqueo movido o borrado en Google cuenta en
+    `errores` y la página avanza.
+
+* **(e) Las llamadas a Google no tienen tope de tiempo propio** (ampliación de
+  la oleada 3, 2026-11-22; orden de Angel). `abrirSesionGoogle`
+  (`src/lib/gcal.ts:230-250`) crea el cliente OAuth y `google.calendar(…)` sin
+  `timeout`, y gaxios (7.1.4) sólo pone un tope si la petición trae
+  `opts.timeout` (`node_modules/gaxios/build/cjs/src/gaxios.js:432`): por
+  omisión, ninguno [C, lectura; no se comprobó en ejecución]. Una llamada
+  colgada sólo la corta el `AbortSignal` de quien llama (donde lo hay, p. ej. el
+  `TIEMPO_GOOGLE_MS` de la reserva) o el límite de la función de Vercel; en un
+  `after()` o en la tarea programada, se come el presupuesto y lo que queda
+  detrás no se hace. **No se tocó:** `gcal.ts` lo usa también la agenda con la
+  v2 apagada (la de `main`), y cambiarlo ahí cambia su comportamiento.
+
+**Arreglo de fondo (el mismo para todo lo de arriba):** una cola de pendientes
+en la base (por clínica), que la pasada siguiente o una tarea reintenta antes de
+dar el trabajo por hecho, con su migración y su auditoría. Para (e), además, un
+`timeout` explícito en el cliente de Google, medido contra los presupuestos de
+cada llamador.
+
+**Cuándo:** en su propia rama, después de producción y **antes de encender la
+v2 en otras clínicas**.
+
+### AG-DT-265 — Sentry no carga en el servidor, y `CLAUDE.md` da a entender lo contrario
+
+**Estado:** abierta, **prioridad ALTA**, **fuera de la agenda, sin tocar**
+(oleada 3, 2026-11-22; decisión de Angel: Sentry se queda como está, apoyado en
+el registro de Vercel).
+
+* No existe `instrumentation.ts` (ni en la raíz ni en `src/`), así que
+  `Sentry.init()` de servidor no corre nunca. Es **deliberado**:
+  `sentry.server.config.ts:1-17` («ESTE ARCHIVO NO SE EJECUTA. NO HAY
+  TELEMETRÍA DE SERVIDOR EN SPINUS», por el coste de `@sentry/node` en cada
+  arranque en frío) y `next.config.ts:201-229` (`autoInstrumentServerFunctions`
+  y `autoInstrumentAppDirectory` apagadas por lo mismo). El de navegador sí corre
+  (`instrumentation-client.ts`).
+* `CLAUDE.md` da a entender lo contrario: «NUNCA envíes datos identificables de
+  pacientes a APIs externas (Gemini, Anthropic, Google Calendar, Sentry)»
+  (línea 134), «NUNCA quites los filtros PII de Sentry» (línea 136) y el stack,
+  «**Sentry** (`@sentry/nextjs` 10.47)» (línea 195), sin decir que en servidor
+  está apagado. Un editor lee ahí que los fallos de servidor llegan a Sentry.
+* **Consecuencia:** los fallos de servidor (rutas de API, `after()`, tareas
+  programadas) sólo quedan en el registro de Vercel. Un `Sentry.captureMessage`
+  de servidor (p. ej. `avisarSentryEmpalmes`, AG-DT-264) no envía nada.
+* Además, el día que se encienda, `src/lib/sentryPiiFilter.ts` redacta los uuid:
+  `UUID_RE` (línea 19), aplicado en `redactString` (línea 67), a los arreglos
+  (líneas 86-91) y a `extra` (línea 134). Los ids de clínica y de cita llegarían
+  como `[ID-REDACTADO]`.
+
+**Cuándo:** decisión de Angel; si se enciende, medir antes (cabecera de
+`sentry.server.config.ts`) y revisar qué ids se dejan pasar.
+
+### AG-DT-266 — `logAudit` falla en silencio y diez rutas ni siquiera lo esperan
+
+**Estado:** abierta, **prioridad ALTA**, **fuera de la agenda, sin tocar**
+(oleada 3, 2026-11-22).
+
+* `logAudit` (`src/lib/audit.ts:278-305`) nunca lanza ni devuelve su fallo: un
+  rechazo de Postgres o una excepción de red quedan sólo en `logger.error`
+  (`console.error`, o sea el registro de Vercel). Las rutas responden éxito
+  aunque la fila de auditoría no se haya escrito.
+* **Diez llamadas sin `await`** (fire-and-forget; comprobado abriendo cada una:
+  la línea empieza por `logAudit(` sin `await` ni `void`), todas bajo
+  `src/app/api/`: `pacientes/[id]/vincular/route.ts:73`,
+  `pacientes/[id]/correo/route.ts:142`, `paciente/[id]/exportar/route.ts:140`,
+  `admin/paciente/[id]/anonimizar/route.ts:78`,
+  `admin/paciente/[id]/rectificar/route.ts:75`, `admin/usuarios/route.ts:175`,
+  `auth/registro/route.ts:55`, `auth/rate-limit/route.ts:59`, `:72` y `:90`.
+  En una función de Vercel lo que no se espera ni se entrega a `after()` puede
+  no terminar cuando la respuesta ya salió (DEDUCIDO; no medido).
+* **Donde la fila de la app es el ÚNICO rastro** (no hay disparador que lo
+  registre, o el disparador no sabe quién fue):
+  - `src/app/api/me/horario/route.ts:85` (`horario_clinica_editado`: `clinicas`
+    no tiene disparador de auditoría y se escribe con el cliente de servicio);
+  - `src/app/api/agenda/correo/route.ts:105` (`enviar_confirmacion_cita`: la
+    fila de `cita_correos` la audita `log_tabla_change`, pero sólo aquí queda
+    QUIÉN la mandó);
+  - `src/app/api/appointments/[id]/reagendar/route.ts:103` (el aviso de cambio
+    al paciente por correo);
+  - los conflictos de la sincronización: `auditar` de
+    `src/lib/gcalSincronizacion.ts` (`gcal_conflicto_cita`,
+    `gcal_cambio_rechazado`) y `auditarConflictoEdicion` de
+    `src/lib/gcalEscritura.ts:167-181`.
+
+**Arreglo posible:** que `logAudit` devuelva si escribió (o lance), y que las
+rutas donde es el único rastro lo esperen y decidan; las diez sin `await`, con
+`await` o `after()`. Toca rutas clínicas: plan propio.
+
+**Cuándo:** en su propia rama; no es de la agenda.
+
+### AG-DT-267 — `consultas/route.ts` usa `after()` sin `maxDuration` (observación)
+
+**Estado:** observación, **sin prioridad** (oleada 3, 2026-11-22; orden de
+Angel: «ni maxDuration ni nada más»). `src/app/api/consultas/route.ts` (la ruta
+que guarda las notas clínicas) deja en `after()` sólo el color de «atendida» en
+Google. Como las rutas de la agenda, no declara `maxDuration` y hereda el límite
+por omisión de la función: con Fluid Compute en Pro, 300 s (regla «La agenda
+depende de Fluid Compute en Vercel» de `CLAUDE.md`). No se toca; queda anotada
+para que nadie le ponga un límite corto sin mirar lo que hace la ruta antes de
+responder.
+
+### AG-DT-268 — Límite de duración y candado de las tareas de Google y del recordatorio van juntos
+
+**Estado:** regla, **sin arreglo pendiente** (oleada 3, 2026-11-22; orden de
+Angel: «para que nadie suba uno sin mirar el otro»). Cada ruta de abajo tiene un
+`maxDuration` que debe quedar por debajo de su candado o de su plazo de
+reintento: si la función vive más que el candado, otra ejecución entra mientras
+la primera sigue y las dos trabajan lo mismo (dos sincronizaciones de la misma
+clínica, o dos correos del mismo recordatorio). Líneas comprobadas abriendo cada
+archivo el 2026-11-22:
+
+| Ruta | `maxDuration` | Candado / plazo | Presupuesto interno | Frecuencia (`vercel.json`) |
+|---|---|---|---|---|
+| `/api/cron/google-sync` | 60 s (`src/app/api/cron/google-sync/route.ts:40`) | `LEASE_SEG = 90` (`:52`), «más que `maxDuration`» | `PRESUPUESTO_TOTAL_MS` 45 s (`:43`) | cada 10 min (`*/10`) |
+| `/api/cron/recordatorios` | **120 s** (`src/app/api/cron/recordatorios/route.ts:46`; era 60, subido en la oleada 3) | un envío `enviando` lo puede volver a tomar otra ejecución a los **10 min** (`cita_correo_tomar`, `supabase/migrations/20261201160000_agenda_f4_confirmacion_correos_avisos.sql:971` y `:982`; el listado lo mira igual en `:1051` y `:1055`; `COMMENT` de `cita_correos.testigo`, `:381-382`) | `PRESUPUESTO_MS` 45 s (`:50`) | cada 15 min (`*/15`) |
+| `/api/google/sync` (el sondeo al abrir la agenda) | 30 s (`src/app/api/google/sync/route.ts:37`) | `LEASE_SEG = 30` (`:43`), «más que el presupuesto» | `PRESUPUESTO_MS` 8 s (`:41`) | no es tarea programada |
+
+Reglas:
+
+* **`maxDuration` < candado/plazo, con margen.** google-sync: 60 < 90.
+  Recordatorios: 120 < 600, y 120 < 900 (la frecuencia): dos pasadas no se
+  pisan. `google/sync`: el candado (30 s) es **igual** al límite (30 s), no
+  mayor; como se toma después de arrancar, caduca un poco después de que muera la
+  función, y el presupuesto (8 s) queda muy por debajo. Si alguien sube su
+  `maxDuration`, sube antes `LEASE_SEG`. Esa igualdad tiene entrada propia:
+  AG-DT-269.
+* **La frecuencia de `vercel.json` > `maxDuration`.** Hoy 600 > 60 y 900 > 120.
+* **Los dos candados viven en la base.** El de Google lo toma por clínica
+  `gcal_sync_tomar` con `leaseSeg` (`src/lib/gcalSincronizacionBase.ts:135`),
+  el MISMO para el sondeo y la tarea: cada ruta pasa el suyo. El del
+  recordatorio es la fila de `cita_correos` con su `testigo`: cambiar el plazo de
+  10 min exige migración y revisar esta tabla.
+* Las pruebas fijan los valores: `src/lib/tests/cronGoogleSync.test.ts:89` (60) y
+  `src/lib/tests/cronRecordatorios.test.ts:106` (120).
+
+### AG-DT-269 — En `/api/google/sync` el candado dura lo mismo que el límite de la función, no más
+
+**Estado:** observación, **sin tocar** (oleada 3, 2026-11-22; orden de Angel).
+Sale de AG-DT-268, donde era una nota dentro de las reglas. En
+`src/app/api/google/sync/route.ts` (el sondeo al abrir la agenda) el candado de
+la clínica, `LEASE_SEG = 30` (`:43`), es **igual** a `maxDuration = 30` (`:37`),
+no mayor como en `/api/cron/google-sync` (90 frente a 60). Hoy no muerde: el
+candado se toma después de arrancar la función, así que caduca un poco después
+de que muera, y el presupuesto interno (`PRESUPUESTO_MS`, 8 s, `:41`) queda muy
+por debajo de los dos. Lo que no hay es margen: si alguien sube `maxDuration`
+sin subir antes `LEASE_SEG`, otra ejecución podría sincronizar la misma clínica
+mientras la primera sigue viva. No se cambia código; queda para que nadie toque
+uno sin el otro (relación de los tres límites con sus candados: AG-DT-268).
+
+### AG-DT-270 — Nada vigila que `public` siga sin TRUNCATE por omisión
+
+**Estado:** abierta, **sin hacer** (condición del auditor independiente, ronda 1,
+2026-11-22: `supabase/produccion/auditoria/RONDA-1.md`, «Juicio sobre la sección
+4-bis»; `supabase/AUDITORIA-MIGRACIONES.md` §4-bis). El paso 3 de
+`20261126120000_public_sin_truncate.sql` (`ALTER DEFAULT PRIVILEGES FOR ROLE
+postgres IN SCHEMA public REVOKE TRUNCATE ON TABLES …`) se queda, pero si la
+plataforma o alguien repone los privilegios por omisión, la siguiente tabla de
+`public` nace con TRUNCATE para `anon`, `authenticated` y `service_role` (que no
+pasa por la RLS ni por la auditoría) y sólo se nota al volver a correr la
+migración. **Lo que haría falta:** una comprobación periódica de sólo lectura;
+sirve la fila 1 de su rejilla («tablas de public con TRUNCATE para los tres = 0»)
+y, para la causa, su fila 6 (el ACL por omisión de `postgres` en `public` sin
+`D`). Dónde correrla (tarea programada, revisión manual tras cada migración) lo
+decide Angel.
+
+### AG-DT-271 — La reserva por enlace y el bloqueo no se serializan con el alta del personal (límite aceptado)
+
+**Estado:** **límite aceptado** por Angel (auditoría independiente, ronda 1, A7,
+2026-11-22). `reservar_por_enlace` (F3) y `agenda_bloqueo_preparar` (F5a) toman
+`pg_advisory_xact_lock(1790, médico)`; el alta o el movimiento de una cita por el
+personal (PostgREST, `cita_proteger_bloqueo` de F5b) no. Comprobado por el
+auditor: una alta de la sesión con la transacción abierta y una
+`reservar_por_enlace` al mismo turno un segundo después → las dos entran (dos
+citas activas en el turno). Por lo mismo, un bloqueo que se confirma mientras el
+personal inserta puede dejar una cita dentro del bloqueo «total» (deducido).
+**Riesgo real:** dos pacientes en el mismo turno, en una ventana de milisegundos
+(PostgREST confirma cada alta en milisegundos); dentro de Spinus el empalme
+avisa. Queda escrito en los `COMMENT` de `reservar_por_enlace`,
+`cita_proteger_bloqueo` y `agenda_bloqueos`: «el bloqueo y la reserva son
+totales salvo carrera de milisegundos». **Lo que haría falta para cerrarlo:**
+que el alta y el movimiento de citas del personal tomen el mismo candado 1790
+del médico (un disparador BEFORE en `appointments`, con el orden fijo de dos
+candados al cambiar de médico, como `agenda_bloqueo_preparar`), con su medida
+de coste sobre la tabla más escrita y una carrera de dos sesiones en
+`scripts/reserva-carrera.sh`.
+
+### AG-DT-272 — Las acciones referenciales pasan por encima de los candados de la cita (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, A10,
+2026-11-22). `ON DELETE SET NULL`/`CASCADE` corren como el dueño (`postgres`) y
+no las frena ningún disparador de la cita: el auditor comprobó que, como
+`service_role`, `delete from public.consultorios where id = …` deja
+`consultorio_id = NULL` en una cita reservada por enlace futura, aunque
+`cita_proteger_eleccion` impida cambiar el consultorio de esa cita. Hoy la app
+archiva consultorios, no los borra (`src/app/api/consultorios/[id]/route.ts:320`),
+así que no muerde. **Para quien añada un borrado** de consultorios (o de
+cualquier tabla con una FK `SET NULL`/`CASCADE` desde `appointments`): ese borrado
+tiene que comprobar antes las citas que tocaría.
+
+### AG-DT-273 — F5b sube de candado sobre `appointments` dentro de la transacción (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, A11,
+2026-11-22; deducido, no reproducido). `20261201170000_agenda_f5b_protecciones_cita.sql`
+pide sobre `appointments` SHARE, luego SHARE ROW EXCLUSIVE y luego ACCESS
+EXCLUSIVE dentro de la misma transacción (ventana de ~12 viajes). Una
+transacción ajena que ya leyó `appointments` y luego quiere escribirla puede
+acabar en abrazo mortal con F5b; PostgreSQL mata a una de las dos al segundo
+(`deadlock_timeout`). Si muere F5b, se deshace entera y se reintenta; si muere la
+otra, falla una petición de la app. Fuera de horario es improbable. **Lo que
+haría falta para quitarlo:** pedir de entrada el candado más fuerte que la
+migración vaya a necesitar sobre `appointments` (un `LOCK TABLE … IN ACCESS
+EXCLUSIVE MODE NOWAIT` con reintentos, como F1), a costa de alargar la ventana
+de ACCESS EXCLUSIVE; es decisión de Angel junto con A1.
+
+### AG-DT-274 — Los códigos de verificación de la reserva no tienen plazo de conservación, y el tope de emisión sólo vive en la app
+
+**Estado:** abierta, **prioridad ALTA — resolver antes de encender la v2 en
+otras clínicas** (decisión de Angel, 2026-11-22: plazo de **30 días**, aplicado
+por una **tarea automática**; **NO se construye ahora**). Origen: auditoría
+independiente, ronda 2, A14 (`supabase/produccion/auditoria/RONDA-2.md`).
+
+**Qué pasa.** Cada petición de código de la reserva por enlace inserta una fila
+en `public.reserva_verificaciones` (`reserva_codigo_emitir`,
+`supabase/migrations/20261201140000_agenda_f3_reserva_enlace.sql`, §10) y nada
+la borra ni la caduca: la tabla no tiene DELETE para nadie salvo el dueño, y
+`trg_reserva_verificaciones_sin_truncate` (T) impide vaciarla con TRUNCATE.
+Guarda el `correo_hmac` de quien pidió el código, también si nunca reservó: una
+conservación indefinida de un seudónimo de datos personales (minimización). No es
+un fallo de seguridad. Además, **`reserva_codigo_emitir` no tiene tope propio**:
+el único freno a la emisión son los límites de `src/lib/reserva/limitesReserva.ts`
+(`codigo`: 3 por correo y hora, 10 por IP, 5 por dispositivo; y los 30 s entre
+códigos del mismo enlace y correo, `REENVIO_CODIGO_S` con
+`reserva_espera_reenvio`), que aplica la ruta; quien llame a la función con
+`service_role` por otro camino no tiene límite.
+
+**Qué guarda cada fila** (columnas de fecha: `created_at`, `caduca_en` —el
+código—, `verificado_en`, `ficha_caduca_en` —la ficha, 30 min tras verificar—,
+`consumida_en`): `clinica_id`, `enlace_id` (FK compuesta a `reserva_enlaces`,
+RESTRICT), `correo_hmac`, `codigo_hmac`, `intentos`, `ficha_hmac`. Ninguna otra
+tabla apunta a `reserva_verificaciones`.
+
+**Otras tablas con el HMAC del correo de alguien que quizá nunca reservó**
+(DEDUCIDO leyendo F3 y la foto):
+- `reserva_enlaces.correo` y `correo_hmac` del enlace de un solo uso: el correo
+  lo teclea la clínica al emitir, **en claro**, y se queda aunque la persona no
+  reserve nunca. Es del mismo plazo y de la misma revisión legal.
+- `ip_rate_limits.ruta` (de `main`) lleva `reserva:codigo:correo:<hmac>`; la
+  propia `rate_limit_intento` borra las filas de una ruta al volver a usarla
+  pasada la ventana, pero las de una ruta que no vuelve se quedan.
+- `reserva_incidencias.correo_hmac` (y `tel_hmac`) y
+  `appointments.reserva_correo_hmac` **no**: son de alguien que SÍ reservó
+  (cuelgan de una cita, FK RESTRICT) y alimentan el candado; su plazo es el del
+  historial del candado (propuesto 12 meses, pendiente de la revisión legal,
+  `mejora_agendaV2.md` §10).
+- `reserva_contactos.clave_hmac`: bloqueos manuales de la clínica; no es esto.
+
+**Diseño propuesto (no construido):**
+1. **Qué se borra:** filas de `reserva_verificaciones` con `created_at < now() -
+   interval '30 days'` cuyo código ya no sirve (`caduca_en` y, si la hay,
+   `ficha_caduca_en` pasados; con 30 días lo están siempre). Si se decide lo
+   mismo para el único: vaciar `reserva_enlaces.correo`/`correo_hmac` de los
+   únicos caducados, revocados o agotados con más de 30 días (no se puede borrar
+   el enlace: lo apuntan citas y verificaciones con RESTRICT, y sin correo el
+   único ya no se puede usar, que es lo que se quiere).
+2. **La migración:** una función `public.reserva_verificaciones_purgar(p_dias
+   integer DEFAULT 30) RETURNS integer`, `SECURITY INVOKER`, `search_path = ''`,
+   que borre por lotes (p. ej. 5 000 por llamada, con `lock_timeout` corto) y
+   devuelva cuántas; `GRANT DELETE ON public.reserva_verificaciones TO
+   service_role` (o la función `SECURITY DEFINER` de `postgres` si se corre desde
+   `pg_cron`); y, si se quiere, el tope propio en `reserva_codigo_emitir` (p. ej.
+   negar más de N filas por enlace y correo en una hora, con el mismo `FOR
+   UPDATE` del enlace). Pre-vuelo y rejilla como las demás; pasa por
+   `supabase/AUDITORIA-MIGRACIONES.md`. Ninguna toca `audit_log` salvo para
+   escribir.
+3. **Quién lo corre — dos opciones:**
+   - **Tarea de Vercel** (como `google-sync` y `recordatorios`, que es como la
+     app hace hoy todo lo programado): una ruta `/api/cron/purgar-reserva` con
+     `CRON_SECRET`, una vez al día en `vercel.json`, que llama a la función con
+     `createAdminClient()` (`service_role`). Ojo con **AG-DT-268**: su
+     `maxDuration` por debajo de la frecuencia, y el borrado por lotes para que
+     una pasada quepa en el límite; si no cabe, la siguiente sigue.
+   - **`pg_cron`** (existe en producción: `pg_cron 1.6.4`, G.12/G.17 de los
+     conteos; hoy con 1 trabajo activo ajeno a la agenda): un `cron.schedule`
+     diario que llama a la función como `postgres`. No depende de Vercel ni de
+     `CRON_SECRET`, pero es el único trabajo de la agenda que viviría en la base
+     y no en `vercel.json`: hay que dejarlo escrito en ambos sitios.
+4. **Con qué rol:** `service_role` (Vercel) o `postgres` (`pg_cron`); nunca la
+   sesión.
+5. **Cómo se audita:** una fila en `audit_log` por pasada que borre algo
+   (`accion = 'reserva_verificaciones_purgadas'`, `user_id = 'system'`, sólo el
+   número de filas y el plazo: nunca HMAC ni ids de enlace).
+
+**Aviso de privacidad:** el aviso de la reserva (`src/lib/reserva/avisoReserva.ts`,
+PENDIENTE DE REVISIÓN LEGAL) tiene que decir cuánto se conservan estos datos;
+anotado en la lista para la revisión legal (`mejora_agendaV2.md` §7, fila
+«Texto legal»).
+
+### AG-DT-275 — Cambiar el rol de un médico con contactos bloqueados rompe su bloqueo y desbloqueo (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 2, A13,
+comprobado por el auditor; decisión de Angel: los roles son tres y la regla de A3
+se queda). Texto del auditor: «Tras A3, `reserva_contacto_marcar` deja de poder
+bloquear Y DESBLOQUEAR si el médico de la cita ya no tiene `role = 'medico'`»
+(`20261201140000_agenda_f3_reserva_enlace.sql`, la comprobación del INSERT de
+`proteger_reserva_contactos` y `reserva_contacto_marcar`, que hace `INSERT … ON
+CONFLICT DO UPDATE`: el disparador BEFORE INSERT corre también cuando la fila ya
+existe). «Con un contacto bloqueado de un médico, cambiar `profiles.role` de ese
+médico a `super_admin`; como secretaria, `select
+public.reserva_contacto_marcar('<cita>', 'desbloquear')` → `23514 El médico del
+contacto no pertenece a la clínica`.» Daño: «un paciente bloqueado a mano para un
+médico que cambió de rol no se puede desbloquear desde la pantalla
+(`src/app/api/agenda/reservas/contactos/route.ts:61`). Sólo si un médico con
+reservas por enlace cambia de rol; hoy es raro.» **Cómo se llegaría hoy:** sólo
+cambiando el rol a mano (SQL) o desde una herramienta de administración
+(spinus-consola); la app no lo ofrece. Quien cambie el rol de un médico con citas
+lo mira antes. Criterio del auditor si se arregla: la regla «médico de la
+clínica» se exige al CREAR la fila; bloquear o desbloquear un contacto que ya
+existe no depende del rol actual del médico, con una prueba que lo cubra.
 
 ---
 

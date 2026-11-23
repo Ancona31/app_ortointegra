@@ -42,8 +42,9 @@ declare v uuid := gen_random_uuid();
 begin
   perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
   set local role service_role;
+  -- La emisora de 9 argumentos (la de 7 se retiró en el conjunto fundido): sin correo.
   perform public.reserva_enlace_emitir('00000000-0000-4000-8000-00000b03c001', '00000000-0000-4000-8000-00000b03b001',
-    v, '00000000-0000-4000-8000-00000b03b001', p_clase, pg_temp.h(p_nombre), null);
+    v, '00000000-0000-4000-8000-00000b03b001', p_clase, pg_temp.h(p_nombre), null, null, null);
   reset role;
   return v;
 end $$;

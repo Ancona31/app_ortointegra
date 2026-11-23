@@ -173,6 +173,47 @@ cd ~/proyectos/app_ortointegra-agenda
 - La terminal de Ubuntu (WSL) abierta.
 - Docker Desktop corriendo en Windows.
 - Chrome.
+
+> **En el equipo nuevo (desde el 2026-11-21) cambia esto:**
+>
+> - Es **Ubuntu 26.04 nativo, sin WSL ni Windows**. La terminal es la del
+>   sistema y Docker es el de Ubuntu (Docker Engine 29.1.3), no Docker Desktop:
+>   arranca solo con el equipo, no hay nada que abrir.
+> - La carpeta `~/proyectos/app_ortointegra-agenda` es **un clon normal, no un
+>   worktree**: no hay otra carpeta del proyecto ni otra rama compartiendo la
+>   base local.
+> - En P2 vale sólo la segunda vía, `SB="npx --yes supabase@2.117.0"`: la CLI no
+>   está instalada bajo `fnm`.
+> - Donde la guía abre un archivo con `explorer.exe "$(wslpath -w …)"`, aquí es
+>   `xdg-open …` con la misma ruta.
+> - Si `docker ps` responde «permission denied … docker.sock», la sesión se abrió
+>   antes de que tu usuario entrara al grupo `docker`: cierra la sesión de Ubuntu
+>   y vuelve a entrar.
+>
+> **Lo comprobado en el equipo nuevo (2026-11-21 y 22, commit `d51bb6dd`):**
+>
+> - Base desde cero con las 50 migraciones (sin `LegacyDbSetupError`), Vitest
+>   2363 de 2363 sin `TZ`, con `UTC` y con `America/Hermosillo`, SQL 45 de 45 y
+>   las dos carreras en verde.
+> - **Pruebas automáticas (Playwright): 634 pasan y 1 falla conocida**, en fin de
+>   semana (sábado por la noche y domingo). La que falla es `agenda-empalme`
+>   «redimensionar hasta otra cita también avisa»: es la prueba, no la app (a
+>   mano funciona); está en `DEUDA_TECNICA.md`, AG-DT-257.
+> - Las pruebas ya no dependen del día en que se corren (AG-DT-256): las citas con
+>   paciente que crean van en la semana siguiente, y una guarda
+>   (`e2e/guardaAsistencia.ts`) pone la corrida en rojo si alguna prueba deja una
+>   cita que abriría «¿Asistió el paciente?» al final de la semana. Si al final de
+>   una corrida ves «Guarda de asistencia: N cita(s)…», ésa es la causa.
+> - **Línea base de rendimiento de este equipo** (4 rondas, mediana de 20
+>   muestras; v2 apagada / encendida): apertura en frío 406 / 406 ms; con red
+>   limitada 850 / 855 ms; semana siguiente 88 / 93 ms; volver del dashboard
+>   117 / 123 ms; validaciones contra Auth 2 / 4; peticiones bloqueantes 0 / 0; JS
+>   al abrir 547,1 / 587,3 KiB en 34 / 39 chunks; al guardar, la tarjeta a los
+>   14 / 17 ms, el modal fuera a los 14 / 184 ms y el POST en 77 / 72 ms. Los
+>   tiempos no se comparan con los del equipo anterior (éste tarda más en el
+>   servidor); el peso y los recuentos sí, y coinciden con los de la tanda M. Los
+>   datos crudos y los scripts quedan en `e2e/resultados/linea-base-equipo-nuevo/`
+>   (fuera de git).
 - Nadie más usando la base local: ni la otra carpeta del proyecto ni otro
   agente. La base es una sola para las dos carpetas; reiniciarla les borra todo
   a los demás.
@@ -318,10 +359,12 @@ Comprueba cuántas migraciones quedaron:
 docker exec supabase_db_app_ortointegra psql -U postgres -Atc "select count(*), max(version) from supabase_migrations.schema_migrations"
 ```
 
-Debe responder `45|20261123140000`: las 5 de `main` más las 40 de la agenda
-(las 16 de los bloques A a F, las 4 de las correcciones de seguridad, las 4 de
-la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de la tanda
-I, las 3 de la tanda J y las 3 de la tanda K).
+Debe responder `50|20261125180000`: las 5 de `main`, las 43 de la agenda hasta
+la tanda L (las 16 de los bloques A a F, las 4 de las correcciones de seguridad,
+las 4 de la tanda de diseño, duración y horarios, las 3 de la tanda H, las 7 de
+la tanda I, las 3 de la tanda J, las 3 de la tanda K y las 3 de la tanda L) y
+las 2 de la integración M: `20261125170000_audit_log_sin_truncate`, que no es de
+la agenda, y `20261125180000_agenda_m_saludo_recordatorio`.
 
 > Este reinicio deja fuera las tres migraciones `20261014…` de la otra rama
 > (`feature/limites-ajustables`). Para probar la agenda no hacen falta. Si

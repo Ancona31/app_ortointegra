@@ -1,0 +1,742 @@
+
+== comentario ==
+~ distinto: function public.agenda_restablecer_configuracion(pg_catalog.uuid,pg_catalog.uuid)  [INESPERADA]
+    texto:
+      A: Restablece la configuración de la agenda v2 de UNA clínica (tanda H, punto 10): consultorios al horario de partida de la v2 (el de la clínica copiado como horario propio, la herencia de G4) y POR REVISAR (horario_revisado_en NULL, tanda I punto 3), tipos de cita archivados, enlaces de reserva vigent… (597 car.)
+      B: Restablece la configuración de la agenda v2 de UNA clínica: consultorios al horario de partida de la v2 (el de la clínica copiado como horario propio) y POR REVISAR (horario_revisado_en NULL), tipos de cita archivados, enlaces de reserva vigentes revocados, plazos de fábrica y recordatorio apagado; … (541 car.)
++ sólo en B: function public.agenda_v2_encendida(pg_catalog.uuid)  [INESPERADA]
+    {"texto": "La única lectura común del interruptor de la agenda v2 de una clínica. Sin fila = false (falla cerrado). INVOKER a propósito: con la sesión lee con la RLS de agenda_ajustes (sólo la clínica propia); dentro de una SECURITY DEFINER, como su dueño. No la hagas DEFINER. Sin EXECUTE para anon.… (302 car.)
+~ distinto: function public.cita_asignacion_google()  [INESPERADA]
+    texto:
+      A: Agenda (tanda I, punto 10): pone appointments.google_asignacion al INSERTAR (por_asignar sólo si la importa el sondeo de Google —service_role con spinus.via = google—, origen google, sin paciente ni reserva, con hora y sin terminar; si no, NULL) y en un UPDATE sólo deja pasar por_asignar → evento de… (428 car.)
+      B: Pone appointments.google_asignacion al INSERTAR (por_asignar sólo si la importa el sondeo de Google —service_role con spinus.via = google—, origen google, sin paciente ni reserva, con hora y sin terminar; si no, NULL) y en un UPDATE sólo deja pasar por_asignar → evento de una fila sin paciente (4250… (400 car.)
+~ distinto: function public.cita_movimiento_google_registrar(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone)  [INESPERADA]
+    texto:
+      A: Tanda J (punto 10): registra un intento de mover desde Google una cita reservada por enlace que la base rechazó; true = intento nuevo (deja el aviso), false = repetido o no aplica (v2 apagada, otra clínica, no es por enlace, ya empezó). Sólo service_role (gcalSincronizacionBase.ts, tras el 42501 de … (324 car.)
+      B: Registra un intento de mover desde Google una cita reservada por enlace que la base rechazó; true = intento nuevo (deja el aviso), false = repetido o no aplica (v2 apagada, otra clínica, no es por enlace, ya empezó). Sólo service_role (gcalSincronizacionBase.ts, tras el 42501 de cita_proteger_elecci… (304 car.)
+~ distinto: function public.cita_recordatorios_pendientes(integer)  [INESPERADA]
+    texto:
+      A: Listado ENTRE CLÍNICAS de recordatorios por mandar (sólo ids), para /api/cron/recordatorios. Igual que cita_correos_pendientes (E4) más el interruptor agenda_ajustes.recordatorio_encendido (tanda H, punto 9). CONVENIO: la expresión del destinatario va junta con la de cita_correo_tomar.
+      B: Listado ENTRE CLÍNICAS de recordatorios por mandar (sólo ids), para /api/cron/recordatorios. Sólo clínicas con la agenda v2 encendida, la puerta S3 (gcal_sync_clinica_habilitada) y el interruptor agenda_ajustes.recordatorio_encendido. CONVENIO: la expresión del destinatario va junta con la de cita_c… (312 car.)
+~ distinto: function public.cita_rsvp_google(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text[])  [INESPERADA]
+    texto:
+      A: Agenda E9: RSVP «accepted» de Google como segunda vía de confirmación. Sólo scheduled → confirmed, cita futura con hora, ligada a ese evento y calendario de la conexión activa de la clínica, y sólo si un correo aceptado es pacientes.email o reserva_correo de ESA cita. Audita via google_rsvp. El códi… (350 car.)
+      B: RSVP «accepted» de Google como segunda vía de confirmación. Sólo scheduled → confirmed, cita futura con hora, ligada a ese evento y calendario de la conexión activa de la clínica, y sólo si un correo aceptado es pacientes.email o reserva_correo de ESA cita. Audita via google_rsvp. El código la llama… (339 car.)
+~ distinto: function public.gcal_aplicar_evento(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,timestamp with time zone,pg_catalog.text,boolean,timestamp with time zone,timestamp with time zone,boolean,pg_catalog.text,boolean,pg_catalog.text,boolean)  [INESPERADA]
+    texto:
+      A: Aplica un evento de Google a una cita ligada (C2, ampliado en D4). Sólo service_role. «Sin paciente» = paciente_id NULL Y reserva_canal NULL: una cita por ligar no acepta título ni todo el día desde Google (C-d); su hora sí.
+      B: Aplica un evento de Google a una cita ligada. Sólo service_role. «Sin paciente» = paciente_id NULL Y reserva_canal NULL: una cita por ligar no acepta título ni todo el día desde Google (C-d); su hora sí.
+~ distinto: function public.gcal_bloqueo_aplicar(pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.uuid,pg_catalog.text,timestamp with time zone,boolean,timestamp with time zone,timestamp with time zone,pg_catalog.date,pg_catalog.date)  [INESPERADA]
+    texto:
+      A: Tanda K (punto 6): lo movido o borrado en Google de un evento de BLOQUEO vuelve al bloqueo, como un evento sin paciente. Sólo un bloqueo que ya existe (ligado al evento, o el de la marca privada spinus_bloqueo sin evento aún): nunca crea uno. Borrado = DELETE; movido = puntas (p_inicio/p_fin con hor… (514 car.)
+      B: Lo movido o borrado en Google de un evento de BLOQUEO vuelve al bloqueo, como un evento sin paciente. Sólo un bloqueo que ya existe (ligado al evento, o el de la marca privada spinus_bloqueo sin evento aún): nunca crea uno. Borrado = DELETE; movido = puntas (p_inicio/p_fin con hora, o p_desde/p_hast… (495 car.)
+~ distinto: function public.gcal_citas_por_evento(pg_catalog.uuid,pg_catalog.text[],pg_catalog.uuid[])  [INESPERADA]
+    texto:
+      A: Espejo del sondeo de Google (C2, ampliado en D4). Sólo service_role. Una cita POR LIGAR (paciente_id NULL y reserva_canal NOT NULL) cuenta como CON paciente: r_con_paciente = true, r_titulo_sin_paciente NULL, r_paciente_nombre = reserva_nombre (nombre completo) y r_paciente_apellidos = '' (cadena va… (420 car.)
+      B: Espejo del sondeo de Google. Sólo service_role. Una cita POR LIGAR (paciente_id NULL y reserva_canal NOT NULL) cuenta como CON paciente: r_con_paciente = true, r_titulo_sin_paciente NULL, r_paciente_nombre = reserva_nombre (nombre completo) y r_paciente_apellidos = '' (cadena vacía, no NULL), para q… (399 car.)
+~ distinto: function public.gcal_sync_frescura(pg_catalog.uuid)  [INESPERADA]
+    texto:
+      A: D11: ultima_ok y si el candado de sincronización de la clínica está tomado ahora. Sólo lectura, sólo service_role. Cero filas si nunca se tomó el candado; ultima_ok NULL si se tomó y ninguna pasada terminó bien.
+      B: ultima_ok y si el candado de sincronización de la clínica está tomado ahora. Sólo lectura, sólo service_role. Cero filas si nunca se tomó el candado; ultima_ok NULL si se tomó y ninguna pasada terminó bien.
+~ distinto: function public.log_cita_change()  [INESPERADA]
+    texto:
+      A: Auditoría de public.appointments (AG-DT-10). Escribe NOMBRES de columnas y estado de→a, nunca valores: audit_log es inmutable y no admite ARCO. "via" sólo sin auth.uid() y con el GUC spinus.via en la lista blanca c_vias: google (C2), enlace_paciente (E1/E6), google_rsvp (E9); otro literal no se escr… (395 car.)
+      B: Auditoría de public.appointments (AG-DT-10). Escribe NOMBRES de columnas y estado de→a, nunca valores: audit_log es inmutable y no admite ARCO. "via" sólo sin auth.uid() y con el GUC spinus.via en la lista blanca c_vias: google y google_rsvp (sincronización con Google), enlace_paciente (confirmación… (443 car.)
+~ distinto: function public.proteger_reserva_enlaces()  [INESPERADA]
+    texto:
+      A: Protección de reserva_enlaces (D1; alta sólo por service_role desde la corrección de seguridad 7a). Decide con current_user: postgres/supabase_admin libres; INSERT sólo service_role; lo emitido no se modifica; revocar una vez; marcar usado sólo service_role y una vez.
+      B: Protección de reserva_enlaces. Decide con current_user: postgres/supabase_admin libres; INSERT sólo service_role (el código y su hash los calcula el servidor con RESERVA_SECRETO); lo emitido no se modifica; revocar una vez (también service_role), sin reactivar; marcar usado sólo service_role y una v… (344 car.)
+~ distinto: function public.rate_limit_espera(pg_catalog.text,integer,integer)  [INESPERADA]
+    texto:
+      A: Tanda K (K2, punto 10): segundos que faltan para que `p_ruta` vuelva a tener sitio con un tope de `p_limite` en `p_ventana_seg` segundos (0 = ya cabe). Cuenta como rate_limit_intento (renglones de ip_rate_limits de esa ruta dentro de la ventana) y no escribe. Sólo service_role (rutas públicas de la … (655 car.)
+      B: Segundos que faltan para que `p_ruta` vuelva a tener sitio con un tope de `p_limite` en `p_ventana_seg` segundos (0 = ya cabe). Cuenta como rate_limit_intento (renglones de ip_rate_limits de esa ruta dentro de la ventana) y no escribe. Sólo service_role (rutas públicas de la reserva: Retry-After de … (631 car.)
+~ distinto: function public.reserva_codigo_verificar(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)  [INESPERADA]
+    texto:
+      A: Reserva por enlace (D3; K2): comprueba el código del correo (5 equivocados por código, 10 min) y, si vale, deja la ficha de un uso (30 min). Devuelve ok | sin_codigo | agotado | caducado | incorrecto | reemplazado. reemplazado (K2, punto 10): el código es el de un correo ANTERIOR de este enlace y co… (389 car.)
+      B: Reserva por enlace fijo: comprueba el código del correo (5 equivocados por código, 10 min) y, si vale, deja la ficha de un uso (30 min). Devuelve ok | sin_codigo | agotado | caducado | incorrecto | reemplazado. reemplazado: el código es el de un correo ANTERIOR de este enlace y correo (lo invalidó u… (370 car.)
+~ distinto: function public.reserva_contacto_estado(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text)  [INESPERADA]
+    texto:
+      A: Estado del candado de un contacto con un médico (D2, cambiado en seg1). manual = bloqueo a mano vigente por el teléfono O por el correo. cancelaciones / no_shows / hasta y el bloqueo automático cuentan SÓLO las incidencias del CORREO (correo_hmac) dentro de la ventana y después del último desbloqueo… (414 car.)
+      B: Estado del candado de un contacto con un médico. manual = bloqueo a mano vigente por el teléfono O por el correo. cancelaciones / no_shows / hasta y el bloqueo automático cuentan SÓLO las incidencias del CORREO (correo_hmac) dentro de la ventana y después del último desbloqueo del correo: el teléfon… (391 car.)
+~ distinto: function public.reserva_contexto(pg_catalog.text,pg_catalog.text,pg_catalog.text)  [INESPERADA]
+    texto:
+      A: Contexto público de un enlace de reserva (D3; G2 añadió consultorio_id y principal a cada tipo; j2 el estado 'agotado' del único). NULL = 404 indistinguible. Sólo service_role. CONVENIO: los tipos van todos juntos; qué tipos valen en cada consultorio (el principal por consultorio sustituye allí al g… (529 car.)
+      B: Contexto público de un enlace de reserva (estado vigente | usado | caducado | agotado). NULL = 404 indistinguible. Sólo service_role. CONVENIO: los tipos van todos juntos, con consultorio_id y principal; qué tipos valen en cada consultorio (el principal por consultorio sustituye allí al general) lo … (513 car.)
+~ distinto: function public.reserva_empalmes_registrar(pg_catalog.uuid,pg_catalog.uuid[])  [INESPERADA]
+    texto:
+      A: D11: registra (sin repetir) los pares reserva por enlace / cita empalmada del mismo médico en los que participa alguna de p_citas (recién importadas o movidas desde Google) y audita cada par nuevo en la misma sentencia. Devuelve los pares nuevos. Sólo service_role; interruptor apagado = 0.
+      B: Registra (sin repetir) los pares reserva por enlace / cita empalmada del mismo médico en los que participa alguna de p_citas (recién importadas o movidas desde Google) y audita cada par nuevo en la misma sentencia. Devuelve los pares nuevos. Sólo service_role; interruptor apagado = 0.
+- sólo en A: function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)  [INESPERADA]
+    {"texto": "Agenda v2 (corrección de seguridad, punto 7a): emite un enlace de reserva. Sólo service_role (POST /api/agenda/enlaces, con el código derivado de RESERVA_SECRETO). p_actor = quien lo pide, comprobado con la regla de las policies de reserva_enlaces. Fijo: revoca el vigente y emite otro, at… (361 car.)
+~ distinto: function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text)  [INESPERADA]
+    texto:
+      A: Emite un enlace de reserva (seg 7a; j2 añadió p_correo y p_correo_hmac, los dos o ninguno, sólo en el único). Sólo service_role, llamada desde POST /api/agenda/enlaces con la clínica de la sesión y el actor; repite la regla de las policies. El hmac lo calcula el servidor con RESERVA_SECRETO.
+      B: Emite un enlace de reserva. Sólo service_role, llamada desde POST /api/agenda/enlaces con la clínica de la sesión y el actor; repite la regla de las policies de reserva_enlaces con p_actor. Fijo: revoca el vigente y emite otro, atómico. Único: emite (la vigencia la congela el disparador), con p_corr… (390 car.)
+~ distinto: function public.reserva_espera_reenvio(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,integer)  [INESPERADA]
+    texto:
+      A: Tanda K (K2, punto 10): segundos que faltan para poder emitir otro código a ese correo EN ESE ENLACE (p_segundos desde el último emitido; 0 = ya). Filtra por clinica_id y enlace_id: desde otro enlace no revela nada; desde ESE enlace sí dice, durante 30 s, que ese correo pidió un código ahí (aceptado… (587 car.)
+      B: Segundos que faltan para poder emitir otro código a ese correo EN ESE ENLACE (p_segundos desde el último emitido; 0 = ya). Filtra por clinica_id y enlace_id: desde otro enlace no revela nada; desde ESE enlace sí dice, durante 30 s, que ese correo pidió un código ahí (aceptado: un bit, una ventana de… (563 car.)
+~ distinto: function public.reserva_ocupacion(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone)  [INESPERADA]
+    texto:
+      A: Lo que ocupa en el enlace de reserva (D3, cambiado en seg1 y k1): sólo puntas. Las citas y eventos CON HORA del médico del enlace menos cancelled y no_show, y sus bloqueos (agenda_bloqueos). k1 (tanda K, punto 4): las filas de TODO EL DÍA de appointments ya NO ocupan. Sólo service_role; interruptor … (350 car.)
+      B: Lo que ocupa en el enlace de reserva: sólo puntas. Las citas y eventos CON HORA del médico del enlace menos cancelled y no_show (las filas de TODO EL DÍA no ocupan), y sus bloqueos (agenda_bloqueos). Sólo service_role; interruptor apagado o enlace revocado o pausado = nada; rango ≤ 15 días.
+~ distinto: function public.reservar_por_enlace(pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)  [INESPERADA]
+    texto:
+      A: Reserva por enlace (D3, cambiada en seg1, i2, j2 y k1). Sólo service_role. Serializa por enlace (FOR UPDATE) y por médico (advisory 1790, que también toman los bloqueos). CONVENIO: horario del consultorio y alineación del turno (rejilla fija de G2) los comprueba el servidor antes de llamar (src/lib/… (1833 car.)
+      B: Reserva por enlace. Sólo service_role. Serializa por enlace (FOR UPDATE) y por médico (advisory 1790, que también toman los bloqueos). CONVENIO: horario del consultorio y alineación del turno (rejilla fija) los comprueba el servidor antes de llamar (src/lib/reserva/turnosReserva.ts, ruta pública); u… (1726 car.)
+~ distinto: table column public.agenda_ajustes.correo_reserva_clinica  [INESPERADA]
+    texto:
+      A: Tanda I (punto 20): correo a los administradores de la clínica por cada reserva nueva por enlace (nombre, fecha, hora, médico y consultorio; nada clínico). APAGADO de fábrica. Lo cambia el administrador desde la configuración (policy de UPDATE de B1).
+      B: Correo a los administradores de la clínica por cada reserva nueva por enlace (nombre, fecha, hora, médico y consultorio; nada clínico). APAGADO de fábrica. Lo cambia el administrador desde la configuración (policy agenda_ajustes_update).
+~ distinto: table column public.agenda_ajustes.recordatorio_encendido  [INESPERADA]
+    texto:
+      A: Recordatorio automático por correo (tanda H, punto 9). APAGADO de fábrica: sólo con true la tarea /api/cron/recordatorios lista las citas de esta clínica (cita_recordatorios_pendientes). No afecta al código ni al comprobante de la reserva por enlace ni a la confirmación que manda el personal. Lo cam… (383 car.)
+      B: Recordatorio automático por correo. APAGADO de fábrica: sólo con true la tarea /api/cron/recordatorios lista las citas de esta clínica (cita_recordatorios_pendientes). No afecta al código ni al comprobante de la reserva por enlace ni a la confirmación que manda el personal. Lo cambia el administrado… (370 car.)
+~ distinto: table column public.appointments.google_asignacion  [INESPERADA]
+    texto:
+      A: Agenda (tanda I, punto 10): qué es un evento NUEVO de Google. NULL = lo de siempre; por_asignar = importado por el sondeo con la v2, se trata como cita por ligar (marca «Por asignar», «Próximas citas», se liga al iniciar la consulta); evento = alguien pulsó «¿No es una cita?» (evento sin paciente; e… (529 car.)
+      B: Qué es un evento NUEVO de Google. NULL = lo de siempre; por_asignar = importado por el sondeo con la v2, se trata como cita por ligar (marca «Por asignar», «Próximas citas», se liga al iniciar la consulta); evento = alguien pulsó «¿No es una cita?» (evento sin paciente; el sondeo no lo devuelve). Lo… (501 car.)
+~ distinto: table column public.appointments.reserva_aviso_version  [INESPERADA]
+    texto:
+      A: Versión de reserva_avisos que aceptó quien reservó (FK). Sin una versión aprobada con el mismo texto_sha256 que el código, no se reserva (D3).
+      B: Versión de reserva_avisos que aceptó quien reservó (FK). Sin una versión aprobada con el mismo texto_sha256 que el código, no se reserva.
+~ distinto: table column public.appointments.reserva_canal  [INESPERADA]
+    texto:
+      A: fijo | unico = la cita nació de una reserva por enlace (D). «Por ligar» = reserva_canal no nulo y paciente_id nulo. CONVENIO: una cita por ligar se trata como cita (no como evento genérico) en tarjetas, conteos, cancelación (B3) y tipo de cita; y su título NO lo cambia Google (C-d). Teléfono, correo… (337 car.)
+      B: fijo | unico = la cita nació de una reserva por enlace. «Por ligar» = reserva_canal no nulo y paciente_id nulo. CONVENIO: una cita por ligar se trata como cita (no como evento genérico) en tarjetas, conteos, cancelación y tipo de cita; y su título NO lo cambia Google. Teléfono, correo y *_hmac nunca… (317 car.)
+~ distinto: table column public.appointments.reserva_correo_hmac  [INESPERADA]
+    texto:
+      A: Seudónimo del correo de quien reservó por enlace (D1): HMAC(RESERVA_SECRETO) del correo normalizado. EXCEPCIÓN (i2): una reserva por enlace único SIN correo lleva sha256('reserva-sin-correo:'||id de la cita) en hex, propio de esa reserva: no es el HMAC de nada y no sirve para buscar a la persona (pa… (396 car.)
+      B: Seudónimo del correo de quien reservó por enlace: HMAC(RESERVA_SECRETO) del correo normalizado. En el único, el correo es el que escribió la clínica en el enlace. EXCEPCIÓN: una reserva por enlace único SIN correo lleva sha256('reserva-sin-correo:'||id de la cita) en hex, propio de esa reserva: no e… (382 car.)
+~ distinto: table column public.appointments.reserva_enlace_id  [INESPERADA]
+    texto:
+      A: Enlace de reserva_enlaces del que nació la cita (D1). La FK compuesta (reserva_enlace_id, clinica_id) impide colgarla de un enlace de otra clínica. Va junto con reserva_canal (appointments_reserva_check).
+      B: Enlace de reserva_enlaces del que nació la cita. La FK compuesta (reserva_enlace_id, clinica_id) impide colgarla de un enlace de otra clínica. Va junto con reserva_canal (appointments_reserva_check).
+~ distinto: table column public.appointments.reserva_nombre  [INESPERADA]
+    texto:
+      A: Nombre de quien reservó por enlace, sin paciente todavía (D1). Se queda en la cita al ligarla a un paciente. Mientras la cita esté por ligar, el espejo de Google (gcal_citas_por_evento, D4) lo devuelve como nombre completo del «paciente» con apellidos vacíos.
+      B: Nombre de quien reservó por enlace, sin paciente todavía. Se queda en la cita al ligarla a un paciente. Mientras la cita esté por ligar, el espejo de Google (gcal_citas_por_evento) lo devuelve como nombre completo del «paciente» con apellidos vacíos.
+~ distinto: table column public.appointments.reserva_reagendados  [INESPERADA]
+    texto:
+      A: Agenda E6: posición en la cadena de reagendados. 0 en una cita no reagendada; la cita NUEVA de un reagendado lleva origen + 1 (sólo la escribe reagendar_por_enlace; la de origen no cambia). Tope agenda_ajustes.candado_reagendados.
+      B: Posición en la cadena de reagendados. 0 en una cita no reagendada; la cita NUEVA de un reagendado lleva origen + 1 (sólo la escribe reagendar_por_enlace; la de origen no cambia). Tope agenda_ajustes.candado_reagendados. Única reserva_* con DEFAULT (cita_proteger_reserva lo tolera).
+~ distinto: table column public.appointments.reserva_tel_hmac  [INESPERADA]
+    texto:
+      A: HMAC-SHA256 (hex) del teléfono normalizado con la subllave «contacto» de RESERVA_SECRETO. Llave del candado (D2) junto con reserva_correo_hmac. Rotar el secreto rompe el historial.
+      B: HMAC-SHA256 (hex) del teléfono normalizado con la subllave «contacto» de RESERVA_SECRETO. Llave del bloqueo manual junto con reserva_correo_hmac. Rotar el secreto rompe el historial.
+~ distinto: table column public.appointments.tipo_cita_id  [INESPERADA]
+    texto:
+      A: Tipo de la cita (agenda B6). La FK compuesta garantiza la misma clínica. CONVENIO QUE LA BASE NO IMPONE: el tipo es de toda la clínica (medico_id NULL) o del medico_id de la cita, y la cita tiene paciente O está por ligar (reserva_canal no nulo, D1). Lo comprueban reservar_por_enlace (D3) y POST/PUT… (537 car.)
+      B: Tipo de la cita. La FK compuesta garantiza la misma clínica. CONVENIO QUE LA BASE NO IMPONE: el tipo es de toda la clínica (medico_id NULL) o del medico_id de la cita, y la cita tiene paciente O está por ligar (reserva_canal no nulo). Lo comprueban reservar_por_enlace y POST/PUT /api/appointments (v… (516 car.)
+~ distinto: table column public.clinicas.timezone  [INESPERADA]
+    texto:
+      A: K3 (punto 12): huso horario IANA «de fábrica» de la clínica; NULL = aún sin elegir. Lo escribe sólo PUT /api/me/horario (administrador, validado contra Intl.supportedValuesOf). CONVENIO: NO lo lee la rejilla, ni la reserva, ni los correos: cada consultorio tiene su propio consultorios.timezone, que … (376 car.)
+      B: Huso horario IANA «de fábrica» de la clínica; NULL = aún sin elegir. Lo escribe sólo PUT /api/me/horario (administrador, validado contra Intl.supportedValuesOf). CONVENIO: NO lo lee la rejilla, ni la reserva, ni los correos: cada consultorio tiene su propio consultorios.timezone, que cambiar éste NO… (361 car.)
+~ distinto: table column public.consultorios.horario_propio  [INESPERADA]
+    texto:
+      A: false = la disponibilidad de este consultorio es clinicas.horario_consulta; true = manda consultorios.horario (un tramo por día, sin pausa; con true y todos los días inactivos el consultorio está CERRADO, no hereda). Lo resuelve horarioEfectivo() en src/lib/agenda/disponibilidad.ts. Desde 2026111913… (564 car.)
+      B: false = la disponibilidad de este consultorio es clinicas.horario_consulta; true = manda consultorios.horario (un tramo por día, sin pausa; con true y todos los días inactivos el consultorio está CERRADO, no hereda). Lo resuelve horarioEfectivo() en src/lib/agenda/disponibilidad.ts. Al crearse esta … (629 car.)
+~ distinto: table column public.consultorios.horario_revisado_en  [INESPERADA]
+    texto:
+      A: Agenda v2 (tanda I, punto 3): cuándo una persona confirmó o guardó el horario de este consultorio desde la configuración de la agenda. NULL = por revisar (lo heredó de la clínica en 20261119130000, lo dejó «Restablecer» o nadie lo ha confirmado). La escribe PATCH /api/consultorios/[id] con la v2; ag… (348 car.)
+      B: Agenda v2: cuándo una persona confirmó o guardó el horario de este consultorio desde la configuración de la agenda. NULL = por revisar (lo heredó de la clínica al crearse la columna, lo dejó «Restablecer» o nadie lo ha confirmado). La escribe PATCH /api/consultorios/[id] con la v2; agenda_restablece… (333 car.)
+~ distinto: table column public.reserva_enlaces.agotado_en  [INESPERADA]
+    texto:
+      A: j2: el único ya no sirve por el tope de intentos (5) o porque un intento dio 'bloqueado'. Sólo service_role lo pone y no se quita. La página dice «Este enlace ya no está disponible», sin la causa.
+      B: El único ya no sirve por el tope de intentos (5) o porque un intento dio 'bloqueado'. Sólo service_role lo pone y no se quita. La página dice «Este enlace ya no está disponible», sin la causa.
+~ distinto: table column public.reserva_enlaces.correo  [INESPERADA]
+    texto:
+      A: j2: el correo del paciente que escribió la clínica al emitir un enlace ÚNICO (opcional). El comprobante y todos los correos de la cita van SÓLO aquí; el que teclee quien reserva no se usa. Nunca viaja a la página pública ni a la lista de enlaces. Inmutable (trg_reserva_enlaces_unico).
+      B: Correo del paciente que escribió la clínica al emitir un enlace ÚNICO (opcional). El comprobante y todos los correos de la cita van SÓLO aquí; el que teclee quien reserva no se usa. Nunca viaja a la página pública ni a la lista de enlaces. Inmutable (trg_reserva_enlaces_unico).
+~ distinto: table column public.reserva_enlaces.correo_hmac  [INESPERADA]
+    texto:
+      A: j2: HMAC(RESERVA_SECRETO) del correo normalizado, el seudónimo del candado (el mismo que usa el fijo al verificar). Lo calcula el servidor.
+      B: HMAC(RESERVA_SECRETO) del correo normalizado, el seudónimo del candado (el mismo que usa el fijo al verificar). Lo calcula el servidor.
+~ distinto: table column public.reserva_enlaces.intentos  [INESPERADA]
+    texto:
+      A: j2: llamadas a reservar_por_enlace con este único vigente (sin contar los reenvíos 'repetida'). Sólo la sube service_role (la RPC).
+      B: Llamadas a reservar_por_enlace con este único vigente (sin contar los reenvíos 'repetida'). Sólo la sube service_role (la RPC).
+~ distinto: table column public.reserva_enlaces.pausado_en  [INESPERADA]
+    texto:
+      A: K3 (punto 14): el enlace FIJO apagado desde «Tu enlace» sin revocarlo; NULL = prendido. Al volver a NULL sirve la MISMA dirección (el código sale del id). CONVENIO: toda función que abra un enlace para el público lo trata como revocado (reserva_contexto, reservar_por_enlace, reagendar_por_enlace, ci… (482 car.)
+      B: El enlace FIJO apagado desde «Tu enlace» sin revocarlo; NULL = prendido. Al volver a NULL sirve la MISMA dirección (el código sale del id). CONVENIO: toda función que abra un enlace para el público lo trata como revocado (reserva_contexto, reservar_por_enlace, reagendar_por_enlace, cita_reagendar_of… (467 car.)
+~ distinto: table column public.tipos_cita.consultorio_id  [INESPERADA]
+    texto:
+      A: Sólo en un tipo principal (tipos_cita_consultorio_check): la duración distinta del médico en ESE consultorio, que allí sustituye a su principal general (agenda G2). El consultorio es del mismo médico y clínica (validar_tipo_cita_consultorio). CONVENIO QUE LA BASE NO IMPONE: reservar_por_enlace acept… (484 car.)
+      B: Sólo en un tipo principal (tipos_cita_consultorio_check): la duración distinta del médico en ESE consultorio, que allí sustituye a su principal general. El consultorio es del mismo médico y clínica (validar_tipo_cita_consultorio). CONVENIO QUE LA BASE NO IMPONE: reservar_por_enlace acepta el tipo en… (472 car.)
+~ distinto: table column public.tipos_cita.principal  [INESPERADA]
+    texto:
+      A: La duración de la consulta del médico (agenda G2): su tipo principal, creado al contestar «¿cuánto dura tu consulta?». Sólo con medico_id (tipos_cita_principal_check); uno activo por médico y, aparte, uno por médico y consultorio (tipos_cita_principal_unico).
+      B: La duración de la consulta del médico: su tipo principal, creado al contestar «¿cuánto dura tu consulta?». Sólo con medico_id (tipos_cita_principal_check); uno activo por médico y, aparte, uno por médico y consultorio (tipos_cita_principal_unico).
+~ distinto: table public.agenda_bloqueos  [INESPERADA]
+    texto:
+      A: Tanda K (sección A): un periodo que el médico cierra a propósito (horas o días completos, motivo opcional). NO es una cita ni un evento. En el enlace de reserva no se ofrecen turnos que lo toquen (reserva_ocupacion) y reservar_por_enlace lo rechaza ('ocupado'); dentro de Spinus sólo pide confirmació… (617 car.)
+      B: Un periodo que el médico cierra a propósito (horas o días completos, motivo opcional). NO es una cita ni un evento. En el enlace de reserva no se ofrecen turnos que lo toquen (reserva_ocupacion) y reservar_por_enlace lo rechaza ('ocupado'); dentro de Spinus, con la v2 encendida, ninguna cita ni even… (696 car.)
+~ distinto: table public.cita_correos  [INESPERADA]
+    texto:
+      A: Envíos de correo de cita (agenda E4 y G3): recordatorio, comprobante y confirmacion (el correo de confirmación que el personal manda desde la agenda, con o sin Google). Llave (cita, tipo, inicio_cita): mover la cita da un recordatorio y una confirmación nuevos; una sola confirmación por inicio (salv… (996 car.)
+      B: Envíos de correo de cita (agenda E4 y G3): recordatorio, comprobante y confirmacion (el correo de confirmación que el personal manda desde la agenda, con o sin Google). Llave (cita, tipo, inicio_cita): mover la cita da un recordatorio y una confirmación nuevos; una sola confirmación por inicio (salv… (1002 car.)
+~ distinto: table public.gcal_movimientos_rechazados  [INESPERADA]
+    texto:
+      A: Tanda J (punto 10): un renglón por INTENTO de mover desde Google una cita reservada por enlace que la base rechazó (cita_proteger_eleccion, I2). Intento = (cita, updated del evento de Google): dos sondeos del mismo cambio son uno. Sólo lo escribe cita_movimiento_google_registrar (service_role); su d… (450 car.)
+      B: Un renglón por INTENTO de mover desde Google una cita reservada por enlace que la base rechazó (cita_proteger_eleccion). Intento = (cita, updated del evento de Google): dos sondeos del mismo cambio son uno. Sólo lo escribe cita_movimiento_google_registrar (service_role); su disparador deja el aviso … (426 car.)
+~ distinto: table public.gcal_sync_estado  [INESPERADA]
+    texto:
+      A: Estado de la sincronización incremental con Google por clínica (bloque C). Sólo service_role, sólo vía gcal_sync_*. Sin FK a la conexión: si (conexion_id, calendar_id) no es la vigente, gcal_sync_tomar reinicia el token. ultimo_error lo compone el código, nunca texto de Google.
+      B: Estado de la sincronización incremental con Google por clínica. Sólo service_role, sólo vía gcal_sync_*. Sin FK a la conexión: si (conexion_id, calendar_id) no es la vigente, gcal_sync_tomar reinicia el token. ultimo_error lo compone el código, nunca texto de Google.
+~ distinto: table public.reserva_empalmes_google  [INESPERADA]
+    texto:
+      A: D11: pares (cita reservada por enlace, cita que se le empalma) detectados por la sincronización con Google al importar o mover una cita. UNIQUE por par: una resincronización no repite el aviso. Sólo lo escribe reserva_empalmes_registrar (service_role), que audita cada par nuevo. Sin FK a appointment… (570 car.)
+      B: Pares (cita reservada por enlace, cita que se le empalma) detectados por la sincronización con Google al importar o mover una cita. UNIQUE por par: una resincronización no repite el aviso. Sólo lo escribe reserva_empalmes_registrar (service_role), que audita cada par nuevo. Sin FK a appointments a p… (531 car.)
+~ distinto: table public.reserva_enlaces  [INESPERADA]
+    texto:
+      A: Enlaces de reserva (agenda D1). El código NO se guarda: se deriva en el servidor (HMAC con RESERVA_SECRETO sobre el id) y aquí sólo vive sha256(código). Un fijo vigente por médico; los únicos congelan vigencia_dias/caduca_en al emitir. Se revocan, nunca se borran. Rotar RESERVA_SECRETO invalida TODO… (314 car.)
+      B: Enlaces de reserva. El código NO se guarda: se deriva en el servidor (HMAC con RESERVA_SECRETO sobre el id) y aquí sólo vive sha256(código). Un fijo vigente por médico; los únicos congelan vigencia_dias/caduca_en al emitir. Los emite sólo service_role (reserva_enlace_emitir). Se revocan, nunca se bo… (355 car.)
+~ distinto: table public.reserva_incidencias  [INESPERADA]
+    texto:
+      A: Cancelaciones y no_show de citas por enlace (candado D2). La escribe SÓLO reserva_registrar_incidencia(). anulada_en = la cita se reactivó. Seudónimos (HMAC), sin datos en claro. Desde seg1 el conteo automático (reserva_contacto_estado) mira sólo correo_hmac; tel_hmac se guarda pero no cuenta.
+      B: Cancelaciones y no_show de citas por enlace (el candado). La escribe SÓLO reserva_registrar_incidencia(). anulada_en = la cita se reactivó. Seudónimos (HMAC), sin datos en claro. El conteo automático (reserva_contacto_estado) mira sólo correo_hmac; tel_hmac se guarda pero no cuenta.
+~ distinto: table public.tipos_cita  [INESPERADA]
+    texto:
+      A: Tipos de cita de la clínica (agenda B6). medico_id NULL = de toda la clínica; con valor = sólo de ese médico. Se archivan (activo=false), nunca se borran. Los límites (nombre 1-60, duración 5-600 en múltiplos de 5, los seis colores) están aquí en CHECK y en src/lib/agenda/tiposCita.ts: cambiar los d… (303 car.)
+      B: Tipos de cita de la clínica. medico_id NULL = de toda la clínica; con valor = sólo de ese médico. Se archivan (activo=false), nunca se borran. Los límites (nombre 1-60, duración 5-600 en múltiplos de 5, los seis colores) están aquí en CHECK y en src/lib/agenda/tiposCita.ts: cambiar los dos.
+~ distinto: table respaldos.consultorios_horario_20261119  [INESPERADA]
+    texto:
+      A: consultorios.horario y horario_propio de cada consultorio sin horario propio, ANTES de heredar el de su clínica (20261119130000, punto 10 de Angel). respaldado_en es el instante de la copia: una fila de consultorios con updated_at igual no se ha editado desde entonces (ver VUELTA ATRÁS en el archivo… (302 car.)
+      B: consultorios.horario y horario_propio de cada consultorio sin horario propio, ANTES de heredar el de su clínica (backfill de 20261201120000_agenda_f1). respaldado_en es el instante de la copia: una fila de consultorios con updated_at igual no se ha editado desde entonces (lo usa la reversa de F1).
+
+== funcion ==
+~ distinto: public.agenda_restablecer_configuracion(p_clinica_id uuid, p_actor uuid)  [INESPERADA]
+    md5_cuerpo:
+      A: 1c3906443dc060471fce5067344b0157
+      B: ed0b98f674864a519afd029314c945f4
+      | --- A
+      | +++ B
+      | @@ -34,7 +34,7 @@
+      |     WHERE c.clinica_id = p_clinica_id;
+      |  
+      | -  -- El horario de partida de la v2: el de la clínica COPIADO y propio, la
+      | -  -- herencia de G4 (20261119130000). La única fuente sigue siendo el consultorio.
+      | -  -- Tanda I (punto 3): queda POR REVISAR hasta que su médico lo confirme.
+      | +  -- El horario de partida de la v2: el de la clínica COPIADO y propio, la misma
+      | +  -- herencia del backfill de los consultorios. La única fuente sigue siendo el
+      | +  -- consultorio, y queda POR REVISAR hasta que su médico lo confirme.
+      |    UPDATE public.consultorios c SET horario = cl.horario_consulta, horario_propio = true, horario_revisado_en = NULL
+      |      FROM public.clinicas cl
++ sólo en B: public.agenda_v2_encendida(p_clinica_id uuid)  [INESPERADA]
+    {"clase": "f", "lenguaje": "sql", "devuelve": "boolean", "argumentos": "p_clinica_id uuid", "security_definer": false, "volatilidad": "s", "estricta": false, "leakproof": false, "paralelo": "u", "config": "search_path=\"\"", "dueno": "postgres", "md5_cuerpo": "18288c1dd2adc17c6ef0b88ee701942b", "cue… (453 car.)
+~ distinto: public.cita_confirmacion_contexto(p_codigo_hash text)  [INESPERADA]
+    md5_cuerpo:
+      A: 2fca66ffb8ea3b15eb7d0224c90a4f1a
+      B: 3c99f013ab965cf71f4e42f0e330f317
+      | --- A
+      | +++ B
+      | @@ -12,5 +12,5 @@
+      |      RETURN NULL;
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = v_c.clinica_id AND j.agenda_v2_encendida) THEN
+      | +  IF NOT public.agenda_v2_encendida(v_c.clinica_id) THEN
+      |      RETURN NULL;
+      |    END IF;
+~ distinto: public.cita_confirmacion_emitir(p_clinica_id uuid, p_cita_id uuid, p_id uuid, p_codigo_hash text, p_creado_por uuid)  [INESPERADA]
+    md5_cuerpo:
+      A: be479fa0c8180d73c88b1d3f4423c25c
+      B: db9b32f1f4002ee7b806f7f221a3f463
+      | --- A
+      | +++ B
+      | @@ -8,5 +8,5 @@
+      |      RAISE EXCEPTION 'cita_confirmacion_emitir: argumentos inválidos' USING ERRCODE = '22023';
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id)
+      |       OR NOT public.gcal_sync_clinica_habilitada(p_clinica_id) THEN
+      |      RETURN NEXT; RETURN;
+~ distinto: public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text)  [INESPERADA]
+    md5_cuerpo:
+      A: 7961e24a4f9f7bda0ce2df744f5b46aa
+      B: 5b6de825e613214886f9292175cdaf0e
+      | --- A
+      | +++ B
+      | @@ -13,5 +13,5 @@
+      |     FOR UPDATE;
+      |    IF NOT FOUND OR v_c.revocado_en IS NOT NULL
+      | -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+      | +     OR NOT public.agenda_v2_encendida(p_clinica_id)
+      |       -- Suspendida = no disponible, como en contexto (auditoría de E1, hallazgo 1).
+      |       OR NOT EXISTS (SELECT 1 FROM public.clinicas k WHERE k.id = p_clinica_id AND NOT k.suspendida) THEN
+~ distinto: public.cita_correo_tomar(p_clinica_id uuid, p_cita_id uuid, p_tipo text, p_testigo uuid)  [INESPERADA]
+    md5_cuerpo:
+      A: 5d0ce8dbadf8e0533893dfd4b7b3c099
+      B: 292eec972d66bd6ab312c4797c8c65fc
+      | --- A
+      | +++ B
+      | @@ -18,5 +18,5 @@
+      |    SELECT a.id, a.start_time, a.end_time, a.status, a.medico_id, a.consultorio_timezone,
+      |           a.consultorio_nombre, a.consultorio_direccion, a.consultorio_telefono,
+      | -         -- ⚠️ Destinatario: la MISMA expresión que cita_correos_pendientes.
+      | +         -- ⚠️ Destinatario: la MISMA expresión que cita_recordatorios_pendientes.
+      |           CASE WHEN a.paciente_id IS NOT NULL
+      |                THEN CASE WHEN p.activo IS NOT FALSE THEN coalesce(nullif(btrim(p.email), ''), nullif(btrim(a.reserva_correo), '')) END
+- sólo en A: public.cita_correos_pendientes(p_limite integer)  [INESPERADA]
+    {"clase": "f", "lenguaje": "sql", "devuelve": "TABLE(r_clinica_id uuid, r_cita_id uuid)", "argumentos": "p_limite integer", "security_definer": false, "volatilidad": "s", "estricta": false, "leakproof": false, "paralelo": "u", "config": "search_path=\"\"", "dueno": "postgres", "md5_cuerpo": "a8b08c1… (2300 car.)
+~ distinto: public.cita_movimiento_google_registrar(p_clinica_id uuid, p_cita_id uuid, p_google_updated timestamp with time zone)  [INESPERADA]
+    md5_cuerpo:
+      A: 109afcb7bfaf7009ffb2f70a87656d44
+      B: 97fba9d929f39a2153c4a7108c584ad9
+      | --- A
+      | +++ B
+      | @@ -4,8 +4,8 @@
+      |      RAISE EXCEPTION 'cita_movimiento_google_registrar: argumentos inválidos' USING ERRCODE = '22023';
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN false;
+      |    END IF;
+      | -  -- El criterio de cita_proteger_eleccion (I2): de ESTA clínica, por enlace y sin empezar.
+      | +  -- El criterio de cita_proteger_eleccion: de ESTA clínica, por enlace y sin empezar.
+      |    IF NOT EXISTS (SELECT 1 FROM public.appointments a
+      |                    WHERE a.id = p_cita_id AND a.clinica_id = p_clinica_id
+~ distinto: public.cita_proteger_bloqueo()  [INESPERADA]
+    md5_cuerpo:
+      A: d084da26524c8edd79243c3d258c156f
+      B: 69a4c7de085710ae92ae510da09459d8
+      | --- A
+      | +++ B
+      | @@ -4,10 +4,13 @@
+      |      RETURN NEW;
+      |    END IF;
+      | -  -- K punto 5: lo que ya estaba dentro se queda; sólo cuenta entrar (alta, o mover inicio, fin o médico).
+      | +  -- Lo que ya estaba dentro se queda; sólo cuenta entrar (alta, o mover inicio,
+      | +  -- fin o médico). Este atajo y la lista de columnas del disparador son lo que
+      | +  -- deja cerrar una cancelada dentro de un bloqueo y editar lo que ya estaba
+      | +  -- dentro: no los quites.
+      |    IF TG_OP = 'UPDATE' AND (NEW.start_time, NEW.end_time, NEW.medico_id)
+      |                            IS NOT DISTINCT FROM (OLD.start_time, OLD.end_time, OLD.medico_id) THEN
+      |      RETURN NEW;
+      |    END IF;
+      | -  -- Lo de Google entra como hoy (C2/D4), y la reserva por enlace ya rechaza los bloqueos ella misma.
+      | +  -- Lo de Google entra como siempre, y la reserva por enlace ya rechaza los bloqueos ella misma.
+      |    IF current_user = 'service_role'
+      |       AND (current_setting('spinus.via', true) = 'google'
+      | @@ -18,6 +21,5 @@
+      |                WHERE b.clinica_id = NEW.clinica_id AND b.medico_id = NEW.medico_id
+      |                  AND b.inicio < NEW.end_time AND b.fin > NEW.start_time)
+      | -     AND EXISTS (SELECT 1 FROM public.agenda_ajustes j
+      | -                  WHERE j.clinica_id = NEW.clinica_id AND j.agenda_v2_encendida) THEN
+      | +     AND public.agenda_v2_encendida(NEW.clinica_id) THEN
+      |      RAISE EXCEPTION 'Este horario está bloqueado. Quita el bloqueo para agendar aquí.'
+      |        USING ERRCODE = '42501', HINT = 'agenda_horario_bloqueado';
+~ distinto: public.cita_proteger_borrado()  [INESPERADA]
+    md5_cuerpo:
+      A: 9cbe4e1679478c3332a71fc7d6ab0cf5
+      B: 8b0828c9841f43a78fff2d8fe8fa0130
+      | --- A
+      | +++ B
+      | @@ -7,6 +7,5 @@
+      |      RETURN OLD;
+      |    END IF;
+      | -  IF EXISTS (SELECT 1 FROM public.agenda_ajustes j
+      | -              WHERE j.clinica_id = OLD.clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
+      | +  IF public.agenda_v2_encendida(OLD.clinica_id) THEN
+      |      RAISE EXCEPTION 'Una cita con paciente o por ligar no se borra: se cancela'
+      |        USING ERRCODE = '42501', HINT = 'Cancélala (status cancelled) en vez de borrarla';
+~ distinto: public.cita_proteger_eleccion()  [INESPERADA]
+    md5_cuerpo:
+      A: a110e6a7a327d977c9a4ca7a40b9f065
+      B: b8feda69cede89c4087593c786165a0b
+      | --- A
+      | +++ B
+      | @@ -4,6 +4,5 @@
+      |       OR (NEW.medico_id, NEW.consultorio_id, NEW.start_time, NEW.all_day)
+      |          IS NOT DISTINCT FROM (OLD.medico_id, OLD.consultorio_id, OLD.start_time, OLD.all_day)
+      | -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j
+      | -                     WHERE j.clinica_id = OLD.clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
+      | +     OR NOT public.agenda_v2_encendida(OLD.clinica_id) THEN
+      |      RETURN NEW;  -- la duración (end_time) es libre
+      |    END IF;
+~ distinto: public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone)  [INESPERADA]
+    md5_cuerpo:
+      A: 00656df5bc7cb66b48c4d20a89f2a30f
+      B: 1e156fb1be831714acef80fbfbe5dbd2
+      | --- A
+      | +++ B
+      | @@ -10,5 +10,5 @@
+      |      RAISE EXCEPTION 'cita_reagendar_clinica: argumentos inválidos' USING ERRCODE = '22023';
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida IS TRUE) THEN
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      r_resultado := 'apagado'; RETURN NEXT; RETURN;
+      |    END IF;
+~ distinto: public.cita_rsvp_google(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_aceptaron text[])  [INESPERADA]
+    md5_cuerpo:
+      A: f48025d5c741e2bea3db825cc4017032
+      B: 6a08b30ee9a6c990ad24cef51e3c4f6b
+      | --- A
+      | +++ B
+      | @@ -13,5 +13,5 @@
+      |      INTO v_correos FROM unnest(p_aceptaron) c;
+      |    IF cardinality(v_correos) = 0
+      | -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida)
+      | +     OR NOT public.agenda_v2_encendida(p_clinica_id)
+      |       OR NOT EXISTS (SELECT 1 FROM public.clinica_conexiones_google g
+      |                       WHERE g.clinica_id = p_clinica_id AND g.rol = 'clinica' AND g.estado = 'activa'
+~ distinto: public.gcal_aplicar_evento(p_clinica_id uuid, p_cita_id uuid, p_esperado_updated_at timestamp with time zone, p_calendar_id text, p_etag text, p_google_updated timestamp with time zone, p_vincular_evento text, p_desvincular boolean, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_title text, p_tocar_notas boolean, p_notas text, p_cancelar boolean)  [INESPERADA]
+    md5_cuerpo:
+      A: 5ac551e4085881a13f10bf08cafa26e3
+      B: 7d38d21da0ff6a676e2282fe444d9f60
+      | --- A
+      | +++ B
+      | @@ -18,5 +18,5 @@
+      |      RAISE EXCEPTION 'gcal_aplicar_evento: texto demasiado largo' USING ERRCODE = '22023';
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN 0;
+      |    END IF;
+~ distinto: public.gcal_bloqueo_aplicar(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_bloqueo_id uuid, p_etag text, p_google_updated timestamp with time zone, p_borrar boolean, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_desde date, p_hasta date)  [INESPERADA]
+    md5_cuerpo:
+      A: 3e426d39518506fc2395318e6f832c8d
+      B: fcfc80e96e5db14571c7bdf31c97df99
+      | --- A
+      | +++ B
+      | @@ -16,5 +16,5 @@
+      |    END IF;
+      |    -- Las mismas dos puertas que gcal_aplicar_evento: v2 encendida y la conexión activa de ESE calendario.
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN 0;
+      |    END IF;
+~ distinto: public.gcal_citas_por_evento(p_clinica_id uuid, p_eventos text[], p_citas uuid[])  [INESPERADA]
+    md5_cuerpo:
+      A: 66feb69a15e35a46bf9d4dad1443848d
+      B: 71d64f8fd3379750f907328d68f3def4
+      | --- A
+      | +++ B
+      | @@ -7,5 +7,5 @@
+      |      RAISE EXCEPTION 'gcal_citas_por_evento: demasiados ids' USING ERRCODE = '22023';
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN;
+      |    END IF;
+      | @@ -16,5 +16,5 @@
+      |           CASE WHEN a.paciente_id IS NULL AND a.reserva_canal IS NULL THEN a.title END,
+      |           CASE WHEN a.paciente_id IS NULL AND a.origen = 'google' THEN a.notes END,
+      | -         -- Una cita POR LIGAR (D4): el nombre de quien reservó, sin apellidos
+      | +         -- Una cita POR LIGAR: el nombre de quien reservó, sin apellidos
+      |           -- aparte (van dentro de reserva_nombre), como lo compone la reserva.
+      |           coalesce(p.nombre, CASE WHEN a.paciente_id IS NULL THEN a.reserva_nombre END),
+~ distinto: public.gcal_importar_evento(p_clinica_id uuid, p_calendar_id text, p_google_event_id text, p_etag text, p_google_updated timestamp with time zone, p_title text, p_start timestamp with time zone, p_end timestamp with time zone, p_all_day boolean, p_timezone text, p_notas text, p_medico_id uuid)  [INESPERADA]
+    md5_cuerpo:
+      A: 9e0c7f1947cdd03e822d1722e3a9dde5
+      B: 350d1a0e91dfdc32858a6f691293628b
+      | --- A
+      | +++ B
+      | @@ -15,5 +15,5 @@
+      |      RAISE EXCEPTION 'gcal_importar_evento: zona horaria desconocida' USING ERRCODE = '22023';
+      |    END IF;
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN NULL;
+      |    END IF;
+~ distinto: public.gcal_sync_clinica_habilitada(p_clinica_id uuid)  [INESPERADA]
+    md5_cuerpo:
+      A: 94570be2303eda92aa7245d168bd58cf
+      B: daa8e65200d897aa7a655e8ca2d44c9f
+      | --- A
+      | +++ B
+      | @@ -21,5 +21,5 @@
+      |         OR v_sql ~* '(get_clinica_id|auth\.|current_setting|request\.jwt|current_user|session_user|current_role|set_config|;)' THEN
+      |        RAISE EXCEPTION 'gcal_sync_clinica_habilitada: % ya no tiene la forma que se sabe evaluar por clínica', v_puerta
+      | -        USING ERRCODE = 'P0001', HINT = 'Revisar C1 (20261113120000) contra la definición nueva; no se adivina.';
+      | +        USING ERRCODE = 'P0001', HINT = 'Revisar gcal_sync_clinica_habilitada (20261201150000_agenda_f2_google) contra la definición nueva; no se adivina.';
+      |      END IF;
+      |      EXECUTE v_sql INTO v_ok USING p_clinica_id;
+~ distinto: public.gcal_sync_tomar(p_clinica_id uuid, p_conexion_id uuid, p_calendar_id text, p_lease_seg integer, p_min_intervalo_seg integer)  [INESPERADA]
+    md5_cuerpo:
+      A: 80bc20721ef2b261acf128c300022aee
+      B: 2939a28c9fd99f8464166d6744b026d4
+      | --- A
+      | +++ B
+      | @@ -6,7 +6,6 @@
+      |      RAISE EXCEPTION 'gcal_sync_tomar: argumentos inválidos' USING ERRCODE = '22023';
+      |    END IF;
+      | -  -- Detrás del interruptor (B1). agenda_ajustes sólo se LEE.
+      | -  IF NOT EXISTS (SELECT 1 FROM public.agenda_ajustes a
+      | -                  WHERE a.clinica_id = p_clinica_id AND a.agenda_v2_encendida) THEN
+      | +  -- Detrás del interruptor de la clínica. agenda_ajustes sólo se LEE.
+      | +  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN;
+      |    END IF;
+~ distinto: public.log_cita_change()  [INESPERADA]
+    md5_cuerpo:
+      A: 80c3556c1655ddf2eaf1d57995190463
+      B: e4a4ebdd29fa976d9b475d2b2502b1bc
+      | --- A
+      | +++ B
+      | @@ -4,5 +4,7 @@
+      |    c_tecnicas CONSTANT text[] := ARRAY['updated_at', 'client_id', 'gcal_sync_status',
+      |                                        'gcal_etag', 'gcal_calendar_id', 'google_event_id'];
+      | -  -- C2 'google' · E1/E6 'enlace_paciente' · E9 'google_rsvp'. Sólo éstos, sólo sin sesión.
+      | +  -- 'google' y 'google_rsvp' los pone la sincronización con Google; 'enlace_paciente',
+      | +  -- la confirmación y el reagendo por enlace. Sólo éstos, sólo sin sesión. Un literal
+      | +  -- nuevo exige migración.
+      |    c_vias     CONSTANT text[] := ARRAY['google', 'enlace_paciente', 'google_rsvp'];
+      |    v_uid    uuid := auth.uid();
+~ distinto: public.rate_limit_espera(p_ruta text, p_limite integer, p_ventana_seg integer)  [INESPERADA]
+    md5_cuerpo:
+      A: 621e753f4f6665766aba699fdb684f9d
+      B: 1b4e44143fb0c37b370c422e7d8d136a
+      | --- A
+      | +++ B
+      | @@ -11,5 +11,5 @@
+      |     ORDER BY r.created_at DESC
+      |    OFFSET p_limite - 1 LIMIT 1;
+      | -  -- `<` y no `<=`: rate_limit_intento cuenta `created_at >= now() - ventana` (auditoría H3).
+      | +  -- `<` y no `<=`: rate_limit_intento cuenta `created_at >= now() - ventana`.
+      |    IF v_sale IS NULL OR v_sale < now() THEN
+      |      RETURN 0;
+~ distinto: public.reserva_codigo_emitir(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text)  [INESPERADA]
+    md5_cuerpo:
+      A: d24c01e93ce43ae8b75013010a7cb1fd
+      B: 3885430cced1c390068f8c6a168d0ddb
+      | --- A
+      | +++ B
+      | @@ -6,6 +6,6 @@
+      |    END IF;
+      |    IF NOT EXISTS (SELECT 1 FROM public.reserva_enlaces e
+      | -                   JOIN public.agenda_ajustes j ON j.clinica_id = e.clinica_id AND j.agenda_v2_encendida
+      | -                  WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.clase = 'fijo' AND e.revocado_en IS NULL AND e.pausado_en IS NULL)
+      | +                  WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.clase = 'fijo' AND e.revocado_en IS NULL AND e.pausado_en IS NULL
+      | +                    AND public.agenda_v2_encendida(e.clinica_id))
+      |       OR NOT public.gcal_sync_clinica_habilitada(p_clinica_id) THEN
+      |      RETURN 'enlace_invalido';
+~ distinto: public.reserva_codigo_verificar(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text, p_ficha_hmac text)  [INESPERADA]
+    md5_cuerpo:
+      A: c3deded3c0d558fdc5ea6740a18964dd
+      B: e43d73f4511461dd223b4dac25ffdf49
+      | --- A
+      | +++ B
+      | @@ -16,5 +16,5 @@
+      |    IF v.caduca_en <= now() THEN RETURN 'caducado'; END IF;
+      |    IF v.codigo_hmac <> p_codigo_hmac THEN
+      | -    -- K2 (punto 10): el código de un correo ANTERIOR (lo invalidó un reenvío) no cuenta como equivocado.
+      | +    -- El código de un correo ANTERIOR (lo invalidó un reenvío) no cuenta como equivocado.
+      |      IF EXISTS (SELECT 1 FROM public.reserva_verificaciones r
+      |                  WHERE r.clinica_id = p_clinica_id AND r.enlace_id = p_enlace_id AND r.correo_hmac = p_correo_hmac
+~ distinto: public.reserva_contacto_estado(p_clinica_id uuid, p_medico_id uuid, p_tel_hmac text, p_correo_hmac text)  [INESPERADA]
+    md5_cuerpo:
+      A: 52ca884f922f5f518da44720f237d947
+      B: f6e19b284f5629c248f406e17746b79c
+      | --- A
+      | +++ B
+      | @@ -16,5 +16,5 @@
+      |         AND c.clave_hmac IN (p_tel_hmac, p_correo_hmac)
+      |    ),
+      | -  -- Automático: cancelaciones e inasistencias SÓLO por el correo (seg1). El
+      | +  -- Automático: cancelaciones e inasistencias SÓLO por el correo. El
+      |    -- teléfono no lo es: nadie lo verifica y cualquiera puede escribir uno ajeno.
+      |    i AS (
+~ distinto: public.reserva_empalmes_registrar(p_clinica_id uuid, p_citas uuid[])  [INESPERADA]
+    md5_cuerpo:
+      A: 6bc47fd8244839a8785b85e74d70096c
+      B: 19586161228cb62e9734538d8f8ba7ef
+      | --- A
+      | +++ B
+      | @@ -8,5 +8,5 @@
+      |    END IF;
+      |    IF cardinality(p_citas) = 0
+      | -     OR NOT EXISTS (SELECT 1 FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida) THEN
+      | +     OR NOT public.agenda_v2_encendida(p_clinica_id) THEN
+      |      RETURN 0;
+      |    END IF;
+      | @@ -25,6 +25,5 @@
+      |         -- Reserva contra reserva: un solo par por solape, en orden canónico,
+      |         -- SÓLO si la otra también podría hacer de reserva (activa y sin
+      | -       -- terminar); si no, este r es el único representante posible
+      | -       -- (auditoría 2026-11-12, hallazgo 1).
+      | +       -- terminar); si no, este r es el único representante posible.
+      |         AND (o.reserva_canal IS NULL OR r.id < o.id
+      |              OR o.status NOT IN ('scheduled', 'confirmed') OR o.end_time <= now())
+- sólo en A: public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text)  [INESPERADA]
+    {"clase": "f", "lenguaje": "plpgsql", "devuelve": "uuid", "argumentos": "p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text", "security_definer": false, "volatilidad": "v", "estricta": false, "leakproof": false, "paralelo": "u", "config": … (1715 car.)
+~ distinto: public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text, p_correo text, p_correo_hmac text)  [INESPERADA]
+    md5_cuerpo:
+      A: 2e616c4ba5d0c44cf220d5321e280fa1
+      B: 1da67fce22a98315e0b77375b9993c30
+      | --- A
+      | +++ B
+      | @@ -3,9 +3,9 @@
+      |    IF p_clinica_id IS NULL OR p_actor IS NULL OR p_id IS NULL OR p_medico_id IS NULL OR p_codigo_hash IS NULL
+      |       OR p_clase IS NULL OR p_clase NOT IN ('fijo', 'unico') OR (p_clase = 'fijo' AND p_etiqueta IS NOT NULL)
+      | -     -- j2: el correo del único, los dos juntos; el fijo nunca lleva.
+      | +     -- El correo del único: los dos juntos; el fijo nunca lleva.
+      |       OR (p_correo IS NULL) <> (p_correo_hmac IS NULL) OR (p_clase = 'fijo' AND p_correo IS NOT NULL) THEN
+      |      RAISE EXCEPTION 'reserva_enlace_emitir: argumentos inválidos' USING ERRCODE = '22023';
+      |    END IF;
+      | -  -- La regla de las policies de reserva_enlaces (lista A, 16) con el actor en lugar de auth.uid().
+      | +  -- La regla de las policies de reserva_enlaces, con el actor en lugar de auth.uid().
+      |    IF NOT EXISTS (SELECT 1 FROM public.profiles p
+      |                    WHERE p.id = p_actor AND p.clinica_id = p_clinica_id
+- sólo en A: public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text)  [INESPERADA]
+    {"clase": "f", "lenguaje": "plpgsql", "devuelve": "uuid", "argumentos": "p_id uuid, p_medico_id uuid, p_codigo_hash text", "security_definer": false, "volatilidad": "v", "estricta": false, "leakproof": false, "paralelo": "u", "config": "search_path=\"\"", "dueno": "postgres", "md5_cuerpo": "ca225e74… (957 car.)
+~ distinto: public.reserva_espera_reenvio(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_segundos integer)  [INESPERADA]
+    md5_cuerpo:
+      A: ed76045debb85b01643cb5ae78c1687d
+      B: 7ff45846892f6f6f036b719b24796408
+      | --- A
+      | +++ B
+      | @@ -14,5 +14,5 @@
+      |      RETURN 0;
+      |    END IF;
+      | -  -- `least`: created_at lo sella clock_timestamp() en otra transacción y puede ir por delante de now() (auditoría 1).
+      | +  -- `least`: created_at lo sella clock_timestamp() en otra transacción y puede ir por delante de now().
+      |    RETURN least(p_segundos, greatest(1, ceil(extract(epoch FROM v_sale - now()))::integer));
+      |  END
+~ distinto: public.reserva_ocupacion(p_clinica_id uuid, p_enlace_id uuid, p_desde timestamp with time zone, p_hasta timestamp with time zone)  [INESPERADA]
+    md5_cuerpo:
+      A: f1701599edf6756887fbb01a8c18464f
+      B: 590d077a782b26cf56c20d6288aaf856
+      | --- A
+      | +++ B
+      | @@ -1,8 +1,8 @@
+      |  
+      | -  -- k1 (tanda K): lo que tiene hora y no está cancelado ni faltó (lo de TODO
+      | -  -- EL DÍA ya no ocupa, punto 4) y los bloqueos del médico (punto 2).
+      | +  -- Lo que tiene hora y no está cancelado ni faltó (lo de TODO EL DÍA no
+      | +  -- ocupa) y los bloqueos del médico. La misma condición de empalme que
+      | +  -- reservar_por_enlace.
+      |    SELECT o.start_time, o.end_time
+      |      FROM public.reserva_enlaces e
+      | -    JOIN public.agenda_ajustes j ON j.clinica_id = e.clinica_id AND j.agenda_v2_encendida
+      |      CROSS JOIN LATERAL (
+      |        SELECT a.start_time, a.end_time
+      | @@ -19,4 +19,5 @@
+      |      ) o
+      |     WHERE e.id = p_enlace_id AND e.clinica_id = p_clinica_id AND e.revocado_en IS NULL AND e.pausado_en IS NULL
+      | +     AND public.agenda_v2_encendida(e.clinica_id)
+      |       AND p_hasta > p_desde AND p_hasta - p_desde <= interval '15 days'
+      |     ORDER BY o.start_time;
+~ distinto: public.reservar_por_enlace(p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid)  [INESPERADA]
+    md5_cuerpo:
+      A: be25c16726eb90839767fd4bd9176195
+      B: 05553eb1c012ebcb7b1587c53444107a
+      | --- A
+      | +++ B
+      | @@ -9,13 +9,13 @@
+      |    v_fin   timestamptz;
+      |    v_id    uuid;
+      | -  -- j2 (punto 3): el correo que cuenta. En el ÚNICO, el que escribió la
+      | -  -- clínica al emitir el enlace (o ninguno); en el FIJO, el verificado.
+      | +  -- El correo que cuenta. En el ÚNICO, el que escribió la clínica al emitir
+      | +  -- el enlace (o ninguno); en el FIJO, el verificado.
+      |    v_correo      text;
+      |    v_correo_hmac text;
+      | -  -- j2 (punto 3): intentos que admite un enlace único (ver la cabecera).
+      | +  -- Intentos que admite un enlace único (ver el contador, abajo).
+      |    c_tope_unico CONSTANT integer := 5;
+      |    v_restr      text;
+      |  BEGIN
+      | -  -- i2: p_correo y p_correo_hmac son opcionales, pero LOS DOS JUNTOS.
+      | +  -- p_correo y p_correo_hmac son opcionales, pero LOS DOS JUNTOS.
+      |    IF p_clinica_id IS NULL OR p_codigo_hash IS NULL OR p_consultorio_id IS NULL OR p_tipo_cita_id IS NULL
+      |       OR p_inicio IS NULL OR p_nombre IS NULL OR p_telefono IS NULL OR p_tel_hmac IS NULL
+      | @@ -68,9 +68,12 @@
+      |    END IF;
+      |  
+      | -  -- j2 (punto 3): el ÚNICO cuenta cada intento que llega aquí (un reenvío del
+      | -  -- mismo client_id ya salió arriba como 'repetida' y no cuenta). Agotado, no
+      | -  -- sirve más y no dice por qué. El intento número c_tope_unico es el último:
+      | -  -- lo marca agotado al empezar, y si reserva queda además usado. Bajo el
+      | -  -- FOR UPDATE del enlace: dos intentos a la vez se cuentan los dos.
+      | +  -- El ÚNICO cuenta cada intento que llega aquí (un reenvío del mismo
+      | +  -- client_id ya salió arriba como 'repetida' y no cuenta). Agotado, no sirve
+      | +  -- más y no dice por qué. El intento número c_tope_unico es el último: lo
+      | +  -- marca agotado al empezar, y si reserva queda además usado. Bajo el FOR
+      | +  -- UPDATE del enlace: dos intentos a la vez se cuentan los dos.
+      | +  -- DESDE AQUÍ NADA PUEDE LANZAR una excepción que provoque quien reserva: la
+      | +  -- excepción desharía el conteo. Por eso lo que sigue son comprobaciones que
+      | +  -- devuelven un resultado, y el INSERT de la cita va en su propio bloque.
+      |    -- El correo del único es el de la clínica (v_enl.correo), NUNCA p_correo.
+      |    IF v_enl.clase = 'unico' THEN
+      | @@ -84,8 +87,8 @@
+      |      v_correo := v_enl.correo;
+      |      v_correo_hmac := v_enl.correo_hmac;
+      | -    -- Auditoría de j2 (H1): un client_id que ya usó OTRA cita haría fallar el
+      | -    -- INSERT de abajo (índice único) y la excepción desharía este conteo: con
+      | -    -- él se probarían teléfonos sin gastar el enlace. Se corta aquí, ANTES de
+      | -    -- mirar nada de la persona, y el intento queda contado.
+      | +    -- Un client_id que ya usó OTRA cita haría fallar el INSERT de abajo
+      | +    -- (índice único) y la excepción desharía este conteo: con él se probarían
+      | +    -- teléfonos sin gastar el enlace. Se corta aquí, ANTES de mirar nada de la
+      | +    -- persona, y el intento queda contado.
+      |      IF EXISTS (SELECT 1 FROM public.appointments a WHERE a.client_id = p_client_id::text) THEN
+      |        r_resultado := 'client_id_en_uso'; RETURN NEXT; RETURN;
+      | @@ -96,4 +99,5 @@
+      |    END IF;
+      |  
+      | +  -- El interruptor se lee junto con los ajustes: no usa agenda_v2_encendida().
+      |    SELECT j.anticipacion_min_horas, j.horizonte_dias, j.candado_citas_activas INTO v_aj
+      |      FROM public.agenda_ajustes j WHERE j.clinica_id = p_clinica_id AND j.agenda_v2_encendida;
+      | @@ -105,4 +109,5 @@
+      |      r_resultado := 'aviso_no_aprobado'; RETURN NEXT; RETURN;
+      |    END IF;
+      | +  -- service_role no pasa por appointments_gates_insert: ésta es la puerta de suscripción.
+      |    IF NOT public.gcal_sync_clinica_habilitada(p_clinica_id) THEN
+      |      r_resultado := 'clinica_sin_acceso'; RETURN NEXT; RETURN;
+      | @@ -119,4 +124,6 @@
+      |      r_resultado := 'consultorio_invalido'; RETURN NEXT; RETURN;
+      |    END IF;
+      | +  -- No mira el consultorio del tipo: qué tipos valen en cada consultorio lo
+      | +  -- decide el servidor antes de llamar (tiposDelConsultorio).
+      |    SELECT t.id, t.nombre, t.duracion_min INTO v_tipo
+      |      FROM public.tipos_cita t
+      | @@ -133,11 +140,10 @@
+      |    END IF;
+      |  
+      | -  -- k1 (tanda K, punto 4): lo de TODO EL DÍA ya no ocupa en el enlace (un
+      | -  -- «Congreso» de todo el día no significa que no consulte); lo que tiene hora
+      | -  -- sí, como siempre. Punto 2: un bloqueo del médico (agenda_bloqueos) ocupa,
+      | -  -- sin excepción, con el mismo solape. Los dos son EXISTS: no lanzan, así
+      | -  -- que nada nuevo después del contador del único puede reventar. El bloqueo
+      | -  -- se escribe bajo el mismo candado 1790 (agenda_bloqueo_preparar): uno
+      | -  -- confirmado antes de este candado se ve aquí (READ COMMITTED).
+      | … (66 líneas más)
+
+== permiso ==
++ sólo en B: funcion public.agenda_v2_encendida(p_clinica_id uuid) → authenticated  [INESPERADA]
+    {"privilegios": "EXECUTE"}
++ sólo en B: funcion public.agenda_v2_encendida(p_clinica_id uuid) → postgres  [INESPERADA]
+    {"privilegios": "EXECUTE"}
++ sólo en B: funcion public.agenda_v2_encendida(p_clinica_id uuid) → service_role  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.cita_correos_pendientes(p_limite integer) → postgres  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.cita_correos_pendientes(p_limite integer) → service_role  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text) → postgres  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text) → service_role  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text) → authenticated  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text) → postgres  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+- sólo en A: funcion public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text) → service_role  [INESPERADA]
+    {"privilegios": "EXECUTE"}
+
+== policy ==
+~ distinto: public.agenda_bloqueos.agenda_bloqueos_insert  [INESPERADA]
+    with_check:
+      A: (((medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text)) AND (clinica_id = public.get_clinica_id()) AND public.clinica_no_suspendida() AND public.clinica_tiene_acceso() AND public.perfil_completo() AND (EXISTS ( SELECT 1
+   FROM public.agenda_ajuste… (524 car.)
+      B: (((medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text)) AND (clinica_id = public.get_clinica_id()) AND public.clinica_no_suspendida() AND public.clinica_tiene_acceso() AND public.perfil_completo() AND public.agenda_v2_encendida(public.get_clinica_i… (446 car.)
+~ distinto: public.agenda_bloqueos.agenda_bloqueos_update  [INESPERADA]
+    with_check:
+      A: (((medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text)) AND (clinica_id = public.get_clinica_id()) AND public.clinica_no_suspendida() AND public.clinica_tiene_acceso() AND public.perfil_completo() AND (EXISTS ( SELECT 1
+   FROM public.agenda_ajuste… (383 car.)
+      B: (((medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text)) AND (clinica_id = public.get_clinica_id()) AND public.clinica_no_suspendida() AND public.clinica_tiene_acceso() AND public.perfil_completo() AND public.agenda_v2_encendida(public.get_clinica_i… (305 car.)
+- sólo en A: public.reserva_enlaces.reserva_enlaces_insert  [INESPERADA]
+    {"comando": "a", "permisiva": true, "roles": "authenticated", "using": null, "with_check": "((clinica_id = public.get_clinica_id()) AND ((medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text)))"}
+
+Resumen: 3437 objetos en A, 3430 en B; 96 diferencias (0 esperadas, 96 inesperadas).

@@ -181,9 +181,9 @@ function idsDe(apellidos: string): { medico: string; consultorio: string; pacien
 }
 
 /** Alta por la API (con v2: acepta el empalme si lo hay). Devuelve el id. */
-async function alta(page: Page, datos: { apellidos?: string; titulo?: string; hora: string; minutos: number }): Promise<string> {
+async function alta(page: Page, datos: { apellidos?: string; titulo?: string; hora: string; minutos: number; dia?: string }): Promise<string> {
   const ids = idsDe(datos.apellidos ?? 'Prueba 23')
-  const inicio = fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, datos.hora, TZ)
+  const inicio = fechaHoraLocalAInstante(datos.dia ?? DIA_LABORABLE_LIBRE, datos.hora, TZ)
   const cuerpo = {
     title: datos.titulo ?? `Paciente ${datos.apellidos}`, start_time: inicio,
     end_time: new Date(Date.parse(inicio) + datos.minutos * 60_000).toISOString(),
@@ -286,7 +286,8 @@ test('encendido: el alta lleva la marca privada y el etag; un evento movido en G
 
 test('encendido: un borrado en Google cancela la cita (no la borra)', async ({ page }) => {
   interruptorAgenda('A', true)
-  const id = await alta(page, { apellidos: 'Prueba 24', hora: '17:45', minutos: 30 })
+  // AG-DT-256: en la semana siguiente; la cita vive agendada hasta que el sondeo la cancela.
+  const id = await alta(page, { apellidos: 'Prueba 24', hora: '17:45', minutos: 30, dia: DIA_FUTURO })
   const ev = await esperarLigada(id)
   g().borrar(ev.id)
   permitirSondeo()

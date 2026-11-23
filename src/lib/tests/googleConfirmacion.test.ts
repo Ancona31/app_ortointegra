@@ -39,6 +39,7 @@ vi.mock('@/lib/gcal', () => ({
 }))
 
 const { reflejarEnGoogle } = await import('@/lib/confirmacion/googleConfirmacion')
+const { logger } = await import('@/lib/logger')
 
 function fila(status: FilaEspejo['status']): FilaEspejo {
   return {
@@ -91,5 +92,22 @@ describe('reflejarEnGoogle', () => {
   it('sin conexión de Google de esa clínica, no se llama a Google', async () => {
     await reflejarEnGoogle({ ...CITA, clinicaId: 'otra' })
     expect(h.patches).toHaveLength(0)
+  })
+})
+
+/* Oleada 3, arreglo 5 (orden de Angel): «El mensaje que dice "lo hará el sondeo" es falso». El
+   sondeo es Google→Spinus: sólo mira los eventos que cambiaron EN GOOGLE, así que un `patch` que no
+   salió no lo vuelve a intentar nadie (AG-DT-264). La prueba es sólo del texto: el comportamiento
+   no cambia. */
+describe('el registro no promete que el sondeo lo arregle', () => {
+  it('Google falla al escribir (5xx): el aviso dice que no se reintenta y no nombra al sondeo', async () => {
+    const aviso = vi.spyOn(logger, 'warn').mockImplementation(() => undefined)
+    h.fallo = { code: 500 }
+    await reflejarEnGoogle(CITA)
+    const textos = aviso.mock.calls.map((c) => c.map(String).join(' '))
+    expect(textos.length).toBeGreaterThan(0)
+    for (const t of textos) expect(t).not.toMatch(/sondeo/i)
+    expect(textos.some((t) => /no se reintenta/.test(t))).toBe(true)
+    aviso.mockRestore()
   })
 })

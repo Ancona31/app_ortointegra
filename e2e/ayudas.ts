@@ -158,6 +158,24 @@ export const DIA_LABORABLE_FIJO = diaDeLaSemana(0, 2)
 export const DIA_LABORABLE_LIBRE = diaDeLaSemana(0, 3)
 
 /**
+ * AG-DT-256 · Miércoles y jueves de la semana SIGUIENTE: los días fijos para
+ * toda prueba que crea una cita CON PACIENTE (o una reserva por ligar).
+ *
+ * Una cita así, agendada o confirmada, dispara la ventana «¿Asistió el
+ * paciente?» en cuanto su inicio tiene más de 48 h
+ * (`src/lib/agenda/asistenciaServidor.ts`). En el miércoles de la semana
+ * visible eso no pasa de lunes a jueves y sí de viernes a domingo: la ventana
+ * tapa la rejilla y la batería entera depende del día en que se corre. La
+ * semana siguiente siempre es futura. Los eventos SIN paciente no tienen
+ * asistencia y pueden seguir en la semana visible.
+ *
+ * Quien las usa abre la agenda con `irAAgendaSiguiente`. Lo vigila
+ * `e2e/guardaAsistencia.ts`.
+ */
+export const DIA_FUTURO_FIJO = diaDeLaSemana(1, 2)
+export const DIA_FUTURO_LIBRE = diaDeLaSemana(1, 3)
+
+/**
  * Un título de alta con sufijo único por corrida (milisegundos desde época,
  * base 36). MENOR de la revisión: sin resembrar entre pruebas, repetir el
  * mismo archivo sin pasar por `global-setup.ts` (p. ej. con `--grep` contra
@@ -186,6 +204,19 @@ export function soloEscritorio(): void {
 export async function irAAgenda(page: Page): Promise<void> {
   await page.goto('/agenda')
   await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 15000 })
+}
+
+/** Pasa de la semana visible a la siguiente y espera a que se pinte (AG-DT-256, ver `DIA_FUTURO_FIJO`). */
+export async function pasarASemanaSiguiente(page: Page): Promise<void> {
+  await page.locator('.fc-next-button').click()
+  await page.locator(`.fc-col-header-cell[data-date="${diaDeLaSemana(1, 0)}"]`).waitFor({ state: 'visible', timeout: 10000 })
+  await page.locator('.fc-event').first().waitFor({ state: 'visible', timeout: 15000 })
+}
+
+/** Abre `/agenda` y pasa a la semana siguiente (AG-DT-256, ver `DIA_FUTURO_FIJO`). Sólo escritorio. */
+export async function irAAgendaSiguiente(page: Page): Promise<void> {
+  await irAAgenda(page)
+  await pasarASemanaSiguiente(page)
 }
 
 /** Un evento (cita o evento genérico) de la rejilla que contenga ese texto. */
