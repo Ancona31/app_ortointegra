@@ -144,9 +144,10 @@ hallazgos de las 25 rutas, claro + oscuro:
 | B10 | Cuenta y administración | hecho | 7776920c, ff66a83e, d5b84ac4, 0f1299cc (fusión 2b2baf0d) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
 | B11 | Ayuda, estadísticas, suplementación | hecho | 21b45d15, e8a78684, d930489e (fusión c8486fe3) | ver B12 | ver B12 | ver B12 | sin e2e propias | ver «B5–B11 · notas» |
 | B12 | Integración de pantallas (push 2) | hecho (verificación tras el reinicio del contenedor) | 24ca09ba … a289ce13 y los de la verificación (ver «Integración de pantallas (B12) · notas») | ok | 87/61 | 2425/2425 (sin TZ y UTC) | ver notas | 3 roles × 5 formatos × 2 temas |
-| B13 | Agenda (AG0–AG10) | | | | | | | |
-| B14 | Retirada del lanzador `/inicio` | | | | | | | |
-| B15 | Limpieza final y QA (push 4) | | | | | | | |
+| B13 | Agenda (AG0–AG10) | fuera de este cierre: espera el aviso del dueño | | | | | | |
+| B14 | Retirada del lanzador `/inicio` | fuera del proyecto (decisión del dueño) | | | | | | |
+| — | Cierre de formularios (T1–T4) | hecho | 836d8990, a8ca4d36 · fead58a1, 8b175282 · 94adb879 · a0fc8193 | ok | 87/61 | 2575/2575 (sin TZ, UTC, Hermosillo) | 425/101/640 (ver notas) | 8 formularios + 3 vistas × 5 × 2 |
+| B15 | Limpieza final y QA (push 4) | hecho salvo lo sacado del alcance | e0a37c85, 55cb2198, d2c9371e | ok | 87/61 | 2575/2575 | subconjunto igual que B12 | diff de píxeles contra antes de la limpieza |
 
 ### B1 · notas
 
@@ -839,3 +840,133 @@ entera sobre `a289ce13` y lo que siguió. Domingo 22-nov, 04:44–06:40 UTC
   `start` en la lista blanca.
 * **Sin uso tras el cambio (no se borró):** las reglas `.sp-ed-bar/-btn/-block/
   -select/-more/-n2/-n3/-m2/-m3` de `spinus-tokens.css`.
+
+### Plan de suplementación compacto · notas (2026-11-22)
+
+* **Qué:** maqueta aprobada `suplementos.html` (excepción aprobada: cambia la
+  forma de capturar) con el patrón y las piezas de la receta (§26.1):
+  `LineaSuplemento`, `SuplementoAbierto`, `BuscadorSuplemento` y la lógica pura
+  `suplementosCompacto.ts` (`src/lib/tests/suplementosCompacto.test.ts`);
+  estilos propios en §26.8 (`.sp-sup-*`) sobre `.sp-rx-*` y la fila de datos
+  `.sp-hon-datos`.
+* **Peso:** en la fila de datos, `type="number"` + `inputmode="decimal"`, área
+  de escritura de 88 px (≥ 72) en los cinco formatos, número en negrita y «kg».
+  Enter en el peso lleva al suplemento abierto.
+* **Un abierto, los demás plegados** (nombre, marca, dosis · justificación;
+  «Falta la dosis» en rojo). Buscador único sobre los nueve, sin acentos, ↓/↑
+  saltando los ya elegidos (atenuados, «ya está en el plan»), Enter añade.
+  Entra con `dosisParaForm` de hoy; el «para qué» (beneficio clínico) visible;
+  «Calculada/Sugerida para N kg … · usar la sugerida».
+* **Lo que NO cambia:** catálogo, textos, `calcularDosis`/`dosisEnCapsulas`/
+  `dosisParaForm` (diff vacío contra HEAD), claves de `contenido`, PDF,
+  plantillas (`editada` se sigue guardando como antes), validación (paciente,
+  peso, ≥ 1 suplemento: la dosis vacía NO bloquea, como hoy). `cambiarPeso`
+  ya recalculaba sólo las no tocadas (S-04): se conserva tal cual. Comprobado:
+  a 60 kg las cinco dosis guardadas son las de las funciones de HEAD.
+* **Vista secundaria:** el catálogo de nueve con su beneficio clínico y
+  palomitas sigue como «Ver catálogo · n de 9».
+* Notas y cita de control tras «＋ Notas» / «＋ Cita de control» (visibles si
+  traen valor).
+
+### Altura compartida de los formularios en `esc` · notas (2026-11-22)
+
+* Con un formulario abierto la columna crece a 880 en `esc` (los dos
+  anfitriones de documentos; la rejilla de tipos sigue en 640; `ih` no gana
+  nada: su área es de ~650).
+* §26.9: a ≥ 800 de contenedor y sólo en `esc`, los tres datos «rótulo — valor»
+  de receta, laboratorio e imagen van en una fila de tres fichas.
+* La tarjeta de plantillas VACÍA pasa a una línea en `ih`/`esc` («Sin
+  plantillas de … · Guardar esta como plantilla», la misma acción del pie y del
+  «···»); con plantillas ya era una línea con el desplegable. Táctil sin
+  cambios (en la revisión cruzada se vio que `.k-b` ganaba en táctil y se
+  arregló: `a0fc8193`).
+* Alto de página a 1280×800 (scrollHeight del área; vista 800), antes →
+  después: laboratorio 15 estudios 1192 → 1026; cotización 6 conceptos
+  1392 → 1306; receta 6 plegados 1252 → 1138; imagen 4 estudios ~930 (874 con
+  3) → 856; internamiento lleno y plegado 800 → 800 (cabe); suplementos 5
+  992 → 976; consentimiento en captura 800 → 800 (cabe); escrito 1116 → 1100
+  (hoja de alto medido). No caben: cotización (+506), receta (+338) y
+  laboratorio (+226): es contenido (las líneas), no aire.
+
+### «Plegado al salir» compartido · notas (2026-11-22)
+
+* Defecto: pulsar el texto de una casilla (o un rótulo, o un párrafo) dentro
+  de una sección abierta la plegaba sin marcarla. Causa: en el `pointerdown`
+  sobre algo no enfocable el foco va al panel del selector (`tabIndex=-1`),
+  fuera, y ese `focusin` plegaba; con el dedo, el foco se mueve en el
+  `mousedown` emulado, DESPUÉS del `pointerup`. Arreglo en
+  `salidaPlegable.ts`: mientras dura el gesto (hasta su `click`) el `focusin`
+  no decide. Una sola escucha para receta, imagen, internamiento, suplementos y
+  consentimiento (honorarios y laboratorio no pliegan al salir). Prueba
+  unitaria `salidaPlegable.test.ts`; verificado en esc y tel (toque).
+
+### Revisión cruzada de los ocho formularios · notas (2026-11-23)
+
+* **Verde:** build exit 0; tsc exit 0; eslint del repo
+  `✖ 148 problems (87 errors, 61 warnings)` (= tope); vitest
+  `174 passed / 2575 passed` sin TZ, `TZ=UTC` y `TZ=America/Hermosillo`.
+* **e2e** (los mismos 105 archivos y 6 tandas de B12, todos los proyectos,
+  resiembra por tanda): **425 passed, 101 failed, 640 skipped** frente a
+  427/100/639. Por caso, 4 pasaban y fallan, ninguno del rediseño:
+  `agenda-reflejo-nota` (clic interceptado por «¿Asistió el paciente?»,
+  AG-DT-256; repetida, falla igual) y `whatsapp-manual` «abrir el modal…»
+  (la cita de prueba quedó en el pasado al cruzar la medianoche UTC; repetida,
+  falla igual) — dependen de la hora; `agenda-cache-rangos` (eco de Realtime) y
+  `agenda-t1-capas` [tableta] pasan al repetirlas. Al revés, `agenda-t1-capas`
+  [telefono] (2) pasa ahora.
+* **Capturas** de los 8 formularios llenos y con faltantes, `/documentos`,
+  pestaña Documentos, rejilla de tipos y la rejilla tras guardar una nota
+  (`/api/consultas` interceptado en el navegador: no escribe) en 5 formatos
+  (ext/ih reales) × 2 temas: consola 0 (salvo `Bucket not found` del Storage
+  local al imprimir), sin desbordes ni fijos en el borde.
+* **Unificado:** toques de 44 en táctil en los datos de receta/laboratorio/
+  imagen y en el título del escrito (medían 40–42); «Un estudio con tipo y
+  región» con mayúscula como los demás faltantes.
+* **PDF local de los 8 tipos** tras todos los cambios (receta, laboratorio,
+  imagen, suplementación, internamiento, cotización, escrito y consentimiento
+  en papel); sus filas de prueba se borraron después.
+* **Visto y no unificado (decisiones de maqueta):** los datos del paciente van
+  en filas «rótulo — valor» en receta/laboratorio/imagen y en campos-píldora en
+  honorarios y suplementos; en `tel` el aviso de faltantes del escrito queda
+  bajo la hoja (el foco va al cuerpo, que es el faltante).
+
+### Limpieza final (B15) · notas (2026-11-23)
+
+* **Borrado, con `grep -rn` en `src` y `e2e` antes (cero importaciones):**
+  `ayuda/DiagnosticoFormato.tsx` y su uso; `dashboard/StatusChip.tsx`;
+  `layout/Breadcrumbs.tsx`; `documentos/SeccionPlegable.tsx`;
+  `dashboard/paletaAvatar.ts`; la variante «rejilla» de
+  `labs/CardDocumento.tsx` (y la prop `layout`); los keyframes `aviso*` y sus
+  clases de `globals.css`; 114 clases `.sp-*` de `spinus-tokens.css` que
+  existían en B0 y el rediseño dejó sin consumidor, con sus 74 comentarios
+  huérfanos. Subconjunto de e2e (`rediseno-formatos`, iniciar y ligar
+  consulta) igual que B12; capturas idénticas píxel a píxel salvo el cambio
+  intencionado de suplementos.
+* **No se borró:** `fechaCitaCompacta` (la importa `husoCitas.test.ts`);
+  `ConfiguracionCalendario.tsx` (agenda; exporta `ActualizarConfig`); 6 `.sp-*`
+  ya muertas antes de B0 (`sp-callout`, `sp-grid-2-1`, `sp-label-eyebrow`,
+  `sp-legal`, `sp-note`, `sp-push-backward`); `.sp-chip--selected`,
+  `.sp-doc-actions--filas` y `.sp-section` dentro de `:not()` (quitarlas cambia
+  la especificidad); los alias `--sp-*` y `--radius-*` (tokens, no clases);
+  comentarios que aún nombran `StatusChip` en `globals.css`, `ui/Avatar.tsx` y
+  `lib/agenda/tiposAgenda.ts` (piezas fuera de alcance).
+
+## Estado al cierre de pantallas y formularios
+
+* **Hecho:** cimientos, primitivas, capas, navegación por formato (B1–B4);
+  pantallas B5–B11 e integración B12; los ocho formularios de documentos con
+  sus maquetas aprobadas (receta, laboratorio, imagen, internamiento,
+  honorarios/cotización, consentimiento, escrito y suplementación); altura
+  compartida en `esc`; plegado al salir compartido; limpieza B15.
+* **Fuera por decisión del dueño:** la agenda (B13: espera su aviso); la
+  retirada del lanzador `/inicio` (B14); el búnker sin conexión (código muerto
+  para el dueño, ni probado ni revisado); la deuda del consentimiento
+  (CI-DT-*) como proyecto aparte; las vías de medicamentos y las regiones de
+  imagen «como están».
+* **Riesgos abiertos:** la detección del Duo por `screen.width/height` sigue
+  sin verificar en el aparato (se retiró la línea de diagnóstico de `/ayuda`
+  sin lectura); la negrita del PDF del escrito sale en peso 500; las e2e que
+  dependen de la hora («¿Asistió el paciente?», citas de «mañana») fallan de
+  noche; el Storage local no tiene el cubo de PDF (`Bucket not found`), así que
+  la descarga desde la lista no se probó en local; en suplementos el
+  desplegable del buscador abierto puede tapar el pie (como en la maqueta).
