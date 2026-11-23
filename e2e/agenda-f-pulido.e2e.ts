@@ -429,8 +429,13 @@ test.describe('teléfono · paso 2', () => {
      abría en el LUNES. Ahora, al fondo (lo más cerca de hoy).
      MUTACIÓN: en `desplazarListaAHoy`, devolver `false` sin mover cuando no hay
      cabecera de hoy ni posterior → «arriba» (rojo). */
+  /* AG-DT-256 · el domingo de DOS semanas atrás, no el de la anterior: el de la anterior es
+     «ayer» un lunes, y una cita de «hace unas horas» de otra prueba cae en él si la batería
+     corre el lunes de madrugada (E1, 2026-11-23 00:53: la de `confirmacion-enlace` a −2 h quedó el
+     domingo 22:53 y aquí salió «el domingo tiene citas»). La semilla llena esa semana igual
+     (de −4 a +4, lunes a viernes) y nunca el domingo; ninguna prueba escribe 8 días atrás. */
   test('F1.12 · el domingo, sin citas de hoy en adelante, la lista abre al fondo y no en el lunes', async ({ page }) => {
-    const domingo = diaDeLaSemana(-1, 6)
+    const domingo = diaDeLaSemana(-2, 6)
     await posicionDeLaLista(page, domingo)
     await expect.poll(() => page.evaluate((iso) => {
       const sc = document.querySelector<HTMLElement>('.fc-listWeek-view .fc-scroller')
