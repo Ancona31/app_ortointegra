@@ -20,7 +20,7 @@
 | Campo | Valor |
 |---|---|
 | **Estado general** | **SIN EMPEZAR** |
-| Commit congelado (el que se despliega) | `________` (propuesto: `7af5775e`, el último que cambia código, migraciones o pruebas; lo posterior es sólo documentación) |
+| Commit congelado (el que se despliega) | `________` (propuesto: `d7486b0c`, el último que cambia código o pruebas y el que pasó la batería; después sólo hay documentación y, en `a272fd7d`, comentarios de cabecera de la migración T) |
 | Huella de `aplicar.sh` vista por Angel ese día | `________` (debe ser `67ec5d149065f0723ca1397591a8e024adb1000960a338dabe497767d2e3e571`, plan §2) |
 | `sha256sum -c huellas.sha256` ese día | `________` (19 líneas, todas OK) |
 | Fecha elegida (sin consulta) | `____ / ____ / ______` (la escribe Angel) |
