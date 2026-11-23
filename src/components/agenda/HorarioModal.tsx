@@ -122,7 +122,7 @@ export default function HorarioModal({ fuente, onClose, onSave }: { fuente: Fuen
           </button>
         </div>
 
-        <div className="px-6 py-4 max-h-[70vh] overflow-y-auto">
+        <div className="px-6 py-4 max-sm:px-4 max-h-[70vh] overflow-y-auto">
           {fuente.estado === 'error' ? (
             /* Ni horario ni pickers: si no se pudo leer, no hay nada que
                ofrecer. Enseñar aquí un horario por defecto sería justo el
@@ -161,12 +161,12 @@ export default function HorarioModal({ fuente, onClose, onSave }: { fuente: Fuen
 
                     {/* Fila: pickers de hora (solo si activo) */}
                     {dia.activo && (
-                      <div className="flex items-center gap-2 mt-2 pl-[52px]">
+                      <div className="flex flex-wrap items-center gap-2 mt-2 pl-[52px] max-sm:pl-0">
                         <input
                           type="time"
                           value={dia.inicio}
                           onChange={e => setHora(key, 'inicio', e.target.value)}
-                          className="flex-1 px-2 py-1.5 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
+                          className="flex-1 min-w-[8rem] px-2 py-1.5 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
                         />
                         <span className="text-xs text-slate-400 flex-shrink-0">–</span>
                         <input
@@ -174,7 +174,7 @@ export default function HorarioModal({ fuente, onClose, onSave }: { fuente: Fuen
                           value={dia.fin}
                           min={dia.inicio}
                           onChange={e => setHora(key, 'fin', e.target.value)}
-                          className="flex-1 px-2 py-1.5 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
+                          className="flex-1 min-w-[8rem] px-2 py-1.5 text-sm border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 bg-white"
                         />
                       </div>
                     )}

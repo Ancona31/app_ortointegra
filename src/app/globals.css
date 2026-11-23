@@ -2903,6 +2903,13 @@ html.dark .nav-fila-icono { color: var(--enlace); }
    `<option>` salen blanco sobre blanco en el desplegable NATIVO de Android, que
    no hereda el color del `<select>`. Lo avisa el propio mockup. */
 .ag-banda-movil-filtros select option { color: var(--ag-ink); background: var(--ag-surface); }
+/* Integración con el rediseño · en `ext` (Duo cerrado) la banda mide 322 px,
+   no 360+: el riel ocupa 60 dentro del viewport. Con filtro, la fila no cabía:
+   el desplegable quedaba en 26–50 px, ilegible, y con la v2 se montaba ENCIMA
+   del engrane. Ahí, y sólo con filtro, el conmutador de vistas ocupa su fila y
+   buscador, filtro y engrane bajan a la siguiente, con el filtro a lo ancho. */
+:root[data-formato="ext"] .ag-banda-movil-filtros:has(.ag-banda-movil-medio select) { flex-wrap: wrap; row-gap: var(--ag-1-5); }
+:root[data-formato="ext"] .ag-banda-movil-filtros:has(.ag-banda-movil-medio select) .ag-banda-movil-vistas { flex: 1 0 100%; }
 
 /* ── LA FECHA, EN SU FILA Y CENTRADA (vuelve en el paso 9b) ────────────────
    Es el `.datenav__label` del mockup, que los TRES dibujan igual: una línea
@@ -6518,6 +6525,19 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   top: 50%;
   translate: -50% -50%;
   width: 360px;
+}
+/* Integración con el rediseño · en `ext` e `ih` el cromo (riel o barra) ocupa
+   un lado DENTRO del viewport (`--fijo-der`/`--fijo-izq`, globals.css, regla
+   de «nada fijo toca el borde»). Las capas con ancla se miden contra la
+   ventana entera (`posicionCapa`, `CapaBarra`): sin esto, la campana o el
+   buscador de 320 px se metían bajo el riel. Se acota el ANCHO al área de
+   contenido y la colocación del JS, que lee `offsetWidth`, la deja dentro; la
+   centrada se centra en esa área. Fuera de `ext`/`ih` los `--fijo-*` valen 0. */
+:root:is([data-formato="ext"], [data-formato="ih"]):has(#barra-lateral) .ag-capa {
+  max-width: calc(100vw - var(--fijo-izq) - var(--fijo-der) - 2 * var(--ag-2));
+}
+:root:is([data-formato="ext"], [data-formato="ih"]):has(#barra-lateral) .ag-capa--centro {
+  left: calc(var(--fijo-izq) + (100vw - var(--fijo-izq) - var(--fijo-der)) / 2);
 }
 
 .ag-hoja {
