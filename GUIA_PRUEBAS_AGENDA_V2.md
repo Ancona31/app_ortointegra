@@ -385,6 +385,26 @@ clínica (unas 350 citas en A y 17 en B) y la lista de usuarios. Si dice
 > Si pruebas al día siguiente, vuelve a sembrar (y repite P7 y P8, porque
 > sembrar los borra).
 
+> **Los almacenes de archivos (Storage) también los pone la semilla.** Lo
+> primero que imprime es `almacenes-locales: 6 buckets`: deja en tu base los
+> seis buckets de producción (`casos-clinicos`, `clinica-logos`,
+> `documentos-pdf`, `firmas-medicos`, `identificaciones`, `labs-documentos`),
+> con el mismo público/privado, límite de tamaño y tipos, y comprueba sus
+> policies (`scripts/local/almacenes-locales.sql`). P5 los borra y ninguna
+> migración los crea; sin ellos el PDF de un documento no se guarda, «Enviar al
+> paciente» dice que no hay PDF y no se suben logo, firma, identificación ni
+> estudios. Para ponerlos sin resembrar: `bash scripts/local/almacenes-locales.sh`
+> (se niega si `.env.local` no apunta a tu computadora).
+>
+> ⚠️ **«Enviar al paciente» de un documento NO pasa por Mailpit**: esa ruta
+> (`/api/email/enviar-documento`) llama a Resend directamente, con la
+> `RESEND_API_KEY` de `.env.local`. Con los almacenes puestos el envío ya
+> funciona, así que **sale un correo de verdad** al correo del paciente. Para
+> probarlo en local arranca la app con `RESEND_API_KEY=re_falsa` delante del
+> comando de P11 (falla sin enviar nada), o con un Resend simulado
+> (`RESEND_BASE_URL`), como en el ensayo del agente S
+> (`docs/despliegue/REPORTE-FINAL.md`).
+
 **P7. Aprobar el aviso de privacidad de la reserva, sólo en tu base local.** El
 enlace de reserva no abre si el aviso no está aprobado. El texto real sigue
 **pendiente de revisión legal**; esto lo aprueba sólo en tu computadora para
@@ -6563,8 +6583,10 @@ los invitados.
 **Qué hago:** primero borro los contadores (§1.6). Con el enlace fijo:
 1. En incógnito, pido el código **4 veces** para el mismo correo
    (`limite@prueba.test`), con «Enviar otro código».
-2. Desde la misma ventana, intento **5 reservas** seguidas (con enlaces de un
-   solo uso distintos).
+2. Desde la misma ventana, reservo con **5 enlaces de un solo uso** distintos
+   (deben reservar todos: el único no cuenta por red ni por navegador, orden de
+   Angel del 2026-11-23) y luego intento **9 reservas** con el enlace fijo (la
+   novena da «Demasiados intentos»).
 3. En la página de confirmación de una cita, pulso los botones más de 10 veces.
 
 **Qué debo ver:** cuando se pasa el límite, «Demasiados intentos. Espera un rato
@@ -6576,7 +6598,7 @@ límites finales, después de las correcciones (no cambiaron los números):
 | Ver horarios | 120 cada 10 min por red |
 | Pedir código | 3 por correo, 10 por red y 5 por navegador, cada hora |
 | Verificar código | 20 por red cada hora (y 5 intentos por código) |
-| Reservar | 6 por red y 4 por navegador cada hora; 30 al día por enlace fijo |
+| Reservar | enlace fijo: 30 por red y 8 por navegador cada hora, y 30 al día por enlace (antes 6 y 4, también para el único); enlace único: sin tope por red ni navegador (5 intentos por enlace); un código que no abre o un único ya usado: 30 por red y 8 por navegador, y lleno da «Demasiados intentos» a cualquier enlace |
 | Confirmar o cancelar | 10 por enlace y 30 por red cada hora |
 
 En el paso 1 el cuarto pedido ya no manda correo. En el 2, la quinta reserva no

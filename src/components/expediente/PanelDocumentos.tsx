@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, FileText, Mail } from 'lucide-react'
-import type { Paciente, Documento } from '@/types'
+import type { Paciente, Documento, MedicoInfo } from '@/types'
+import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { puedeComponer } from '@/lib/mobileShare'
@@ -44,6 +45,102 @@ const FORMATO_POR_DEFECTO = 1
  */
 function nombreDescarga(doc: Documento): string {
   return doc.pdf_url?.split('/').pop()?.trim() || `${doc.tipo}.pdf`
+}
+
+type DocumentoRegenerable = Pick<
+  Documento, 'id' | 'tipo' | 'contenido' | 'formato_version' | 'folio' | 'paciente_id' | 'subido_por'
+>
+
+const NO_REGENERADO = 'El documento no se regeneró: '
+
+/**
+ * El médico de la cabecera, leído DEL SERVIDOR en este momento (AG-DT-276).
+ *
+ * ⚠️ NI `localStorage` NI NINGUNA CACHÉ. Antes salía de
+ * `spinus_doctor_profile`, que sólo llenan los formularios y el perfil: en un
+ * navegador que no los había abierto el PDF se componía sin nombre, cédula ni
+ * firma y sustituía al emitido. La fuente es la de la EMISIÓN,
+ * `/api/me/perfil-medico` (`useMedicoInfo`), que da el perfil de quien tiene la
+ * sesión; por eso sólo regenera quien emitió (`subido_por`): con otra sesión
+ * saldría la cabecera de otro.
+ *
+ * Mínimo de la cabecera: nombre (nombres o apellido, no sólo el título) y
+ * cédula profesional. Sin ellos no se compone: un documento clínico no se
+ * guarda sin el médico que lo firma.
+ */
+async function medicoParaRegenerar(
+  doc: DocumentoRegenerable, usuarioId: string | null,
+): Promise<{ medico: PdfMedicoData; logoUrl?: string } | { motivo: string }> {
+  if (!usuarioId || doc.subido_por !== usuarioId) {
+    return { motivo: `${NO_REGENERADO}solo el médico que emitió el documento puede regenerarlo.` }
+  }
+  let m: MedicoInfo | null = null
+  try {
+    const res = await fetch('/api/me/perfil-medico', { cache: 'no-store' })
+    const cuerpo: { medico?: MedicoInfo | null } = res.ok ? await res.json() : {}
+    m = cuerpo.medico ?? null
+  } catch {
+    m = null
+  }
+  if (!m) return { motivo: `${NO_REGENERADO}no se pudieron leer tus datos de médico. Inténtalo de nuevo.` }
+  const conNombre = [m.nombres, m.apellido_paterno].some(t => !!t?.trim())
+  if (!conNombre || !m.cedula_profesional?.trim()) {
+    return { motivo: `${NO_REGENERADO}a tu perfil le falta el nombre o la cédula profesional. Complétalo en «Perfil».` }
+  }
+  return {
+    medico: {
+      nombre: m.nombre, titulo: m.titulo ?? null, nombres: m.nombres ?? null,
+      apellido_paterno: m.apellido_paterno ?? null, apellido_materno: m.apellido_materno ?? null,
+      especialidad: m.especialidad, cedula_profesional: m.cedula_profesional,
+      cedula_especialidad: m.cedula_especialidad, universidad: m.universidad ?? null,
+      color_primario: m.color_primario, color_secundario: m.color_secundario,
+      direccion_consultorio: m.direccion_consultorio, telefono_consultorio: m.telefono_consultorio,
+      firma_url: m.firma_url ?? null,
+    },
+    logoUrl: m.logo_url?.startsWith('https://') ? m.logo_url : undefined,
+  }
+}
+
+/**
+ * Vuelve a componer el PDF de un documento y, si se subió, lo pone en
+ * `pdf_url`. Sin médico válido (ver `medicoParaRegenerar`) sale ANTES de
+ * componer: ni sube ni toca la fila. Exportada para su prueba
+ * (`regenerarDocumento.test.ts`).
+ */
+export async function regenerarDocumento(
+  doc: DocumentoRegenerable, usuarioId: string | null,
+): Promise<{ guardado: boolean; aviso: string }> {
+  const cabecera = await medicoParaRegenerar(doc, usuarioId)
+  if ('motivo' in cabecera) return { guardado: false, aviso: cabecera.motivo }
+  const { generarPdf } = await import('@/lib/mobileShare')
+  const { generateDocFileName } = await import('@/lib/patientUtils')
+  const { storagePath } = await generarPdf({
+    tipo: doc.tipo,
+    medico: cabecera.medico,
+    data: {
+      ...(doc.contenido as Record<string, unknown>),
+      /* ⚠️ EL FOLIO CON EL QUE SE EMITIÓ, Y EL ORDEN DEL `??` IMPORTA.
+         `contenido.folio` primero: es el que el papel llevaba impreso. Las
+         recetas anteriores a agosto de 2026 guardaron ahí un `R-a3f9…` y
+         caen por la izquierda; las nuevas caen a `folioImpreso()`, que es
+         quien sabe qué formatos imprimen la columna. Invertirlo regeneraría
+         las viejas con un número que su papel no dice. */
+      folio: doc.contenido.folio ?? folioImpreso(doc.tipo, doc.folio),
+    },
+    logoUrl: cabecera.logoUrl,
+    filename: generateDocFileName(
+      (doc.contenido as Record<string, unknown>).paciente as string ?? 'documento',
+      doc.tipo.replace(/_/g, '-'),
+    ),
+    pacienteId: doc.paciente_id ?? undefined,
+    entregar: false,
+    formatoVersion: doc.formato_version ?? FORMATO_POR_DEFECTO,
+  })
+  if (!storagePath) {
+    return { guardado: false, aviso: 'El documento se regeneró, pero no se pudo guardar. Descárgalo antes de salir.' }
+  }
+  await createClient().from('documentos').update({ pdf_url: storagePath }).eq('id', doc.id)
+  return { guardado: true, aviso: 'El documento se regeneró y quedó guardado.' }
 }
 
 export default function PanelDocumentos({
@@ -243,58 +340,14 @@ export default function PanelDocumentos({
     setRegenerando(true)
     setAviso(null)
     try {
-      const formatoVersion = doc.formato_version ?? FORMATO_POR_DEFECTO
-      const { generarPdf } = await import('@/lib/mobileShare')
-      const { getDoctorProfile } = await import('@/lib/offline/doctorProfile')
-      const { generateDocFileName } = await import('@/lib/patientUtils')
-      const perfil = getDoctorProfile()
-
-      const { storagePath } = await generarPdf({
-        tipo: doc.tipo,
-        medico: perfil ? {
-          nombre: perfil.nombre,
-          especialidad: perfil.especialidad,
-          cedula_profesional: perfil.cedula_profesional,
-          cedula_especialidad: perfil.cedula_especialidad,
-          universidad: perfil.universidad || null,
-          color_primario: perfil.color_primario,
-          color_secundario: perfil.color_secundario,
-          direccion_consultorio: perfil.direccion_consultorio,
-          telefono_consultorio: perfil.telefono_consultorio,
-          firma_url: perfil.firma_base64,
-        } : null,
-        data: {
-          ...(doc.contenido as Record<string, unknown>),
-          /* ⚠️ EL FOLIO CON EL QUE SE EMITIÓ, Y EL ORDEN DEL `??` IMPORTA.
-             `contenido.folio` primero: es el que el papel llevaba impreso. Las
-             recetas anteriores a agosto de 2026 guardaron ahí un `R-a3f9…` y
-             caen por la izquierda; las nuevas caen a `folioImpreso()`, que es
-             quien sabe qué formatos imprimen la columna. Invertirlo regeneraría
-             las viejas con un número que su papel no dice. */
-          folio: doc.contenido.folio ?? folioImpreso(doc.tipo, doc.folio),
-        },
-        logoUrl: perfil?.logo_base64 ?? undefined,
-        filename: generateDocFileName(
-          (doc.contenido as Record<string, unknown>).paciente as string ?? 'documento',
-          doc.tipo.replace(/_/g, '-'),
-        ),
-        pacienteId: doc.paciente_id ?? undefined,
-        entregar: false,
-        formatoVersion,
-      })
-
-      if (storagePath) {
-        await createClient().from('documentos').update({ pdf_url: storagePath }).eq('id', doc.id)
-        /* ⚠️ SE RECARGA LA LISTA EN VEZ DE MUTAR `doc.pdf_url` EN SITIO. Eso
-           último es la deuda técnica #1 del CLAUDE.md: mutaba el objeto por
-           referencia y el botón de descarga no reaparecía hasta refetch manual.
-           Recargando, la url nueva llega por props y la firma vuelve sola a
-           «preparando», que es lo que el §6.2 pide. */
-        onRecargarDocumentos()
-        setAviso('El documento se regeneró y quedó guardado.')
-      } else {
-        setAviso('El documento se regeneró, pero no se pudo guardar. Descárgalo antes de salir.')
-      }
+      const r = await regenerarDocumento(doc, profile?.id ?? null)
+      /* ⚠️ SE RECARGA LA LISTA EN VEZ DE MUTAR `doc.pdf_url` EN SITIO. Eso
+         último es la deuda técnica #1 del CLAUDE.md: mutaba el objeto por
+         referencia y el botón de descarga no reaparecía hasta refetch manual.
+         Recargando, la url nueva llega por props y la firma vuelve sola a
+         «preparando», que es lo que el §6.2 pide. */
+      if (r.guardado) onRecargarDocumentos()
+      setAviso(r.aviso)
     } catch {
       setAviso('No se pudo regenerar el documento.')
     } finally {
@@ -371,6 +424,7 @@ export default function PanelDocumentos({
 
   const bloqueoRegenerar =
     !esComponible ? 'Este archivo se subió; no hay datos con los que componerlo.'
+    : !esAutor ? 'Solo el médico que emitió el documento puede regenerarlo.'
     : doc && !puedeComponer(doc.tipo, doc.formato_version ?? FORMATO_POR_DEFECTO)
       ? 'Se emitió con una plantilla anterior. Se conserva tal cual para que el archivo recuperado sea el que se entregó.'
       : undefined

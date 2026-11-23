@@ -28,7 +28,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 beforeAll(() => { process.env.RESERVA_SECRETO = 'ab'.repeat(32) })
 beforeEach(() => { h.llamadas = []; h.reenvios = []; h.respuesta = () => ({ data: 0, error: null }) })
 
-const { REENVIO_CODIGO_S, esperaDeLimites, esperaReenvio } = await import('@/lib/reserva/limitesReserva')
+const { REENVIO_CODIGO_S, esperaDeLimites, esperaReenvio, esperaSinContar } = await import('@/lib/reserva/limitesReserva')
 const { demasiadosIntentos } = await import('@/lib/reserva/puertaReserva')
 
 const IP = 'a'.repeat(64)
@@ -53,6 +53,26 @@ describe('esperaDeLimites', () => {
     expect(await esperaDeLimites('reservar', { ip: IP })).toBeNull()
     h.respuesta = () => ({ data: -5, error: null })
     expect(await esperaDeLimites('reservar', { ip: IP })).toBeNull()
+  })
+})
+
+describe('esperaSinContar (agente S: el freno de sondeo, leído sin contar)', () => {
+  it('pregunta por cada sujeto con el límite del sondeo y la ventana en segundos; 0 si todos tienen sitio', async () => {
+    expect(await esperaSinContar('sondeo', { ip: IP, disp: DISP })).toBe(0)
+    expect(h.llamadas).toEqual([
+      { p_ruta: `reserva:sondeo:ip:${IP}`, p_limite: 30, p_ventana_seg: 3600 },
+      { p_ruta: `reserva:sondeo:disp:${DISP}`, p_limite: 8, p_ventana_seg: 3600 },
+    ])
+  })
+  it('da la mayor espera de los que topan', async () => {
+    h.respuesta = ruta => ({ data: ruta.includes(':disp:') ? 700 : 0, error: null })
+    expect(await esperaSinContar('sondeo', { ip: IP, disp: DISP })).toBe(700)
+  })
+  it('falla cerrado: un sujeto que no se sabe, o sin seudónimo, da null aunque el otro tenga sitio', async () => {
+    h.respuesta = ruta => (ruta.includes(':disp:') ? { data: null, error: { code: 'PGRST202' } } : { data: 0, error: null })
+    expect(await esperaSinContar('sondeo', { ip: IP, disp: DISP })).toBeNull()
+    h.respuesta = () => ({ data: 0, error: null })
+    expect(await esperaSinContar('sondeo', { ip: null, disp: DISP })).toBeNull()
   })
 })
 

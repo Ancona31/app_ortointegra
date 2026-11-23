@@ -3316,7 +3316,8 @@ policy). Prueba: `supabase/pruebas-sql/seg1_candado_correo.sql`.
   se base en un dato no verificado lo ve quien lo manda. Quien tenga el enlace
   puede saber si la clínica bloqueó A MANO un número con ese médico (sale el
   mismo 403 «Para agendar, comunícate con el consultorio» que cualquier
-  bloqueo; acotado a 6 por IP y 4 por dispositivo por hora, y en el fijo con
+  bloqueo; acotado a 6 por IP y 4 por dispositivo por hora (desde el agente S,
+  2026-11-23: 30 y 8, sólo el fijo; el único, por sus 5 intentos), y en el fijo con
   un correo verificado propio). Ya no se puede saber si tiene cita ni
   historial. **Alternativa:** que el bloqueo manual también mire sólo el
   correo (el teléfono no decidiría nada; un contacto bloqueado entraría con

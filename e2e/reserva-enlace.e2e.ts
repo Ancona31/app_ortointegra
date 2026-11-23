@@ -212,7 +212,9 @@ test('datos expuestos: los turnos sólo llevan fecha, inicio y fin; un consultor
   expect(otra.status).toBe(201)
 })
 
-test('límite: el séptimo POST de reservar desde la misma IP en una hora da 429', async () => {
+// Agente S (orden de Angel, 2026-11-23): el único vigente ya no cuenta por IP ni por dispositivo (antes, el
+// séptimo daba 429). El tope del fijo (30 por IP, 8 por dispositivo) lo prueba `reserva-s-topes.e2e.ts`.
+test('límite: el único no cuenta por IP; siete POST desde la misma IP en una hora siguen sin 429', async () => {
   const { codigo } = emitirEnlace(e, 'unico')
   const ip = ipAlAzar()
   const estados: number[] = []
@@ -222,5 +224,5 @@ test('límite: el séptimo POST de reservar desde la misma IP en una hora da 429
     estados.push((await reservar(e, codigo, { inicio: '2031-01-07T15:07:00.000Z', persona: personaNueva() }, ctx)).status)
     await ctx.dispose()
   }
-  expect(estados).toEqual([400, 400, 400, 400, 400, 400, 429])
+  expect(estados).toEqual([400, 400, 400, 400, 400, 400, 400])
 })

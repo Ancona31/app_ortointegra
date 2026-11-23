@@ -274,7 +274,8 @@ test('la reserva falla después de verificar: reintentar no vuelve a verificar (
   const persona = personaNueva()
   await hastaCodigo(p, persona)
   const codigo = await codigoN(persona.correo, 0)
-  const llave = await topeDeDispositivo(p, 'reservar', 4)
+  // Agente S (2026-11-23): el tope del fijo por dispositivo pasó de 4 a 8 por hora.
+  const llave = await topeDeDispositivo(p, 'reservar', 8)
   await verificar(p, codigo)
   await expect(alerta(p)).toHaveText('Demasiados intentos. Podrás volver a probar en 60 min.')
   sqlLocal(`delete from public.ip_rate_limits where ruta = :'r'`, { r: llave })

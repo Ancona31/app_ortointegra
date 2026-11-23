@@ -52,6 +52,7 @@ vi.mock('@/lib/reserva/limitesReserva', async (original) => {
   return {
     ...real,
     dentroDeLimites: async (accion: string, s: object) => { h.orden.push(`limites:${accion}:${Object.keys(s).join(',')}`); return true },
+    esperaSinContar: async () => 0, // agente S: el freno de sondeo, con sitio
   }
 })
 vi.mock('@/lib/reserva/servidorReserva', () => ({
@@ -92,7 +93,8 @@ describe('reservar sin correo (I, punto 2)', () => {
     expect(h.args[0].correo).toBeNull()
     expect(h.args[0].correoHmac).toBeNull()
     expect(h.args[0].telHmac).toMatch(/^[0-9a-f]{64}$/)
-    expect(h.orden).toEqual(['limites:reservar:ip,disp', 'rpc', 'comprobante', 'google'])  // oleada 3: el comprobante va primero y no espera a Google
+    // oleada 3: el comprobante va primero y no espera a Google. Agente S: el único vigente no cuenta por IP ni dispositivo.
+    expect(h.orden).toEqual(['rpc', 'comprobante', 'google'])
     expect(h.escrito).toEqual([null])
   })
 
@@ -102,7 +104,8 @@ describe('reservar sin correo (I, punto 2)', () => {
     expect(r.status).toBe(201)
     expect(h.args[0].correo).toBeNull()
     expect(h.args[0].correoHmac).toBeNull()
-    expect(h.orden).toEqual(['limites:reservar:ip,disp', 'rpc', 'comprobante', 'google'])  // oleada 3: el comprobante va primero y no espera a Google
+    // oleada 3: el comprobante va primero y no espera a Google. Agente S: el único vigente no cuenta por IP ni dispositivo.
+    expect(h.orden).toEqual(['rpc', 'comprobante', 'google'])
     expect(h.escrito).toEqual([null])
   })
 
