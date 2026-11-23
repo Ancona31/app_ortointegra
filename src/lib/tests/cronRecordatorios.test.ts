@@ -101,9 +101,9 @@ afterEach(() => {
 })
 
 describe('GET /api/cron/recordatorios — la puerta (S2)', () => {
-  it('declara force-dynamic y maxDuration 60', () => {
+  it('declara force-dynamic y maxDuration 120 (por debajo del plazo de 10 min de cita_correo_tomar)', () => {
     expect(dynamic).toBe('force-dynamic')
-    expect(maxDuration).toBe(60)
+    expect(maxDuration).toBe(120)
   })
 
   it('401 sin cuerpo: sin cabecera, con otro secreto, sin CRON_SECRET o vacío; y no toca la base', async () => {
