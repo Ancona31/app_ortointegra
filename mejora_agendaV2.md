@@ -748,10 +748,13 @@ pudo probar: §10.
 
 ### 7.1 Todas las migraciones, una por una (punto 24 de Angel, 2026-11-17; conjunto fundido, 2026-11-22)
 
-Las **13** de `supabase/migrations/` en orden de nombre (`descartadas/` no
+Las **14** de `supabase/migrations/` en orden de nombre (`descartadas/` no
 entra), leídas de los archivos, sin ninguna consulta a producción. Las cinco
 primeras son las de `main` y la 6 y la 7 no son de la agenda; sus filas son las
-de la tabla histórica de abajo, sin cambios. **Desde el 2026-11-22 las 44 de la
+de la tabla histórica de abajo, sin cambios. La 14
+(`20261201180000_agenda_sin_truncate`) es de la agenda pero va APARTE del
+conjunto fundido, después de las seis: a producción van **9** (de la 6 a la
+14). **Desde el 2026-11-22 las 44 de la
 agenda están FUNDIDAS en seis archivos** (8 a 13), uno por bloque, cada objeto
 en su versión final; su comportamiento es el de las 44 (diferencias a propósito,
 una por una y con su razón, en `supabase/fusion/diferencias/CONJUNTO.tsv`; el

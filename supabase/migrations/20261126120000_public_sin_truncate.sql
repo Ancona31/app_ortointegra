@@ -144,8 +144,9 @@
 --
 -- ═══ VUELTA ATRÁS ══════════════════════════════════════════════════════
 -- supabase/reversas/20261126120000_public_sin_truncate_reversa.sql: devuelve
--- el TRUNCATE a los tres roles en las 30 tablas del inventario (las que
--- existan), los privilegios por omisión y quita los 11 disparadores y la
+-- el TRUNCATE en las 28 tablas de SU inventario, el de la foto de producción
+-- (a los roles que lo tenían allí; las que no existan se saltan), los
+-- privilegios por omisión y quita los 11 disparadores y la
 -- función. Reabre el hueco: sólo si Angel lo pide.
 --
 -- ═══ APLICACIÓN LOCAL ══════════════════════════════════════════════════
