@@ -6980,10 +6980,32 @@ presentación o nombre: habría que ajustar esa regla a la vez.
 
 ### RED-DT-21 — Capas de consulta rápida y registro rápido de paciente sin `role="dialog"` ni foco atrapado
 
-**Estado:** 🟡 abierta, menor (accesibilidad, **heredada**, no regresión) ·
-**Archivos:** `src/components/launcher/ConsultaRapidaModal.tsx:253-261` (también
-«Nuevo documento» del dashboard), `QuickPatientModal` (auditoría final del
-rediseño, H10, 2026-11-23)
+**Estado:** 🟡 **parcialmente cerrada** (2026-11-23): `ConsultaRapidaModal`
+corregida; `QuickPatientModal` sigue abierta · menor (accesibilidad,
+**heredada**, no regresión) · **Archivos:** `src/components/launcher/ConsultaRapidaModal.tsx`
+(también «Nuevo documento» del dashboard), `src/components/ui/QuickPatientModal.tsx`
+(auditoría final del rediseño, H10, 2026-11-23)
+
+**Cerrado en `ConsultaRapidaModal`:** el panel lleva `role="dialog"`,
+`aria-modal="true"` y nombre (el `titulo`, o «Buscar paciente» / «Registro
+rápido»); el oyente de teclado que ya cerraba con Escape atrapa además el Tab
+(misma regla que `ModalShell`, con `focusablesDelPanel` de `useDialogoModal`), y
+al cerrar el foco vuelve al disparador. Medido en `esc` (1280×800): 24 Tab y 24
+Mayús+Tab sin salir, también en el modo «Registro rápido» y tras un clic en el
+velo; Escape y la ✕ cierran como antes; el velo sigue sin cerrar; en táctil sin
+anillo de foco ni teclado al cerrar. `rediseno-formatos.e2e.ts`: 26 pasadas.
+
+**Por qué `QuickPatientModal` se queda:** lo montan, como hermano de su
+diálogo, la agenda (`AppointmentModal`, `BurbujaAlta`, `VentanaLigarCita`,
+`ConvertirEnCita`) y `/documentos`, y **cada llamador decide adónde va el foco al
+cerrarlo** (`ConvertirEnCita` lo devuelve a su campo de paciente en el propio
+`onClose`; los de la agenda activan `useEscudoTrasRegistro` en ese momento). El
+mecanismo existente (`useDialogoModal`) trae dos cosas que lo cambian: Escape
+pasaría a cerrar el registro (hoy no hace nada dentro de él) y la devolución del
+foco al desmontar correría DESPUÉS del `onClose` y pisaría el foco que el
+llamador acaba de poner. Hacerlo bien exige tocar los cinco llamadores y
+repasar las e2e de la agenda que lo abren: no es «sencillo y sin afectar nada»;
+va en su propia rama, con la agenda.
 
 Ninguna de las dos capas declara `role="dialog"`/`aria-modal` ni atrapa el foco:
 con el teclado en `esc`, 24 de 24 tabulaciones salen a la página de detrás. Ya

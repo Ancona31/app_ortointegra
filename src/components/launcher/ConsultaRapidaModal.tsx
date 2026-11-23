@@ -7,6 +7,7 @@ import { Search, User, X, ArrowRight, Loader2, UserPlus, ChevronLeft, AlertTrian
 import Avatar, { inicialesDe } from '@/components/ui/Avatar'
 import { useCapaMontada } from '@/components/ui/ModalShell'
 import Portal from '@/components/ui/Portal'
+import { focusablesDelPanel } from '@/hooks/useDialogoModal'
 import { toTitleCase, calcularEdad, fechaHoyISO, FECHA_MIN_NACIMIENTO } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
 import type { DuplicatePatientResponse } from '@/types'
@@ -63,6 +64,24 @@ interface Props {
   titulo?: string
 }
 
+/**
+ * RED-DT-21 · El Tab no sale de la capa: en los bordes da la vuelta, y desde
+ * fuera (p. ej. tras un clic en el velo) entra por el primero o el último.
+ * Misma regla que `teclaDelModal` de `ModalShell` y `useDialogoModal`; la lista
+ * de enfocables es la de este último (`focusablesDelPanel`).
+ */
+function atraparTab(e: KeyboardEvent, panel: HTMLElement): void {
+  const focos = focusablesDelPanel(panel)
+  if (focos.length === 0) return
+  const activo = document.activeElement
+  const fuera = !panel.contains(activo)
+  if (e.shiftKey && (fuera || activo === focos[0])) {
+    e.preventDefault(); focos[focos.length - 1].focus()
+  } else if (!e.shiftKey && (fuera || activo === focos[focos.length - 1])) {
+    e.preventDefault(); focos[0].focus()
+  }
+}
+
 export default function ConsultaRapidaModal({
   open,
   onClose,
@@ -93,6 +112,7 @@ export default function ConsultaRapidaModal({
   const forceCreateRef = useRef(false)
 
   const inputRef    = useRef<HTMLInputElement>(null)
+  const panelRef    = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -110,10 +130,21 @@ export default function ConsultaRapidaModal({
   }, [open])
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      else if (e.key === 'Tab' && panelRef.current) atraparTab(e, panelRef.current)
+    }
     if (open) window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
+
+  /* RED-DT-21 · Al cerrar, el foco vuelve a quien abrió la capa (como en
+     `ModalShell`). Se apunta al abrir: el buscador se enfoca 50 ms después. */
+  useEffect(() => {
+    if (!open) return
+    const previo = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => { previo?.focus({ preventScroll: true }) }
+  }, [open])
 
   const buscar = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); return }
@@ -258,7 +289,8 @@ export default function ConsultaRapidaModal({
           y Esc sí. */}
       <div className="k-velo" />
 
-      <div className="k-capa-panel max-w-lg" lang="es">
+      <div ref={panelRef} className="k-capa-panel max-w-lg" lang="es" role="dialog" aria-modal="true"
+        aria-label={titulo ?? (modoCrear ? 'Registro rápido' : 'Buscar paciente')}>
         {offlineMsg && (
           <p className="mx-4 mt-3 rounded-[10px] bg-mal-fondo px-3 py-2 text-[13px] leading-[18px] text-mal-tinta">{offlineMsg}</p>
         )}
