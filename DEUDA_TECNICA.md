@@ -6048,6 +6048,111 @@ la medianoche y sigue después, la cita pasa a ser «de hoy» para el servidor y
 deja de estar en la lista. Quien decide es el reloj del servidor: `page.clock` no
 sirve. Lo mismo, como sospecha, para `agenda-h4-por-confirmar`.
 
+### AG-DT-261 — `feature/limites-ajustables` fuera del paquete de producción
+
+**Estado:** abierta, aplazada (decisión de Angel, 2026-11-22: «fuera de este
+paquete. Se completa después, en su propia fase. Anota en la deuda lo que le
+falta.»). La rama (punta remota `e76973cd`, nace de `a58419fb` de `main`) trae
+tres migraciones, `20261014120000` (P1, EXECUTE de PUBLIC), `20261014130000`
+(P1b, permisos de 7 funciones DEFINER) y `20261014140000` (P2, `ajuste_*` de
+`clinicas` y `limite_efectivo`), y el código de P3. Estado y veredicto completo
+en `supabase/fusion/LIMITES-AJUSTABLES.md` (agente I): **NO COMPLETA**. Su
+código y Vitest pasan (700/700, `tsc` limpio salvo los tipos de `next typegen`)
+y mezcla sin conflictos con `feature/agenda-v2-produccion`. Le falta:
+
+1. **Auditoría de las tres `20261014…`** contra `supabase/AUDITORIA-MIGRACIONES.md`:
+   - las cabeceras dicen «PENDIENTE DE APLICAR» en local y en producción;
+   - no tienen auditoría independiente anotada;
+   - sin `BEGIN`/`COMMIT` (dimensión 2);
+   - sin `lock_timeout` (dimensión 6); P2 hace `ALTER TABLE clinicas` y
+     `CREATE TRIGGER` sobre `clinicas`;
+   - sin rejilla ni post-vuelo (dimensiones 5 y 18); P2 sin pre-vuelo;
+   - sin vuelta atrás (dimensión 7);
+   - sin fila en `mejora_agendaV2.md` §7.1.
+2. **La lista del caso 3 de `p1_permisos_funciones.sql`** sigue con las 10 de
+   producción. Al fusionarla hay que pegar la lista final en el mismo commit:
+   `CLAUDE.md` («Agenda v2», tanda H) la da en 49 funciones con el conjunto
+   fundido; el documento de I calcula 48 a 51 según lo que se retirara en la
+   fusión (§3.2). Con la lista de la rama, `p1` da rojo seguro en la base
+   combinada.
+3. **Correr `p1`, `p1b`, `p2` y `p3`** en una base combinada y aislada (no la
+   local compartida). No se han corrido sobre el conjunto de ahora
+   (`LIMITES-AJUSTABLES.md` §2).
+4. **Aclarar el texto de RN-1** del «Contrato con spinus-consola» que la rama
+   añade a `CLAUDE.md` («o 5 pacientes o menos contando los dados de baja»): el
+   cuerpo vigente de `clinica_tiene_acceso()` no tiene esa condición. Y decir
+   si P4–P6, que citan sus cabeceras, son parte de la rama (el plan que citan no
+   está en el repo).
+
+Con 1 a 3 resueltos, el documento de I dice que puede entrar **antes** del
+bloque fundido, por fecha (`20261014` < `20261201`).
+
+### AG-DT-262 — `log_cita_change` cuesta ~505 µs por UPDATE de una cita
+
+**Estado:** abierta, sin hacer (decisión de Angel, 2026-11-22: «no ahora. A la
+deuda, con tus números.»). Medido por el agente F5 en la oleada 2
+(`supabase/fusion/notas/F5.md` §5.4 y §5.7; los scripts en
+`supabase/fusion/notas/F5/`; los números no los volví a medir).
+
+* **Cómo se midió** (`medir-disparadores.{sql,sh}` + `resumir-medicion.py`): por
+  operación, 2 000 sentencias de una fila (más 300 de calentamiento) en una
+  transacción con ROLLBACK, mediana; y `EXPLAIN (ANALYZE)` sobre 2 000 filas
+  para el tiempo por disparador. Una clínica, un médico, un paciente, v2
+  encendida, 5 bloqueos lejos. 3 vueltas alternando tres clones («antes» =
+  originales, «F5» = fundido, «unión» = la variante de abajo).
+* **El número:** `audit_appointments_update` (F1, `log_cita_change()`) cuesta
+  **~505 µs por UPDATE**, «la mitad de la sentencia» y el mayor costo de guardar
+  una cita. Para comparar, en la misma medición: `proteger_reserva` ~55 µs por
+  UPDATE de sesión, `horario_bloqueado` ~75 µs por alta o movimiento con sesión.
+  Sentencias enteras con sesión (`authenticated`, F5): notas 907 µs, PUT con la
+  fila 920, mueve 986, estado 922, alta 848.
+* **La causa que señala F5 (deducida, leyendo):** el `(to_jsonb(OLD) -> n.key)`
+  dentro del `WHERE` sobre `jsonb_each(to_jsonb(NEW))` convierte la fila OLD
+  entera por cada columna (~45 veces); y el WHEN de `audit_appointments_update`
+  hace otras dos conversiones completas.
+* **La propuesta:** calcular `to_jsonb(OLD)` (y `to_jsonb(NEW)`) una sola vez en
+  una variable. «Debería dejar el mismo resultado; a medir por F1»: no se ha
+  medido ni escrito. Al tocarla, respetar las reglas de `log_cita_change()` de
+  `CLAUDE.md` (sólo nombres de columna; la lista de columnas técnicas va en la
+  función y en el WHEN, juntas; `via` sólo de `c_vias`).
+* **Lo que NO se hace: unir los disparadores de `appointments`** (F5.md §5.6,
+  «se midió, no conviene»). La variante `notas/F5/variante-union.sql` (B2 + B3
+  de UPDATE + B5 + B6 en un `trg_appointments_proteger_cambios`, B3 de DELETE
+  dentro de B4), en µs por fila de los BEFORE, F5 → unión:
+  - estado: 58.7 → 74.3 con sesión, 3.8 → 12.4 con `service_role`;
+  - PUT con la fila: 59.9 → 74.5 con sesión, 5.5 → 12.5 con `service_role`;
+  - lo que ahorra (una llamada en el alta y al mover) son 2–4 µs, dentro del
+    ruido;
+  - en su primera versión cambió el mensaje que ve `anon` en 2 de 4 130 casos
+    («permission denied for table agenda_bloqueos» en vez del rechazo de la
+    RLS);
+  - y rompería nombres que miran las pruebas y `CLAUDE.md`
+    (`l_integracion_disparadores.sql` caso 3; `trg_appointments_proteger_atendida`,
+    `_borrado`, `horario_bloqueado`…).
+
+### AG-DT-263 — La caída a la emisora de 7 argumentos, rama muerta
+
+**Estado:** abierta, se deja como está (decisión de Angel, 2026-11-22: «no la
+toques. Se retira después de producción.»). El conjunto fundido sólo crea
+`reserva_enlace_emitir` de 9 argumentos (`20261201140000`, línea 741); la de 7
+se retiró en la fusión (AG-DT-137). La tolerancia que cae en ella ya no se
+ejerce con el conjunto fundido, pero queda en el código:
+
+* `src/app/api/agenda/enlaces/route.ts:120-132` (`emitirEnBase`): si la de 9 da
+  PGRST202 y el único va SIN correo, emite con la de 7
+  (`admin.rpc('reserva_enlace_emitir', args)`, línea 131; el aviso del
+  `logger.warn`, línea 130).
+* Su prueba, `src/lib/tests/enlacesSinMigracionJ2.test.ts`: los casos «emitir
+  sin correo cae en la firma de 7 argumentos» (línea 85) y «emitir CON correo
+  no cae en la de 7…» (línea 93); el simulador del PGRST202, línea 57.
+* `src/lib/confirmacion/recordatorios.ts:19`, el comentario «No vuelvas a llamar
+  a `cita_correos_pendientes` (la de E4, sin interruptor).». La función sigue
+  retirada (el conjunto fundido no la crea, y ningún otro archivo de `src` la
+  nombra); el comentario se queda.
+
+**Cuándo:** después de aplicar el conjunto en producción, en un commit propio que
+retire la rama, sus dos casos de prueba y, si Angel quiere, el comentario.
+
 ---
 
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
