@@ -449,15 +449,90 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
       la tabla haría fallar la migración por un resto ajeno de un
       `CREATE INDEX CONCURRENTLY` de otro, sin relación con lo que ella crea.
 
+29. **Candado fuerte × viajes del cliente, con guarda para la conexión que se
+    corta.** Un candado se sostiene hasta el fin de la transacción, y con
+    `psql -f` cada sentencia es un viaje por el pooler: lo que cuenta no es el
+    tiempo de servidor de cada sentencia, sino cuántos viajes hay entre el
+    primer candado fuerte sobre una tabla caliente (`appointments`, `clinicas`,
+    `profiles`) y el `COMMIT`, multiplicado por el RTT real de quien aplica.
+    Qué mirar: contar las sentencias de nivel superior entre ese candado y el
+    `COMMIT` (un bloque `DO` es un viaje); comparar con el `lock_timeout` y el
+    `statement_timeout` de los roles de la app (en la foto, 8 s); y qué pasa si
+    la conexión de quien aplica se queda colgada a media transacción:
+    `lock_timeout` y `statement_timeout` no acotan a una sesión OCIOSA dentro
+    de la transacción (eso es `idle_in_transaction_session_timeout`). Lo que
+    exige ese candado va junto, al final, en pocos viajes (o el archivo entero
+    en una sola petición), y la transacción no puede quedarse ociosa con
+    candados más de unos segundos. Cómo se comprueba: el recuento con un
+    analizador que respete `$…$`, comillas y comentarios, y el RTT medido desde
+    la terminal que aplicará. *Ejemplo del proyecto:* F1, F4 y F5b agrupan lo
+    del ACCESS EXCLUSIVE en un bloque `DO`; F3 y F2 retenían ACCESS EXCLUSIVE
+    sobre `appointments` durante 89 y 59 viajes (auditoría independiente, ronda
+    1, A1: `supabase/produccion/auditoria/RONDA-1.md`).
+
+30. **FK de una sola columna hacia una tabla de varias clínicas, en una tabla
+    que la sesión puede escribir.** Una FK `medico_id → profiles(id)` (o a
+    `consultorios`, `pacientes`, `appointments`) sólo dice que la fila referida
+    EXISTE, no que sea de la misma clínica. Si la sesión puede escribir esa
+    columna y nada más lo comprueba, quien tenga sesión en una clínica deja
+    filas que apuntan a otra (y una FK `RESTRICT` retiene el borrado ajeno) y,
+    por la diferencia entre «entra» y «23503», distingue un uuid que existe de
+    uno que no (oráculo de existencia). Qué mirar: por cada tabla nueva, cada
+    FK de una columna hacia una tabla multi-clínica; si `authenticated` puede
+    INSERT/UPDATE esa columna (privilegio + policy); y qué comprueba la misma
+    clínica: una FK compuesta `(x_id, clinica_id)`, la policy `WITH CHECK` o un
+    disparador `BEFORE` que corra antes de la FK. El error tiene que ser el
+    mismo exista o no lo referido (con la RLS de la sesión, lo ajeno ni se ve).
+    Cómo se comprueba: insertarlo desde otra clínica con un uuid ajeno y con uno
+    inexistente, y comparar los errores. *Ejemplo del proyecto:*
+    `reserva_contactos.medico_id` (F3) lo aceptaba de otra clínica (auditoría
+    independiente, ronda 1, A3); lo cierra `proteger_reserva_contactos()` y lo
+    vigila `supabase/pruebas-sql/cb_aislamiento_clinicas.sql`, que barre las
+    demás tablas nuevas.
+
+31. **Una cadena de reversas comprueba todas sus negativas antes de deshacer la
+    primera.** Si las reversas se corren en orden inverso y una de en medio se
+    niega por datos, las que ya corrieron dejaron la base en un estado
+    intermedio que nadie ensayó (p. ej., sin las protecciones de la última
+    migración y con los datos que esas protecciones guardaban). Qué mirar: que
+    cada reversa exponga su guarda de datos como una consulta de SÓLO LECTURA
+    identificable (en su cabecera), y que el procedimiento (guion o plan) corra
+    las guardas de TODA la cadena antes de ejecutar la primera reversa; o que
+    las reversas que quitan protecciones se nieguen solas mientras haya datos
+    que esas protecciones guardan. Cómo se comprueba: con datos de la v2 en el
+    clon, lanzar la cadena y ver que se detiene antes de tocar nada. *Ejemplo
+    del proyecto:* las reversas de T y F5b corrían en verde y la de F4 se
+    negaba después, dejando la v2 encendida sin sus candados (auditoría
+    independiente, ronda 1, A5).
+
 ---
 
 ## 4-bis. Cambio de privilegios por omisión (`20261126120000`)
 
-> **PENDIENTE DE JUICIO DEL AUDITOR GLOBAL.** Por orden de Angel («el cambio de
-> privilegios por omisión de P se queda, en sección aparte, y que lo juzgue el
-> auditor»), esta sección sólo describe el cambio y lo que podría romper; no da
-> veredicto. Quien audite `20261126120000_public_sin_truncate.sql` decide si se
-> queda, se acota o se quita, y lo anota aquí.
+> **JUZGADO: SE QUEDA, TAL COMO ESTÁ, CON CONDICIONES** (auditor independiente,
+> ronda 1, 2026-11-22: `supabase/produccion/auditoria/RONDA-1.md`, «Juicio sobre
+> la sección 4-bis»). Por orden de Angel («el cambio de privilegios por omisión
+> de P se queda, en sección aparte, y que lo juzgue el auditor») esta sección
+> describía el cambio sin veredicto; el auditor lo comprobó en un clon de la
+> foto: hace exactamente lo que dice (`pg_default_acl` de `postgres` en `public`
+> para tablas queda `arwdxtm` para los tres roles, sin `D`; secuencias y
+> funciones intactas), una tabla nueva de `postgres` nace sin TRUNCATE y una de
+> `supabase_admin` con él (el límite descrito abajo), nada del repo depende del
+> privilegio y la foto no trae entradas globales que lo anulen. Sin el ajuste,
+> el invariante «cero TRUNCATE en `public`» se rompería con la primera tabla
+> nueva.
+>
+> **Condiciones** (ninguna impide aplicar):
+> 1. Los `REVOKE TRUNCATE` tabla a tabla de las migraciones de la agenda **no se
+>    quitan** por redundantes: mantienen cada archivo correcto si se aplica sin
+>    `20261126120000` o tras su reversa.
+> 2. **Nada vigila que el ajuste siga ahí:** hace falta una comprobación
+>    periódica (sirve la fila 1 de la rejilla de `20261126120000`: «tablas de
+>    public con TRUNCATE para los tres = 0»). Anotada como deuda: `DEUDA_TECNICA.md`,
+>    AG-DT-270.
+> 3. Sin verificar: qué rol usan las herramientas del panel de Supabase para
+>    «vaciar tabla» (si es `postgres` o `supabase_admin`, el REVOKE no les
+>    afecta; en las 22 tablas con disparador las frena el disparador).
 
 **Qué hace, exactamente** (paso 3 de la migración, línea 260):
 
