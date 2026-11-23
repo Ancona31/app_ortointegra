@@ -596,6 +596,9 @@ async function main(): Promise<void> {
   candado()
   const modo = leerModo(process.argv.slice(2))
   const t0 = Date.now()
+  // Los seis buckets de Storage de producción y sus policies: `db reset` los
+  // borra y ninguna migración los crea (idempotente, ~0,1 s; sólo local).
+  execFileSync('bash', [resolve(process.cwd(), 'scripts/local/almacenes-locales.sh')], { stdio: 'inherit' })
   await borrar()
   if (modo.borrarSolo) return
   const { ses, ctx } = await sembrarEquipo()
