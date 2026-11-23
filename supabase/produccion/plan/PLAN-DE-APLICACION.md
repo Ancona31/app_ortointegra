@@ -94,6 +94,40 @@ falla o si su rejilla tiene alguna fila `REVISAR`, y la registra con la CLI:
 `npx --yes supabase@2.117.0 migration repair --status applied <versión>
 --db-url <URL sin contraseña>`. Comprueba que la fila quedó en el historial.
 
+**Antes de correrlo, su huella (G10, ronda 2 del guion):** el propio `aplicar.sh`
+no puede comprobarse a sí mismo, así que Angel lo mira a mano, en la raíz del
+repo, en la rama que va a desplegar:
+
+```bash
+sha256sum supabase/produccion/plan/aplicar.sh
+# tiene que dar: 67ec5d149065f0723ca1397591a8e024adb1000960a338dabe497767d2e3e571
+sha256sum -c supabase/produccion/plan/huellas.sha256   # las 18 de SQL y reversa-previa.sql: todas OK
+```
+
+Si `aplicar.sh` da otra cosa, alguien lo cambió después de este plan: no se
+corre hasta saber qué cambió (y, si el cambio es bueno, se pone aquí su huella
+nueva en el mismo commit).
+
+**Lo que el guion comprueba además (ronda 2 del guion, segundo auditor) [C-CA,
+fase 4]:**
+- **Historial frente a catálogo (G1, G4).** `estado` enseña, para cada una de
+  las 9, el historial Y su objeto testigo, con cuatro estados: `pendiente`,
+  `aplicada y registrada`, `ALTO aplicada SIN registrar` y `ALTO registrada SIN
+  aplicar` (§8 dice qué hacer con los dos últimos). `aplicar` no ofrece ninguna
+  migración mientras alguna no cuadre; no salta una registrada sin mirar su
+  testigo; y antes de «Las 9 aplicadas y registradas» vuelve a comprobar las 9.
+- **Prueba de humo (G3).** Si no pasa, `estado` sale con ≠ 0 y `aplicar` se
+  detiene sin ofrecer ninguna migración.
+- **Sin historial (G6).** Si no existe `supabase_migrations.schema_migrations`,
+  para con un ALTO propio (antes también paraba, pero con otro mensaje).
+- **Uno a la vez (G9).** `aplicar`, `reversa` y `reversa-truncate` toman un
+  cerrojo de archivo (`flock`, en `$XDG_RUNTIME_DIR` o `/tmp`); un segundo
+  `aplicar.sh` en el mismo equipo para con «ya hay otro aplicar.sh …».
+- **El error, repetido (G7).** Tras un fallo, el guion repite al final la línea
+  del `ERROR` (psql la escribe antes que el resto de la salida).
+- `estado`, `aplicar` y las reversas siguen siendo las mismas peticiones; las
+  rejillas de la ida salieron idénticas.
+
 **Cómo viaja cada archivo (A1, desde la oleada 3, ronda 1): ENTERO, EN UNA SOLA
 PETICIÓN.** Cada archivo es una sesión de `psql` con tres peticiones:
 
@@ -209,10 +243,23 @@ Revisado línea a línea el 2026-11-22 [C, lectura y ensayo]:
   directa `db.<ref>.supabase.co` se habría tratado como ensayo. Corregido.)
 - **La contraseña:** si `PGPASSWORD` ya está en el entorno, la usa (lo dice, sin
   imprimirla); si no, la pide con `read -rsp` (no se ve, no va en la línea de
-  comandos, no queda en `~/.zsh_history`). Vive en el entorno del proceso y de
-  los contenedores efímeros (`docker run -e PGPASSWORD`, sin valor en la línea:
-  `ps` no la enseña). Nunca se escribe en disco ni en los registros; no se
-  imprime [C: buscada en todos los registros del ensayo, no aparece].
+  comandos, no queda en `~/.zsh_history`). Vive en el entorno del proceso de
+  `aplicar.sh` (y de la CLI, para `migration repair`). **A cada contenedor
+  efímero de `psql`/`pg_dump` le llega por su entrada estándar** (G11, ronda 2
+  del guion): ya no va con `-e PGPASSWORD`, que la dejaba legible con `docker
+  inspect` (`Config.Env`) mientras el contenedor vivía; el `sh` de dentro la lee
+  y la exporta sólo al proceso de psql. Quien tenga acceso a Docker o sea root en
+  el equipo aún podría leerla del entorno de ese proceso: el equipo es de un solo
+  usuario (Angel), y es el riesgo que queda. Nunca se escribe en disco ni en los
+  registros; no se imprime [C: buscada en todos los registros del ensayo, no
+  aparece; C-CA fase 4: ningún contenedor efímero visto durante una aplicación
+  tiene `PGPASSWORD` en `Config.Env`].
+- **«Local» son sólo tres literales** (G12): `127.0.0.1`, `localhost` y `::1`.
+  Por un **túnel o reenvío local** (`ssh -L`, un proxy) hacia otra base el guion
+  lo trataría como ENSAYO y **no pediría `PRODUCCION`**: no se usa nunca un túnel
+  hacia producción. No se le pregunta al servidor «quién es»: un clon de la foto
+  copia sus roles y su configuración, así que no hay una marca fiable. El
+  mensaje de arranque del ensayo lo recuerda.
 - La URL de la CLI va **sin** contraseña:
   `postgresql://postgres.qpnegmmpneseirfyplbf@aws-0-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require`.
 - **Nunca** `supabase link`, `--linked`, `db push`, `-p`/`--password` ni
@@ -885,7 +932,15 @@ servidor puede estar terminándolo aunque el cliente haya muerto, §5.2).
 ### 8.1 Si aborta por la espera del candado: repetir, y a qué hora
 
 Es el aborto más probable y el más inocente: otra transacción tenía la tabla y
-el archivo no consiguió su candado en 5 s (`lock_timeout`, aprobado por Angel
+el archivo no consiguió su candado en 5 s. **Lo que cuesta cada intento fallido
+(G5, ronda 2 del guion, medido por el segundo auditor):** si F3, F2 o F5b llegan
+con un LECTOR ajeno de `appointments` en una transacción abierta, el archivo
+hace cola sus 5 s y, mientras tanto, **toda lectura nueva de citas espera detrás:
+lectura más lenta medida, 5 000 ms** (la agenda de todas las clínicas parada 5 s;
+un rol con `statement_timeout` de 3 s, como `anon`, vería error: deducido). Con
+un escritor ajeno, o en F1/F5a (que no hacen cola), los lectores no lo notan. Por
+eso la regla de abajo (2 minutos de pausa, como mucho 3 veces) y mirar antes
+G.14/G.15: **no se repite en bucle** (`lock_timeout`, aprobado por Angel
 junto con los 10 s de transacción ociosa, los 120 s por sentencia y el tope de
 130 000 bytes). **Lo que se verá**, una de estas dos:
 
@@ -942,6 +997,13 @@ Causas de fallo, por el mensaje del servidor:
 | `ALTO: la rejilla de … tiene filas REVISAR` | todas | **ya tiene COMMIT**, sin registrar | no seguir; mandar `*.salida.txt`; decidir registrar o revertir ese archivo |
 | `ALTO: … se aplicó pero no quedó en el historial` | todas | falló el `repair` | repetir sólo `npx --yes supabase@2.117.0 migration repair --status applied <versión> --db-url "$URL"` (con `PGPASSWORD` en el entorno) |
 | `password authentication failed` | — | contraseña | repetir; la CLI no la imprime |
+| `ALTO registrada SIN aplicar: …` (en `estado`) / `… está en el historial pero NO aplicada …` | — | el historial dice que está y su testigo no existe (G1): un `migration repair` a mano con la versión equivocada, o una reversa a mano sin reparar | **no aplicar nada**: `aplicar.sh` se niega a ofrecer migraciones mientras alguna de las 9 no cuadre. Quitar SÓLO esa versión del historial (`npx --yes supabase@2.117.0 migration repair --status reverted <versión> --db-url "$URL"`), `aplicar.sh estado` (tiene que salir «pendiente») y volver a `aplicar` [C-CA, fase 4] |
+| `ALTO aplicada SIN registrar: …` (en `estado`) | — | testigo sí, historial no (§8, arriba) | lo de «aplicada sin registrar» de la primera tabla; `aplicar` no ofrece nada hasta repararlo [C-CA, fase 4] |
+| `ALTO: … al terminar, historial y catálogo NO cuadran …` | — | la comprobación final de `aplicar` (G1) | no seguir; `aplicar.sh estado` dice cuál |
+| `⚠️ NO aceptada` en la prueba de humo, y `ALTO: la prueba de humo … NO pasó …: no ofrezco ninguna migración (G3)` | — | el destino no acepta una petición del tamaño del archivo mayor | no se aplica nada (y `estado` sale con ≠ 0); averiguar por qué antes de otro intento; con ese destino el envío en una petición no sirve [C-CA, fase 4] |
+| `ALTO: NO EXISTE supabase_migrations.schema_migrations …` | — | no hay tabla de historial (G6) | parar y tomar otra foto (§1) [C-CA, fase 4] |
+| `ALTO: ya hay otro aplicar.sh … corriendo en este equipo (cerrojo …)` | — | dos `aplicar`/`reversa` a la vez (G9) | esperar a que termine el otro [C-CA, fase 4] |
+| `──────── EL ERROR (repetido …)` encima del `ALTO` | — | (no es un fallo nuevo) tras cualquier fallo el guion repite la línea del error, porque psql la escribe antes que el resto de la salida (G7) | leer ESE error, no las últimas líneas de la salida |
 
 **Quedarse a medias** entre dos archivos es válido días: cada prefijo del orden
 es coherente con la v2 apagada, y con «código primero» el código nuevo ya está
@@ -1068,6 +1130,35 @@ fallo de una reversa, `aplicar.sh` pregunta al catálogo por el testigo (§8):
 «SIGUE aplicada» (no hizo nada), «YA NO está … pero SIGUE en el historial»
 (repetir sólo `migration repair --status reverted <versión>`) o «no lo sé».
 `reversa-truncate` se niega sin tocar nada si T sigue en el historial [C-CA].
+
+**Lo que añadió la ronda 2 del guion (segundo auditor) [C-CA, fase 4]:**
+- **G2 · la v2 apagada se comprueba en CADA reversa, no sólo al principio.**
+  Cada reversa viaja como `BEGIN;` [+ `SET LOCAL spinus.reversa_con_datos =
+  'si';`] + un bloque `DO` + el archivo: el `DO` bloquea las escrituras de
+  `agenda_ajustes` hasta el `COMMIT` (`LOCK … IN SHARE MODE`, con el
+  `lock_timeout` de 5 s) y, si alguna clínica tiene la v2 encendida, aborta con
+  `REVERSA PARADA POR aplicar.sh: la v2 está ENCENDIDA en estas clínicas: <ids>`
+  sin tocar nada; si `agenda_ajustes` ya no existe (F1 deshecha), no mira. Vale
+  también para `reversa-truncate`. Ninguna reversa se cambió: va delante del
+  archivo en la misma petición.
+- **G13 · dice CUÁLES:** la comprobación previa y esa guarda listan los ids de
+  clínica (un uuid no es un dato personal).
+- **Coherencia antes de empezar (A5, guardas de orden):** `reversa` y
+  `reversa-truncate` exigen que historial y catálogo cuadren en las 9 antes de
+  la primera reversa. Las guardas de ORDEN de las reversas (F5a, F3, F2, F1; la
+  nº 2 antes que la nº 1 y T antes que la nº 2) no están en `reversa-previa.sql`
+  a propósito: con el historial coherente, el orden fijo de la cadena las cumple
+  siempre; lo que las rompería (una versión aplicada sin registrar o registrada
+  sin aplicar) se para ahí. Las dos de TRUNCATE no pasan por la previa porque no
+  se niegan por datos; sus otras guardas son de dueño, y `reversa-truncate`
+  exige además `current_user = postgres`.
+- **G8 · REVISAR también en las reversas:** si la rejilla de una reversa tiene
+  una fila REVISAR, el guion para: «la reversa quedó HECHA (COMMIT) pero <versión>
+  SIGUE en el historial» (como en la ida). Qué hacer: mandar la `*.salida.txt`;
+  si se decide darla por buena, quitar sólo esa versión del historial con
+  `migration repair --status reverted`.
+- **G10 · huella de `reversa-previa.sql`:** está en `huellas.sha256` y el guion
+  la comprueba antes de usarla.
 
 Lo que la reversa no quita: `respaldos.consultorios_horario_20261119` (a
 propósito) y las filas de `audit_log` (nunca).
@@ -1242,7 +1333,10 @@ Compute confirmado por Angel; se mira el panel en el paso 4).
 1. **`huellas.sha256`:** regenerado con el SQL definitivo (fase 2 de CA: 17 de
    los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Si se toca
    cualquier migración o reversa, se regenera en el mismo commit:
-   `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* > supabase/produccion/plan/huellas.sha256`.
+   `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* supabase/produccion/plan/reversa-previa.sql > supabase/produccion/plan/huellas.sha256`
+   (desde la fase 4 de CA lleva también `reversa-previa.sql`, G10). Y la huella
+   del propio `aplicar.sh`, en §2: Angel la comprueba a mano antes de correrlo; si
+   se cambia el guion, se cambia allí en el mismo commit.
 2. **§15, el fragmento de la consola:** pendiente de probar en un navegador
    real; lo prueba el agente del ensayo principal.
 3. **La hora sin consulta** (§4, paso 0; §8.1 si hay que dejarlo para otra):

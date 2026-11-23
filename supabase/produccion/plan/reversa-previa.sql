@@ -25,10 +25,6 @@
 BEGIN TRANSACTION READ ONLY;
 
 WITH c(version, clase, que, tabla, columnas, consulta) AS (VALUES
-  -- Previas, de toda la cadena.
-  ('previo', 'BLOQUEA', 'la v2 está ENCENDIDA en estas clínicas (apágala en TODAS antes de revertir)',
-     'public.agenda_ajustes', ARRAY['agenda_v2_encendida'],
-     'SELECT count(*) AS n FROM public.agenda_ajustes WHERE agenda_v2_encendida'),
   -- F5b (20261201170000_agenda_f5b_protecciones_cita_reversa.sql)
   ('20261201170000', 'DATOS', 'citas canceladas cerradas (cerrada_en/sustituida_por; reaparecerían en la agenda)',
      'public.appointments', ARRAY['cerrada_en', 'sustituida_por'],
@@ -94,6 +90,17 @@ cuentas AS (
     FROM c
 )
 SELECT version || '|' || clase || '|' || que || ': ' || n FROM cuentas WHERE n > 0
+UNION ALL
+-- Previa de toda la cadena. G13 (ronda 2 del guion): dice CUÁLES (ids de
+-- clínica; un uuid no es un dato personal), no sólo cuántas. aplicar.sh lo
+-- vuelve a comprobar dentro de la transacción de CADA reversa (G2).
+SELECT 'previo|BLOQUEA|la v2 está ENCENDIDA en estas clínicas (apágala en TODAS antes de revertir): ' || x.ids
+  FROM (SELECT CASE WHEN to_regclass('public.agenda_ajustes') IS NOT NULL
+                    THEN (xpath('/row/n/text()', query_to_xml(
+                           'SELECT string_agg(clinica_id::text, '', '' ORDER BY clinica_id) AS n FROM public.agenda_ajustes WHERE agenda_v2_encendida',
+                           false, true, '')))[1]::text
+               END AS ids) x
+ WHERE x.ids IS NOT NULL
 UNION ALL
 SELECT 'previo|BLOQUEA|hay que correr la reversa como el rol postgres (current_user es ' || current_user || ')'
  WHERE current_user <> 'postgres'
