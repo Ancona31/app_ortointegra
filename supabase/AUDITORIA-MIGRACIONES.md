@@ -411,7 +411,7 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
     que el contador subió, y una carrera de dos sesiones. *Ejemplo del
     proyecto:* el tope de 5 intentos del enlace de un solo uso
     (`reserva_enlaces.intentos` y `agotado_en`, en `reservar_por_enlace`,
-    `20261201140000`): `client_id_en_uso` se comprueba antes del contador, y el
+    `20261201140000`): `client_id_en_uso` se comprueba después del contador sin lanzar excepción (devuelve un resultado), y el
     INSERT de la cita va en su propio `BEGIN … EXCEPTION WHEN unique_violation`
     para que una carrera no deshaga el conteo (escenario 5 de
     `reserva-carrera.sh`; nació del hallazgo H1 de la antigua `20261122120000` y

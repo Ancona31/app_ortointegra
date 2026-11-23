@@ -1,0 +1,213 @@
+BEGIN
+SET
+INSERT 0 2
+INSERT 0 4
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+CREATE FUNCTION
+INSERT 0 1
+CREATE FUNCTION
+GRANT
+CREATE TABLE
+CREATE TABLE
+INSERT 0 8
+CREATE FUNCTION
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1	01 anon inserta cita en C1	anon	42501		permission denied for table agenda_bloqueos	Grant the required privileges to the current role with: GRANT SELECT ON public.agenda_bloqueos TO anon;	
+2	02 M1 alta cita X1 con paciente (C1, v2)	authenticated	ok	filas=1			cita_alta|appointments|00000000-0000-4000-8000-0000000e0e01|00000000-0000-4000-8000-0000000e0b01|{"origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": true}
+3	03 M1 alta con columnas reserva_* (deben quedar NULL)	authenticated	42501		La columna reserva_canal de la cita sólo la escribe el servidor		
+4	04 lectura de X2 (reserva_* tras el alta)	postgres	ok	[]			
+5	05 M2 (otra clínica) alta en C1	authenticated	42501		new row violates row-level security policy for table "appointments"		
+6	06 M2 alta cita Y1 con paciente (C2, v2 apagada)	authenticated	ok	filas=1			cita_alta|appointments|00000000-0000-4000-8000-0000000e0e21|00000000-0000-4000-8000-0000000e0b02|{"origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c02", "con_paciente": true}
+7	07 M1 edita notas de X1	authenticated	ok	filas=1			cita_editada|appointments|00000000-0000-4000-8000-0000000e0e01|00000000-0000-4000-8000-0000000e0b01|{"campos": ["notes"], "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": true}
+8	08 M1 mueve X1	authenticated	ok	filas=1			cita_editada|appointments|00000000-0000-4000-8000-0000000e0e01|00000000-0000-4000-8000-0000000e0b01|{"campos": ["end_time", "start_time"], "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": true}
+9	09 S1 confirma X1	authenticated	ok	filas=1			cita_editada|appointments|00000000-0000-4000-8000-0000000e0e01|00000000-0000-4000-8000-0000000e0b05|{"campos": ["status"], "estado": {"a": "confirmed", "de": "scheduled"}, "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": true}
+10	10 M2 edita X1 (otra clínica)	authenticated	ok	filas=0			
+11	11 anon edita X1	anon	ok	filas=0			
+12	12 M1 intenta reserva_* en edición	authenticated	42501		La columna reserva_nombre de la cita sólo la escribe el servidor		
+13	13 lectura X1	postgres	ok	[{"status":"confirmed","notes":"nota e0","start_time":"2026-11-26T16:00:00+00:00","reserva_nombre":null}]			
+14	14 anon crea bloqueo	anon	42501		permission denied for table agenda_bloqueos	Grant the required privileges to the current role with: GRANT INSERT ON public.agenda_bloqueos TO anon;	
+15	15 M1 crea bloqueo B1 (C1)	authenticated	ok	filas=1			INSERT|agenda_bloqueos|<uuid>|00000000-0000-4000-8000-0000000e0b01|
+16	16 M2 crea bloqueo en C1	authenticated	42501		new row violates row-level security policy for table "agenda_bloqueos"		
+17	17 M2 crea bloqueo en C2 (v2 apagada)	authenticated	42501		new row violates row-level security policy for table "agenda_bloqueos"		
+18	18 M1 edita motivo de B1	authenticated	ok	filas=1			UPDATE|agenda_bloqueos|<uuid>|00000000-0000-4000-8000-0000000e0b01|
+19	19 M1 alta de cita dentro de B1	authenticated	42501		Este horario está bloqueado. Quita el bloqueo para agendar aquí.	agenda_horario_bloqueado	
+20	20 M1 mueve X1 dentro de B1	authenticated	42501		Este horario está bloqueado. Quita el bloqueo para agendar aquí.	agenda_horario_bloqueado	
+21	21 S1 evento sin paciente dentro de B1	authenticated	42501		Este horario está bloqueado. Quita el bloqueo para agendar aquí.	agenda_horario_bloqueado	
+22	22 service_role mueve X1 dentro de B1	service_role	42501		Este horario está bloqueado. Quita el bloqueo para agendar aquí.	agenda_horario_bloqueado	
+23	23 M2 alta dentro de su bloqueo (C2 apagada)	authenticated	ok	filas=1			cita_alta|appointments|00000000-0000-4000-8000-0000000e0e22|00000000-0000-4000-8000-0000000e0b02|{"origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c02", "con_paciente": true}
+24	23b S1 borra el evento sin paciente (v2)	authenticated	ok	filas=0			
+25	24 M1 borra X1 (v2: se cancela, no se borra)	authenticated	42501		Una cita con paciente o por ligar no se borra: se cancela	Cancélala (status cancelled) en vez de borrarla	
+26	25 service_role borra X1	service_role	42501		Una cita con paciente o por ligar no se borra: se cancela	Cancélala (status cancelled) en vez de borrarla	
+27	26 M2 borra Y1 (C2 apagada)	authenticated	ok	filas=1			cita_eliminada|appointments|00000000-0000-4000-8000-0000000e0e21|00000000-0000-4000-8000-0000000e0b02|{"origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c02", "con_paciente": true}
+28	27 M1 cancela X1	authenticated	ok	filas=1			cita_cancelada|appointments|00000000-0000-4000-8000-0000000e0e01|00000000-0000-4000-8000-0000000e0b01|{"campos": ["status"], "estado": {"a": "cancelled", "de": "confirmed"}, "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": true}
+29	28 M1 cierra X1 con la sesión	authenticated	42501		Sólo el servidor cierra una cita cancelada, sin sustituta o con una sustituta viva de la misma clínica		
+30	29 service_role cierra X1 (Eliminar cita)	service_role	ok	filas=1			cita_editada|appointments|00000000-0000-4000-8000-0000000e0e01|system|{"campos": ["cerrada_en"], "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": true}
+31	30 service_role reabre X1	service_role	42501		Una cita cancelada que ya se cerró no se reabre	Se sustituyó por otra cita o se quitó de la agenda; se conserva como cancelada	
+32	31 M1 borra bloqueo B1	authenticated	ok	filas=1			DELETE|agenda_bloqueos|<uuid>|00000000-0000-4000-8000-0000000e0b01|
+33	32 anon INSERT reserva_enlaces	anon	42501		permission denied for table reserva_enlaces	Grant the required privileges to the current role with: GRANT INSERT ON public.reserva_enlaces TO anon;	
+34	33 M1 INSERT reserva_enlaces (su clínica)	authenticated	42501		Los enlaces de reserva los emite el servidor		
+35	34 S1 INSERT reserva_enlaces (su clínica, fijo de M1)	authenticated	42501		Los enlaces de reserva los emite el servidor		
+36	35 M2 INSERT reserva_enlaces en C1 (otra clínica)	authenticated	42501		Los enlaces de reserva los emite el servidor		
+37	36 M2 INSERT reserva_enlaces en C2 (la suya)	authenticated	42501		Los enlaces de reserva los emite el servidor		
+38	37 service_role INSERT reserva_enlaces directo	service_role	ok	filas=1			INSERT|reserva_enlaces|00000000-0000-4000-8000-0000000e0796|system|
+39	38 M1 emite por RPC (sólo servidor)	authenticated	42501		permission denied for function reserva_enlace_emitir		
+40	39 servidor emite único U1 con correo	service_role	ok	[{"reserva_enlace_emitir":"00000000-0000-4000-8000-0000000e0701"}]			INSERT|reserva_enlaces|00000000-0000-4000-8000-0000000e0701|system|
+41	40 servidor emite fijo F1	service_role	ok	[{"reserva_enlace_emitir":"00000000-0000-4000-8000-0000000e0702"}]			INSERT|reserva_enlaces|00000000-0000-4000-8000-0000000e0702|system|
+42	41 servidor emite en C2 (apagada)	service_role	ok	[{"reserva_enlace_emitir":"00000000-0000-4000-8000-0000000e0703"}]			INSERT|reserva_enlaces|00000000-0000-4000-8000-0000000e0703|system|
+43	42 servidor emite con actor de otra clínica	service_role	42501		reserva_enlace_emitir: quien emite no gestiona los enlaces de ese médico		
+44	43 enlaces que hay	postgres	ok	[{"id":"00000000-0000-4000-8000-0000000e0701","clinica_id":"00000000-0000-4000-8000-0000000e0c01","medico_id":"00000000-0000-4000-8000-0000000e0b01","clase":"unico","etiqueta":"Para Ana","correo":"ana@prueba.local","intentos":0,"revocado":false}, 
+ {"id":"00000000-0000-4000-8000-0000000e0702","clinica_id":"00000000-0000-4000-8000-0000000e0c01","medico_id":"00000000-0000-4000-8000-0000000e0b01","clase":"fijo","etiqueta":null,"correo":null,"intentos":0,"revocado":false}, 
+ {"id":"00000000-0000-4000-8000-0000000e0703","clinica_id":"00000000-0000-4000-8000-0000000e0c02","medico_id":"00000000-0000-4000-8000-0000000e0b02","clase":"fijo","etiqueta":null,"correo":null,"intentos":0,"revocado":false}, 
+ {"id":"00000000-0000-4000-8000-0000000e0796","clinica_id":"00000000-0000-4000-8000-0000000e0c01","medico_id":"00000000-0000-4000-8000-0000000e0b01","clase":"unico","etiqueta":null,"correo":null,"intentos":0,"revocado":false}]			
+45	44 contexto del único	service_role	ok	[{"ctx":{"clase": "unico", "tipos": [{"id": "00000000-0000-4000-8000-0000000e0a01", "nombre": "Consulta", "principal": false, "duracion_min": 30, "consultorio_id": null}], "estado": "vigente", "medico": {"titulo": "Dr.", "nombres": "Médico", "telefono": null, "especialidad": "Ortopedia", "apellido_materno": null, "apellido_paterno": "Uno"}, "ajustes": {"horizonte_dias": 60, "anticipacion_min_horas": 2}, "clinica": {"nombre": "E0 encendida", "horario": {"lunes": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "jueves": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "martes": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "sabado": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "domingo": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "viernes": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "miercoles": {"fin": "19:00", "activo": true, "inicio": "09:00"}}, "nombre_display": null}, "enlace_id": "00000000-0000-4000-8000-0000000e0701", "medico_id": "00000000-0000-4000-8000-0000000e0b01", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "consultorios": [{"id": "00000000-0000-4000-8000-0000000e0d01", "nombre": "Consultorio Uno", "horario": {"lunes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "jueves": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "martes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "sabado": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "domingo": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "viernes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "miercoles": {"fin": "19:00", "activo": false, "inicio": "09:00"}}, "telefono": null, "timezone": "America/Mexico_City", "direccion": "Calle 1", "horario_propio": false}]}}]			
+46	45 ocupación del único	service_role	ok	[]			
+47	46 ocupación en C2 (apagada)	service_role	ok	[]			
+48	47 reserva por el único (ok)	service_role	ok	[{"r_resultado":"ok","r_inicio":"2026-11-26T14:00:00+00:00","r_fin":"2026-11-26T14:30:00+00:00","r_historial":0}]			cita_alta|appointments|<uuid>|system|{"origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": false} ;; cita_reservada_enlace|appointments|<uuid>|system|{"aviso": "v1-e0", "canal": "unico", "enlace_id": "00000000-0000-4000-8000-0000000e0701", "clinica_id": "00000000-0000-4000-8000-0000000e0c01"} ;; INSERT|avisos_clinica|<uuid>|system| ;; UPDATE|reserva_enlaces|00000000-0000-4000-8000-0000000e0701|system| ;; UPDATE|reserva_enlaces|00000000-0000-4000-8000-0000000e0701|system|
+49	48 la cita reservada	postgres	ok	[{"title":"Ana Prueba","status":"scheduled","reserva_canal":"unico","reserva_nombre":"Ana Prueba","reserva_correo":"ana@prueba.local","hmac_de_la_clinica":true,"start_time":"2026-11-26T14:00:00+00:00","end_time":"2026-11-26T14:30:00+00:00","tipo_cita_id":"00000000-0000-4000-8000-0000000e0a01"}]			
+50	49 reserva por el fijo sin código	service_role	ok	[{"r_resultado":"correo_sin_verificar"}]			
+51	50 código para el fijo	service_role	ok	[{"reserva_codigo_emitir":"ok"}]			
+52	51 verificar código	service_role	ok	[{"reserva_codigo_verificar":"ok"}]			
+53	52 reserva por el fijo con ficha	service_role	ok	[{"r_resultado":"ok","r_inicio":"2026-11-26T13:00:00+00:00"}]			cita_alta|appointments|<uuid>|system|{"origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": false} ;; cita_reservada_enlace|appointments|<uuid>|system|{"aviso": "v1-e0", "canal": "fijo", "enlace_id": "00000000-0000-4000-8000-0000000e0702", "clinica_id": "00000000-0000-4000-8000-0000000e0c01"} ;; INSERT|avisos_clinica|<uuid>|system|
+54	53 reserva por el fijo encima de la otra	service_role	ok	[{"r_resultado":"ocupado"}]			
+55	54 bloqueo B2 y reserva dentro	postgres	ok	filas=1			INSERT|agenda_bloqueos|00000000-0000-4000-8000-0000000e0903|system|
+56	55 reserva dentro de B2	service_role	ok	[{"r_resultado":"ocupado"}]			
+57	56 ocupación tras reservas y B2	service_role	ok	[{"start_time":"2026-11-26T13:00:00+00:00","end_time":"2026-11-26T13:30:00+00:00"}, 
+ {"start_time":"2026-11-26T14:00:00+00:00","end_time":"2026-11-26T14:30:00+00:00"}, 
+ {"start_time":"2026-11-27T02:00:00+00:00","end_time":"2026-11-27T04:00:00+00:00"}]			
+58	57 anon llama a reservar_por_enlace	anon	42501		permission denied for function reservar_por_enlace		
+59	58 M1 mueve la cita reservada (candado)	authenticated	42501		El consultorio, el día y la hora de una cita reservada por enlace sólo cambian con «Reagendar»	Reagendar avisa al paciente con los datos nuevos	
+60	59 M1 cambia médico de la reservada	authenticated	42501		El médico de una cita reservada por enlace no se cambia	Si la atenderá otro médico, cancélala y reserva con él	
+61	60 M1 notas de la reservada	authenticated	ok	filas=1			cita_editada|appointments|<uuid>|00000000-0000-4000-8000-0000000e0b01|{"campos": ["notes"], "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": false}
+62	61 reagendar por la clínica	service_role	ok	[{"r_resultado":"modificada"}]			
+63	62 reagendar dentro de B2	service_role	ok	[{"r_resultado":"modificada"}]			
+64	63 reagendar en C2 (apagada)	service_role	ok	[{"r_resultado":"apagado"}]			
+65	64 emitir confirmación de la reservada	service_role	ok	[{"r_codigo_hash":"c4d59fd663e0443d77864e8a79bae19629e3fb97e386f2347226409a86913aa1"}]			INSERT|cita_confirmaciones|00000000-0000-4000-8000-0000000e0601|system|
+66	65 contexto de la confirmación	service_role	ok	[{"ctx":{"fin": "2026-11-26T14:30:00+00:00", "zona": "America/Mexico_City", "estado": "agendada", "inicio": "2026-11-26T14:00:00+00:00", "medico": {"titulo": "Dr.", "nombres": "Médico", "apellido_materno": null, "apellido_paterno": "Uno"}, "respuesta": null, "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "consultorio": {"nombre": "Consultorio Uno", "telefono": null, "direccion": "Calle 1"}, "corte_cancelar": "2026-11-26T13:00:00+00:00", "puede_cancelar": true, "puede_confirmar": true}}]			
+67	66 el paciente confirma	service_role	ok	[{"r_resultado":"confirmada"}]			cita_editada|appointments|<uuid>|system|{"via": "enlace_paciente", "campos": ["status"], "estado": {"a": "confirmed", "de": "scheduled"}, "origen": "spinus", "clinica_id": "00000000-0000-4000-8000-0000000e0c01", "con_paciente": false} ;; INSERT|avisos_clinica|<uuid>|system| ;; UPDATE|cita_confirmaciones|00000000-0000-4000-8000-0000000e0601|system|
+68	67 emitir confirmación en C2 (apagada)	service_role	ok	[{"r_codigo_hash":null}]			
+69	68 avisos de la clínica	postgres	ok	[{"tipo":"confirmacion_paciente","clinica_id":"00000000-0000-4000-8000-0000000e0c01","revisado":false}, 
+ {"tipo":"reserva_enlace","clinica_id":"00000000-0000-4000-8000-0000000e0c01","revisado":false}, 
+ {"tipo":"reserva_enlace","clinica_id":"00000000-0000-4000-8000-0000000e0c01","revisado":false}]			
+70	69 correo de la confirmación (tomar)	service_role	ok	[{"r_envio_id":"<uuid>","r_para":"ana@prueba.local","r_inicio":"2026-11-26T14:00:00+00:00","r_fin":"2026-11-26T14:30:00+00:00","r_zona":"America/Mexico_City","r_estado":"confirmed","r_medico":{"titulo": "Dr.", "nombres": "Médico", "apellido_materno": null, "apellido_paterno": "Uno"},"r_consultorio":{"nombre": "Consultorio Uno", "telefono": null, "direccion": "Calle 1"}}]			INSERT|cita_correos|<uuid>|system|
+71	70 recordatorios pendientes	service_role	ok	[]			
+72	71 gcal_citas_por_evento C1	service_role	ok	[]			
+73	72 gcal_citas_por_evento C2	service_role	ok	[]			
+74	73 gcal_sync_tomar C1 sin conexión	service_role	ok	[]			
+75	74 gcal_sync_tomar C2	service_role	ok	[]			
+76	75 gcal_importar_evento C1	service_role	ok	[{"importada":false}]			
+77	76 gcal_importar_evento C2	service_role	ok	[{"importada":false}]			
+78	77 gcal_sync_clinica_habilitada	service_role	ok	[{"a":true,"b":true}]			
+79	78 reserva_empalmes_registrar C1	service_role	ok	[{"reserva_empalmes_registrar":0}]			
+80	79 cita_movimiento_google_registrar C1	service_role	ok	[{"cita_movimiento_google_registrar":true}]			INSERT|avisos_clinica|<uuid>|system|
+81	80 cita_movimiento_google_registrar C2	service_role	ok	[{"cita_movimiento_google_registrar":false}]			
+82	81 cita_rsvp_google C1	service_role	ok	[{"cita_rsvp_google":"sin_cambio"}]			
+83	82 gcal_bloqueo_aplicar C1 (no crea)	service_role	ok	[{"gcal_bloqueo_aplicar":0}]			
+84	83 gcal_bloqueo_aplicar C2	service_role	ok	[{"gcal_bloqueo_aplicar":0}]			
+85	84 authenticated llama a una gcal_* (sólo servidor)	authenticated	42501		permission denied for function gcal_citas_por_evento		
+86	85 anon llama a cita_confirmacion_contexto	anon	42501		permission denied for function cita_confirmacion_contexto		
+87	86 restablecer configuración C1	service_role	ok	[{"agenda_restablecer_configuracion":{"r_resultado":"ok","r_consultorios":1,"r_tipos":1,"r_enlaces":2}}]			agenda_configuracion_restablecida|agenda_ajustes|<uuid>|00000000-0000-4000-8000-0000000e0b01|consultorios: 1; tipos archivados: 1; enlaces revocados: 2 ;; agenda_horario_restablecido|consultorios|00000000-0000-4000-8000-0000000e0d01|00000000-0000-4000-8000-0000000e0b01|{"horario": {"lunes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "jueves": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "martes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "sabado": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "domingo": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "viernes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "miercoles": {"fin": "19:00", "activo": false, "inicio": "09:00"}}, "horario_propio": false} ;; UPDATE|agenda_ajustes|<uuid>|system| ;; UPDATE|consultorios|00000000-0000-4000-8000-0000000e0d01|system| ;; UPDATE|reserva_enlaces|00000000-0000-4000-8000-0000000e0702|system| ;; UPDATE|reserva_enlaces|00000000-0000-4000-8000-0000000e0796|system| ;; UPDATE|tipos_cita|00000000-0000-4000-8000-0000000e0a01|system|
+88	87 estado final de las citas	postgres	ok	[{"id":"<uuid>","clinica_id":"00000000-0000-4000-8000-0000000e0c01","medico_id":"00000000-0000-4000-8000-0000000e0b01","title":"Beto Prueba","status":"scheduled","start_time":"2026-11-26T13:00:00+00:00","end_time":"2026-11-26T13:30:00+00:00","notes":null,"reserva_canal":"fijo","reserva_nombre":"Beto Prueba","reserva_reagendados":0,"google_asignacion":null,"origen":"spinus","cerrada":false,"sustituida_por":null,"tipo_cita_id":"00000000-0000-4000-8000-0000000e0a01","gcal_sync_status":"pending"}, 
+ {"id":"<uuid>","clinica_id":"00000000-0000-4000-8000-0000000e0c01","medico_id":"00000000-0000-4000-8000-0000000e0b01","title":"Ana Prueba","status":"confirmed","start_time":"2026-11-26T14:00:00+00:00","end_time":"2026-11-26T14:30:00+00:00","notes":"ok","reserva_canal":"unico","reserva_nombre":"Ana Prueba","reserva_reagendados":0,"google_asignacion":null,"origen":"spinus","cerrada":false,"sustituida_por":null,"tipo_cita_id":"00000000-0000-4000-8000-0000000e0a01","gcal_sync_status":"pending"}, 
+ {"id":"00000000-0000-4000-8000-0000000e0e01","clinica_id":"00000000-0000-4000-8000-0000000e0c01","medico_id":"00000000-0000-4000-8000-0000000e0b01","title":"Paciente Uno","status":"cancelled","start_time":"2026-11-26T16:00:00+00:00","end_time":"2026-11-26T16:30:00+00:00","notes":"nota e0","reserva_canal":null,"reserva_nombre":null,"reserva_reagendados":0,"google_asignacion":null,"origen":"spinus","cerrada":true,"sustituida_por":null,"tipo_cita_id":null,"gcal_sync_status":"synced"}, 
+ {"id":"00000000-0000-4000-8000-0000000e0e22","clinica_id":"00000000-0000-4000-8000-0000000e0c02","medico_id":"00000000-0000-4000-8000-0000000e0b02","title":"Paciente Dos","status":"scheduled","start_time":"2026-11-26T19:30:00+00:00","end_time":"2026-11-26T20:00:00+00:00","notes":null,"reserva_canal":null,"reserva_nombre":null,"reserva_reagendados":0,"google_asignacion":null,"origen":"spinus","cerrada":false,"sustituida_por":null,"tipo_cita_id":null,"gcal_sync_status":"synced"}]			
+89	88 estado final de bloqueos, enlaces, tipos y consultorios	postgres	ok	[{"bloqueos":[{"medico_id":"00000000-0000-4000-8000-0000000e0b01","inicio":"2026-11-27T02:00:00+00:00","fin":"2026-11-27T04:00:00+00:00","motivo":null}],"enlaces":[{"id":"00000000-0000-4000-8000-0000000e0701","clase":"unico","rev":false,"pau":false,"intentos":1}, 
+ {"id":"00000000-0000-4000-8000-0000000e0702","clase":"fijo","rev":true,"pau":false,"intentos":0}, 
+ {"id":"00000000-0000-4000-8000-0000000e0703","clase":"fijo","rev":false,"pau":false,"intentos":0}, 
+ {"id":"00000000-0000-4000-8000-0000000e0796","clase":"unico","rev":true,"pau":false,"intentos":0}],"tipos":[{"id":"00000000-0000-4000-8000-0000000e0a01","activo":false,"duracion_min":30}],"consultorios":[{"id":"00000000-0000-4000-8000-0000000e0d01","horario_propio":true,"por_revisar":true,"horario":{"lunes": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "jueves": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "martes": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "sabado": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "domingo": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "viernes": {"fin": "19:00", "activo": true, "inicio": "09:00"}, "miercoles": {"fin": "19:00", "activo": true, "inicio": "09:00"}}}, 
+ {"id":"00000000-0000-4000-8000-0000000e0d02","horario_propio":false,"por_revisar":true,"horario":{"lunes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "jueves": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "martes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "sabado": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "domingo": {"fin": "14:00", "activo": false, "inicio": "09:00"}, "viernes": {"fin": "19:00", "activo": false, "inicio": "09:00"}, "miercoles": {"fin": "19:00", "activo": false, "inicio": "09:00"}}}],"correos":[{"tipo":"confirmacion","estado":"enviando"}],"confirmaciones":[{"respuesta":"confirmo"}]}]			
+ROLLBACK
