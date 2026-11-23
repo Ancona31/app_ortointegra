@@ -18,19 +18,22 @@
  * Tanda L (punto 17 de Angel): con el diseño y la escala de la configuración nueva (`estilosConfig`):
  * filas grises, botones de 44 px como mínimo. Sólo la presentación: lo que ofrece, a quién y con qué
  * ruta sigue igual.
+ * B13 · AG9 (rediseño, maqueta `ag-config`, secretaria): la ficha es un grupo: el nombre del médico como rótulo
+ * (sigue siendo el `h4`), y en UNA superficie las filas de sus enlaces y el alta de uno de un solo uso.
  */
 import { useState, type FormEvent } from 'react'
+import { User } from 'lucide-react'
 import FilaEnlaceReserva from '@/components/agenda/configuracion/FilaEnlaceReserva'
 import FaltaParaEnlace from '@/components/agenda/configuracion/FaltaParaEnlace'
-import { AYUDA, BLOQUE, BOTON_AZUL, BOTON_CHICO, CAMPO_NUEVO, FILA_GRIS, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, BLOQUE, BOTON_CHICO, BOTON_TEXTO, CAMPO_NUEVO, FILA_GRIS, LISTA, ROTULO } from '@/components/agenda/configuracion/estilosConfig'
 import { avisoDeEnlace, type MotivoApertura } from '@/lib/reserva/aperturaEnlace'
 
 /** Lo que se arregla desde la ficha (lo demás lo decide la base o ya pasó). */
 const ARREGLABLES: readonly MotivoApertura[] = ['sin_consultorio', 'sin_tipos', 'sin_disponibilidad']
 import type { EnlaceReserva } from '@/lib/reserva/gestionReserva'
 
-/** Etiqueta encima de un campo (`.rp-campo` de la reserva: 13,5 px · 600). */
-const ETIQUETA_CAMPO = 'flex flex-col gap-[6px] text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]'
+/** Etiqueta encima de un campo (`.k-etiqueta`: 13 · 600). */
+const ETIQUETA_CAMPO = 'k-etiqueta flex flex-col gap-[4px]'
 
 const FECHA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -73,7 +76,8 @@ function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir:
     setCorreo('')
   }
   return (
-    <form onSubmit={ev => void emitirUnico(ev)} className="flex flex-wrap items-end gap-[12px]">
+    <form onSubmit={ev => void emitirUnico(ev)}
+      className="flex flex-wrap items-end gap-[12px] px-[16px] pb-[16px] pt-[14px] ih:px-[20px] iv:px-[20px] esc:px-[20px] ih:pb-[18px] iv:pb-[18px] esc:pb-[18px]">
       <label className={`${ETIQUETA_CAMPO} min-w-0 flex-1 basis-56`}>Etiqueta (opcional)
         <input className={CAMPO_NUEVO} value={etiqueta} maxLength={60} onChange={ev => setEtiqueta(ev.target.value)}
           placeholder="Para uso interno" />
@@ -96,9 +100,11 @@ function FormUnico(p: { ocupado: boolean; vigenciaDias: number | null; onEmitir:
 function SinFijo(p: { verFalta: boolean; onVerFalta?: () => void; puedeEmitir: boolean; ocupado: boolean; onCrearFijo: () => void }) {
   return (
     <li className={FILA_GRIS}>
-      <span className={AYUDA}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
-      {p.verFalta && <button type="button" className={BOTON_CHICO} onClick={p.onVerFalta}>Ver qué falta</button>}
-      {p.puedeEmitir && <button type="button" className={BOTON_AZUL} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
+      <span className={`${AYUDA} flex-[1_1_200px]`}>Aún no hay enlace fijo: se comparte una vez y sirve siempre.</span>
+      <span className="flex flex-wrap">
+        {p.verFalta && <button type="button" className={BOTON_TEXTO} onClick={p.onVerFalta}>Ver qué falta</button>}
+        {p.puedeEmitir && <button type="button" className={BOTON_TEXTO} disabled={p.ocupado} onClick={p.onCrearFijo}>Crear enlace fijo</button>}
+      </span>
     </li>
   )
 }
@@ -116,12 +122,13 @@ export default function BloqueEnlacesMedico(p: Props) {
   const verFalta = Boolean(p.motivos) && (completando || (p.enlaces.length === 0 && !p.faltaEnPasos))
   return (
     <div className={BLOQUE}>
-      {p.nombre && <h4 className={`m-0 ${TITULO_BLOQUE}`}>{p.nombre}</h4>}
+      {p.nombre && <h4 className={ROTULO}><User size={16} strokeWidth={2} aria-hidden="true" className="flex-none" />{p.nombre}</h4>}
       {verFalta && p.motivos && (
         <FaltaParaEnlace motivos={p.motivos} medicoId={p.medicoId} esPropio={p.esPropio} puedeCrearTipos={p.puedeCrearTipos}
           alResolver={() => { setCompletando(false); p.alCrearTipo() }} />
       )}
-      <ul className="m-0 flex list-none flex-col gap-[8px] p-0">
+      <div className={LISTA}>
+      <ul className="m-0 flex list-none flex-col p-0 [&>li+li]:border-t [&>li+li]:border-linea">
         {fijo ? (
           <FilaEnlaceReserva titulo="Enlace fijo" detalle={`desde el ${FECHA.format(new Date(fijo.created_at))}`}
             aviso={fijo.pausado_en ? AVISO_PAUSADO : aviso}
@@ -140,6 +147,7 @@ export default function BloqueEnlacesMedico(p: Props) {
         ))}
       </ul>
       {p.puedeEmitir && <FormUnico ocupado={p.ocupado} vigenciaDias={p.vigenciaDias} onEmitir={p.onEmitirUnico} />}
+      </div>
     </div>
   )
 }

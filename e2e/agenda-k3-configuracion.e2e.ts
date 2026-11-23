@@ -15,6 +15,7 @@ import { codigoDeEnlace } from '../src/lib/reserva/secretos'
  *   · 14 apagar «Tu enlace» lo PAUSA: la página, los turnos y la reserva responden igual que con un
  *        enlace que no existe; al prenderlo vuelve la MISMA dirección; sólo «Cambiar por uno nuevo» revoca.
  *   · 13 en el teléfono las cinco pestañas son iconos con su nombre accesible, sin desplazamiento
+ *        (B13 · AG9: ahora son texto en una pista que se desliza; ver la prueba 13)
  *        lateral a 390 ni a 320 px, y el nombre de la elegida va de título debajo; en computadora, texto.
  *
  * Cada prueba deja la clínica A como estaba (`foto`/`devolver`, como postgres; copia de las de
@@ -276,6 +277,9 @@ test('13 · en computadora las pestañas llevan su texto y no hay título debajo
 })
 
 /* ── 13 · las pestañas en el teléfono ───────────────────────────────── */
+/* B13 · AG9 (rediseño, maqueta `ag-config`; sustituye a los iconos de K3): en el teléfono las pestañas son TEXTO,
+   en una pista que se desliza (la página no se desborda); el nombre accesible no cambia, el teclado tampoco, y la
+   elegida se ve. Ya no hay título aparte debajo (`data-titulo-pestana`): lo dice la pestaña. */
 
 const NOMBRES = ['Tu enlace', 'Cuándo das consulta', 'Tu consulta', 'Avisos', 'Más opciones']
 
@@ -283,7 +287,7 @@ test.describe('teléfono', () => {
   test.beforeEach(({}, testInfo) => { test.skip(testInfo.project.name !== 'telefono', 'específica del teléfono') })
 
   for (const ancho of [390, 320]) {
-    test(`13 · a ${ancho} px las cinco pestañas son iconos con nombre, caben sin desplazamiento y el título dice la elegida`, async ({ page }) => {
+    test(`13 · a ${ancho} px las cinco pestañas llevan su texto en una pista que se desliza, sin desbordar la página`, async ({ page }) => {
       limpiezas.push(sinPendientesAgenda(CORREO.adminA))
       await page.setViewportSize({ width: ancho, height: 800 })
       await page.goto(RUTA)
@@ -292,21 +296,21 @@ test.describe('teléfono', () => {
       await expect(pestanas).toHaveCount(5)
       for (const [i, nombre] of NOMBRES.entries()) {
         await expect(pestanas.nth(i)).toHaveAccessibleName(nombre)
-        await expect(pestanas.nth(i).locator('svg')).toBeVisible()
-        await expect(pestanas.nth(i)).not.toContainText(nombre, { useInnerText: true })
+        await expect(pestanas.nth(i)).toContainText(nombre, { useInnerText: true })
       }
-      expect(await lista.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0)
+      // La pista se desliza (no caben) y la página no se desborda.
+      expect(await lista.evaluate(el => el.scrollWidth - el.clientWidth)).toBeGreaterThan(0)
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0)
-      const titulo = page.locator('[data-titulo-pestana]')
-      await expect(titulo).toHaveText('Tu enlace')
-      // Teclado intacto: la flecha pasa a la siguiente, con el foco, y el título la sigue.
+      await expect(page.locator('[data-titulo-pestana]')).toHaveCount(0)
+      // Teclado intacto: la flecha pasa a la siguiente, con el foco; la última elegida queda a la vista.
       await pestanas.nth(0).focus()
       await page.keyboard.press('ArrowRight')
       await expect(pestanas.nth(1)).toBeFocused()
       await expect(pestanas.nth(1)).toHaveAttribute('aria-selected', 'true')
-      await expect(titulo).toHaveText('Cuándo das consulta')
+      await page.keyboard.press('End')
+      await expect(pestanas.nth(4)).toHaveAttribute('aria-selected', 'true')
+      await expect(pestanas.nth(4)).toBeInViewport({ ratio: 0.9 })
       await pestanas.nth(3).click()
-      await expect(titulo).toHaveText('Avisos')
       await expect(page.locator('#config-panel-avisos')).toBeVisible()
     })
   }

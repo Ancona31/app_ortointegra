@@ -119,19 +119,23 @@ test.describe('15 · los permisos que dice cada aviso', () => {
 })
 
 /* ── 2 · la escala de computadora ───────────────────────────────────────── */
+/* B13 · AG9 (rediseño): las dos escalas siguen, ahora con el KIT y por FORMATO (`ih`/`esc` la de computadora;
+   `ext`/`tel`/`iv` la táctil): título de pantalla 32 / 26, rótulo de grupo 13, ayuda 13, pestaña 14 de 40 / 44 de
+   alto, «‹ Agenda» 36 / 44, la fila-acción «Cambiar horario» 44 de alto y 14 de letra / 48 y 15. El h2 de cada
+   pestaña es sólo para el lector de pantalla (lo dice la pestaña elegida). */
 
-interface Medidas { h1: number; h2: number; ayuda: number; pestana: [number, number]; agenda: number; boton: [number, number] }
+interface Medidas { h1: number; rotulo: number; ayuda: number; pestana: [number, number]; agenda: number; boton: [number, number] }
 
 async function medidas(page: Page): Promise<Medidas> {
   await pestanaConfig(page, 'Cuándo das consulta')
   const p = panel(page, 'horario')
   const caja = async (l: Locator): Promise<[number, number]> => l.evaluate(el =>
-    [el.getBoundingClientRect().height, parseFloat(getComputedStyle(el).fontSize)] as [number, number])
+    [Math.round(el.getBoundingClientRect().height), parseFloat(getComputedStyle(el).fontSize)] as [number, number])
   const letra = async (l: Locator): Promise<number> => (await caja(l))[1]
   return {
     h1: await letra(page.locator('main h1')),
-    h2: await letra(p.locator('h2')),
-    ayuda: await letra(page.locator('[data-horario-clinica] span').filter({ hasText: 'Lo usan los consultorios' })),
+    rotulo: await letra(page.locator('[data-horario-clinica] h3')),
+    ayuda: await letra(page.locator('[data-horario-clinica] p').filter({ hasText: 'Lo usan los consultorios' })),
     pestana: await caja(page.locator('#config-tab-horario')),
     agenda: (await caja(page.locator('main a[href="/agenda"]').first()))[0],
     boton: await caja(p.getByRole('button', { name: 'Cambiar horario de la clínica' })),
@@ -141,17 +145,17 @@ async function medidas(page: Page): Promise<Medidas> {
 test.describe('2 · el administrador', () => {
   test.use({ storageState: SESION.adminA })
 
-  test('2 · en computadora 16 / 13–14 / 13 px y 40 de alto; en el teléfono, como estaba', async ({ page }, info) => {
+  test('2 · en computadora (esc) 32 / 13 / 13 y controles de 36–44; en el teléfono, la escala táctil de 44', async ({ page }, info) => {
     limpiezas.push(sinPendientesAgenda(CORREO.adminA))
     await page.goto(RUTA)
     const m = await medidas(page)
     const compu = info.project.name === 'escritorio'
-    expect(m.h1).toBe(18)
-    expect(m.h2).toBe(16)
-    expect(m.ayuda).toBe(compu ? 13 : 13.5)
-    expect(m.pestana).toEqual(compu ? [40, 13] : [52, 15])
-    expect(m.agenda).toBe(compu ? 40 : 44)
-    expect(m.boton).toEqual(compu ? [40, 13] : [44, 15])
+    expect(m.h1).toBe(compu ? 32 : 26)
+    expect(m.rotulo).toBe(13)
+    expect(m.ayuda).toBe(13)
+    expect(m.pestana).toEqual(compu ? [40, 14] : [44, 14])
+    expect(m.agenda).toBe(compu ? 36 : 44)
+    expect(m.boton).toEqual(compu ? [44, 14] : [48, 15])
     // El interruptor: el mismo dibujo (52 × 30) y su área de toque, 40 en computadora (5 px fuera) y 46 en el teléfono (8).
     await pestanaConfig(page, 'Avisos')
     const sw = panel(page, 'avisos').getByRole('switch').first()

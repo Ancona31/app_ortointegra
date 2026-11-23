@@ -10,11 +10,15 @@
  * (opcional)», el de J2 (punto 3), que la maqueta no dibuja. Sin él, la
  * pantalla nueva no tenía cómo darle correo a un único y la reserva por ese
  * enlace no mandaba comprobante ni avisos a nadie.
+ *
+ * B13 · AG9/AG10 (rediseño, maquetas `ag-config` y `ag-pv`): campos del kit; «Crear enlace de una vez» es tonal
+ * (el único relleno de la pantalla es «Copiar enlace»); creado, la dirección en letra de máquina y «Copiar» como
+ * acción de texto.
  */
 import { useId, useState } from 'react'
 import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import { emitirEnlace, urlReserva } from '@/components/agenda/configuracion/accionesConfig'
-import { AYUDA, CAMPO_NUEVO, ERROR } from '@/components/agenda/configuracion/estilosConfig'
+import { AYUDA, BOTON_BLANCO, BOTON_CHICO, BOTON_TEXTO, CAMPO_NUEVO, DIRECCION, ERROR } from '@/components/agenda/configuracion/estilosConfig'
 
 interface Props {
   medicoId: string
@@ -24,8 +28,7 @@ interface Props {
   alCancelar?: () => void
 }
 
-const BOTON_CONTORNO =
-  'inline-flex min-h-[44px] sm:min-h-[40px] cursor-pointer items-center justify-center rounded-[10px] border border-[var(--ag-brand-secondary)] bg-[var(--ag-surface)] px-[20px] sm:px-[16px] text-[15px] sm:text-[13px] font-semibold text-[var(--ag-brand-legible)] disabled:cursor-not-allowed disabled:opacity-60'
+const ETIQUETA = 'k-etiqueta flex min-w-0 flex-[1_1_220px] flex-col gap-[4px]'
 
 export default function CrearEnlaceUnaVez({ medicoId, alCrear, alCancelar }: Props) {
   const id = useId()
@@ -45,28 +48,29 @@ export default function CrearEnlaceUnaVez({ medicoId, alCrear, alCancelar }: Pro
   }
   if (url) {
     return (
-      <div className="flex flex-wrap items-center gap-[10px] rounded-[10px] border border-[var(--ag-border-card)] bg-[var(--ag-surface-sunken)] px-[14px] sm:px-[12px] py-[12px]">
-        <span data-enlace-una-vez className="flex-[1_1_260px] break-all font-mono text-[15px] sm:text-[14px] text-[var(--ag-ink)]">{url}</span>
-        <BotonCopiar texto={url} ariaLabel="Copiar el enlace de una vez"
-          className="inline-flex min-h-[44px] sm:min-h-[40px] cursor-pointer items-center rounded-[10px] border-0 bg-[var(--ag-brand-secondary)] px-[18px] sm:px-[16px] text-[15px] sm:text-[13px] font-semibold text-white" />
+      <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
+        <span data-enlace-una-vez className={`${DIRECCION} flex-[1_1_240px]`}>{url}</span>
+        <BotonCopiar texto={url} ariaLabel="Copiar el enlace de una vez" className={BOTON_TEXTO} />
       </div>
     )
   }
   return (
-    <div className="flex flex-col gap-[8px]">
-      <div className="flex flex-wrap items-end gap-[10px]">
-        <label htmlFor={`${id}-q`} className="flex flex-[1_1_260px] flex-col gap-[6px] text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]">¿Para quién es? (solo lo ves tú)
-          <input id={`${id}-q`} type="text" maxLength={60} placeholder="Ej.: Sra. López, revisión" className={`${CAMPO_NUEVO} px-[12px] py-[10px]`}
+    <div className="flex flex-col gap-[12px]">
+      <div className="flex flex-wrap items-end gap-[12px]">
+        <label htmlFor={`${id}-q`} className={ETIQUETA}>¿Para quién es? (solo lo ves tú)
+          <input id={`${id}-q`} type="text" maxLength={60} placeholder="Ej.: Sra. López, revisión" className={CAMPO_NUEVO}
             value={etiqueta} onChange={e => setEtiqueta(e.target.value)} />
         </label>
-        <label htmlFor={`${id}-c`} className="flex flex-[1_1_260px] flex-col gap-[6px] text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-text)]">Correo del paciente (opcional)
-          <input id={`${id}-c`} type="email" autoComplete="off" maxLength={254} aria-describedby={`${id}-n`} className={`${CAMPO_NUEVO} px-[12px] py-[10px]`}
+        <label htmlFor={`${id}-c`} className={ETIQUETA}>Correo del paciente (opcional)
+          <input id={`${id}-c`} type="email" autoComplete="off" maxLength={254} aria-describedby={`${id}-n`} className={CAMPO_NUEVO}
             value={correo} onChange={e => setCorreo(e.target.value)} />
         </label>
-        <button type="button" className={BOTON_CONTORNO} disabled={enviando} onClick={() => void crear()}>
+      </div>
+      <div className="flex flex-wrap gap-[8px]">
+        <button type="button" className={BOTON_CHICO} disabled={enviando} onClick={() => void crear()}>
           {enviando ? 'Creando…' : 'Crear enlace de una vez'}
         </button>
-        {alCancelar && <button type="button" className={BOTON_CONTORNO} onClick={alCancelar}>Cancelar</button>}
+        {alCancelar && <button type="button" className={BOTON_BLANCO} onClick={alCancelar}>Cancelar</button>}
       </div>
       <p id={`${id}-n`} className={`m-0 ${AYUDA}`}>El comprobante y los avisos de la cita irán sólo a este correo; sin él, no se manda ninguno.</p>
       {error && <p role="alert" className={ERROR}>{error}</p>}

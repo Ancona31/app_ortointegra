@@ -23,7 +23,8 @@ import type { MotivoApertura } from '@/lib/reserva/aperturaEnlace'
 import { useToast } from '@/components/ui/Toast'
 
 const ENLACE = 'font-semibold underline underline-offset-2'
-const CAJA_AVISO = 'rounded-[10px] border border-[var(--ag-aviso-border)] bg-[var(--ag-aviso-bg)] px-[14px] sm:px-[12px] py-[10px] text-[14px] text-[var(--ag-aviso-text)]'
+/* B13 · AG9: la caja ámbar del kit (`--aviso-*`, con su oscuro); dentro, la pregunta de la duración sobre `--sup`. */
+const CAJA_AVISO = 'rounded-[12px] bg-aviso-fondo p-[12px] text-[13px] leading-[18px] text-aviso-tinta'
 
 interface Props {
   motivos: readonly MotivoApertura[]
@@ -61,7 +62,7 @@ export default function FaltaParaEnlace({ motivos, medicoId, esPropio, puedeCrea
           <li className="flex flex-col gap-[8px]">
             <span>La duración de la consulta.</span>
             {contesta ? (
-              <div className="rounded-[10px] bg-[var(--ag-surface)] p-[12px] text-[var(--ag-text)]">
+              <div className="rounded-[12px] bg-sup p-[12px] text-tinta">
                 <DuracionConsulta medicoId={medicoId} pregunta={esPropio ? '¿Cuánto dura tu consulta?' : '¿Cuánto dura su consulta?'}
                   onHecho={() => { toast.success('Duración de la consulta guardada'); alResolver() }} />
               </div>

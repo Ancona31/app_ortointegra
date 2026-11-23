@@ -8,7 +8,7 @@
  * clínica de «Cuándo das consulta».
  */
 import { useId } from 'react'
-import { CAMPO_NUEVO } from '@/components/agenda/configuracion/estilosConfig'
+import { SELECTOR } from '@/components/agenda/configuracion/estilosConfig'
 import { ZONAS_MEXICO } from '@/lib/consultorios/zonas-mexico'
 
 /** El nombre de una zona para enseñarlo («Yucatán — Mérida, Valladolid (UTC-6)»), o el IANA crudo. */
@@ -21,8 +21,8 @@ export default function SelectorHuso({ valor, alCambiar }: { valor: string; alCa
   const zonas = ZONAS_MEXICO.some(z => z.value === valor) ? ZONAS_MEXICO : [{ value: valor, label: valor }, ...ZONAS_MEXICO]
   return (
     <div className="flex flex-col gap-[6px]">
-      <label htmlFor={id} className="text-[13.5px] sm:text-[13px] font-semibold text-[var(--ag-ink)]">Huso horario de la clínica</label>
-      <select id={id} className={`${CAMPO_NUEVO} w-full`} value={valor} onChange={e => alCambiar(e.target.value)}>
+      <label htmlFor={id} className="k-etiqueta">Huso horario de la clínica</label>
+      <select id={id} className={SELECTOR} value={valor} onChange={e => alCambiar(e.target.value)}>
         {zonas.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
       </select>
     </div>
