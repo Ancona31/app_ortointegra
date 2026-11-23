@@ -2761,6 +2761,12 @@ details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
   .sp-img-linea .sp-rx-linea-1 { flex-direction: column; align-items: flex-start; gap: 2px; }
   .sp-img-linea .sp-rx-com { max-width: 100%; }
   .sp-img-linea .sp-rx-det { max-width: 100%; }
+  /* Una falta larga («Falta simple o contrastada») no cabe al lado del estudio:
+     baja a su renglón, a la derecha, y parte si hace falta. Antes no encogía,
+     dejaba el nombre en 0 y desbordaba la página (auditoría H2). */
+  .sp-img-linea { flex-wrap: wrap; row-gap: 6px; }
+  .sp-img-linea > .sp-rx-linea-t { flex-basis: 140px; }
+  .sp-img-linea > .sp-rx-via--falta { margin-left: auto; max-width: 100%; white-space: normal; }
 }
 
 /* ── 26.4 · SOLICITUD DE INTERNAMIENTO COMPACTA (maqueta `internamiento.html`, aprobada) ──
