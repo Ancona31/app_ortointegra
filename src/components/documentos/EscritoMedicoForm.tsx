@@ -318,8 +318,8 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   }, [])
 
   /**
-   * EL ALTO DE LA HOJA: el del área de contenido menos su relleno de arriba y el
-   * pie de acciones, medido (nada de alturas mágicas: el relleno de
+   * EL ALTO DE LA HOJA: el del área de contenido menos sus rellenos de arriba y
+   * de abajo, los avisos que sigan a la hoja y el pie de acciones, medido (nada de alturas mágicas: el relleno de
    * `.app-contenido` cambia por formato y lleva las franjas). Con el teclado en
    * pantalla (iPad/teléfono) manda `visualViewport`, para que el cursor no quede
    * bajo el teclado; entonces el pie de acciones queda detrás de él y no cuenta.
@@ -337,7 +337,16 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
       const vv = window.visualViewport
       const teclado = vv !== null && ventana - vv.height > 120
       const visible = teclado && vv ? vv.height : ventana
-      const abajo = teclado ? 8 : (pie?.offsetHeight ?? 0) + 8
+      // Al fondo del desplazamiento, bajo la hoja van —en flujo— los avisos que
+      // haya, el pie y el relleno de abajo de `.app-contenido` (que lleva la
+      // franja): todo eso se resta, o la hoja (sticky) los tapa (auditoría H1).
+      const hueco = parseFloat(getComputedStyle(hoja.parentElement ?? hoja).rowGap) || 0
+      let entre = 0
+      for (let el = hoja.nextElementSibling; el && el !== pie; el = el.nextElementSibling) {
+        if (el instanceof HTMLElement && el.offsetHeight > 0) entre += el.offsetHeight + hueco
+      }
+      const relleno = cont ? parseFloat(getComputedStyle(cont).paddingBottom) || 0 : 0
+      const abajo = teclado ? 8 : entre + (pie?.offsetHeight ?? 0) + hueco + relleno
       hoja.style.setProperty('--esc-arriba', `${arriba}px`)
       hoja.style.setProperty('--esc-alto', `${Math.max(280, Math.round(visible - arriba - abajo))}px`)
     }
@@ -346,6 +355,9 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
     if (main) ro.observe(main)
     const pie = formRef.current?.querySelector('.sp-doc-actions')
     if (pie) ro.observe(pie)
+    // El cuerpo del formulario crece cuando aparece un aviso entre hoja y pie.
+    const cuerpo = hoja.parentElement
+    if (cuerpo) ro.observe(cuerpo)
     window.visualViewport?.addEventListener('resize', medir)
     window.addEventListener('resize', medir)
     return () => {

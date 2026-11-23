@@ -3306,6 +3306,11 @@ html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(-
 .sp-esc-cuerpo { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .sp-esc-cuerpo > div { display: flex; flex-direction: column; min-height: 100%; }
 .sp-esc-cuerpo .sp-ed-prose { flex: 1; min-height: 0; padding: 14px 18px 18px; }
+/* El pie de acciones (sticky abajo, `z-index: 1`) va POR ENCIMA de la hoja
+   (sticky arriba, `z-index: 2`): al abrir, la hoja aún no ha subido y su parte
+   de abajo pasa por detrás del pie; con la hoja encima, «Imprimir» quedaba
+   tapado (auditoría H1). */
+.sp-doc-formbody:has(> .sp-esc-hoja) > .sp-doc-actions { z-index: 3; }
 .sp-esc-pieh { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 10px 6px; border-top: 1px solid var(--linea); }
 .sp-esc-pieh svg { width: 16px; height: 16px; }
 .sp-esc-piecampo { flex: 1 1 280px; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 4px 0; }
