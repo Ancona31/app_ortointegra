@@ -391,6 +391,25 @@ y `eslint` limpios en los archivos tocados.
 | `reserva-g1-diseno`, `reserva-h1`, `reserva-i2`, `reserva-k2-codigo`, `reserva-m4-salir`, `reservaPublicaAyudas.ts` | reservan el primer turno de la «Semana siguiente» (`primerTurnoDeLaSemanaSiguiente`) |
 | `agenda-h4-por-confirmar`, `whatsapp-manual`, `agenda-l5-campana`, `agenda-i5-barra-avisos`, `recordatorios`, `husos-dos-consultorios`, `confirmacion-enlace`, `agenda-k5-marcas`, `agenda-j3-ligar-ventana`, `agenda-i3-por-asignar` | lo que por su naturaleza es de mañana o de dentro de horas se crea y se borra dentro de la prueba (`afterEach`), con la anotación `asistencia-a-proposito`; lo que no lo necesitaba, a la semana siguiente |
 
+## Batería del agente R sobre `d7486b0c` [C]
+
+**Lunes 2026-11-23, de 09:56:44 a 09:57:07 (hora de Mérida)**, sobre `d7486b0c`
+(árbol limpio; arreglo de AG-DT-276), `npm run build` de ese commit, `next start
+-p 3001` y `npx playwright test` una vez. Evidencias:
+`~/spinus-fusion/ensayo-r/bateria/` (`e2e.log`, `salida.txt`, `commit.txt`,
+`srv-3001.log`).
+
+**Resultado: no corrió ninguna prueba (salida 1).** El `globalSetup` abortó al
+sembrar: «Hay 1 fila(s) en documentos sobre pacientes sembrados. No se borra
+expediente clínico: retíralo a mano o recrea la base local.» La fila es una
+solicitud de laboratorio creada a las 09:51 desde el `next start` de :3000
+(Angel probando a mano: en `audit_log`, ver expediente, emitir, enviar, y la
+configuración de la agenda de la clínica Semilla A). No se borró ni se recreó
+la base. Antes de abortar, el `globalSetup` apagó la v2 de la Semilla A
+(09:56:45), que estaba encendida; se volvió a encender a mano con `postgres`
+(sólo esa fila, la que había cambiado). **Hay que repetir la batería entera**
+cuando la base quede libre.
+
 ## Estado al cerrar [C]
 
 Base local: 14 migraciones (`base.sh 14`: 5 + deriva + las 9 con `aplicar.sh`),

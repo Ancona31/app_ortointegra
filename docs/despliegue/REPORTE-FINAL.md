@@ -100,6 +100,7 @@ Fuente: `supabase/fusion/equivalencia/DIFERENCIAS.md`, tercera vuelta.
 | Batería 1 | lunes 23, 00:35–01:00: 617 pasan, 5 fallan, 13 no corren, 491 se saltan; **guarda en ROJO** (51 citas) | [C] §5.3e |
 | Batería 2 | lunes 23, 03:11–03:36, sobre `7af5775e`: 635 pasan, 0 fallan, 0 no corren, 491 se saltan; **guarda en VERDE** | [C] «Batería tras corregir las pruebas» |
 | Batería 3 (agente S) | lunes 23, 09:04–09:30, sobre `2e7d5d72` (build de `77751da3`): **632 pasan, 2 fallan, 4 no corren, 494 se saltan; guarda en VERDE**. Fallos: `reserva-k2-codigo` «la reserva falla después de verificar» (la prueba llenaba el tope viejo de 4; corregida en `131ad6c1`, suelta 3 de 3 en verde; las 4 que no corrieron son las que le siguen en serie) y `agenda-empalme` «redimensionar…» (AG-DT-257, suelta 1 de 3). No se repitió entera | [C] §10 |
+| Batería 4 (agente R) | lunes 23, 09:56:44–09:57:07, sobre `d7486b0c` (build de ese commit): **no corrió ninguna prueba.** El `globalSetup` abortó en la semilla: «Hay 1 fila(s) en documentos sobre pacientes sembrados. No se borra expediente clínico» (una solicitud de laboratorio creada a las 09:51 desde el `next start` de :3000, mientras Angel probaba a mano). No se borró la fila ni se recreó la base; **pendiente de repetir entera** cuando Angel deje libre la base | [C] §10.3 |
 | Orden | las dos direcciones son seguras. Código primero: un `warn` por petición. Base primero: 500 con main sobre una cita atendida con nota | [C] ORDEN-Y-REVERSA §5.4 |
 | Reversa | se niega si hay datos. Con la v2 encendida, quitar F3 o más da 500 en 21 de 66 peticiones. `audit_log` solo crece. Volver a aplicar da 0 diferencias | [C] §5.5 |
 
@@ -181,8 +182,8 @@ Fuente: ENSAYO-PRINCIPAL §5.6. Mediana de 20 muestras; servidor y base en la mi
 ## 9. Coordinación con `feature/rediseno-estetico`
 Punta leída: `14df1305` (sólo `git fetch`; ni merge ni rebase). Nació de `951e31b3` [C].
 
-**a. Commit congelado:** `131ad6c1` (agente S, 2026-11-23), el último que toca código, migraciones o pruebas [C: `git log -1 -- . ':(exclude)*.md'`]. Antes era `7af5775e`. Los commits posteriores son sólo documentación.
-- Último de `src/`: `77751da3` (antes `24eb9910`).
+**a. Commit congelado:** candidato `d7486b0c` (agente R, 2026-11-23: arreglo de AG-DT-276, §10.3), el último que toca código, migraciones o pruebas [C: `git log -1 -- . ':(exclude)*.md'`]. **Todavía NO ha pasado la batería** (§5, «Batería 4»: no llegó a correr). El último que sí la pasó con la guarda en verde, salvo las dos fallas de la batería 3, es `131ad6c1` (antes `7af5775e`). Los commits posteriores a `d7486b0c` son sólo documentación.
+- Último de `src/`: `d7486b0c` (antes `77751da3`, y antes `24eb9910`).
 - Último de migraciones: `fb1c9dd3`.
 - Último de `aplicar.sh`: `254eb74f`.
 
@@ -209,8 +210,9 @@ Otros archivos que tocan las dos ramas [C: `comm -12`]:
 | `e2e/agenda-i3-por-asignar.e2e.ts` | +5 / −2 | +27 / −8 |
 | `e2e/agenda-j3-ligar-ventana.e2e.ts` | +17 / −8 | +24 / −8 |
 | `e2e/agenda-k5-marcas.e2e.ts` | +13 / −4 | +7 / −3 |
+| `src/components/expediente/PanelDocumentos.tsx` | +107 / −53 (agente R, AG-DT-276): imports de tipos, dos funciones nuevas antes del componente (`medicoParaRegenerar`, `regenerarDocumento`), el cuerpo de `regenerar()` y una línea en `bloqueoRegenerar` | +83 / −84: imports, la guarda de la primera línea de `regenerar()` (`ofreceRegenerar`), los estados de error/carga/vacío y el JSX de las acciones. **Conflicto seguro en los imports y en el cuerpo de `regenerar()`** (las dos cambian su primera línea y esta rama vacía el resto); el resto, zonas distintas [C: `git diff 951e31b3..origin/feature/rediseno-estetico`] |
 
-Ningún archivo de `src/` lo tocan las dos.
+De `src/`, sólo `PanelDocumentos.tsx` lo tocan las dos (desde el agente R); antes, ninguno.
 
 **c. Migraciones finales:** la tabla de la sección 3.
 
@@ -268,3 +270,21 @@ dos que no llegaron a la RPC; el segundo único chocó a los 56 min del primero)
 por IP y 8 por dispositivo cada hora; lo que no abre y el único no vigente
 cuentan en «sondeo» (30/8), que se LEE sin contar antes de abrir el enlace: lleno,
 429 a cualquier código (sin oráculo). Qué deja de frenar y qué sigue: AG-DT-278.
+
+**3. Agente R (2026-11-23): AG-DT-276 arreglada.** Causa raíz [C: lectura del
+código]: `regenerar()` de `src/components/expediente/PanelDocumentos.tsx` tomaba
+al médico de `getDoctorProfile()` (`localStorage['spinus_doctor_profile']`), que
+sólo llenan los formularios y el perfil; sin caché, `medico: null`, y aun así
+`pdf_url` pasaba al PDF nuevo. La emisión lo toma de `/api/me/perfil-medico`
+(`useMedicoInfo`; cliente de sesión, el perfil de quien tiene la sesión). Ahora
+`regenerarDocumento` → `medicoParaRegenerar` lee esa misma ruta en el momento;
+sólo regenera quien emitió (`subido_por`), porque con otra sesión saldría la
+cabecera de otro; sin perfil, con error, o sin nombre o sin cédula profesional,
+no compone, no sube ni toca `pdf_url`, y lo dice. Archivo de la app tocado: sólo
+ese (más `src/lib/tests/regenerarDocumento.test.ts`). Prueba: 8/8 en ROJO con el
+comportamiento de antes extraído tal cual, 8/8 en verde con el arreglo [C:
+`~/spinus-fusion/ensayo-r/prueba-276-*.txt`]. Vitest 2403/2403 en las tres zonas,
+`tsc` y `eslint` limpios, build sale 0 [C]. No probado en navegador [D: el camino
+de PDF real es el de la emisión]. Queda abierto: el objeto huérfano en
+`documentos-pdf` y que la regeneración no pasa el consultorio de la emisión
+(AG-DT-276). La batería sobre `d7486b0c` no corrió (§5, «Batería 4»).
