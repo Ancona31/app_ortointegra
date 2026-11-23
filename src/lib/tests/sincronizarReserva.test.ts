@@ -15,7 +15,12 @@ const OTRA = '99999999-9999-4999-8999-999999999999'
 const d = vi.hoisted(() => ({
   conexion: null as ConexionGoogle | null | 'lanza',
   /** Lo que devuelve cada pasada, en orden; 'cuelga' = no termina nunca (salvo abortada). */
-  pasadas: [] as Array<ResultadoSincronizacion['estado'] | 'cuelga'>,
+  pasadas: [] as Array<ResultadoSincronizacion['estado'] | 'cuelga' | 'controlada'>,
+  /** W: la pasada 'controlada' termina (o lanza) cuando la prueba lo dice. */
+  controlada: null as null | { terminar: (r: ResultadoSincronizacion) => void; lanzar: (e: Error) => void },
+  /** W: lo que la ruta entregó a `after()`; `afterLanza` = fuera de una petición. */
+  despues: [] as Array<() => unknown>,
+  afterLanza: false,
   opciones: [] as OpcionesSincronizacion[],
   frescura: { ultimaOk: null as string | null, ocupada: false } as { ultimaOk: string | null; ocupada: boolean } | 'ausente' | 'lanza',
   /** La señal de la pasada colgada se abortó. */
@@ -26,6 +31,12 @@ const d = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({}) }))
+vi.mock('next/server', () => ({
+  after: (tarea: () => unknown) => {
+    if (d.afterLanza) throw new Error('`after` was called outside a request scope.')
+    d.despues.push(tarea)
+  },
+}))
 vi.mock('@/lib/reserva/limitesReserva', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/lib/reserva/limitesReserva')>()
   return { ...real, dentroDeLimites: async (accion: string, s: unknown) => { d.cupos.push([accion, s]); return d.cupo } }
@@ -40,6 +51,9 @@ vi.mock('@/lib/gcalSincronizacion', () => ({
   sincronizarClinica: async (_c: ConexionGoogle, op: OpcionesSincronizacion) => {
     d.opciones.push(op)
     const paso = d.pasadas.shift() ?? 'omitida'
+    if (paso === 'controlada') {
+      return new Promise<ResultadoSincronizacion>((terminar, lanzar) => { d.controlada = { terminar, lanzar } })
+    }
     if (paso === 'cuelga') {
       return new Promise<ResultadoSincronizacion>(() => {
         op.senal?.addEventListener('abort', () => { d.abortada = true })
@@ -74,7 +88,7 @@ const reloj = { ahora: () => AHORA, dormir: async () => undefined }
 const hace = (ms: number): string => new Date(AHORA - ms).toISOString()
 
 beforeEach(() => {
-  Object.assign(d, { conexion, pasadas: [], opciones: [], frescura: { ultimaOk: null, ocupada: false }, abortada: false, cupo: true, cupos: [] })
+  Object.assign(d, { conexion, pasadas: [], opciones: [], frescura: { ultimaOk: null, ocupada: false }, abortada: false, cupo: true, cupos: [], controlada: null, despues: [], afterLanza: false })
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -249,5 +263,57 @@ describe('tolerancia y fallos de la base', () => {
     d.conexion = 'lanza'
     d.frescura = { ultimaOk: hace(60_000), ocupada: false }
     expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+  })
+})
+
+describe('W · la pasada que pierde la carrera con el tope sigue dentro de after()', () => {
+  const OK: ResultadoSincronizacion = { estado: 'ok', cambios: 0, paginas: 1, errores: 0, restablecer: [] }
+
+  /** Responde al tope con la pasada aún en curso (temporizadores falsos, sin tiempo real). */
+  async function responderAlTope(): Promise<string> {
+    vi.useFakeTimers()
+    try {
+      d.pasadas = ['controlada']
+      d.frescura = { ultimaOk: hace(60 * 60_000), ocupada: false }
+      const v = sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)
+      await vi.advanceTimersByTimeAsync(TIEMPO_GOOGLE_MS)
+      return await v
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  it('el tope gana: la respuesta no espera, la pasada llega a after() y termina allí', async () => {
+    expect(await responderAlTope()).toBe('no_por_ahora')
+    expect(d.abortada || d.opciones[0].senal?.aborted).toBe(true)
+    expect(d.despues).toHaveLength(1)
+    let terminada = false
+    const tarea = Promise.resolve(d.despues[0]()).then(() => { terminada = true })
+    await Promise.resolve()
+    expect(terminada).toBe(false)
+    d.controlada?.terminar(OK)
+    await tarea
+    expect(terminada).toBe(true)
+  })
+
+  it('la pasada lanza dentro de after(): se atrapa (nada sin atrapar) y queda en el registro', async () => {
+    expect(await responderAlTope()).toBe('no_por_ahora')
+    const tarea = Promise.resolve(d.despues[0]())
+    d.controlada?.lanzar(new Error('base caída'))
+    await expect(tarea).resolves.toBeUndefined()
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('pasada tras el tope fallida'))
+  })
+
+  it('la pasada gana: no se llama a after()', async () => {
+    d.pasadas = ['ok']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.despues).toHaveLength(0)
+  })
+
+  it('fuera de una petición (after lanza): la respuesta sale igual, sin lanzar', async () => {
+    d.afterLanza = true
+    expect(await responderAlTope()).toBe('no_por_ahora')
+    d.controlada?.terminar(OK)
+    expect(d.despues).toHaveLength(0)
   })
 })
