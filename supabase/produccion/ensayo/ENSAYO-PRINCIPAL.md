@@ -357,6 +357,40 @@ Dónde engaña, y que lo decida Angel (no cambié su regla):
 
 En el plan, la nota «pendiente de probar» se sustituye por este resultado.
 
+## Batería tras corregir las pruebas [C]
+
+**Lunes 2026-11-23, de 03:11:12 a 03:36:43 (hora de Mérida)**, sobre `7af5775e`
+(árbol limpio), mismo procedimiento que (e): `next start -p 3001` sobre el build
+de (d) (no se tocó `src/`), `npx playwright test` una vez, sin editar nada
+mientras corría. Evidencias: `~/spinus-fusion/ensayo-e1/bateria-20261123-b/`
+(`e2e.log` completo, `salida.txt`, `resumen.txt`, `guarda.txt`, `test-results/`,
+`srv-3001-bateria.log`, `commit.txt`).
+
+**Resultado: 635 pasan, 0 fallan, 0 no corrieron, 491 se saltan; salida 0.**
+**La guarda: «ninguna prueba dejó citas que dependan del día de la corrida».**
+La conocida AG-DT-257 (`agenda-empalme` «redimensionar…») pasó esta vez; no se
+tocó y sigue abierta (ya pasaba de vez en cuando en batería). La rama del lunes
+de `agenda-t1-burbuja` punto 4 (AG-DT-259) corrió y pasó.
+
+Antes de la batería: los 15 archivos de la lista de (e), juntos y sin tocar,
+reprodujeron las 51 citas (119 verdes); cada archivo tocado, solo, 3 veces en
+verde y con la guarda en verde, salvo `husos-dos-consultorios`, 1 de 6 en rojo
+(un 429 al reservar en su prueba 2, sin causa encontrada: ninguna llave de IP
+al tope, dispositivo nuevo en cada petición; el limitador falla cerrado si la
+RPC falla y el registro de `next start` no lo muestra). Vitest 2387/2387; `tsc`
+y `eslint` limpios en los archivos tocados.
+
+**Pruebas tocadas (sólo `e2e/`):**
+
+| Archivo | Qué |
+|---|---|
+| `agenda-g4-herencia-horario` | el recorte de la F1 fundida: tabla de §7 + INSERT/UPDATE del backfill de §10 (ya no arrastra `CREATE FUNCTION agenda_restablecer_configuracion`) |
+| `reserva-enlace` | cuenta sólo lo activo del turno y exige que sea su reserva (la cancelada de la semilla no ocupa) |
+| `reserva-google` (4) | espera a que ninguna pasada tenga el candado y a que la reserva ligue su evento antes de crear el que se empalma (la carrera es deducida, no reproducida) |
+| `agenda-f-pulido` F1.12 | el domingo de la semana −2 (el de la −1 es «ayer» un lunes) |
+| `reserva-g1-diseno`, `reserva-h1`, `reserva-i2`, `reserva-k2-codigo`, `reserva-m4-salir`, `reservaPublicaAyudas.ts` | reservan el primer turno de la «Semana siguiente» (`primerTurnoDeLaSemanaSiguiente`) |
+| `agenda-h4-por-confirmar`, `whatsapp-manual`, `agenda-l5-campana`, `agenda-i5-barra-avisos`, `recordatorios`, `husos-dos-consultorios`, `confirmacion-enlace`, `agenda-k5-marcas`, `agenda-j3-ligar-ventana`, `agenda-i3-por-asignar` | lo que por su naturaleza es de mañana o de dentro de horas se crea y se borra dentro de la prueba (`afterEach`), con la anotación `asistencia-a-proposito`; lo que no lo necesitaba, a la semana siguiente |
+
 ## Estado al cerrar [C]
 
 Base local: 14 migraciones (`base.sh 14`: 5 + deriva + las 9 con `aplicar.sh`),

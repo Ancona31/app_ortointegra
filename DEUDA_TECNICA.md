@@ -5940,9 +5940,26 @@ Lo que queda abierto de este punto es la base combinada con
 
 ### AG-DT-256 — E2e que dependen de la hora o del día de la corrida
 
-**Estado:** arreglada en lo que se conoce (2026-11-22, equipo nuevo). Quedan los
-restos de AG-DT-258 a AG-DT-260. Una prueba que se salta o cambia según la hora no
-prueba nada a esa hora.
+**Estado:** arreglada en lo que se conoce, **también entre semana: comprobado un
+lunes** (2026-11-23, 03:11–03:36, sobre `7af5775e`: 635 pasan, 0 fallan, guarda en
+verde; `supabase/produccion/ensayo/ENSAYO-PRINCIPAL.md`, «Batería tras corregir
+las pruebas»). Quedan los restos de AG-DT-258 a AG-DT-260. Una prueba que se salta
+o cambia según la hora no prueba nada a esa hora.
+
+**El lunes 2026-11-23 (E1) la guarda la puso en rojo con 51 citas**: las pruebas
+que crean citas «para mañana» o «dentro de N horas» sólo salían verdes en fin de
+semana. Arreglo (sólo en `e2e/`, sin tocar la guarda): las reservas de la página
+pública toman el primer turno de la «Semana siguiente»
+(`primerTurnoDeLaSemanaSiguiente`); lo que por su naturaleza es de mañana o de
+dentro de horas («Por confirmar», recordatorios, carrera a T−1h, cita «pasada»,
+«Próximas citas») se crea y se borra DENTRO de cada prueba, con la anotación
+`asistencia-a-proposito` (ahora también en `h4-por-confirmar`, `whatsapp-manual`,
+`l5-campana`, `i5-barra-avisos`, `recordatorios`, `husos-dos-consultorios`,
+`confirmacion-enlace`, `k5-marcas`, `j3-ligar-ventana` e `i3-por-asignar`); y lo
+que no lo necesitaba, a la semana siguiente. `agenda-f-pulido` F1.12 mira el
+domingo de la semana −2. **No comprobado:** una corrida de martes a viernes ni
+una que cruce la medianoche (AG-DT-260 sigue igual). Un 429 sin causa encontrada
+en `husos-dos-consultorios` prueba 2, 1 de 6 corridas sueltas.
 
 **Qué pasaba.** El sábado 2026-11-21 la batería cayó en cadena: una cita con
 paciente (o por ligar) que una prueba crea el miércoles o el jueves de la semana
