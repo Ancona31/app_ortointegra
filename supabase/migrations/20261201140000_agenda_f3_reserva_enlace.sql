@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- Agenda v2 · F3 — reserva por enlace
--- (conjunto fundido: 3.º de 6, después de F1 y F5a; ANTES de F2)
+-- Orden de aplicación: 3.º de 6 (F1 → F5a → F3 → F2 → F4 → F5b).
 -- ───────────────────────────────────────────────────────────────────────
 -- QUÉ HACE
 --   Crea entero el bloque de la reserva por enlace, en su versión final:
@@ -27,6 +27,11 @@
 --     consultorios.horario/horario_propio y public.agenda_v2_encendida(uuid).
 --   F5a: agenda_bloqueos (reserva_ocupacion es LANGUAGE sql y la nombra:
 --     Postgres valida su cuerpo al crearla).
+--   PostgreSQL ≥ 17: los GRANT de la sección 11 conceden MAINTAIN, que no
+--   existe antes de la 17 (en una 15 o 16 el archivo falla y no deja nada).
+--   El archivo va con fines de línea LF: el post-vuelo exige el md5 de un
+--   cuerpo creado aquí (proteger_reserva_enlaces) y con CRLF no coincidiría
+--   (aborta, no deja nada).
 --   Lo comprueba el pre-vuelo (1) antes de crear nada.
 --   F2 va DESPUÉS a propósito: su disparador cita_asignacion_google() lee
 --   NEW.reserva_canal, que nace aquí; con F2 antes, entre los dos COMMIT
@@ -36,26 +41,46 @@
 --   FUNCIONA (42883). Nadie puede llamarla antes: no hay enlaces (los emite
 --   sólo reserva_enlace_emitir, con service_role) ni la v2 encendida.
 --
--- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s)
---   ADD COLUMN ×11, ADD CONSTRAINT y CREATE TRIGGER sobre appointments →
---   ACCESS EXCLUSIVE sobre appointments hasta el COMMIT. Sólo catálogo salvo
---   la validación de las FK y CHECK nuevas, que recorren appointments con las
---   columnas todas NULL (un único DEFAULT constante: sin reescritura).
---   CREATE TABLE con FK → SHARE ROW EXCLUSIVE un instante sobre clinicas,
---   profiles y appointments.
+-- search_path: el resultado y las comprobaciones no dependen de él (todo va
+--   calificado con public. o pg_catalog, y lo que el catálogo imprime según
+--   el search_path —nombres de función de los disparadores, definiciones de
+--   restricción— se compara ya calificado o sin el prefijo). Probado con
+--   '', 'public' y el del rol postgres ("$user", public, extensions).
+--
+-- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s). Todo es UNA
+--   transacción y cada candado dura hasta el COMMIT:
+--   · appointments: SHARE ROW EXCLUSIVE desde el CREATE TABLE reserva_enlaces
+--     (FK usado_cita_id) y ACCESS EXCLUSIVE desde el primer ALTER TABLE
+--     (sección 4): primero no se puede escribir una cita y luego tampoco
+--     leerla. ADD COLUMN no reescribe (un único DEFAULT, constante); las FK y
+--     CHECK nuevas recorren la tabla una vez y los 3 índices la leen.
+--   · clinicas y profiles: SHARE ROW EXCLUSIVE (FK de las tablas nuevas):
+--     no se escriben mientras dura.
+--   Medido en el clon de la foto: 67 ms en total con appointments vacía;
+--   con 50 000 citas sintéticas, 297 ms en total y ~277 ms con ACCESS
+--   EXCLUSIVE sobre appointments (de ellos ~213 ms el COMMIT).
+--   No se baja con NOT VALID + VALIDATE: el ACCESS EXCLUSIVE del ADD COLUMN
+--   ya dura hasta el COMMIT en la misma transacción, y partirla en varias
+--   quitaría el «aborta sin dejar nada».
+--   Riesgo real: si una consulta larga tiene appointments, el ALTER espera
+--   hasta 5 s (lock_timeout) y, mientras espera, las consultas nuevas a
+--   appointments esperan detrás; a los 5 s todo aborta sin dejar nada.
+--   Aplicar con poco tráfico.
 --
 -- RIESGO: MEDIO. Es el único camino por el que alguien SIN sesión escribe una
 --   cita (reservar_por_enlace, con service_role, que se salta la RLS); y deja
 --   un disparador en appointments que, si fallara, haría fallar la
---   cancelación de una cita por enlace.
+--   cancelación de una cita por enlace. Si el archivo falla en cualquier
+--   punto, la transacción se deshace entera.
 --
--- RE-EJECUCIÓN: NO es re-ejecutable; ABORTA LIMPIO. Si ya existe cualquier
---   objeto de este bloque, el pre-vuelo lo dice y no toca nada.
+-- SEGUNDA PASADA: NO es re-ejecutable; ABORTA LIMPIO. Si ya existe cualquier
+--   objeto de este bloque, el pre-vuelo lo dice («PRE-VUELO F3: … ya existe»)
+--   y no toca nada (comprobado en el clon de la foto).
 --
 -- VUELTA ATRÁS: supabase/reversas/20261201140000_agenda_f3_reserva_enlace_reversa.sql
---   (con F5b, F4 y F2 ya quitados; pierde los enlaces, las verificaciones y el
---   historial del candado: respaldar antes esas tablas y las reserva_* de las
---   citas).
+--   (con F5b, F4 y F2 ya quitados). Se niega si hay enlaces, avisos,
+--   verificaciones, incidencias, contactos o citas por enlace, salvo
+--   confirmación explícita (ver su cabecera): respaldar antes.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -1167,7 +1192,7 @@ BEGIN
   -- CORREO; el bloqueo MANUAL de la clínica, por teléfono o correo, y corta
   -- también el enlace único. Sin correo, v_correo_hmac es NULL y decide sólo
   -- el teléfono (el bloqueo manual). A PROPÓSITO: un «bloqueado» delata que la
-  -- clínica bloqueó a mano ese teléfono (AG-DT-28).
+  -- clínica bloqueó a mano ese teléfono.
   SELECT * INTO v_hist FROM public.reserva_contacto_estado(p_clinica_id, v_enl.medico_id, p_tel_hmac, v_correo_hmac);
   IF v_hist.manual OR (v_enl.clase = 'fijo' AND v_hist.bloqueado) THEN
     -- En el ÚNICO, «bloqueado» agota el enlace: es el intento que revela algo
@@ -1471,10 +1496,11 @@ BEGIN
   IF v_n <> 11 OR v_mal IS NOT NULL THEN
     RAISE EXCEPTION 'POST-VUELO F3: appointments tiene % columnas reserva_* o alguna con DEFAULT de más (%).', v_n, v_mal;
   END IF;
-  IF (SELECT md5(replace(pg_get_constraintdef(oid), 'public.', '')) FROM pg_constraint
-       WHERE conrelid = 'public.appointments'::regclass AND conname = 'appointments_reserva_check')
-     IS DISTINCT FROM '12f5eb0a7cae5d1b7813634001f9c5c4' THEN
-    RAISE EXCEPTION 'POST-VUELO F3: appointments_reserva_check no tiene la fórmula esperada.';
+  -- Sin el prefijo public.: pg_get_constraintdef lo pone o no según el search_path.
+  SELECT md5(replace(pg_get_constraintdef(oid), 'public.', '')) INTO v_src FROM pg_constraint
+   WHERE conrelid = 'public.appointments'::regclass AND conname = 'appointments_reserva_check';
+  IF v_src IS DISTINCT FROM '12f5eb0a7cae5d1b7813634001f9c5c4' THEN
+    RAISE EXCEPTION 'POST-VUELO F3: appointments_reserva_check no tiene la fórmula esperada (md5 %, se espera 12f5eb0a…).', v_src;
   END IF;
   -- Ninguna FK de este bloque borra en cascada.
   IF EXISTS (SELECT 1 FROM pg_constraint
@@ -1484,26 +1510,30 @@ BEGIN
     RAISE EXCEPTION 'POST-VUELO F3: una FK del bloque es ON DELETE CASCADE.';
   END IF;
 
-  -- Disparadores, activos y con su función.
-  SELECT array_agg(c.relname || '.' || t.tgname || '=' || t.tgfoid::regproc::text ORDER BY c.relname, t.tgname) INTO v_mal
+  -- Disparadores, activos y con su función. El nombre de la función se arma
+  -- con su esquema (no con ::regproc, que lo omite o no según el search_path).
+  SELECT array_agg(c.relname || '.' || t.tgname || '=' || fn.nspname || '.' || f.proname ORDER BY c.relname, t.tgname)
+    INTO v_mal
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
-   WHERE NOT t.tgisinternal AND t.tgenabled = 'O'
+    JOIN pg_proc f ON f.oid = t.tgfoid JOIN pg_namespace fn ON fn.oid = f.pronamespace
+   WHERE c.relnamespace = 'public'::regnamespace AND NOT t.tgisinternal AND t.tgenabled = 'O'
      AND (c.relname = ANY (c_tablas) OR t.tgname = 'trg_appointments_reserva_incidencia');
   IF v_mal IS DISTINCT FROM ARRAY[
-       'appointments.trg_appointments_reserva_incidencia=reserva_registrar_incidencia',
-       'reserva_avisos.audit_reserva_avisos=log_tabla_change',
-       'reserva_contactos.audit_reserva_contactos=log_tabla_change',
-       'reserva_contactos.trg_reserva_contactos_proteger=proteger_reserva_contactos',
-       'reserva_enlaces.audit_reserva_enlaces=log_tabla_change',
-       'reserva_enlaces.trg_reserva_enlaces_proteger=proteger_reserva_enlaces',
-       'reserva_enlaces.trg_reserva_enlaces_unico=proteger_reserva_enlace_unico'] THEN
+       'appointments.trg_appointments_reserva_incidencia=public.reserva_registrar_incidencia',
+       'reserva_avisos.audit_reserva_avisos=public.log_tabla_change',
+       'reserva_contactos.audit_reserva_contactos=public.log_tabla_change',
+       'reserva_contactos.trg_reserva_contactos_proteger=public.proteger_reserva_contactos',
+       'reserva_enlaces.audit_reserva_enlaces=public.log_tabla_change',
+       'reserva_enlaces.trg_reserva_enlaces_proteger=public.proteger_reserva_enlaces',
+       'reserva_enlaces.trg_reserva_enlaces_unico=public.proteger_reserva_enlace_unico'] THEN
     RAISE EXCEPTION 'POST-VUELO F3: disparadores inesperados: %.', v_mal;
   END IF;
 
-  -- Lo que otros bloques y CLAUDE.md dan por hecho de estos cuerpos.
-  IF (SELECT md5(prosrc) FROM pg_proc WHERE oid = 'public.proteger_reserva_enlaces()'::regprocedure)
-     <> 'acd4128b5f25df54f6b4fd95391cf1dc' THEN
-    RAISE EXCEPTION 'POST-VUELO F3: proteger_reserva_enlaces() no es el cuerpo acd4128b…';
+  -- Lo que otros bloques y CLAUDE.md dan por hecho de estos cuerpos. md5
+  -- exacto, sin normalizar: el cuerpo nace aquí, del archivo (LF).
+  SELECT md5(prosrc) INTO v_src FROM pg_proc WHERE oid = 'public.proteger_reserva_enlaces()'::regprocedure;
+  IF v_src IS DISTINCT FROM 'acd4128b5f25df54f6b4fd95391cf1dc' THEN
+    RAISE EXCEPTION 'POST-VUELO F3: proteger_reserva_enlaces() no es el cuerpo acd4128b… (md5 %; ¿archivo con CRLF?).', v_src;
   END IF;
   SELECT prosrc INTO v_src FROM pg_proc
    WHERE oid = 'public.reservar_por_enlace(uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid)'::regprocedure;
@@ -1582,9 +1612,11 @@ FROM (
          'acd4128b5f25df54f6b4fd95391cf1dc'
   UNION ALL
   SELECT 7, 'disparador de incidencias en appointments',
-         coalesce((SELECT tgfoid::regproc::text FROM pg_trigger WHERE tgrelid = 'public.appointments'::regclass
-                    AND tgname = 'trg_appointments_reserva_incidencia' AND tgenabled = 'O'), 'AUSENTE'),
-         'reserva_registrar_incidencia'
+         coalesce((SELECT fn.nspname || '.' || f.proname FROM pg_trigger t
+                     JOIN pg_proc f ON f.oid = t.tgfoid JOIN pg_namespace fn ON fn.oid = f.pronamespace
+                    WHERE t.tgrelid = 'public.appointments'::regclass
+                      AND t.tgname = 'trg_appointments_reserva_incidencia' AND t.tgenabled = 'O'), 'AUSENTE'),
+         'public.reserva_registrar_incidencia'
   UNION ALL
   SELECT 8, 'TRUNCATE en las 5 tablas (anon, authenticated, service_role)',
          (SELECT count(*)::text FROM unnest(ARRAY['reserva_avisos', 'reserva_enlaces', 'reserva_verificaciones',

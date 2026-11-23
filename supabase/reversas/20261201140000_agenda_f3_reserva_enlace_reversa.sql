@@ -11,16 +11,20 @@
 -- lee NEW.reserva_canal: sin la columna fallaría toda alta de cita. Si alguno
 -- sigue ahí, el pre-vuelo aborta.
 --
--- PIERDE DATOS: enlaces, verificaciones, incidencias, contactos bloqueados y
--- las columnas reserva_* de las citas. Por eso aborta si hay alguna fila: se
--- respalda y se decide a mano antes. audit_log no se toca.
+-- PIERDE DATOS: avisos aprobados, enlaces emitidos, verificaciones,
+-- incidencias, contactos bloqueados y las columnas reserva_* de las citas
+-- nacidas de un enlace (las citas se quedan). Por eso SE NIEGA, sin tocar
+-- nada, si hay cualquiera de esas filas, y dice cuántas de cada.
+-- Para quitar el bloque CON datos, respaldarlos antes y confirmarlo en la
+-- misma sesión: «SET spinus.reversa_con_datos = 'si';» antes de correr el
+-- archivo (o «SET LOCAL spinus.reversa_con_datos = 'si';» justo después de
+-- su BEGIN). audit_log no se toca.
 --
 -- Bloqueos: ACCESS EXCLUSIVE sobre appointments (DROP COLUMN/CONSTRAINT/
--- TRIGGER) hasta el COMMIT. lock_timeout 5 s.
--- También quita, si existen, las tres piezas que el conjunto fundido ya no
--- crea (reserva_enlace_regenerar_fijo, reserva_enlace_emitir de 7 argumentos
--- y la policy reserva_enlaces_insert), para que esta reversa sirva igual
--- sobre una base con las migraciones originales.
+-- TRIGGER) hasta el COMMIT. lock_timeout 5 s. Si falla, no deja nada.
+-- También quita, si existen, reserva_enlace_regenerar_fijo y la
+-- reserva_enlace_emitir de 7 argumentos, que este bloque no crea pero puede
+-- haber en una base que las tenga.
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -32,6 +36,7 @@ DO $$
 DECLARE
   v_n bigint := 0;
   v_t text;
+  v_hay text[];
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.appointments'::regclass
               AND tgname IN ('trg_appointments_aviso_clinica', 'trg_appointments_proteger_eleccion')) THEN
@@ -42,21 +47,30 @@ BEGIN
                  AND tgname = 'trg_appointments_asignacion_google') THEN
     RAISE EXCEPTION 'REVERSA F3: sigue F2 (cita_asignacion_google lee reserva_canal); deshacer F2 antes.';
   END IF;
+  -- Lo que se perdería: todas las filas que mira se cuentan antes de decidir.
   FOREACH v_t IN ARRAY ARRAY['public.reserva_avisos', 'public.reserva_enlaces', 'public.reserva_verificaciones',
                              'public.reserva_incidencias', 'public.reserva_contactos'] LOOP
     IF to_regclass(v_t) IS NOT NULL THEN
       EXECUTE format('SELECT count(*) FROM %s', v_t) INTO v_n;
       IF v_n > 0 THEN
-        RAISE EXCEPTION 'REVERSA F3: % tiene % filas; respaldar y decidir a mano antes de quitar el bloque.', v_t, v_n;
+        v_hay := v_hay || (v_t || ': ' || v_n);
       END IF;
     END IF;
   END LOOP;
-  IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass
-              AND attname = 'reserva_canal' AND NOT attisdropped) THEN
-    EXECUTE 'SELECT count(*) FROM public.appointments WHERE reserva_canal IS NOT NULL' INTO v_n;
+  IF (SELECT count(*) FROM pg_attribute WHERE attrelid = 'public.appointments'::regclass
+       AND attname IN ('reserva_canal', 'reserva_enlace_id', 'reserva_reagendados') AND NOT attisdropped) = 3 THEN
+    EXECUTE 'SELECT count(*) FROM public.appointments
+              WHERE reserva_canal IS NOT NULL OR reserva_enlace_id IS NOT NULL OR reserva_reagendados <> 0' INTO v_n;
     IF v_n > 0 THEN
-      RAISE EXCEPTION 'REVERSA F3: hay % citas nacidas de un enlace; respaldar y decidir a mano antes.', v_n;
+      v_hay := v_hay || ('public.appointments con reserva_*: ' || v_n);
     END IF;
+  END IF;
+  IF v_hay IS NOT NULL THEN
+    IF current_setting('spinus.reversa_con_datos', true) IS DISTINCT FROM 'si' THEN
+      RAISE EXCEPTION 'REVERSA F3 ABORTADA: se perderían datos (%). No se tocó nada. Respáldalos y confírmalo con spinus.reversa_con_datos = ''si'' (ver la cabecera).',
+        array_to_string(v_hay, '; ');
+    END IF;
+    RAISE NOTICE 'Confirmado spinus.reversa_con_datos = si: se pierden %.', array_to_string(v_hay, '; ');
   END IF;
 END $$;
 
