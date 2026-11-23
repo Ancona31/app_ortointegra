@@ -24,6 +24,16 @@
 --       \i supabase/reversas/20261201160000_agenda_f4_confirmacion_correos_avisos_reversa.sql
 --   (el BEGIN de este archivo avisa «ya hay una transacción en curso» y sigue
 --   en la tuya; su COMMIT la cierra).
+-- GUARDA DE DATOS, SIN CORRER LA REVERSA (auditoría ronda 1, A5): consulta de
+--   SÓLO LECTURA con la misma condición que la negativa de abajo, para
+--   comprobar TODA la cadena de reversas antes de deshacer la primera. Con la
+--   migración aplicada; 0 filas = esta reversa no se negará por datos.
+--     SELECT 'F4: ' || t AS motivo, n FROM (
+--       SELECT 'avisos_clinica' AS t, count(*) AS n FROM public.avisos_clinica
+--       UNION ALL SELECT 'cita_correos', count(*) FROM public.cita_correos
+--       UNION ALL SELECT 'cita_reagendos', count(*) FROM public.cita_reagendos
+--       UNION ALL SELECT 'cita_confirmaciones', count(*) FROM public.cita_confirmaciones) x
+--      WHERE n > 0;
 -- RIESGO / BLOQUEOS: SHARE ROW EXCLUSIVE sobre appointments, clinicas,
 --   profiles, reserva_empalmes_google y gcal_movimientos_rechazados (DROP
 --   TRIGGER y las FK que se van con las tablas) hasta el COMMIT; lock_timeout

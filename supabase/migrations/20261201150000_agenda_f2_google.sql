@@ -399,6 +399,10 @@ CREATE POLICY reserva_empalmes_google_select ON public.reserva_empalmes_google F
 
 COMMENT ON TABLE public.reserva_empalmes_google IS
   'Pares (cita reservada por enlace, cita que se le empalma) detectados por la sincronización con Google al importar o mover una cita. UNIQUE por par: una resincronización no repite el aviso. Sólo lo escribe reserva_empalmes_registrar (service_role), que audita cada par nuevo. Sin FK a appointments a propósito; el lector cruza con appointments. cita_otra_id puede ser también una reserva por enlace: entre dos reservas activas, cita_reserva_id es la de id menor; si sólo una está activa (scheduled/confirmed y sin terminar), es ésa.';
+COMMENT ON COLUMN public.reserva_empalmes_google.cita_reserva_id IS
+  'La cita reservada por enlace del par. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).';
+COMMENT ON COLUMN public.reserva_empalmes_google.cita_otra_id IS
+  'La cita que se le empalma. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).';
 
 -- Un renglón por INTENTO rechazado (cita, updated del evento): dos sondeos del
 -- mismo cambio son uno, y el aviso (disparador de F4) no se repite.
@@ -421,6 +425,8 @@ GRANT SELECT, INSERT ON TABLE public.gcal_movimientos_rechazados TO service_role
 
 COMMENT ON TABLE public.gcal_movimientos_rechazados IS
   'Un renglón por INTENTO de mover desde Google una cita reservada por enlace que la base rechazó (cita_proteger_eleccion). Intento = (cita, updated del evento de Google): dos sondeos del mismo cambio son uno. Sólo lo escribe cita_movimiento_google_registrar (service_role); su disparador deja el aviso google_movimiento_rechazado en avisos_clinica. Nada clínico. Sin FK a appointments a propósito (como reserva_empalmes_google).';
+COMMENT ON COLUMN public.gcal_movimientos_rechazados.cita_id IS
+  'La cita cuyo movimiento desde Google se rechazó. SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita (con RESTRICT, borrar un evento sin paciente, que la v2 permite, fallaría por un aviso que nadie ve); el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano (auditoría ronda 1, A9).';
 
 -- ---------------------------------------------------------------------
 -- 3 · «Por asignar»: la columna de appointments, su CHECK y su disparador.

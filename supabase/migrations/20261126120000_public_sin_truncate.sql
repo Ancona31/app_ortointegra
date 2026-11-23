@@ -9,8 +9,10 @@
 -- de disparador nueva, como pide la regla del proyecto).
 -- ───────────────────────────────────────────────────────────────────────
 -- ESTADO · LOCAL: ver «APLICACIÓN LOCAL» al pie de esta cabecera.
--- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. PENDIENTE DE AUDITORÍA
---   INDEPENDIENTE (supabase/AUDITORIA-MIGRACIONES.md): no se ha auditado.
+-- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. AUDITADA (auditor independiente,
+--   ronda 1, 2026-11-22: supabase/produccion/auditoria/RONDA-1.md). El cambio
+--   de privilegios por omisión (paso 3) SE QUEDA, con las condiciones de
+--   supabase/AUDITORIA-MIGRACIONES.md §4-bis.
 --
 -- ═══ EL PORQUÉ ═════════════════════════════════════════════════════════
 -- 20261125170000_audit_log_sin_truncate cerró el TRUNCATE de audit_log y dejó
@@ -123,8 +125,9 @@
 -- tablas.
 --
 -- ═══ APLICACIÓN ════════════════════════════════════════════════════════
--- EJECUTAR EN EL SQL EDITOR DE SUPABASE, DE UNA SOLA VEZ, COMPLETO, como
--- postgres. PG ≥ 14 (CREATE OR REPLACE TRIGGER).
+-- La aplica Angel con la CLI y psql (supabase/produccion/plan/aplicar.sh:
+-- psql -X -v ON_ERROR_STOP=1), como postgres, de una sola vez y completa; no
+-- por el SQL Editor. PG ≥ 14 (CREATE OR REPLACE TRIGGER).
 -- Bloqueos (lock_timeout 5 s): REVOKE y ALTER DEFAULT PRIVILEGES sólo
 --   escriben catálogo; cada CREATE TRIGGER toma SHARE ROW EXCLUSIVE sobre su
 --   tabla y lo retiene hasta el COMMIT: durante ese instante se frenan las
@@ -368,14 +371,17 @@ FROM (
              AND has_table_privilege(r, c.oid, 'TRUNCATE')) AS valor,
          '0' AS esperado
   UNION ALL
-  SELECT 2, 'tablas a las que esta pasada quitó TRUNCATE (30 la primera vez en local; 0 al repetir)',
+  SELECT 2, 'tablas a las que esta pasada quitó TRUNCATE (28 la primera vez en producción, 30 en local; 0 al repetir)',
          (SELECT count(*)::text || coalesce(': ' || string_agg(tabla, ', ' ORDER BY tabla), '') FROM pg_temp._public_sin_truncate),
          NULL
   UNION ALL
-  SELECT 3, 'disparadores sin_truncate (tgtype 34, prohibir_truncate, habilitados)',
+  SELECT 3, 'disparadores sin_truncate de ESTE archivo (sus 11 tablas; tgtype 34, prohibir_truncate, habilitados)',
          (SELECT count(*)::text FROM pg_trigger g
            WHERE g.tgname LIKE 'trg\_%\_sin\_truncate' AND g.tgtype = 34 AND NOT g.tgisinternal
-             AND g.tgfoid = to_regprocedure('public.prohibir_truncate()') AND g.tgenabled = 'O'),
+             AND g.tgfoid = to_regprocedure('public.prohibir_truncate()') AND g.tgenabled = 'O'
+             AND g.tgrelid IN (SELECT to_regclass('public.' || t) FROM unnest(ARRAY['addendums', 'appointments',
+               'calculadora_resultados', 'casos_clinicos', 'casos_clinicos_recursos', 'consultas', 'documentos',
+               'mediciones_analitos', 'paciente_medico', 'pacientes', 'solicitudes_arco']) t)),
          '11'
   UNION ALL
   SELECT 4, 'prohibir_truncate: INVOKER / search_path vacío / md5 / EXECUTE a PUBLIC',

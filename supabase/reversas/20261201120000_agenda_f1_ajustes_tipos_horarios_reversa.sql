@@ -3,7 +3,10 @@
 -- ───────────────────────────────────────────────────────────────────────
 -- QUÉ HACE: quita TODOS los objetos de F1 y sólo ésos, en orden inverso de
 --   dependencias, sin CASCADE. Antes devuelve a consultorios.horario el valor
---   previo al backfill en las filas que nadie editó desde la copia.
+--   previo a la ÚLTIMA pasada del backfill (respaldo.horario_antes) en las
+--   filas cuyo horario sigue siendo el que escribió la copia
+--   (respaldo.horario_copiado): editar otro campo del consultorio no cuenta.
+--   El ciclo aplicar → revertir → reaplicar → revertir funciona cada vez.
 -- DEPENDE DE: va la ÚLTIMA, después de las reversas de F5b, F4, F2, F3 y F5a.
 --   Si queda algo de esos bloques que nombre lo de F1, aborta sin tocar nada.
 --   Necesita respaldos.consultorios_horario_20261119.
@@ -12,7 +15,8 @@
 --   · filas de agenda_ajustes (ajustes guardados o el interruptor encendido);
 --   · tipos de cita, y citas con tipo (appointments.tipo_cita_*);
 --   · consultorios con horario revisado por una persona (horario_revisado_en)
---     o con horario propio editados desde la copia (o creados después);
+--     o cuyo horario se editó desde la copia (o creados después con horario
+--     propio);
 --   · el huso «de fábrica» de alguna clínica (clinicas.timezone).
 --   Para quitarlo igualmente: respaldar con
 --     CREATE TABLE respaldos.agenda_ajustes_AAAAMMDD AS SELECT * FROM public.agenda_ajustes;
@@ -26,10 +30,21 @@
 --   y confirmarlo: «SET LOCAL spinus.reversa_con_datos = 'si';» justo después
 --   del BEGIN de este archivo (o «SET spinus.reversa_con_datos = 'si';» en la
 --   misma sesión antes de él).
+-- GUARDA DE DATOS, SIN CORRER LA REVERSA (sólo lectura; la misma condición
+--   que el pre-vuelo de abajo; 0 filas = se puede revertir sin confirmar):
+--     SELECT 'agenda_ajustes' FROM public.agenda_ajustes
+--     UNION ALL SELECT 'tipos_cita' FROM public.tipos_cita
+--     UNION ALL SELECT 'cita con tipo' FROM public.appointments WHERE tipo_cita_id IS NOT NULL
+--     UNION ALL SELECT 'horario revisado' FROM public.consultorios WHERE horario_revisado_en IS NOT NULL
+--     UNION ALL SELECT 'horario editado o creado tras la copia' FROM public.consultorios k
+--      WHERE k.horario_propio AND NOT EXISTS (SELECT 1 FROM respaldos.consultorios_horario_20261119 r
+--             WHERE r.id = k.id AND r.horario_copiado IS NOT DISTINCT FROM k.horario)
+--     UNION ALL SELECT 'huso de fábrica' FROM public.clinicas WHERE timezone IS NOT NULL;
 -- QUÉ SE QUEDA, a propósito:
 --   · respaldos.consultorios_horario_20261119: es el único sitio con el
 --     horario previo al backfill de las filas que se editaron después. Si
---     F1 se vuelve a aplicar, lo reutiliza (conserva la primera copia).
+--     F1 se vuelve a aplicar, lo reutiliza: conserva la primera copia
+--     (horario, respaldado_en) y renueva horario_antes/horario_copiado/copiado_en.
 --     Borrarlo, cuando ya no haga falta: DROP TABLE respaldos.consultorios_horario_20261119;
 --   · las filas de audit_log (inmutables).
 -- RIESGO: ACCESS EXCLUSIVE sobre appointments, consultorios y clinicas
@@ -80,6 +95,10 @@ BEGIN
   IF to_regclass('respaldos.consultorios_horario_20261119') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta respaldos.consultorios_horario_20261119; sin él no se puede devolver el horario previo. No se toca nada.';
   END IF;
+  IF (SELECT count(*) FROM pg_attribute WHERE attrelid = 'respaldos.consultorios_horario_20261119'::regclass
+        AND NOT attisdropped AND attname IN ('horario_antes', 'horario_copiado')) <> 2 THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: respaldos.consultorios_horario_20261119 no tiene horario_antes/horario_copiado (es de una F1 anterior a la ronda 1 de la auditoría). No se toca nada.';
+  END IF;
 
   -- Lo creado con la v2 que se perdería. Sin confirmación explícita, no se toca nada.
   SELECT array_agg(o) INTO v_datos FROM (
@@ -93,11 +112,11 @@ BEGIN
     SELECT format('consultorios con horario revisado: %s', count(*)) FROM public.consultorios
      WHERE horario_revisado_en IS NOT NULL HAVING count(*) > 0
     UNION ALL
-    SELECT format('consultorios con horario propio editados o creados tras la copia: %s', count(*))
+    SELECT format('consultorios con horario editado o creados con horario propio tras la copia: %s', count(*))
       FROM public.consultorios k
      WHERE k.horario_propio
        AND NOT EXISTS (SELECT 1 FROM respaldos.consultorios_horario_20261119 r
-                        WHERE r.id = k.id AND r.respaldado_en = k.updated_at)
+                        WHERE r.id = k.id AND r.horario_copiado IS NOT DISTINCT FROM k.horario)
     HAVING count(*) > 0
     UNION ALL
     SELECT format('clínicas con huso de fábrica: %s', count(*)) FROM public.clinicas WHERE timezone IS NOT NULL HAVING count(*) > 0
@@ -111,14 +130,14 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------
--- 2 · Datos: el horario previo al backfill, sólo en las filas que nadie
---     editó desde la copia (su updated_at sigue siendo el de la copia). Las
---     editadas se quedan como están: no se pisan con un valor más viejo.
+-- 2 · Datos: el horario previo a la última pasada del backfill, sólo en las
+--     filas cuyo horario sigue siendo el que escribió la copia. Las editadas
+--     se quedan como están: no se pisan con un valor más viejo.
 -- ---------------------------------------------------------------------
 UPDATE public.consultorios k
-   SET horario = r.horario
+   SET horario = r.horario_antes
   FROM respaldos.consultorios_horario_20261119 r
- WHERE r.id = k.id AND k.updated_at = r.respaldado_en;
+ WHERE r.id = k.id AND k.horario IS NOT DISTINCT FROM r.horario_copiado;
 
 -- ---------------------------------------------------------------------
 -- 3 · Objetos, en orden inverso de dependencias. DROP TABLE se lleva sus

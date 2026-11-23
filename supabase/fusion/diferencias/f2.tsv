@@ -35,3 +35,6 @@ distinto	columna	public.appointments.cerrada_en	COLATERAL DEL ENSAYO: al quitar 
 distinto	columna	public.appointments.sustituida_por	COLATERAL DEL ENSAYO: misma causa que cerrada_en
 solo_b	funcion	public.agenda_v2_encendida(*	COLATERAL DEL ENSAYO: la función común de F1 (ENCARGO §5), puesta a mano antes de aplicar F2 porque la referencia no la tiene; va en la lista de F1
 solo_b	permiso	funcion public.agenda_v2_encendida(*	COLATERAL DEL ENSAYO: permisos de esa función de F1
+solo_b	comentario	table column public.reserva_empalmes_google.cita_reserva_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.reserva_empalmes_google.cita_otra_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.gcal_movimientos_rechazados.cita_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)

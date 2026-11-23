@@ -217,7 +217,7 @@ CREATE POLICY agenda_bloqueos_update ON public.agenda_bloqueos FOR UPDATE TO aut
               AND public.agenda_v2_encendida(public.get_clinica_id()));
 
 COMMENT ON TABLE public.agenda_bloqueos IS
-  'Un periodo que el médico cierra a propósito (horas o días completos, motivo opcional). NO es una cita ni un evento. En el enlace de reserva no se ofrecen turnos que lo toquen (reserva_ocupacion) y reservar_por_enlace lo rechaza (''ocupado''); dentro de Spinus, con la v2 encendida, ninguna cita ni evento entra ni se mueve a él (cita_proteger_bloqueo, HINT agenda_horario_bloqueado). Lo crean, editan y quitan quienes pueden agendar para ese médico (mismo predicado que appointments). google_event_id/gcal_*: el evento «Ocupado» del calendario de Spinus, sólo los escribe el servidor; gcal_bloqueo_aplicar trae lo movido o borrado en Google. agenda_bloqueo_preparar toma el candado 1790 del médico.';
+  'Un periodo que el médico cierra a propósito (horas o días completos, motivo opcional). NO es una cita ni un evento. En el enlace de reserva no se ofrecen turnos que lo toquen (reserva_ocupacion) y reservar_por_enlace lo rechaza (''ocupado''); dentro de Spinus, con la v2 encendida, ninguna cita ni evento entra ni se mueve a él (cita_proteger_bloqueo, HINT agenda_horario_bloqueado). Lo crean, editan y quitan quienes pueden agendar para ese médico (mismo predicado que appointments). google_event_id/gcal_*: el evento «Ocupado» del calendario de Spinus, sólo los escribe el servidor; gcal_bloqueo_aplicar trae lo movido o borrado en Google. agenda_bloqueo_preparar toma el candado 1790 del médico. LÍMITE ACEPTADO (auditoría ronda 1, A7; decisión de Angel): el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa: el alta de una cita por el personal no toma el candado 1790, así que una reserva por enlace o un bloqueo confirmados a la vez pueden dejar dos citas en el turno o una cita dentro del bloqueo.';
 
 -- ---------------------------------------------------------------------
 -- 4 · Antes de escribir: el candado del médico y updated_at.
@@ -343,9 +343,10 @@ FROM (
                      FROM pg_proc WHERE oid = to_regprocedure('public.agenda_bloqueo_preparar()')), 'AUSENTE'),
          'dc778b4cbd29cedba8066caae5a7354f / true / true / true'
   UNION ALL
-  SELECT 6, 'disparadores de agenda_bloqueos, activos',
+  SELECT 6, 'disparadores de agenda_bloqueos de ESTE archivo, activos (el _sin_truncate es de T y no cuenta)',
          coalesce((SELECT string_agg(tgname, ',' ORDER BY tgname) FROM pg_trigger
-                    WHERE tgrelid = to_regclass('public.agenda_bloqueos') AND NOT tgisinternal AND tgenabled = 'O'), ''),
+                    WHERE tgrelid = to_regclass('public.agenda_bloqueos') AND NOT tgisinternal AND tgenabled = 'O'
+                      AND tgname IN ('audit_agenda_bloqueos', 'trg_agenda_bloqueos_preparar')), ''),
          'audit_agenda_bloqueos,trg_agenda_bloqueos_preparar'
 ) t
 ORDER BY t.n;
