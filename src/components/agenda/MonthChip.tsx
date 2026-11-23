@@ -5,7 +5,8 @@
  * comentarios; sólo cambiaron los `import`/`export` que hacían falta.
  */
 
-import { memo } from 'react'
+import { memo, type CSSProperties } from 'react'
+import { nombreCortoPaciente } from '@/lib/agenda/nombresTarjeta'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, esEventoGenerico, marcaPorLigar, marcasDeCita, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
@@ -56,7 +57,8 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
         : {})}
       className={`ag-mes${isGcal ? ' ag-mes--gcal' : ''}${esEvento ? ' ag-mes--evento' : ''}${
         ext?.status === 'cancelled' ? ' ag-mes--cancelada' : ''}`}
-      style={{ background: fondo }}
+      /* B13 · AG4 · `--ag-mes-tinta`: la barra de 3 px del chip de la v2 (globals.css, bloque de VISTAS). */
+      style={{ background: fondo, '--ag-mes-tinta': tinta } as CSSProperties}
     >
       {/* El hueco del marcador. La G de Google gana a todo: es una marca y va en
           sus cuatro colores. Lo demás es el punto, redondo en una cita y
@@ -74,7 +76,11 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
           <IconoDelEvento nombre={ext.icono} size="var(--ag-mes-icono-px)" color={tinta} />
         </span>
       )}
-      <span className="ag-mes-nombre">{pac ? `${pac.nombre} ${pac.apellidos}` : arg.event.title}</span>
+      {/* B13 · AG4 · Con la v2, el nombre corto de la rejilla («Paciente P.», PIEZAS-MES §1); el entero va
+          en la etiqueta accesible de la caja. Un evento conserva su título. */}
+      <span className="ag-mes-nombre">{pac
+        ? (sinAvisoFlotante ? nombreCortoPaciente(pac.nombre, pac.apellidos) : `${pac.nombre} ${pac.apellidos}`)
+        : arg.event.title}</span>
       {sinAvisoFlotante
         ? <MarcasCita enlace={procedencia.enlace} sinExpediente={procedencia.sinExpediente} size={11} decorativa />
         : marca && <span className="ag-mes-badge" title={marca.titulo}>{marca.texto}</span>}

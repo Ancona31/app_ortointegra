@@ -1,5 +1,6 @@
-import { test, expect, type Page } from '@playwright/test'
-import { irAAgenda, SESION } from './ayudas'
+import { test, expect, type Page, type BrowserContext } from '@playwright/test'
+import { irAAgenda, SESION, interruptorAgenda } from './ayudas'
+import { abrirAgendaV2 } from './interaccionesAyudas'
 
 /**
  * Bloque F · F1.16 · la tableta (768–1023 px) dibuja Semana como rejilla de tres
@@ -55,6 +56,11 @@ test('Día es la rejilla de un día y Mes es el del teléfono', async ({ page })
 test('el arrastre con pulsación larga mueve una cita (PUT)', async ({ page, context }) => {
   await irAAgenda(page)
   await sinCompactar(page)
+  await arrastrarConPulsacionLarga(page, context)
+})
+
+/** La primera cita futura a la vista, bajada dos franjas con pulsación larga; espera el PUT. */
+async function arrastrarConPulsacionLarga(page: Page, context: BrowserContext): Promise<void> {
   /* La primera cita FUTURA de arriba a abajo (una pasada no se arrastra lejos
      de la vista) y se baja una hora. */
   const objetivo = await page.locator('.fc-timegrid-event:not(.fc-event-past)', { hasText: 'Paciente' }).evaluateAll(els => {
@@ -79,4 +85,40 @@ test('el arrastre con pulsación larga mueve una cita (PUT)', async ({ page, con
   const confirmar = page.getByRole('dialog').getByRole('button', { name: /^(Mover|Sí|Confirmar|Continuar|Aceptar)/ })
   if (await confirmar.isVisible({ timeout: 1500 }).catch(() => false)) await confirmar.click()
   await put
+}
+
+/* B13 · AG2 · Con la v2 la tableta (`iv`, 820 px sin franja) tiene CUATRO vistas
+   (CALMA §29.1): Semana son siete columnas y «3 días» es otra vista; Día, rejilla;
+   el Mes, la rejilla con chips (no el del teléfono). El arrastre sigue pidiendo
+   pulsación larga (§29.13). Va a la semana siguiente para no tocar citas que
+   dependan del día de la corrida (AG-DT-256). */
+test.describe('con la v2', () => {
+  test.afterEach(() => { interruptorAgenda('A', false) })
+
+  test('cuatro vistas: Semana de siete columnas, «3 días» aparte, Día y Mes en rejilla', async ({ page }) => {
+    interruptorAgenda('A', true)
+    await abrirAgendaV2(page)
+    await expect(page.locator('.fc-timeGridWeek-view')).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Semana', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await sinCompactar(page)
+    await expect(page.locator('.fc-timegrid-col[data-date]')).toHaveCount(7)
+    await page.getByRole('tab', { name: '3 días', exact: true }).click()
+    await expect(page.locator('.fc-timeGridTresDias-view')).toBeVisible()
+    await expect(page.locator('.fc-timegrid-col[data-date]')).toHaveCount(3)
+    await page.getByRole('tab', { name: 'Día', exact: true }).click()
+    await expect(page.locator('.fc-timegrid-col[data-date]')).toHaveCount(1)
+    await page.getByRole('tab', { name: 'Mes', exact: true }).click()
+    await expect(page.locator('.fc-dayGridMonth-view')).toBeVisible()
+    await expect(page.locator('.agenda-fc.ag-cal-mes-movil')).toHaveCount(0)
+    await expect(page.locator('section[aria-label="Citas del día seleccionado"]')).toHaveCount(0)
+  })
+
+  test('el arrastre con pulsación larga mueve una cita en la Semana de siete columnas (PUT)', async ({ page, context }) => {
+    interruptorAgenda('A', true)
+    await abrirAgendaV2(page)
+    await sinCompactar(page)
+    await page.getByRole('button', { name: 'Periodo siguiente' }).click()
+    await expect(page.locator('.fc-timegrid-event', { hasText: 'Paciente' }).first()).toBeVisible()
+    await arrastrarConPulsacionLarga(page, context)
+  })
 })

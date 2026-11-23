@@ -217,6 +217,60 @@ export const VISTAS_FC_TABLETA = {
   listWeek: VISTAS_FC_MOVIL.listWeek,
 } as const
 
+/* ═══ B13 · AG2 · LAS TABLAS DE LA V2 ENCENDIDA ════════════════════════════
+   Con la v2 «3 días» es una vista más (CALMA §29.1), no la Semana de la
+   tableta, y en el teléfono Día y «3 días» son rejilla (§28). Lo único que
+   cambia respecto de las tablas de arriba son los TÍTULOS del periodo, que
+   siguen a la maqueta (`agenda-base/tmp-gen.py`, `TIT`): en ancho
+   «19 – 21 nov 2026», en el teléfono «19 – 21 de noviembre» y
+   «Jue, 19 de noviembre» (la `J` la pone el `::first-letter` de siempre).
+   Tres objetos completos a nivel de módulo, por la regla de identidad estable.
+   Las tablas de arriba son las de la v2 apagada y no se tocan. */
+const TRES_DIAS_ANCHO = { ...TRES_DIAS, titleFormat: { day: 'numeric', month: 'short', year: 'numeric' } } as const
+const TRES_DIAS_TELEFONO = { ...TRES_DIAS, titleFormat: { day: 'numeric', month: 'long' } } as const
+
+/* B13 · AG4 · EL MES DE LA V2 EN COMPUTADORA Y TABLETA (PIEZAS-MES §2). Seis
+   semanas que se reparten el alto (`fixedWeekCount`, `expandRows`; la fila
+   mínima la pone la hoja) y la regla de cuántos caben: K líneas por día, y con
+   más de K se ven K − 1 y «+N». Es exactamente `dayMaxEventRows` de
+   FullCalendar (el «+N» cuenta como fila); `dayMaxEvents: false` apaga el tope
+   global de 3 del `<FullCalendar>`, que no cuenta el «+N». K = 3 en `esc`,
+   2 en `ih`/`iv`. En la tableta las cabeceras van cortas («lun»): a 86 px la
+   larga no cabe. El teléfono (`ext`/`tel`) sigue con el mes de puntos. */
+const MES_V2_ANCHO = {
+  ...VISTAS_FC.dayGridMonth, fixedWeekCount: true, expandRows: true, dayMaxEvents: false, dayMaxEventRows: 3,
+} as const
+const MES_V2_TABLETA = {
+  ...MES_V2_ANCHO, dayHeaderFormat: { weekday: 'short' }, dayMaxEventRows: 2, moreLinkContent: masBreve,
+} as const
+
+export const VISTAS_FC_V2 = {
+  timeGridTresDias: TRES_DIAS_ANCHO,
+  dayGridMonth: MES_V2_ANCHO,
+  timeGridWeek: VISTAS_FC.timeGridWeek,
+  timeGridDay: VISTAS_FC.timeGridDay,
+  listDay: VISTAS_FC.listDay,
+  listWeek: VISTAS_FC.listWeek,
+} as const
+
+export const VISTAS_FC_V2_TABLETA = {
+  timeGridTresDias: TRES_DIAS_ANCHO,
+  dayGridMonth: MES_V2_TABLETA,
+  timeGridWeek: VISTAS_FC.timeGridWeek,
+  timeGridDay: VISTAS_FC.timeGridDay,
+  listDay: VISTAS_FC_MOVIL.listDay,
+  listWeek: VISTAS_FC_MOVIL.listWeek,
+} as const
+
+export const VISTAS_FC_V2_MOVIL = {
+  timeGridTresDias: TRES_DIAS_TELEFONO,
+  dayGridMonth: VISTAS_FC_MOVIL.dayGridMonth,
+  timeGridWeek: VISTAS_FC_MOVIL.timeGridWeek,
+  timeGridDay: { titleFormat: { weekday: 'short', day: 'numeric', month: 'long' }, dayMaxEvents: 2 },
+  listDay: VISTAS_FC_MOVIL.listDay,
+  listWeek: VISTAS_FC_MOVIL.listWeek,
+} as const
+
 /* Las dos configuraciones del toolbar nativo, A NIVEL DE MÓDULO por la regla de
    identidad estable: un literal en el JSX es un objeto nuevo en cada render y
    FullCalendar vuelve a refinar sus opciones cuando la referencia cambia.

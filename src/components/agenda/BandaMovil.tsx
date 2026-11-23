@@ -2,13 +2,13 @@
 
 import { Menu } from 'lucide-react'
 import type { Medico } from '@/components/agenda/AppointmentModal'
-import { vistaEnElOtroFormato } from '@/lib/agenda/vistasAgenda'
+import { vistaEnElOtroFormato, vistaDelFormato } from '@/lib/agenda/vistasAgenda'
 import { NavegacionBandaMovil } from '@/components/agenda/NavegacionBandaMovil'
 import { FiltrosBandaMovil } from '@/components/agenda/FiltrosBandaMovil'
 import type { ReactNode } from 'react'
 import { teclasDeAccion, type AccionAtajo } from '@/lib/agenda/atajosAgenda'
 
-const ATAJO_DE_VISTA: Record<string, AccionAtajo> = {
+const ATAJO_DE_VISTA: Partial<Record<string, AccionAtajo>> = {
   dayGridMonth: 'vista-mes', timeGridWeek: 'vista-semana', timeGridDay: 'vista-dia',
 }
 
@@ -66,6 +66,17 @@ export const VIEWS = [
   { type: 'timeGridDay',  label: 'Día'    },
 ] as const
 
+/* B13 · AG2 · Con la v2, cuatro periodos en todos los formatos (CALMA §29.1):
+   «3 días» es una vista más, siempre rejilla. Tipo ANCHO de cada uno, como
+   `VIEWS`; el formato lo pone `vistaDelFormato`. Rótulos enteros: caben a 13 px
+   en el conmutador estirado del teléfono (PIEZAS §12). */
+export const VIEWS_V2 = [
+  { type: 'dayGridMonth',     label: 'Mes'    },
+  { type: 'timeGridWeek',     label: 'Semana' },
+  { type: 'timeGridTresDias', label: '3 días' },
+  { type: 'timeGridDay',      label: 'Día'    },
+] as const
+
 /* ═══ F1.15 · DOS FILAS (eran cuatro y la banda medía ~195 px de 844) ═══════
    Fila 1: ☰ · fecha (15 px, negrita) con el conteo debajo (12 px) · ‹ · Hoy · ›.
    Fila 2: segmentado Mes/Semana/Día de ancho fijo · filtro (cede ancho) · los
@@ -78,7 +89,7 @@ export const VIEWS = [
 export function BandaMovil(
   { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, tableta = false, onMenu,
     medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
-    mesSinTodos, selectorFecha, buscar, atajos = false, engraneConfiguracion = false, campana, engrane }: {
+    mesSinTodos, selectorFecha, buscar, atajos = false, engraneConfiguracion = false, campana, engrane, cuatroVistas }: {
     conteo: string; vistaActual: string; onVista: (tipo: string) => void
     titulo: string; onPrev: () => void; onNext: () => void
     /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
@@ -104,6 +115,9 @@ export function BandaMovil(
         conteo sale del subtítulo. Sin ellos, la banda de siempre. */
     campana?: ReactNode
     engrane?: ReactNode
+    /** B13 · AG2 · Con la v2, el conmutador de cuatro y el formato de la sonda
+        (`telefono`: Semana en lista). Sin él, los tres de siempre. */
+    cuatroVistas?: 'telefono' | 'rejilla'
   },
 ) {
   const bandaV2 = engrane !== undefined
@@ -124,15 +138,19 @@ export function BandaMovil(
       </div>
       <div className="ag-banda-movil-filtros">
         <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
-          {VIEWS.map(v => {
+          {(cuatroVistas ? VIEWS_V2 : VIEWS).map(v => {
             /* El mismo traductor que el segmentado de escritorio y que el efecto
                del ancho: aquí `isMobile` es true por construcción —esta banda sólo
-               se monta en móvil—, así que «Semana» apunta a `listWeek`. */
-            const tipo = vistaEnElOtroFormato(v.type, true, tableta)
+               se monta en móvil—, así que «Semana» apunta a `listWeek`. Con la v2,
+               la tabla de la v2 (`vistaDelFormato`). */
+            const tipo = cuatroVistas
+              ? vistaDelFormato(v.type, cuatroVistas === 'telefono')
+              : vistaEnElOtroFormato(v.type, true, tableta)
+            const atajo = ATAJO_DE_VISTA[v.type]
             return (
               <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
-                aria-keyshortcuts={atajos ? teclasDeAccion(ATAJO_DE_VISTA[v.type]) : undefined}
-                onClick={() => onVista(tipo)}>{tipo === 'timeGridTresDias' ? '3 días' : v.label}</button>
+                aria-keyshortcuts={atajos && atajo ? teclasDeAccion(atajo) : undefined}
+                onClick={() => onVista(tipo)}>{!cuatroVistas && tipo === 'timeGridTresDias' ? '3 días' : v.label}</button>
             )
           })}
         </div>
