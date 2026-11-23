@@ -4,13 +4,14 @@ import path from 'node:path'
 import { soloEscritorio, sqlLocal } from './ayudas'
 
 /**
- * Punto 10 de Angel · el backfill de la herencia de horario (sección 8 de
+ * Punto 10 de Angel · el backfill de la herencia de horario (secciones 7 y 10 de
  * `20261201120000_agenda_f1_ajustes_tipos_horarios.sql`, que funde la original
  * `20261119130000_agenda_g4_herencia_horario_consultorios.sql`) contra datos
  * propios, DOS pasadas seguidas y todo en una transacción que se deshace (no
- * deja nada en la base). Corre el TEXTO REAL de esa sección del archivo (del
- * CREATE TABLE del respaldo al UPDATE), no una copia: una mutación del archivo
- * se ve aquí. El resto del archivo no: su pre-vuelo aborta con F1 ya aplicado.
+ * deja nada en la base). Corre el TEXTO REAL del archivo (el CREATE TABLE del
+ * respaldo de §7 y el INSERT + UPDATE del backfill de §10), no una copia: una
+ * mutación de esos tramos se ve aquí. El resto del archivo no: su pre-vuelo
+ * aborta con F1 ya aplicado (ver `cuerpo`).
  *
  *   · el consultorio SIN horario propio hereda el de su clínica (también el
  *     archivado), con su fila de respaldo y su fila UPDATE en audit_log;
@@ -22,12 +23,29 @@ soloEscritorio()
 
 const MIGRACION = path.resolve(process.cwd(), 'supabase/migrations/20261201120000_agenda_f1_ajustes_tipos_horarios.sql')
 
+/*
+ * En la F1 FUNDIDA el texto ya no es seguido: la tabla del respaldo está en §7,
+ * §8 crea `agenda_restablecer_configuracion` (ya existe en una base con F1: no se
+ * puede volver a correr) y el backfill (INSERT del respaldo + UPDATE) va dentro
+ * del bloque DO de §10, entre otras sentencias que exigen la base SIN F1. Se
+ * toman, del archivo real, sólo esos dos tramos: la tabla de §7 y las dos
+ * sentencias del backfill, que son SQL suelto válido fuera del DO.
+ */
+function tramo(s: string, desde: string, hasta: string, incluirHasta: boolean, que: string): string {
+  const i = s.indexOf(desde)
+  const j = i < 0 ? -1 : s.indexOf(hasta, i)
+  if (i < 0 || j < i) throw new Error(`la migración no tiene ${que} donde la prueba lo busca`)
+  return s.slice(i, incluirHasta ? j + hasta.length : j)
+}
+
 function cuerpo(): string {
   const s = readFileSync(MIGRACION, 'utf8')
-  const i = s.indexOf('\nCREATE TABLE IF NOT EXISTS respaldos.consultorios_horario_20261119 (')
-  const j = s.indexOf('\n-- 9 · ', i)
-  if (i < 0 || j < i) throw new Error('la migración no tiene su sección 8 (backfill) seguida de la 9')
-  return s.slice(i + 1, j)
+  const tabla = tramo(s, 'CREATE TABLE IF NOT EXISTS respaldos.consultorios_horario_20261119 (', '\n-- 8 · ', false,
+    'la tabla del respaldo (§7) seguida de la §8')
+  const backfill = tramo(s, 'INSERT INTO respaldos.consultorios_horario_20261119 AS r', 'AND NOT k.horario_propio;', true,
+    'el backfill de §10 (INSERT del respaldo y UPDATE)')
+  if (!backfill.includes('UPDATE public.consultorios k')) throw new Error('el backfill de §10 ya no termina en su UPDATE')
+  return `${tabla}\n${backfill}`
 }
 
 const CL = '00000000-0000-4000-8000-0000000064c1'
