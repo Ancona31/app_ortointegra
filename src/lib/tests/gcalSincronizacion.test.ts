@@ -39,7 +39,7 @@ const h = vi.hoisted(() => {
     /** C5: los `events.patch` del restablecimiento, con sus opciones (If-Match). */
     parches: [] as Array<{ params: unknown; opciones: unknown }>,
     patchFalla: null as number | Error | null,
-    rpc: { data: null as unknown, error: null as { code: string; message: string } | null, args: [] as unknown[] },
+    rpc: { data: null as unknown, error: null as { code: string; message: string } | null, args: [] as unknown[], status: undefined as number | undefined },
   }
   return { estado }
 })
@@ -82,7 +82,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
     rpc: async (nombre: string, args: unknown) => {
       h.estado.rpc.args.push({ nombre, args })
-      return { data: h.estado.rpc.data, error: h.estado.rpc.error }
+      return { data: h.estado.rpc.data, error: h.estado.rpc.error, status: h.estado.rpc.status }
     },
   }),
 }))
@@ -120,6 +120,8 @@ const db = vi.hoisted(() => ({
   aplicadas: [] as Aplicacion[],
   importadas: [] as DatosImportar[],
   fallarAplicar: new Set<string>(),
+  /** Oleada 3, arreglo 3: el error (de la capa de base REAL) con que falla `aplicarEvento`. */
+  errorAplicar: null as unknown,
   /** Tanda I, punto 9: la base rechaza (candado de la cita por enlace) lo que cambia contenido. */
   rechazarAplicar: new Set<string>(),
   aplicarDevuelve: 1,
@@ -173,6 +175,7 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
     },
     aplicarEvento: async (_c: string, _cal: string, a: Aplicacion) => {
       if (db.fallarAplicar.has(a.citaId)) throw new Error('la base falló')
+      if (db.errorAplicar) throw db.errorAplicar
       if (db.rechazarAplicar.has(a.citaId) && Object.keys(a.cambios).length > 0) throw new real.CambioRechazadoPorLaBase('gcal_aplicar_evento')
       db.aplicadas.push(a)
       return db.aplicarDevuelve
@@ -239,11 +242,11 @@ const llamadas = (): Params[] => h.estado.llamadas as Params[]
 beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
-    noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), rechazarAplicar: new Set(),
+    noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), errorAplicar: null, rechazarAplicar: new Set(),
     aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, empalmesFallan: 0, espejoFalla: false, movimientos: [], movimientosFalla: null,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
-  h.estado.rpc = { data: null, error: null, args: [] }
+  h.estado.rpc = { data: null, error: null, args: [], status: undefined }
   vi.mocked(logAudit).mockClear()
   vi.mocked(captureMessage).mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
@@ -872,5 +875,61 @@ describe('W · el candado se suelta siempre (la pasada que sigue dentro de after
     h.estado.guion = [(p) => { control.abort(new Error('tope')); return pagina([nuevo], { nextSyncToken: 't' })(p) }]
     expect(await sincronizarClinica(conexion, { ...op, senal: control.signal })).toMatchObject({ estado: 'error' })
     expect(db).toMatchObject({ candado: null, soltados: ['google_tiempo'] })
+  })
+})
+
+/* Oleada 3, arreglo 3 (orden de Angel): «si falla al aplicar un cambio de Google, la página no
+   avanza y la pasada siguiente lo repite [...] Solo ante fallos pasajeros; un error definitivo no
+   debe dejar a la clínica sin sincronizar.» El error sale de la capa de base REAL (`llamar`) con
+   la respuesta de PostgREST que toca, como en producción. Mutación en rojo: quitar el `throw new
+   AplicacionPendiente()` de `procesarPagina` (la página avanzaba y el cambio se perdía). */
+describe('oleada 3 · un fallo pasajero de la base al aplicar repite la página', () => {
+  async function errorDeLaBase(code: string, status: number): Promise<unknown> {
+    const real = await vi.importActual<typeof import('@/lib/gcalSincronizacionBase')>('@/lib/gcalSincronizacionBase')
+    h.estado.rpc.error = { code, message: 'falló' }
+    h.estado.rpc.status = status
+    const err = await real.aplicarEvento(CLINICA, CAL, {
+      citaId: CITA, esperadoUpdatedAt: '2031-05-01T00:00:00Z', etag: null, actualizado: null, vincular: null, desvincular: false, cambios: {},
+    }).then(() => null, (e: unknown) => e)
+    h.estado.rpc = { data: null, error: null, args: [], status: undefined }
+    return err
+  }
+  const movida = evento({ start: { dateTime: '2031-06-06T14:00:00-06:00' }, end: { dateTime: '2031-06-06T15:00:00-06:00' } })
+
+  it('40001 al aplicar: la página no avanza, el candado se suelta con código y la pasada siguiente lo aplica', async () => {
+    db.errorAplicar = await errorDeLaBase('40001', 500)
+    h.estado.guion = [pagina([movida], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'error', errores: 1 })
+    expect(db).toMatchObject({ syncToken: null, candado: null, soltados: ['base_pendiente'] })
+    db.errorAplicar = null
+    h.estado.guion = [pagina([movida], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(db.syncToken).toBe('t')
+    expect(db.aplicadas).toHaveLength(1)
+  })
+
+  it('lo que es pasajero y lo que no (sin código: la red o el 5xx de la pasarela; con código, sólo la lista)', async () => {
+    const casos: Array<[string, number, boolean]> = [
+      ['', 0, true], ['', 503, true], ['PGRST003', 504, true], ['40P01', 500, true], ['55P03', 500, true],
+      ['57014', 500, true], ['08006', 503, true], ['53300', 503, true],
+      ['23505', 409, false], ['P0001', 400, false], ['42501', 403, false], ['42703', 400, false], ['XX000', 500, false], ['', 400, false],
+    ]
+    for (const [code, status, pasajero] of casos) {
+      Object.assign(db, { syncToken: null, soltados: [], aplicadas: [] })
+      db.errorAplicar = await errorDeLaBase(code, status)
+      h.estado.guion = [pagina([movida], { nextSyncToken: 't' })]
+      const r = await sincronizarClinica(conexion, op)
+      expect(r.errores, `${code}/${status}`).toBe(1)
+      expect(db.syncToken, `${code}/${status}`).toBe(pasajero ? null : 't')
+    }
+  })
+
+  it('los empalmes de lo que sí se aplicó en la página se registran ANTES de no avanzar', async () => {
+    db.errorAplicar = await errorDeLaBase('40001', 500)
+    h.estado.guion = [pagina([movida, nuevo], { nextSyncToken: 't' })]
+    await sincronizarClinica(conexion, op)
+    expect(db.importadas).toHaveLength(1)
+    expect(db.empalmes).toEqual([['55555555-5555-4555-8555-555555555555']])
+    expect(db.syncToken).toBeNull()
   })
 })
