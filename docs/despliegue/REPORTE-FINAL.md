@@ -92,17 +92,18 @@ Fuente: `supabase/fusion/equivalencia/DIFERENCIAS.md`, tercera vuelta.
 | `aplicar.sh aplicar` | 9 en verde, 0,28–0,41 s cada una; 63 OK, 10 INFO, 0 REVISAR; historial 14 | [C] ENSAYO-PRINCIPAL §5.1 |
 | Antes ↔ después | 965 diferencias, mismas claves que el clon de la foto | [C] §5.1; plan §11 |
 | Clon de la foto (CA, fase 2) | prueba de humo de 104 104 bytes aceptada en 0,30 s; 1,21–1,60 s por archivo con 150 ms de ida y vuelta | [C] plan §11 |
-| Vitest | 2387/2387 en tres zonas: sin TZ, UTC y Hermosillo (con `--exclude ".claude/**"`) | [C] §5.3a |
-| SQL | 48/48 | [C] §5.3b |
+| Vitest | 2387/2387 en tres zonas: sin TZ, UTC y Hermosillo (con `--exclude ".claude/**"`). **Agente S:** 2395/2395 en las tres | [C] §5.3a; §10 |
+| SQL | 48/48 (agente S: 48/48 otra vez, sobre la base de 14 con los almacenes) | [C] §5.3b; §10 |
 | Carreras | `reserva-carrera` 1–6b y `confirmacion-carrera` 1–3, en verde | [C] §5.3c |
-| Build | sale 0; 98 páginas | [C] §5.3d |
+| Build | sale 0; 98 páginas. Agente S: sale 0 sobre `77751da3` | [C] §5.3d; §10 |
 | Lint | main: 96 errores y 67 avisos; rama: 101 y 68; ningún error nuevo en código versionado | [C] §5.3d |
 | Batería 1 | lunes 23, 00:35–01:00: 617 pasan, 5 fallan, 13 no corren, 491 se saltan; **guarda en ROJO** (51 citas) | [C] §5.3e |
 | Batería 2 | lunes 23, 03:11–03:36, sobre `7af5775e`: 635 pasan, 0 fallan, 0 no corren, 491 se saltan; **guarda en VERDE** | [C] «Batería tras corregir las pruebas» |
+| Batería 3 (agente S) | lunes 23, 09:04–09:30, sobre `2e7d5d72` (build de `77751da3`): **632 pasan, 2 fallan, 4 no corren, 494 se saltan; guarda en VERDE**. Fallos: `reserva-k2-codigo` «la reserva falla después de verificar» (la prueba llenaba el tope viejo de 4; corregida en `131ad6c1`, suelta 3 de 3 en verde; las 4 que no corrieron son las que le siguen en serie) y `agenda-empalme` «redimensionar…» (AG-DT-257, suelta 1 de 3). No se repitió entera | [C] §10 |
 | Orden | las dos direcciones son seguras. Código primero: un `warn` por petición. Base primero: 500 con main sobre una cita atendida con nota | [C] ORDEN-Y-REVERSA §5.4 |
 | Reversa | se niega si hay datos. Con la v2 encendida, quitar F3 o más da 500 en 21 de 66 peticiones. `audit_log` solo crece. Volver a aplicar da 0 diferencias | [C] §5.5 |
 
-`src/`, las migraciones y `vercel.json` no cambian desde `b2993fe1`, que es el commit del build [C: git diff vacío]. Entre la batería 1 y la 2 sólo cambiaron archivos de `e2e/`.
+Hasta el agente S, `src/`, las migraciones y `vercel.json` no cambiaban desde `b2993fe1` [C: git diff vacío]; entre la batería 1 y la 2 sólo cambiaron archivos de `e2e/`. **El agente S cambia `src/`** (`77751da3`: la ruta de reservar, `limitesReserva.ts` y 5 pruebas de Vitest; §10). Migraciones y `vercel.json`, sin cambios [C: `git diff --stat b2993fe1 -- supabase/migrations vercel.json` vacío].
 
 ## 6. Hallazgos de los auditores
 
@@ -180,8 +181,8 @@ Fuente: ENSAYO-PRINCIPAL §5.6. Mediana de 20 muestras; servidor y base en la mi
 ## 9. Coordinación con `feature/rediseno-estetico`
 Punta leída: `14df1305` (sólo `git fetch`; ni merge ni rebase). Nació de `951e31b3` [C].
 
-**a. Commit congelado:** `7af5775e` (2026-11-23 03:10), el último que toca código, migraciones o pruebas [C: `git log -1 -- . ':(exclude)*.md'`]. Los commits posteriores son sólo documentación; la punta de la rama es el commit que añade este reporte (ver `git log -1`).
-- Último de `src/`: `24eb9910`.
+**a. Commit congelado:** `131ad6c1` (agente S, 2026-11-23), el último que toca código, migraciones o pruebas [C: `git log -1 -- . ':(exclude)*.md'`]. Antes era `7af5775e`. Los commits posteriores son sólo documentación.
+- Último de `src/`: `77751da3` (antes `24eb9910`).
 - Último de migraciones: `fb1c9dd3`.
 - Último de `aplicar.sh`: `254eb74f`.
 
@@ -214,7 +215,7 @@ Ningún archivo de `src/` lo tocan las dos.
 **c. Migraciones finales:** la tabla de la sección 3.
 
 **d. Capas y velos nuevos desde `951e31b3`: ninguno** [C].
-- En `src/` cambian 18 archivos de lógica y pruebas.
+- En `src/` cambian 18 archivos de lógica y pruebas, más los 7 del agente S (`src/app/api/reservar/[codigo]/route.ts`, `src/lib/reserva/limitesReserva.ts` y 5 de `src/lib/tests/`); el rediseño no toca ninguno [C: `git diff --stat 951e31b3 14df1305` sobre esas rutas, vacío].
 - El único archivo añadido es `src/lib/tests/reservarDespuesSeparado.test.ts`.
 - En el diff no aparece ninguna línea con `fixed`, `inset-0`, `z-`, `backdrop`, `overlay` ni `createPortal`.
 
@@ -238,3 +239,32 @@ Usan `.ag-capa` y `.ag-hoja`: BurbujaCita, BurbujaAlta, TarjetaLectura, CampanaA
 - **El rediseño no tiene `e2e/guardaAsistencia.ts`.** Su reporter es `[['list']]`.
 - **Por qué no sirve:** la guarda toma su línea base en `onBegin`, después del `globalSetup` (`guardaAsistencia.ts:95-98`), y solo acusa lo nuevo (`:106-107`). Sin resembrar, una cita vieja que ya esté en la base cuenta como «conocida» aunque tape la rejilla.
 - **E1 lo comprobó ejecutando:** `agenda-m3-barra` cayó con la ventana «¿Asistió el paciente?» encima, y la guarda dijo «ninguna prueba dejó citas» (ENSAYO-PRINCIPAL §5.3 f).
+
+## 10. Agente S (2026-11-23): dos hallazgos de Angel en sus pruebas a mano
+
+Evidencias fuera del repo: `~/spinus-fusion/ensayo-s/`.
+
+**1. La base local no tenía los almacenes de Storage.** Ninguna migración crea
+los seis buckets de producción y `db reset` los borra; las 13 policies de
+`storage.objects` sí estaban (las trae `20260912190416_remote_schema`) y son
+idénticas a las de la foto [C: catálogo normalizado, 13 de 13]. Ahora
+`scripts/local/almacenes-locales.{sh,sql}` los pone (mismo id, público, límite y
+tipos que `06-buckets.tsv` [C: diff vacío]) y la semilla lo llama al empezar.
+Producción no tiene nada en Storage que el código nuevo necesite distinto [C].
+Probado en navegador contra la base local con la semilla: documento emitido con
+su PDF guardado, enviado (Resend simulado → Mailpit, adjunto idéntico al
+emitido), regenerado y descargado; logo, firma, identificación y dos estudios
+subidos. Ninguna e2e usa Storage, así que ninguna se saltaba ni fallaba por esto,
+y ningún fallo anterior se atribuyó a esto [C: grep]. Dos defectos de la app,
+**sin arreglar**: AG-DT-276 («Regenerar» sin el perfil en caché del navegador
+guarda un PDF sin el médico) y AG-DT-277 («Enviar al paciente» usa Resend directo:
+en local, con los buckets, sale un correo real).
+
+**2. El tope de reservas bloqueaba usos legítimos.** Lo que vio Angel: el tope
+de 4 por dispositivo de `reservar` (un POST del fijo y tres del primer único,
+dos que no llegaron a la RPC; el segundo único chocó a los 56 min del primero)
+[C: `ip_rate_limits` leída antes de tocar la base]. Cambio sólo de código
+(`77751da3`): el único vigente no cuenta por IP ni por dispositivo; el fijo, 30
+por IP y 8 por dispositivo cada hora; lo que no abre y el único no vigente
+cuentan en «sondeo» (30/8), que se LEE sin contar antes de abrir el enlace: lleno,
+429 a cualquier código (sin oráculo). Qué deja de frenar y qué sigue: AG-DT-278.

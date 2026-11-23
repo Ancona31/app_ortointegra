@@ -6555,6 +6555,58 @@ lo mira antes. Criterio del auditor si se arregla: la regla «médico de la
 clínica» se exige al CREAR la fila; bloquear o desbloquear un contacto que ya
 existe no depende del rol actual del médico, con una prueba que lo cubra.
 
+### AG-DT-276 — «Regenerar PDF» compone sin el médico si el navegador no tiene su perfil en caché, y sustituye el PDF guardado
+
+**Estado:** abierta, **sin arreglar** (agente S, 2026-11-23; defecto de la app
+encontrado al probar Storage en local, fuera de la agenda). **Archivo:**
+`src/components/expediente/PanelDocumentos.tsx:240-283` (`regenerar`).
+`regenerar()` toma al médico de `getDoctorProfile()`, que lee
+`localStorage['spinus_doctor_profile']`; esa caché sólo la llenan los
+formularios de documentos y el perfil. En un navegador que no ha abierto
+ninguno (equipo nuevo, sesión limpia), `perfil` es `null`, el PDF sale **sin
+cabecera, sin nombre, sin cédula y sin firma**, y aun así se guarda:
+`documentos.pdf_url` pasa a apuntar a él, y «Enviar al paciente» y «Descargar»
+sirven ese a partir de entonces. Comprobado en local con un escrito médico
+ficticio (`pdftotext` del emitido: cabecera con nombre, dirección, cédula y
+firma; del regenerado sin caché: sólo título, paciente y cuerpo; con la caché
+llena, vuelve la cabecera). Además cada «Regenerar» sube con otro nombre
+(`escrito-medico` y la hora, en vez de `Escrito_Medico`), así que el objeto
+anterior queda huérfano en `documentos-pdf`. Choca con la regla de
+`adjuntoPdf.ts` («se adjunta el PDF guardado al emitir») y con F3-10-DT-01,
+que suponía que regenerar sólo se usaba con documentos sin `pdf_url`; en
+`PanelDocumentos` se ofrece para cualquier documento componible. Decisión de
+Angel: si «Regenerar» debe ofrecerse con `pdf_url` y de dónde sale el médico.
+
+### AG-DT-277 — «Enviar al paciente» (documentos) llama a Resend directo: en local manda correos de verdad
+
+**Estado:** abierta, nota de entorno (agente S, 2026-11-23).
+`src/app/api/email/enviar-documento/route.ts:39` crea `new Resend(...)` y no
+pasa por `src/lib/correo/transporte.ts`, así que no respeta
+`EMAIL_TRANSPORT=captura` (Mailpit). Hasta el 2026-11-23 en local no salía nada
+porque, sin buckets, no había PDF que adjuntar; con
+`scripts/local/almacenes-locales.sh` el envío funciona y, con la
+`RESEND_API_KEY` de `.env.local`, **sale de verdad** al correo del paciente.
+Para probar: `RESEND_API_KEY=re_falsa` o `RESEND_BASE_URL` a un servidor local
+(así se probó, reenviando a Mailpit con el adjunto). No es de la agenda
+(AG-DT-16 es sólo para el correo de la agenda); pasarla por `transporte.ts` lo
+decide Angel.
+
+### AG-DT-278 — Topes de la reserva pública con IP compartida (nota del cambio del agente S)
+
+**Estado:** nota (agente S, 2026-11-23, orden de Angel). `reservar` cuenta IP
+(30/h) y dispositivo (8/h) sólo con el enlace FIJO; el ÚNICO vigente no cuenta
+(lo frenan su uso único y sus 5 intentos). Lo que no abre y el único no vigente
+cuentan en `sondeo` (30/h IP, 8/h dispositivo); con el sondeo lleno, la ruta da
+429 a cualquier código antes de abrirlo. Las llaves de IP son GLOBALES (todas las
+clínicas): pacientes distintos detrás de la misma IP de una compañía de celular
+comparten el cupo. Sin cambiar (orden de Angel: sólo informar): `codigo` 10/h por
+IP (≈ 10 pacientes del fijo por hora y por IP: es el que topa antes que
+`reservar`), `verificar` 20/h por IP, `turnos` 120 cada 10 min por IP (cada
+paciente hace varias al cambiar de semana). Lo que el cambio deja menos frenado:
+códigos inexistentes 30/h por IP (antes 6), una ráfaga simultánea que pasa la
+lectura del sondeo antes de contar, y con un fijo agotado por IP la ruta ya hace
+`reserva_contexto` antes del 429 (antes no tocaba la base).
+
 ---
 
 ## Latencia de `/agenda` — investigación y tanda de arreglos (2026-08-31)
