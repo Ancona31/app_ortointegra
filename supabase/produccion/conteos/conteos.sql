@@ -136,7 +136,7 @@ SELECT 8, 'G.08', 'historial', 'las 5 de main registradas (falta = la CLI intent
        'ninguna falta',
        (SELECT bool_and(v = ANY (h.versiones)) FROM repo, h, unnest(repo.main) v), 'ALTO'
 UNION ALL
-SELECT 9, 'G.09', '20260919230000', 'auth_02 registrada (su cabecera dice «PENDIENTE DE APLICAR»)',
+SELECT 9, 'G.09', '20260919230000', 'auth_02 registrada (la foto del 2026-11-22 ya la enseña registrada y con su ACL)',
        (SELECT ('20260919230000' = ANY (versiones))::text FROM h), 'true',
        (SELECT '20260919230000' = ANY (versiones) FROM h), 'ALTO'
 UNION ALL
