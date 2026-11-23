@@ -9,3 +9,4 @@ distinto	comentario	table public.agenda_bloqueos	el COMMENT de k1 decía «dentr
 # Colateral del ENSAYO, no de F5: la pieza de F1 que ref-originales todavía no tiene (notas/F5/ensayo-f1-agenda_v2_encendida.sql).
 solo_b	funcion	public.agenda_v2_encendida(p_clinica_id uuid)	colateral del ensayo: la crea F1 (20261201120000); ref-originales no la tiene
 solo_b	permiso	funcion public.agenda_v2_encendida(p_clinica_id uuid) → *	colateral del ensayo: permisos de la pieza de F1 (authenticated, service_role y el dueño)
+distinto	funcion	public.agenda_bloqueo_preparar()	C1: poda de dos comentarios del cuerpo («B3», «ver la cabecera»); md5 f1f887ec → dc778b4c. Mismo código

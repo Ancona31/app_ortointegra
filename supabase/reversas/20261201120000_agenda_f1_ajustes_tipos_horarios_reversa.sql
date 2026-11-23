@@ -4,13 +4,17 @@
 -- QUÉ HACE: quita TODOS los objetos de F1 y sólo ésos, en orden inverso de
 --   dependencias, sin CASCADE. Antes devuelve a consultorios.horario el valor
 --   previo al backfill en las filas que nadie editó desde la copia.
--- CUÁNDO: la ÚLTIMA, después de las reversas de F5b, F4, F2, F3 y F5a. Si
---   queda algo de esos bloques que nombre lo de F1, aborta sin tocar nada.
--- QUÉ SE PIERDE (respaldar antes si hace falta):
---   · los ajustes y el interruptor de cada clínica (agenda_ajustes);
---   · los tipos de cita y qué tipo tenía cada cita (appointments.tipo_cita_*);
---   · qué consultorios tienen horario propio, cuáles revisó una persona y el
---     huso «de fábrica» de cada clínica.
+-- DEPENDE DE: va la ÚLTIMA, después de las reversas de F5b, F4, F2, F3 y F5a.
+--   Si queda algo de esos bloques que nombre lo de F1, aborta sin tocar nada.
+--   Necesita respaldos.consultorios_horario_20261119.
+-- DATOS DE LA V2: se NIEGA (aborta sin tocar nada y dice cuántos hay) si hay
+--   algo creado con la v2 que se perdería:
+--   · filas de agenda_ajustes (ajustes guardados o el interruptor encendido);
+--   · tipos de cita, y citas con tipo (appointments.tipo_cita_*);
+--   · consultorios con horario revisado por una persona (horario_revisado_en)
+--     o con horario propio editados desde la copia (o creados después);
+--   · el huso «de fábrica» de alguna clínica (clinicas.timezone).
+--   Para quitarlo igualmente: respaldar con
 --     CREATE TABLE respaldos.agenda_ajustes_AAAAMMDD AS SELECT * FROM public.agenda_ajustes;
 --     CREATE TABLE respaldos.tipos_cita_AAAAMMDD AS SELECT * FROM public.tipos_cita;
 --     CREATE TABLE respaldos.citas_tipo_AAAAMMDD AS
@@ -19,14 +23,19 @@
 --       SELECT id, horario, horario_propio, horario_revisado_en FROM public.consultorios;
 --     CREATE TABLE respaldos.clinicas_timezone_AAAAMMDD AS
 --       SELECT id, timezone FROM public.clinicas WHERE timezone IS NOT NULL;
+--   y confirmarlo: «SET LOCAL spinus.reversa_con_datos = 'si';» justo después
+--   del BEGIN de este archivo (o «SET spinus.reversa_con_datos = 'si';» en la
+--   misma sesión antes de él).
 -- QUÉ SE QUEDA, a propósito:
 --   · respaldos.consultorios_horario_20261119: es el único sitio con el
 --     horario previo al backfill de las filas que se editaron después. Si
 --     F1 se vuelve a aplicar, lo reutiliza (conserva la primera copia).
 --     Borrarlo, cuando ya no haga falta: DROP TABLE respaldos.consultorios_horario_20261119;
 --   · las filas de audit_log (inmutables).
--- Bloqueos: ACCESS EXCLUSIVE sobre appointments, consultorios y clinicas
---   (DROP COLUMN / DROP CONSTRAINT / DROP TRIGGER) hasta el COMMIT.
+-- RIESGO: ACCESS EXCLUSIVE sobre appointments, consultorios y clinicas
+--   (DROP COLUMN / DROP CONSTRAINT / DROP TRIGGER) hasta el COMMIT, con
+--   lock_timeout 5 s: aplicarla cuando no haya consulta. Una transacción: si
+--   falla, no queda nada a medias.
 -- SEGUNDA PASADA: aborta limpio (F1 ya no está).
 -- ═══════════════════════════════════════════════════════════════════════
 
@@ -41,6 +50,7 @@ SET LOCAL statement_timeout = '60s';
 DO $$
 DECLARE
   v_resto text[];
+  v_datos text[];
 BEGIN
   IF to_regclass('public.agenda_ajustes') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: F1 no está aplicado (no existe public.agenda_ajustes). No se toca nada.';
@@ -69,6 +79,34 @@ BEGIN
   END IF;
   IF to_regclass('respaldos.consultorios_horario_20261119') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta respaldos.consultorios_horario_20261119; sin él no se puede devolver el horario previo. No se toca nada.';
+  END IF;
+
+  -- Lo creado con la v2 que se perdería. Sin confirmación explícita, no se toca nada.
+  SELECT array_agg(o) INTO v_datos FROM (
+    SELECT format('agenda_ajustes: %s fila(s), %s con la v2 encendida', count(*), count(*) FILTER (WHERE agenda_v2_encendida)) AS o
+      FROM public.agenda_ajustes HAVING count(*) > 0
+    UNION ALL
+    SELECT format('tipos_cita: %s', count(*)) FROM public.tipos_cita HAVING count(*) > 0
+    UNION ALL
+    SELECT format('citas con tipo: %s', count(*)) FROM public.appointments WHERE tipo_cita_id IS NOT NULL HAVING count(*) > 0
+    UNION ALL
+    SELECT format('consultorios con horario revisado: %s', count(*)) FROM public.consultorios
+     WHERE horario_revisado_en IS NOT NULL HAVING count(*) > 0
+    UNION ALL
+    SELECT format('consultorios con horario propio editados o creados tras la copia: %s', count(*))
+      FROM public.consultorios k
+     WHERE k.horario_propio
+       AND NOT EXISTS (SELECT 1 FROM respaldos.consultorios_horario_20261119 r
+                        WHERE r.id = k.id AND r.respaldado_en = k.updated_at)
+    HAVING count(*) > 0
+    UNION ALL
+    SELECT format('clínicas con huso de fábrica: %s', count(*)) FROM public.clinicas WHERE timezone IS NOT NULL HAVING count(*) > 0
+  ) x;
+  IF v_datos IS NOT NULL THEN
+    IF current_setting('spinus.reversa_con_datos', true) IS DISTINCT FROM 'si' THEN
+      RAISE EXCEPTION 'REVERSA ABORTADA: hay datos de la agenda v2 que se perderían: %. No se tocó nada. Respáldalos y confírmalo con spinus.reversa_con_datos = ''si'' (ver la cabecera).', v_datos;
+    END IF;
+    RAISE NOTICE 'Confirmado spinus.reversa_con_datos = si: se pierden %', v_datos;
   END IF;
 END $$;
 
@@ -104,9 +142,8 @@ DROP FUNCTION public.update_tipos_cita_updated_at();
 DROP FUNCTION public.validar_tipo_cita_consultorio();
 DROP FUNCTION public.validar_tipo_cita_medico();
 
--- IF EXISTS sólo aquí: es la única pieza de F1 que no existía en las 44
--- migraciones originales, y así la reversa también sirve sobre una base
--- montada con ellas.
+-- IF EXISTS sólo aquí: una base montada con las migraciones anteriores a la
+-- fusión tiene todo lo demás de F1, pero no esta función.
 DROP FUNCTION IF EXISTS public.agenda_v2_encendida(uuid);
 DROP TABLE public.agenda_ajustes;
 DROP FUNCTION public.proteger_agenda_ajustes();

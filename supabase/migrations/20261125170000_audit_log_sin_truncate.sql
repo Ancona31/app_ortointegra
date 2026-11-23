@@ -35,7 +35,10 @@
 --    permite UPDATE ni DELETE.»). La función vale para un disparador de
 --    sentencia: sólo hace RAISE EXCEPTION y RETURN NULL; no lee OLD ni NEW
 --    (que en un disparador de sentencia valen NULL). El pre-vuelo exige el
---    md5 de su cuerpo, así que si en producción fuera otra, aborta antes.
+--    md5 de su cuerpo con los fines de línea \r\n pasados a \n (en producción
+--    está guardada con \r\n: md5 tal cual 7f0318cb…, normalizado f1fe023a…,
+--    el mismo código que en local), así que si en producción fuera otra,
+--    aborta antes.
 --    Al reutilizarla no nace ninguna función: «Permisos de funciones» de
 --    CLAUDE.md no aplica, y la función conserva sus privilegios. El disparador
 --    no necesita EXECUTE de quien hace el TRUNCATE: PostgreSQL comprueba
@@ -94,9 +97,9 @@
 --   de audit_log, ahora fallaría (no debe hacerlo).
 --
 -- ═══ VUELTA ATRÁS ══════════════════════════════════════════════════════
---   DROP TRIGGER IF EXISTS prevent_audit_truncate ON public.audit_log;
---   GRANT TRUNCATE ON public.audit_log TO anon, authenticated, service_role;
---   (devolver el GRANT reabre el hueco; sólo si Angel lo pide).
+--   supabase/reversas/20261125170000_audit_log_sin_truncate_reversa.sql
+--   (quita el disparador y devuelve TRUNCATE a los tres roles; reabre el
+--   hueco: sólo si Angel lo pide, y después de la reversa de 20261126120000).
 --
 -- ═══ AUDITORÍA INDEPENDIENTE ═══════════════════════════════════════════
 -- 2026-11-19, agente aparte (Sonnet), sólo lectura, con
@@ -133,6 +136,7 @@ SET LOCAL lock_timeout = '5s';
 DO $$
 DECLARE
   v_md5 text;
+  v_crudo text;
   v_def text;
 BEGIN
   IF to_regclass('public.audit_log') IS NULL THEN
@@ -141,9 +145,10 @@ BEGIN
   IF NOT pg_has_role(current_user, (SELECT relowner FROM pg_class WHERE oid = 'public.audit_log'::regclass), 'USAGE') THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: el rol % no es dueño de public.audit_log.', current_user;
   END IF;
-  -- La función es la del baseline: RETURNS trigger, plpgsql y el cuerpo exacto (md5 de prosrc).
-  -- ⚠️ Si en producción el cuerpo difiere (aunque sea un espacio), esto aborta: revisar antes de cambiar el md5.
-  SELECT md5(p.prosrc) INTO v_md5 FROM pg_proc p
+  -- La función es la del baseline: RETURNS trigger, plpgsql y el cuerpo (md5 de prosrc con \r\n → \n:
+  -- en producción está guardada con \r\n). ⚠️ Cualquier otra diferencia, aunque sea un espacio, aborta:
+  -- revisar antes de cambiar el md5.
+  SELECT md5(replace(p.prosrc, E'\r\n', E'\n')), md5(p.prosrc) INTO v_md5, v_crudo FROM pg_proc p
    WHERE p.oid = to_regprocedure('public.prevent_audit_modification()')
      AND p.prorettype = 'pg_catalog.trigger'::regtype
      AND p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql');
@@ -151,7 +156,7 @@ BEGIN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta public.prevent_audit_modification() (RETURNS trigger, plpgsql).';
   END IF;
   IF v_md5 <> 'f1fe023a49dae586103b5e80b52841ea' THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: public.prevent_audit_modification() tiene otro cuerpo (md5 %).', v_md5;
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: public.prevent_audit_modification() tiene otro cuerpo (md5 con \r\n→\n: %, tal cual: %; se esperaba f1fe023a49dae586103b5e80b52841ea con \r\n→\n). Si sólo difiere el tal cual, son fines de línea; si difiere el otro, cambió el código.', v_md5, v_crudo;
   END IF;
   -- Replay: si el disparador ya existe, tiene que ser exactamente el de esta migración.
   -- tgtype 34 = BEFORE (2) + TRUNCATE (32), sin el bit de fila (1): de sentencia. Se compara por
@@ -218,8 +223,8 @@ FROM (
                     WHERE t.tgrelid = 'public.audit_log'::regclass AND NOT t.tgisinternal AND t.tgname <> 'prevent_audit_truncate'), 'NINGUNO'),
          'prevent_audit_delete:O,prevent_audit_update:O'
   UNION ALL
-  SELECT 4, 'la función, la misma (md5 de prosrc)',
-         coalesce((SELECT md5(prosrc) FROM pg_proc WHERE oid = to_regprocedure('public.prevent_audit_modification()')), 'AUSENTE'),
+  SELECT 4, 'la función, la misma (md5 de prosrc con \r\n→\n)',
+         coalesce((SELECT md5(replace(prosrc, E'\r\n', E'\n')) FROM pg_proc WHERE oid = to_regprocedure('public.prevent_audit_modification()')), 'AUSENTE'),
          'f1fe023a49dae586103b5e80b52841ea'
   UNION ALL
   SELECT 5, 'policies de audit_log, intactas',
