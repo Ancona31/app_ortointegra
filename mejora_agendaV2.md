@@ -733,6 +733,8 @@ scripts/google-falso-manual.ts`). Auditoría del conjunto de migraciones:
 `supabase/AUDITORIA-CONJUNTO-AGENDA-V2.md` (§8, las correcciones). Lo que no se
 pudo probar: §10.
 
+**Paquete final del despliegue 1 (agente B7, 2026-11-23): `docs/despliegue/`** — `ESTADO.md` (tablero-plantilla del día, pasos 0 a 8, SIN EMPEZAR) y `VARIABLES-VERCEL.md` (variables comprobadas contra el código).
+
 | Momento | Qué |
 |---|---|
 | Durante el proyecto | Nada obligatorio: los reportes de bloque son informativos |
