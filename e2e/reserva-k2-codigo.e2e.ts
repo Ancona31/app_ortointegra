@@ -2,7 +2,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from '@pla
 import { soloEscritorio, sqlLocal } from './ayudas'
 import { codigoDe, contarCorreos, esperarCorreo } from './mailpit'
 import { marcaE2e, limpiarReservasE2e } from './reservaAyudas'
-import { api, cerrarEscenario, citaDe, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario } from './reservaPublicaAyudas'
+import { api, cerrarEscenario, citaDe, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, primerTurnoDeLaSemanaSiguiente, type Escenario } from './reservaPublicaAyudas'
 import { hmacRed } from '../src/lib/reserva/secretos'
 
 /**
@@ -74,7 +74,8 @@ async function hastaDatos(p: Page): Promise<void> {
   const tipo = p.locator(`input[name="tipo"][value="${e.tipoId}"]`)
   if (await tipo.count()) await tipo.check()
   await p.getByRole('button', { name: 'Elegir día y hora' }).click()
-  await p.locator('button[data-inicio]').first().click()
+  // AG-DT-256: la reserva es por ligar; en la semana siguiente, nunca en la de hoy.
+  await primerTurnoDeLaSemanaSiguiente(p)
   await p.getByRole('button', { name: 'Continuar' }).click()
 }
 async function llenar(p: Page, persona: { nombre: string; telefono: string; correo?: string }): Promise<void> {

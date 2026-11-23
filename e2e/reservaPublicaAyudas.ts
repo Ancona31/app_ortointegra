@@ -21,7 +21,7 @@
  * una prueba no se coman los de la siguiente ni los de la corrida anterior
  * (`ip_rate_limits` sobrevive a la siembra).
  */
-import { request, test, type APIRequestContext } from '@playwright/test'
+import { expect, request, test, type APIRequestContext, type Page } from '@playwright/test'
 import { randomUUID, randomInt } from 'node:crypto'
 import { resolve } from 'node:path'
 import { config } from 'dotenv'
@@ -130,6 +130,24 @@ export function correoDelEnlace(codigo: string, correo: string): void {
   sqlLocal(`update public.reserva_enlaces set correo = :'c', correo_hmac = :'h'
              where codigo_hash = :'hash' and clase = 'unico' and correo is null`,
   { c: correo.trim(), h: hmac, hash: hashDeCodigo(codigo) })
+}
+
+/**
+ * AG-DT-256 · En el paso «Día y hora» de `/reservar`, pasa a la «Semana siguiente» y pulsa su
+ * primer turno; devuelve su `data-inicio`. Una reserva por enlace es «por ligar»: con el primer
+ * turno de la semana de HOY (lo que hacían estas pruebas), corriendo de lunes a viernes la cita
+ * queda en la semana visible y dispararía «¿Asistió el paciente?» (la guarda la señala). La
+ * página empieza en hoy y la flecha suma 7 días: el primero de esa semana nunca es de esta.
+ */
+export async function primerTurnoDeLaSemanaSiguiente(page: Page): Promise<string> {
+  const desde = Date.parse(`${desplazarFecha(hoyEnTZ('America/Merida'), { dias: 7 })}T00:00:00-06:00`)
+  await page.getByRole('button', { name: 'Semana siguiente' }).click()
+  const boton = page.locator('button[data-inicio]').first()
+  await expect.poll(async () => Date.parse((await boton.getAttribute('data-inicio')) ?? '') >= desde,
+    { message: 'la página no pasó a la semana siguiente' }).toBe(true)
+  const inicio = (await boton.getAttribute('data-inicio')) ?? ''
+  await boton.click()
+  return inicio
 }
 
 /** Los turnos libres de 7 días desde dentro de una semana (lejos de la anticipación mínima). */

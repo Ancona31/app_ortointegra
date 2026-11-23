@@ -3,7 +3,7 @@ import { sqlLocal, interruptorAgenda } from './ayudas'
 import { esperarCorreo } from './mailpit'
 import { limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import {
-  api, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turnosLibres, type Escenario,
+  api, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, primerTurnoDeLaSemanaSiguiente, reservar, turnosLibres, type Escenario,
 } from './reservaPublicaAyudas'
 
 /**
@@ -48,14 +48,14 @@ async function remitenteDe(id: string): Promise<{ nombre: string; direccion: str
   return { nombre: m.From?.Name ?? '', direccion: m.From?.Address ?? '' }
 }
 
-/** Del paso «Lugar» al de «Tus datos», con el primer turno libre. */
+/** Del paso «Lugar» al de «Tus datos», con el primer turno libre de la semana siguiente (AG-DT-256). */
 async function hastaTusDatos(page: Page, codigo: string): Promise<void> {
   await page.goto(`/reservar/${codigo}`)
   await page.locator(`input[name="consultorio"][value="${e.consultorioId}"]`).check()
   const tipo = page.locator(`input[name="tipo"][value="${e.tipoId}"]`)
   if (await tipo.count()) await tipo.check()
   await page.getByRole('button', { name: 'Elegir día y hora' }).click()
-  await page.locator('button[data-inicio]').first().click()
+  await primerTurnoDeLaSemanaSiguiente(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
 }
 

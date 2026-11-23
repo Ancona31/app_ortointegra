@@ -1,11 +1,12 @@
 import { test, expect } from '@playwright/test'
 import { resolve } from 'node:path'
 import { config } from 'dotenv'
-import { interruptorAgenda, irAAgenda, soloEscritorio, sqlLocal } from './ayudas'
+import { DIA_FUTURO_FIJO, interruptorAgenda, irAAgendaSiguiente, soloEscritorio, sqlLocal } from './ayudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
 import { aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { aprobarAviso, emitirEnlace, personaNueva, reservar, type Escenario, type Turno, api } from './reservaPublicaAyudas'
-import { hoyEnTZ, desplazarFecha } from '../src/lib/dates'
+import { hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante } from '../src/lib/dates'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * Tanda T2 · punto 11: un médico (Dr. Admin, dispositivo en Mérida) con un
@@ -80,7 +81,9 @@ test.beforeAll(() => {
   ;[paciente.id = '', paciente.email = ''] = p.split('|')
 })
 
-test.afterAll(() => {
+/** Las citas del consultorio de Tijuana y lo que cuelga de ellas (su auditoría se queda). */
+function borrarCitasDeTijuana(): void {
+  if (!e?.consultorioId) return
   sqlLocal(`
     begin;
     set local session_replication_role = replica;
@@ -88,11 +91,22 @@ test.afterAll(() => {
     delete from public.cita_correos where appointment_id in (select id from _a);
     delete from public.cita_confirmaciones where appointment_id in (select id from _a);
     delete from public.reserva_incidencias where appointment_id in (select id from _a);
+    delete from public.avisos_clinica where cita_id in (select id from _a);
     update public.reserva_enlaces set usado_en = null, usado_cita_id = null where usado_cita_id in (select id from _a);
     delete from public.appointments where id in (select id from _a);
+    commit;`, { k: e.consultorioId })
+}
+
+/* AG-DT-256 · la reserva y la cita del recordatorio son de MAÑANA (el recordatorio sólo sale dentro de
+   `recordatorio_horas`, 72 como mucho) y, de lunes a viernes, de la semana visible. Se borran al
+   terminar CADA prueba: al acabar ya no disparan la ventana y la guarda las perdona con la anotación. */
+test.afterEach(() => { borrarCitasDeTijuana() })
+
+test.afterAll(() => {
+  borrarCitasDeTijuana()
+  sqlLocal(`
     delete from public.consultorios where id = :'k';
-    delete from public.tipos_cita where id = :'t';
-    commit;`, { k: e.consultorioId, t: e.tipoId })
+    delete from public.tipos_cita where id = :'t';`, { k: e.consultorioId, t: e.tipoId })
   try { limpiarReservasE2e(desde) } finally { devolverEnlaces(aparcados) }
   if (paciente.id) sqlLocal(`update public.pacientes set email = nullif(:'e', '') where id = :'p'`, { e: paciente.email, p: paciente.id })
   sqlLocal(`update public.agenda_ajustes set recordatorio_horas = :'h'::int, recordatorio_encendido = false where clinica_id = :'c'`,
@@ -123,7 +137,7 @@ test('turnos del enlace en el consultorio de Tijuana: empiezan a las 09:00 de Ti
   expect(horaEn(turno.inicio, 'America/Merida')).toBe('11:00')
 })
 
-test('comprobante y recordatorio con la hora de Tijuana; la confirmación dice «09:30 h» del Pacífico', async ({ page }) => {
+test('comprobante y recordatorio con la hora de Tijuana; la confirmación dice «09:30 h» del Pacífico', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'reserva y cita de mañana; las borra el afterEach' } }, async ({ page }) => {
   const previosComprobante = await contarCorreos(persona.correo, 'Tu cita con')
   expect((await reservar(e, codigo, { inicio: turno.inicio, persona })).status).toBe(201)
   const comprobante = await esperarCorreo(persona.correo, 'Tu cita con', previosComprobante)
@@ -155,18 +169,19 @@ test('comprobante y recordatorio con la hora de Tijuana; la confirmación dice �
 })
 
 test('la agenda (dispositivo en Mérida) la dibuja a las 11:00 con la etiqueta «09:00 hora Baja California»', async ({ page }) => {
-  await irAAgenda(page)
-  const dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Merida' }).format(new Date(turno.inicio))
-  /* AG-DT-69 · el turno es MAÑANA (el de la reserva real del primer caso), que el
-     domingo cae en la semana siguiente. Este paso sólo corría en domingo y
-     pulsaba «Periodo siguiente», que es la flecha de la banda del TELÉFONO: en
-     escritorio (este archivo es `soloEscritorio`) la flecha es la nativa de
-     FullCalendar. No se fija el reloj del navegador: el día lo pone el turno,
-     que es del servidor, y llevarlo a mañana adelantaría el reloj (ver
-     `fijarDia` en `agenda-f-pulido.e2e.ts`). */
-  if (!(await page.locator(`.fc-timegrid-col[data-date="${dia}"]`).count())) {
-    await page.locator('.fc-next-button').click()
-  }
+  /* AG-DT-256 · antes dibujaba la reserva de MAÑANA de la prueba anterior, que ahora se borra al
+     terminar aquélla. Lo que se prueba aquí es el dibujo, no la reserva: una cita propia del consultorio
+     de Tijuana a las 09:00 de Tijuana del miércoles de la semana SIGUIENTE (11:00 en Mérida, el mismo
+     día), con paciente, como postgres. La fecha es fija: ni depende del día ni hace falta adivinar la
+     semana (antes, AG-DT-69). */
+  const dia = DIA_FUTURO_FIJO
+  sqlLocal(`
+    insert into public.appointments (clinica_id, paciente_id, medico_id, consultorio_id, title, start_time, end_time, status, all_day,
+                                     consultorio_timezone, consultorio_nombre, consultorio_direccion)
+    values (:'c', :'p', :'m', :'k', 'Cita husos T2 rejilla', :'i'::timestamptz, :'i'::timestamptz + interval '30 minutes', 'scheduled', false,
+            :'tz', :'n', 'Av. Revolución 1, Tijuana')`,
+  { c: e.clinicaId, p: paciente.id, m: e.medicoId, k: e.consultorioId, i: fechaHoraLocalAInstante(dia, '09:00', TIJUANA), tz: TIJUANA, n: NOMBRE })
+  await irAAgendaSiguiente(page)
   await expect(page.locator(`.fc-timegrid-col[data-date="${dia}"]`)).toHaveCount(1)
   const tarjeta = page.locator('.fc-timegrid-event', { hasText: '09:00 hora Baja California' })
   await expect(tarjeta).toBeVisible()

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { interruptorAgenda, sqlLocal } from './ayudas'
 import { contarCorreos, esperarCorreo } from './mailpit'
 import { marcaE2e, limpiarReservasE2e } from './reservaAyudas'
-import { aprobarAviso, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario } from './reservaPublicaAyudas'
+import { aprobarAviso, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, primerTurnoDeLaSemanaSiguiente, type Escenario } from './reservaPublicaAyudas'
 import { codigoDeEnlace, hashDeCodigo } from '../src/lib/reserva/secretos'
 
 /**
@@ -94,7 +94,8 @@ test('cuatro pasos, «Tipo de cita» con más de un tipo y la dirección complet
   await page.getByRole('button', { name: 'Elegir día y hora' }).click()
   await expect(pasoActual(page)).toHaveText('Día y hora')
   await expect(page.locator('[data-direccion]')).toHaveText(direccion)
-  await page.locator('button[data-inicio]').first().click()
+  // AG-DT-256: la reserva es por ligar; en la semana siguiente, nunca en la de hoy.
+  await primerTurnoDeLaSemanaSiguiente(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
   await expect(pasoActual(page)).toHaveText(/Tus datos/)
   await expect(page.locator('[data-direccion]')).toHaveText(direccion)

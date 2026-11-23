@@ -5,6 +5,7 @@ import {
 import { abrirAgendaV2, editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
 import { crearCitaPorLigar, limpiarReservasE2e, marcaE2e } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * Tanda J · agente J3. Puntos 6, 7, 8 y 12 de Angel, contra la base local:
@@ -50,6 +51,11 @@ test.afterEach(() => {
 })
 test.afterAll(() => { interruptorAgenda('A', false) })
 
+/* AG-DT-256 · «Próximas citas» lista las siguientes del médico: la por ligar tiene que ser de dentro de
+   minutos (`pronto`), no puede ir a la semana siguiente. El `afterEach` la borra (`limpiarReservasE2e`) antes de
+   que la prueba termine, así que al acabar ya no dispara la ventana: la guarda la perdona con esta anotación. */
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO, description: 'por ligar de dentro de minutos; la borra el afterEach' } }
+
 /** Dentro de `minutos`, redondeado al minuto: la primera de «Próximas citas» del Dr. Admin. */
 function pronto(minutos: number): string {
   return new Date(Math.ceil((Date.now() + minutos * 60_000) / 60_000) * 60_000).toISOString()
@@ -86,7 +92,7 @@ function registro(page: Page): Locator {
   return page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
 }
 
-test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta»; elegir un paciente liga y abre la nota', async ({ page, browser }) => {
+test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta»; elegir un paciente liga y abre la nota', A_PROPOSITO, async ({ page, browser }) => {
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Lucía Reserva J3')
   const c = crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })
@@ -214,7 +220,7 @@ async function clicsTrasDobleClic(page: Page, boton: Locator, tras: () => Promis
   return page.evaluate(() => (window as unknown as { __clicsJ3: number }).__clicsJ3)
 }
 
-test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador ni, al cancelar el alta, en la ventana', async ({ page }) => {
+test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador ni, al cancelar el alta, en la ventana', A_PROPOSITO, async ({ page }) => {
   interruptorAgenda('A', true)
   const nombre = tituloUnico('Elsa Escudo J3')
   crearCitaPorLigar({ correo: CORREO.adminA, inicio: pronto(3), minutos: 30, nombre, canal: 'unico' })

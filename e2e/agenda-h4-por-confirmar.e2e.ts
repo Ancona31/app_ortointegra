@@ -4,6 +4,7 @@ import { SESION, interruptorAgenda, soloEscritorio, sqlLocal, tituloUnico } from
 import { abrirAgendaV2 } from './interaccionesAyudas'
 import { ipAlAzar } from './reservaPublicaAyudas' // además carga .env.local (RESERVA_SECRETO)
 import { codigoDeConfirmacion, hashDeCodigo } from '../src/lib/reserva/secretos'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
 
 /**
  * H4 · «Por confirmar» (puntos 15 a 19 de Angel):
@@ -63,17 +64,32 @@ function citaDeManana(hora: string, titulo: string, tel: string | null, correo: 
   return { cita, paciente, titulo, codigo }
 }
 
-test.beforeAll(() => {
-  interruptorAgenda('A', true)
+/*
+ * AG-DT-256 · «Por confirmar» lista las agendadas de MAÑANA: estas citas no pueden ir a la semana
+ * siguiente. De lunes a viernes «mañana» es de la semana visible y la guarda las vería al final del
+ * domingo. Por eso cada prueba que las usa las crea al empezar (`sembrarFilas`) y el `afterEach` las
+ * borra antes de que termine: al acabar ya no disparan la ventana y la guarda las perdona con la
+ * anotación (`A_PROPOSITO`). Antes nacían en un `beforeAll` y vivían hasta el final del archivo
+ * (también en el proyecto `telefono`, donde las pruebas se saltan).
+ */
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO, description: 'citas de mañana; las borra el afterEach' } }
+
+function sembrarFilas(): void {
   filas.ambos = citaDeManana('07:00', tituloUnico('H4 Ambos'), '9990000091', 'h4.ambos@semilla.spinus.test')
   filas.tel = citaDeManana('07:15', tituloUnico('H4 Telefono'), '9990000092', null)
   filas.correo = citaDeManana('07:30', tituloUnico('H4 Correo'), null, 'h4.correo@semilla.spinus.test')
   filas.ninguno = citaDeManana('07:45', tituloUnico('H4 Ninguno'), null, null)
-})
+}
 
-test.afterAll(() => {
+test.beforeAll(() => { interruptorAgenda('A', true) })
+
+test.afterEach(() => {
   const citas = [...Object.values(filas).map(f => f.cita), ...extras].filter(Boolean)
   const pacientes = [...Object.values(filas).map(f => f.paciente), ...pacientesExtra].filter(Boolean)
+  for (const f of Object.values(filas)) Object.assign(f, { cita: '', paciente: '', titulo: '', codigo: '' })
+  extras.length = 0
+  pacientesExtra.length = 0
+  if (citas.length === 0 && pacientes.length === 0) return
   sqlLocal(`
     begin;
     set local session_replication_role = replica;
@@ -84,7 +100,10 @@ test.afterAll(() => {
     delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);
     delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
-    commit;`, { citas: citas.join(','), pacientes: pacientes.join(',') })
+    commit;`, { citas: citas.join(',') || '00000000-0000-0000-0000-000000000000', pacientes: pacientes.join(',') })
+})
+
+test.afterAll(() => {
   interruptorAgenda('A', false) // como el resto de las e2e: quien lo enciende, lo apaga (global-setup)
 })
 
@@ -108,7 +127,8 @@ function contarJoins(page: Page): () => number {
   return () => n
 }
 
-test('15-17: sólo agendadas de mañana; la leyenda; cada fila con sus medios; sin ninguno, «Marcar como confirmada»', async ({ page }) => {
+test('15-17: sólo agendadas de mañana; la leyenda; cada fila con sus medios; sin ninguno, «Marcar como confirmada»', A_PROPOSITO, async ({ page }) => {
+  sembrarFilas()
   await abrirAgendaV2(page)
   await abrirPanel(page)
   await expect(panel(page).getByText('Estos pacientes están pendientes de confirmar su cita. Envía un recordatorio.', { exact: true })).toBeVisible()
@@ -135,7 +155,8 @@ test('15-17: sólo agendadas de mañana; la leyenda; cada fila con sus medios; s
   await expect(fila(page, filas.correo).locator('[data-estado-fila]')).toHaveText(/^Correo enviado \d\d:\d\d$/)
 })
 
-test('18: «Marcar como confirmada» la saca al instante, sin cerrar el menú, por el PUT de «Confirmar» (firma y auditoría)', async ({ page }) => {
+test('18: «Marcar como confirmada» la saca al instante, sin cerrar el menú, por el PUT de «Confirmar» (firma y auditoría)', A_PROPOSITO, async ({ page }) => {
+  sembrarFilas()
   await abrirAgendaV2(page)
   await abrirPanel(page)
   const auditAntes = Number(sqlLocal(`select count(*) from public.audit_log where registro_id = :'id'`, { id: filas.ninguno.cita }))
@@ -151,7 +172,8 @@ test('18: «Marcar como confirmada» la saca al instante, sin cerrar el menú, p
     .toBeGreaterThan(auditAntes)
 })
 
-test('18: el paciente confirma por /confirmar en otra pestaña y la fila sale sin cerrar el menú; un solo join y sin peticiones en reposo', async ({ page, browser }) => {
+test('18: el paciente confirma por /confirmar en otra pestaña y la fila sale sin cerrar el menú; un solo join y sin peticiones en reposo', A_PROPOSITO, async ({ page, browser }) => {
+  sembrarFilas()
   const joins = contarJoins(page)
   let gets = 0
   page.on('request', r => { if (r.url().includes('/api/agenda/por-confirmar')) gets += 1 })
@@ -180,7 +202,8 @@ test('18: el paciente confirma por /confirmar en otra pestaña y la fila sale si
   expect(joins()).toBe(1)
 })
 
-test('18 y 19: cancelar (el paciente y el personal) la saca; una cita nueva para mañana entra; el contador rojo de canceladas', async ({ page, browser }) => {
+test('18 y 19: cancelar (el paciente y el personal) la saca; una cita nueva para mañana entra; el contador rojo de canceladas', A_PROPOSITO, async ({ page, browser }) => {
+  sembrarFilas()
   await abrirAgendaV2(page)
   await abrirPanel(page)
   const paciente = await browser.newContext({ extraHTTPHeaders: { 'x-forwarded-for': ipAlAzar() } })

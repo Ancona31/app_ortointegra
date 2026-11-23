@@ -1,6 +1,9 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
-import { interruptorAgenda, sqlLocal, soloEscritorio } from './ayudas'
+import { DIA_FUTURO_LIBRE, interruptorAgenda, sqlLocal, soloEscritorio } from './ayudas'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
+import { limpiarReservasE2e, marcaE2e } from './reservaAyudas'
+import { fechaHoraLocalAInstante } from '../src/lib/dates'
 import { contarCorreos, esperarCorreo, type CorreoCapturado } from './mailpit'
 import {
   api, cerrarEscenario, citaDe, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, reservar, turnosLibres, verificarCorreo,
@@ -49,6 +52,14 @@ test.afterAll(() => {
   borrarCitasDelPersonal()
   cerrarEscenario()
 })
+/* AG-DT-256 · las citas del personal se borran al terminar CADA prueba, no al final del archivo: la
+   carrera a T−1h y la cita «pasada» tienen que ser de dentro de una hora y de hace dos horas (es lo que
+   prueban), y de lunes a viernes son de la semana visible. Al acabar la prueba ya no están y la guarda
+   las perdona con la anotación (`A_PROPOSITO`). Las que no necesitan una hora concreta, a la semana
+   siguiente (`EN_LA_SEMANA_SIGUIENTE`). */
+test.afterEach(() => { borrarCitasDelPersonal() })
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO, description: 'cita de dentro de horas; se borra al terminar la prueba' } }
+const EN_LA_SEMANA_SIGUIENTE = fechaHoraLocalAInstante(DIA_FUTURO_LIBRE, '10:00', 'America/Merida')
 
 /**
  * Las citas «del personal» que siembra este archivo llevan un paciente de la
@@ -213,7 +224,7 @@ test('no podré asistir: dos pasos (el segundo GET no escribe), la cita se cance
   expect(estado(citaId)).toBe('cancelled|cancelo')
 })
 
-test('la carrera a T−1h: la página ofrecía cancelar, el POST llega tarde y no cancela; confirmar todavía vale', async ({ page }) => {
+test('la carrera a T−1h: la página ofrecía cancelar, el POST llega tarde y no cancela; confirmar todavía vale', A_PROPOSITO, async ({ page }) => {
   // 20 s de colchón para sembrar, abrir y pintar la página; luego se espera a pasar el corte.
   const corte = Date.now() + 20_000
   const inicio = new Date(corte + 60 * 60 * 1000).toISOString()
@@ -232,7 +243,7 @@ test('la carrera a T−1h: la página ofrecía cancelar, el POST llega tarde y n
   expect(estado(citaId)).toBe('confirmed|confirmo')
 })
 
-test('enlace caducado (cita pasada) o revocado: «ya pasó» sin botones; revocado, 404 en la página y en el POST', async ({ page }) => {
+test('enlace caducado (cita pasada) o revocado: «ya pasó» sin botones; revocado, 404 en la página y en el POST', A_PROPOSITO, async ({ page }) => {
   const pasada = citaDelPersonal(new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
   await page.goto(`/confirmar/${pasada.codigo}`)
   await expect(page.getByText('Esta cita ya pasó.')).toBeVisible()
@@ -240,7 +251,7 @@ test('enlace caducado (cita pasada) o revocado: «ya pasó» sin botones; revoca
   expect((await responder(pasada.codigo, 'confirmar')).destino).toContain('?r=pasada')
   expect(estado(pasada.citaId)).toBe('scheduled|-')
 
-  const viva = citaDelPersonal(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString())
+  const viva = citaDelPersonal(EN_LA_SEMANA_SIGUIENTE)
   sqlLocal(`update public.cita_confirmaciones set revocado_en = now() where appointment_id = :'id';`, { id: viva.citaId })
   const r = await page.goto(`/confirmar/${viva.codigo}`)
   expect(r?.status()).toBe(404)
@@ -251,7 +262,7 @@ test('enlace caducado (cita pasada) o revocado: «ya pasó» sin botones; revoca
 })
 
 test('clínica suspendida: no disponible (404 en la página y en el POST) y la cita no cambia; al levantarla, vuelve', async ({ page }) => {
-  const { citaId, codigo } = citaDelPersonal(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString())
+  const { citaId, codigo } = citaDelPersonal(EN_LA_SEMANA_SIGUIENTE)
   sqlLocal(`update public.clinicas set suspendida = true where id = :'c';`, { c: e.clinicaId })
   try {
     expect((await page.goto(`/confirmar/${codigo}`))?.status()).toBe(404)
@@ -324,9 +335,12 @@ test('reagendar desde «no podré asistir» con el enlace fijo, hasta el tope de
   expect({ status: tope.status, error: tope.error }).toEqual({ status: 403, error: 'tope_reagendados' })
 })
 
-test('lista A 4: una reserva dentro de la ventana recibe UN correo (el comprobante); la tarea de recordatorios, después, no manda otro', async () => {
+/* AG-DT-256 · la reserva tiene que caer dentro de la ventana del recordatorio (72 h como mucho): se borra al
+   terminar la prueba (`limpiarReservasE2e` con la marca de ESTA prueba), y la guarda la perdona. */
+test('lista A 4: una reserva dentro de la ventana recibe UN correo (el comprobante); la tarea de recordatorios, después, no manda otro', A_PROPOSITO, async () => {
   const cron = process.env.CRON_SECRET ?? ''
   test.skip(cron === '', 'Falta CRON_SECRET (sólo de prueba) en .env.local')
+  const marca = marcaE2e()
   // Ventana de 72 h para tener turnos dentro sin depender del día de la semana; se restablece al terminar.
   // Tanda H (H2): el recordatorio encendido, o la prueba pasaría sin probar nada (apagado no sale ninguno).
   sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 72, recordatorio_encendido = true where clinica_id = :'c';`, { c: e.clinicaId })
@@ -357,5 +371,6 @@ test('lista A 4: una reserva dentro de la ventana recibe UN correo (el comproban
     expect(sqlLocal(`select count(*) from public.cita_correos where appointment_id = :'id' and tipo = 'recordatorio';`, { id: citaId })).toBe('0')
   } finally {
     sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 24, recordatorio_encendido = false where clinica_id = :'c';`, { c: e.clinicaId })
+    limpiarReservasE2e(marca)
   }
 })

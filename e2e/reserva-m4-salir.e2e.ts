@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { soloEscritorio, sqlLocal } from './ayudas'
 import { marcaE2e, limpiarReservasE2e } from './reservaAyudas'
-import { baseUrlPublica, cerrarEscenario, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, type Escenario } from './reservaPublicaAyudas'
+import { baseUrlPublica, cerrarEscenario, emitirEnlace, ipAlAzar, personaNueva, prepararEscenario, primerTurnoDeLaSemanaSiguiente, type Escenario } from './reservaPublicaAyudas'
 
 /**
  * Tanda M (punto 8 de Angel): «Salir» en «Tu cita quedó agendada». Cierra la pestaña; si el navegador no
@@ -32,7 +32,8 @@ async function reservarHastaListo(p: Page): Promise<void> {
   const tipo = p.locator(`input[name="tipo"][value="${e.tipoId}"]`)
   if (await tipo.count()) await tipo.check()
   await p.getByRole('button', { name: 'Elegir día y hora' }).click()
-  await p.locator('button[data-inicio]').first().click()
+  // AG-DT-256: la reserva es por ligar; en la semana siguiente, nunca en la de hoy.
+  await primerTurnoDeLaSemanaSiguiente(p)
   await p.getByRole('button', { name: 'Continuar' }).click()
   await p.getByLabel('Nombre completo').fill(persona.nombre)
   await p.getByLabel('Teléfono (10 dígitos)').fill(persona.telefono)
