@@ -5,7 +5,6 @@ import {
   ChevronDown, Calendar, FilePlus2, Mail, Pill, UserPlus, MonitorCheck,
   RotateCcw, ExternalLink, type LucideIcon,
 } from 'lucide-react'
-import DiagnosticoFormato from './DiagnosticoFormato'
 
 /* ── FAQ ──
    ⚠️ ESTA FAQ Y LA PÚBLICA (`components/landing/faq-contenido.ts`) HABLAN DEL
@@ -312,9 +311,6 @@ export default function AyudaPage() {
           <Soporte />
         </div>
       </div>
-
-      {/* TEMPORAL — se retira en B15: diagnóstico del formato para el Duo real. */}
-      <DiagnosticoFormato />
     </div>
   )
 }

@@ -23,8 +23,9 @@
  * declarada en vertical (`screen.width < screen.height`, como la da iOS): así
  * una computadora (pantalla apaisada) con la ventana estrecha no la activa.
  * ⚠️ ASUMIENDO QUE `screen.width/height` del Duo dan el tamaño TOTAL (466×678
- * cerrado, 669×951 abierto). NO VERIFICADO en el aparato: lo dirá la línea de
- * diagnóstico de `/ayuda` (TEMPORAL, se retira en B15).
+ * cerrado, 669×951 abierto). NO VERIFICADO en el aparato: la línea de
+ * diagnóstico que lo iba a medir al pie de `/ayuda` se retiró en la limpieza
+ * final (B15) sin lectura del aparato; sigue siendo un riesgo abierto.
  *
  * QUIÉN LO ESCRIBE: la sonda `SCRIPT_SONDA_FORMATO`, que `ScriptTema.tsx` corre
  * ANTES DEL PRIMER PINTADO y que deja en <html> `data-formato` y
