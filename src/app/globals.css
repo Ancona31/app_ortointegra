@@ -2281,6 +2281,9 @@ main > div:has(.agenda-fc) .agenda-raiz {
   background: var(--nav-avatar); color: var(--navy); font-size: 13px; font-weight: 600;
 }
 .nav-avatar[data-activa="true"] { box-shadow: 0 0 0 2px var(--navy), 0 0 0 4px #fff; }
+/* Se ve de 40 en el teléfono; se toca en 44 (auditoría H9). */
+a.nav-avatar { position: relative; }
+a.nav-avatar::after { content: ''; position: absolute; inset: -2px; border-radius: 999px; }
 @media (min-width: 600px) {
   .nav-titulo, .nav-ic-tel { display: none; }
   .nav-ic-iv { display: block; }
@@ -2396,6 +2399,9 @@ html.dark .nav-riel-accion { color: var(--enlace); }
   white-space: nowrap;
 }
 a.nav-plan:hover { color: #fff; }
+/* La píldora mide 26; el área de toque, la del formato (auditoría H9). */
+a.nav-plan { position: relative; }
+a.nav-plan::after { content: ''; position: absolute; inset: calc((var(--k-toque) - 26px) / -2) 0; }
 .nav-icono {
   flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
   border-radius: 999px; color: var(--nav-tinta);
@@ -2514,10 +2520,16 @@ button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
 [data-formato="ih"] .nav-barra-medio { gap: 6px; }
 [data-formato="ih"] .nav-barra-enlace { min-height: 38px; }
 [data-formato="ih"] .nav-barra-aviso { margin-inline: -8px; }
+/* …y el contenedor que desplaza se ensancha lo mismo, o la tarjeta (208) no
+   cabía en sus 192: desplazamiento lateral de 8 y el borde derecho cortado
+   (auditoría H3). */
+[data-formato="ih"] .nav-barra-medio { margin-inline: -8px; padding-inline: 8px; }
 [data-formato="ih"] .nav-aviso-cabeza { min-height: 36px; gap: 8px; padding: 6px 10px; }
 [data-formato="ih"] .nav-aviso-titulo { font-size: 14px; line-height: 18px; }
 [data-formato="ih"] .nav-aviso-cuerpo { margin-inline: 10px; padding: 2px 0 8px; }
 [data-formato="ih"] .nav-aviso-fila { padding-block: 9px; }
+/* En `esc`, el mismo mínimo de 36 que en `ih` (auditoría H9; antes 33). */
+[data-formato="esc"] .nav-aviso-fila { padding-block: 9px; }
 [data-formato="ih"] .nav-aviso-boton { min-height: 36px; margin-top: 4px; }
 [data-formato="ih"] .nav-pie { gap: 2px; padding-top: 8px; }
 [data-formato="ih"] .nav-icono--barra { width: 36px; height: 36px; }
