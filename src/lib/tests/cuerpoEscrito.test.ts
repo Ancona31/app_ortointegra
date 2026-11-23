@@ -66,7 +66,7 @@ describe('las tres marcas que la barra ofrece', () => {
   /**
    * El subrayado es la marca que NO competía con nada, y por eso se prueba
    * combinada: `textDecoration` no es familia, así que se acumula con las otras
-   * dos. Negrita + cursiva sí compiten —no hay 500 itálica registrada— pero esa
+   * dos. Negrita + cursiva piden su propia cara —la 700 itálica, registrada— pero esa
    * decisión la toma el formato al componer, no el conversor: aquí llegan las dos.
    */
   it('las marcas se acumulan en el mismo tramo', () => {

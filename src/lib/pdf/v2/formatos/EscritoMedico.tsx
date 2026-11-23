@@ -31,11 +31,12 @@
  *    llevaría NI folio —no existe— ni fecha, y su línea inferior sólo diría el nombre del
  *    paciente. Antes ese papel lo ataba la celda de `EMISIÓN`, que es la que se retira.
  *
- * ⚠ **ES EL ÚNICO FORMATO QUE CARGA LA ITÁLICA, Y NO HAY ITÁLICA DE PESO 500.** Un
- * tramo con negrita **y** cursiva a la vez pediría `IBM Plex Sans 500 italic`, que no
- * está registrada; react-pdf compondría la redonda **sin lanzar nada**. Se resuelve
- * aquí y de forma declarada: **gana la cursiva** —400 itálica—, porque una cursiva
- * perdida cambia el sentido de una cita textual y medio punto de peso no. Reportado.
+ * ⚠ **ES EL ÚNICO FORMATO QUE CARGA LA ITÁLICA Y LA NEGRITA 700 DE LA HUMANISTA.** La
+ * negrita del cuerpo se compone en **700** (`IBM Plex Sans Bold`) y negrita + cursiva en
+ * **700 itálica**; las dos caras están registradas en `fonts.ts` sólo para este formato
+ * (2026-11-23). Antes la negrita iba en 500 y, sin 500 itálica, la combinación cedía el
+ * peso a la cursiva. Si alguien quita una de esas dos caras, react-pdf compone la más
+ * cercana **sin lanzar nada**: la negrita volvería a salir tenue en silencio.
  *
  * ⚠ **LA SEGUNDA EXCEPCIÓN DECLARADA A I.3.2** (prohibición del justificado) vive en
  * este archivo: el médico elige la alineación en la barra del editor y perderla por el
@@ -73,7 +74,7 @@ const PRESENCIA = { encabezado1: 50, encabezado2: 46 } as const
 
 export interface TramoTexto {
   readonly texto: string
-  /** `<strong>` del editor. Peso 500, no 600: 600 es del chasis, no del cuerpo. */
+  /** `<strong>` del editor. Peso 700 (IBM Plex Sans Bold), como la negrita del editor. */
   readonly negrita?: boolean
   /** `<em>` del editor. 400 itálica. */
   readonly cursiva?: boolean
@@ -246,10 +247,10 @@ const estilos = StyleSheet.create({
 function estiloTramo(tramo: TramoTexto): Style {
   const cursiva = tramo.cursiva === true
   return {
-    // Gana la cursiva: sin cara 500 itálica, la negrita cede el peso y no el sentido.
+    // Negrita 700 y cursiva se acumulan: las dos caras (700 y 700 itálica) están registradas.
     fontFamily: FUENTE.humanista,
     fontStyle: cursiva ? 'italic' : 'normal',
-    fontWeight: cursiva ? 400 : tramo.negrita === true ? 500 : 400,
+    fontWeight: tramo.negrita === true ? 700 : 400,
     ...(tramo.subrayado === true ? { textDecoration: 'underline' } : {}),
   }
 }

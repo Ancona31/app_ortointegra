@@ -64,6 +64,9 @@ function registrarFuentesDeDisco(): void {
       { src: ruta('IBMPlexSans-Medium.ttf'), fontWeight: 500 },
       // La única itálica del sistema, y la carga este formato. Ver `fonts.ts`.
       { src: ruta('IBMPlexSans-Italic.ttf'), fontWeight: 400, fontStyle: 'italic' },
+      // La negrita del cuerpo: 700 y 700 itálica, sólo para este formato. Ver `fonts.ts`.
+      { src: ruta('IBMPlexSans-Bold.ttf'), fontWeight: 700 },
+      { src: ruta('IBMPlexSans-BoldItalic.ttf'), fontWeight: 700, fontStyle: 'italic' },
     ],
   })
 }
@@ -872,6 +875,25 @@ describe('II.8 · Escrito Médico', () => {
       expect(marcado[0].trazos).toBe(plano[0].trazos + 1)
     }, 200_000)
 
+    /**
+     * La negrita del cuerpo es la cara 700 de la humanista, no la Medium (500), y con
+     * cursiva es la 700 itálica. Se lee el nombre de la fuente incrustada: si falta una
+     * de las dos caras, react-pdf compone la más cercana sin lanzar nada y esto lo ve.
+     */
+    it('la negrita sale en IBM Plex Sans Bold, y con cursiva en Bold Italic', async () => {
+      const crudo = (await renderToBuffer(h<DocumentProps>(Document, {}, h(EscritoMedico, {
+        ...BASE,
+        cuerpo: [{
+          tipo: 'parrafo',
+          tramos: [{ texto: 'fuerte ', negrita: true }, { texto: 'ambas', negrita: true, cursiva: true }],
+        }],
+      })))).toString('latin1')
+      const fuentes = [...crudo.matchAll(/\/BaseFont \/[A-Z]{6}\+([\w-]+)/g)].map((m) => m[1])
+      expect(fuentes).toContain('IBMPlexSans-Bold')
+      expect(fuentes).toContain('IBMPlexSans-BoldItalic')
+      expect(fuentes).not.toContain('IBMPlexSans-Medium')
+    }, 200_000)
+
     it('el subrayado se acumula con negrita y cursiva sin pedir una cara nueva', async () => {
       const hojas = await componer({
         ...BASE,
@@ -885,8 +907,8 @@ describe('II.8 · Escrito Médico', () => {
         cuerpo: [{ tipo: 'parrafo', tramos: [{ texto: SUBRAYADO, negrita: true, cursiva: true }] }],
       })
 
-      // El texto sale entero y la línea se dibuja igual: la decoración no compite con la
-      // familia, que es lo que sí ocurre entre negrita y cursiva.
+      // El texto sale entero y la línea se dibuja igual: la decoración no es familia,
+      // así que no pide una cara nueva (negrita + cursiva sí piden la 700 itálica).
       expect(hojas[0].texto).toContain(SUBRAYADO)
       expect(hojas[0].trazos).toBe(plano[0].trazos + 1)
     }, 200_000)

@@ -4,7 +4,7 @@
  * ANDAMIAJE INERTE (Paso 0.a). Nadie importa este módulo todavía.
  *
  * PROCEDENCIA DE LOS TTF
- * Los cinco archivos en `public/fonts/` se obtuvieron de la API de CSS de
+ * Los archivos de Archivo e IBM Plex Sans en `public/fonts/` se obtuvieron de la API de CSS de
  * Google Fonts, que sirve los binarios desde `fonts.gstatic.com`. Esas URLs
  * incluyen un hash de versión y CADUCAN en cuanto Google publica una revisión
  * de la fuente: no sirven como referencia estable. Si algún día hay que
@@ -91,10 +91,15 @@ export function registrarFuentesV2(): void {
    * la API de Google Fonts y leer la URL vigente de `fonts.gstatic.com`— y queda versionado
    * en el repo como los otros cinco.
    *
-   * ⚠ **NO HAY ITÁLICA DE PESO 500.** La negrita de este formato se compone en 500 y la
-   * cursiva en 400; una cursiva DENTRO de una negrita pediría 500 itálica, que no está
-   * registrada. Ver `TRAMO` en el formato: la combinación se resuelve allí y queda
-   * reportada.
+   * LA NEGRITA DEL CUERPO ES 700 (2026-11-23, autorizado por el dueño). Antes se componía
+   * en 500 —la Medium, que es del sistema— y en papel apenas se distinguía de la redonda.
+   * `IBMPlexSans-Bold.ttf` (700) y `IBMPlexSans-BoldItalic.ttf` (700 itálica) se obtuvieron
+   * por el mismo procedimiento —API de CSS de Google Fonts, `fonts.gstatic.com`, IBM Plex
+   * Sans v23, versión 3.201, SIL Open Font License 1.1—; los tres archivos de antes salen de
+   * esa misma petición byte a byte. **Sólo los pide el Escrito Médico** (`estiloTramo`):
+   * ningún rol de `tokens.ts` pide 700 en la humanista, y `FUENTE_PESOS` no lo anuncia a
+   * propósito para que ningún otro formato empiece a usarlo sin decidirlo. Con la
+   * 700 itálica, negrita + cursiva ya no compiten: se componen las dos.
    */
   Font.register({
     family: 'IBM Plex Sans',
@@ -102,6 +107,8 @@ export function registrarFuentesV2(): void {
       { src: '/fonts/IBMPlexSans-Regular.ttf', fontWeight: 400 },
       { src: '/fonts/IBMPlexSans-Medium.ttf', fontWeight: 500 },
       { src: '/fonts/IBMPlexSans-Italic.ttf', fontWeight: 400, fontStyle: 'italic' },
+      { src: '/fonts/IBMPlexSans-Bold.ttf', fontWeight: 700 },
+      { src: '/fonts/IBMPlexSans-BoldItalic.ttf', fontWeight: 700, fontStyle: 'italic' },
     ],
   })
 }
