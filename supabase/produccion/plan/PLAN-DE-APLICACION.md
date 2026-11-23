@@ -1443,9 +1443,15 @@ ordenarlas):
    });
    ```
 
-   **Pendiente de probar en un navegador real; lo prueba el agente del ensayo
-   principal.** (Sólo se comprobó su sintaxis con `node --check`; si da error,
-   basta con los números del punto 3.)
+   **Probado [C-E1, 2026-11-23]** en Chromium sobre la agenda local con sesión,
+   pegado tal cual: funciona y da cifras coherentes (detalle:
+   `../ensayo/ENSAYO-PRINCIPAL.md` §5.6). Dos avisos: **«load» (= «Carga»)
+   llega ANTES de que se pinten las citas** (≈145 ms frente a ≈315 ms en local);
+   el **LCP** sí coincide con la aparición de la agenda. Y con la v2 «fin de la
+   última de /api y /rest» sube (≈220 → ≈390 ms) por dos peticiones que salen
+   DESPUÉS del pintado (`por-confirmar`, `google/sync`), sin que la agenda tarde
+   más. **Decisión pendiente de Angel:** si la cifra que decide (abajo) pasa de
+   «Carga» al LCP.
    El «primer byte» incluye el servidor: la página trae las citas de la semana
    ya en el HTML. «Fin de la última de /api y /rest» es lo más cerca de «la
    agenda terminó de cargar sus datos».

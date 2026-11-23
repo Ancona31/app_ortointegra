@@ -222,29 +222,143 @@ Reintentos guardados en `bateria-20261123/reintentos/<archivo>-<n>/` (salida y
   pregunta HOY (no las del peor domingo). No lo toqué (no es de este encargo).
   La cita de la prueba se borró al terminar y la v2 quedó apagada en A y B.
 
-## 5.6 — Rendimiento: NO HECHO
+## 5.6 — Rendimiento [C]
 
-Preparado y probado, pero **sin ninguna cifra**: la corrida de medición se
-lanzó y se paró en el primer cambio de base, antes de la primera muestra, porque
-el agente tuvo que entregar su informe. No hay tabla, ni comparación con `main`,
-ni prueba del fragmento de la consola del plan §15.
+### Lo que sale PEOR que `main` (mediana de 20 muestras; «ruido» = las medianas por ronda se solapan)
 
-Lo que queda listo en `~/spinus-fusion/ensayo-e1/perf/` (fuera del repo):
-- `rondas-e1.sh`: el método de `e2e/resultados/linea-base-equipo-nuevo/rondas.sh`
-  (`medir-carga.e2e.ts` + `peso-js.cjs` + `guardar.cjs`, 4 rondas, mediana) con
-  tres configuraciones, un servidor cada vez en 3001: `main` sobre la base de 5 +
-  deriva (bloques A y C), y `main`, rama apagada y rama encendida sobre la de 14,
-  intercaladas (bloque B). Termina en la base de 5: al acabar, volver a
-  `base.sh 14` y sembrar.
-- `base.sh 5|14`, `medicion.config.ts`, `medicion-v2.config.ts` +
-  `global-setup-v2.ts` (enciende la v2 en A tras la siembra), `guardar.cjs`
-  tolerante a la base de 5 y `mover-cancelar.cjs` (PUT de mover y de cancelar con
-  la sesión del navegador; probado: 200/200, 55–68 ms en la rama).
-- El build de `main` salió bien (`16-build-main.txt`, 1 min 44 s, 6,3 GB de pico);
-  el worktree de `main` se borró al cerrar: hay que recrearlo.
+Contra `main` sobre la base de hoy (5 + deriva):
 
-## Estado al cerrar
+| Métrica | `main` | rama apagada | rama encendida | ¿Ruido? |
+|---|---|---|---|---|
+| JS al primer evento | 472 KiB, 25 chunks | **547 KiB (+16 %), 34 chunks** | **528 KiB (+12 %), 30 chunks** | no: es fijo |
+| JS en reposo | 472 KiB | **547 KiB (+16 %)** | **587 KiB (+25 %)** (campana y engrane, J1) | no: es fijo |
+| Guardar: clic → modal cerrado | 42 ms | 14 ms | **184 ms** | no (es la salida animada del modal, sólo con la v2, CLAUDE.md tanda K: la tarjeta ya está pintada a los 72 ms, igual que en `main`) |
+| Cancelar: PUT | 49 ms | **58 ms (+18 %)** | 50 ms | apagada NO se solapa (medianas por ronda 48–50 frente a 51–68); +9 ms de servidor |
+| Guardar: POST | 70 ms | 80 ms (+14 %) | 82 ms (+16 %) | sí, cabe en el ruido |
+| Mover: PUT | 61 ms | 66 ms (+8 %) | 66 ms (+7 %) | sí |
+| Guardar: clic → tarjeta pintada | 73 ms | 75 ms | 72 ms | sí |
 
-Base local: 14 migraciones (rehecha con `base.sh 14`: 5 + deriva + las 9 con
-`aplicar.sh`), sembrada (365 citas), v2 apagada en A y B. Ningún servidor en
-3000–3009. Worktree de `main` borrado (con su `.env.local` y `.next`).
+Nada de lo que el usuario espera al ABRIR o NAVEGAR la agenda sale peor: la rama
+abre y navega más rápido en las dos posiciones del interruptor (tabla de abajo).
+El peso de JS es mayor y la rama lo compensa (abre 50–60 ms antes en frío y
+~150 ms antes con red limitada). Los PUT/POST son 5–10 ms más lentos en mediana
+(la rama hace más comprobaciones en el servidor: empalmes, bloqueos, nota
+ligada); sólo «cancelar» con la v2 apagada sale fuera del ruido.
+
+### Montaje
+
+- **Método:** el de la tanda del equipo nuevo
+  (`e2e/resultados/linea-base-equipo-nuevo/rondas.sh`): `e2e/medir-carga.e2e.ts`
+  (5 repeticiones de cada medida, contexto nuevo = caché vacía), `peso-js.cjs` y
+  `guardar.cjs` (5 cada uno), más `mover-cancelar.cjs` (nuevo: el MISMO PUT que
+  mandan el arrastre —`start_time`/`end_time`— y «Cancelar» —`status`— en las
+  dos versiones, desde el navegador con la sesión; 5). **4 rondas → 20 muestras
+  por celda**; en cada celda: mediana [mín–máx] y el rango de las 4 medianas por
+  ronda. Admin A, Chromium de Playwright, 1440×900, `es-MX`, `America/Merida`.
+  Red limitada: 60 ms de latencia y 10 Mbps por CDP (el perfil del método).
+- **Cambio en el método** (copia fuera del repo, `perf/e2e-copia/`): en `main` la
+  medida «salto tras precarga» lanza (no tiene la precarga en ocioso, A1.5b) y
+  tiraba la medición entera; la copia la anota «no aplica». Nada más cambia.
+  `guardar.cjs` mira `agenda_bloqueos` sólo si existe.
+- **Código y base de cada configuración**, un servidor `next start` cada vez en
+  3001 (nunca dos), cada uno con su build (`main` en un worktree fuera del repo,
+  `95cb5781`; la rama en `b2993fe1`+docs):
+  - `main` · base 5 (5 de `main` + deriva): rondas 1–2 al principio y 3–4 al
+    final (bloques A y C, `base.sh 5`).
+  - `main` · base 14, rama apagada · base 14, rama encendida · base 14:
+    intercaladas en cada ronda, con el orden rotado (bloque B, `base.sh 14`).
+- **Datos:** cada medición resiembra (su `globalSetup`): **348 citas en la
+  Clínica A en las dos bases** (comprobado en cada medición:
+  `crudos/v2-*.txt`), la misma semilla calculada desde hoy. La v2: `true` en las
+  4 de «encendida», sin fila en las demás.
+- **«En frío»:** servidor recién arrancado antes de cada configuración y
+  calentado igual (`/login` hasta 200, más el `globalSetup`, que abre sesión con
+  los 4 usuarios), caché del navegador vacía en cada muestra.
+- **Limitaciones:** el servidor y Supabase están en la misma máquina (sin la
+  latencia servidor↔base de producción); la red limitada sólo frena
+  navegador↔servidor. «Guardar» mide un evento sin paciente por el formulario;
+  «mover» y «cancelar» miden la petición, no el gesto (la tarjeta se pinta de
+  forma optimista en las dos versiones). Las validaciones contra Auth se
+  cuentan en el registro del contenedor de Auth durante la apertura.
+
+### La tabla
+
+| Métrica | main · base 5 | main · base 14 | rama v2 apagada · base 14 | rama v2 encendida · base 14 |
+|---|---|---|---|---|
+| Abrir la agenda en frío (ms al 1er evento) | 452 [434–585] r:446–457 n=20 | 450 [437–493] r:442–457 n=20 | 391 [378–429] r:386–398 n=20 | 400 [391–415] r:398–409 n=20 |
+| Abrir con red limitada 60 ms/10 Mbps (ms) | 999 [992–1499] r:998–1002 n=20 | 1506 [1000–1518] r:1505–1510 n=20 | 844 [837–854] r:841–846 n=20 | 852 [842–857] r:850–853 n=20 |
+| Semana siguiente (ms) | 150 [131–165] r:144–152 n=20 | 148 [131–161] r:142–157 n=20 | 91 [75–103] r:86–94 n=20 | 91 [80–99] r:89–92 n=20 |
+| Semana anterior (ms) | 150 [133–164] r:142–153 n=20 | 140 [131–160] r:135–150 n=20 | 86 [76–104] r:82–92 n=20 | 88 [77–93] r:87–90 n=20 |
+| Volver del dashboard (ms) | 224 [220–242] r:223–234 n=20 | 225 [221–238] r:224–225 n=20 | 114 [93–134] r:104–117 n=20 | 121 [93–131] r:121–123 n=20 |
+| Volver a una semana ya vista (ms) | 134 [129–153] r:132–136 n=20 | 132 [128–148] r:131–134 n=20 | 77 [64–82] r:67–79 n=20 | 74 [63–86] r:65–81 n=20 |
+| Salto tras precarga W+1→W+2 (ms) | no aplica | no aplica | 78 [68–81] r:75–79 n=20 | 80 [68–93] r:77–85 n=20 |
+| Bloqueantes al volver del dashboard | 1 [1–1] r:1–1 n=20 | 1 [1–1] r:1–1 n=20 | 0 [0–0] r:0–0 n=20 | 0 [0–0] r:0–0 n=20 |
+| Bloqueantes en semana ya vista | 1 [1–1] r:1–1 n=20 | 1 [1–1] r:1–1 n=20 | 0 [0–0] r:0–0 n=20 | 0 [0–0] r:0–0 n=20 |
+| Bloqueantes tras precarga | no aplica | no aplica | 0 [0–0] r:0–0 n=20 | 0 [0–0] r:0–0 n=20 |
+| Validaciones Auth GET /user, servidor (al abrir) | 4 [4–4] r:4–4 n=20 | 4 [4–4] r:4–4 n=20 | 2 [2–2] r:2–2 n=20 | 4 [4–4] r:4–4 n=20 |
+| Validaciones Auth GET /user, total (al abrir) | 5 [5–5] r:5–5 n=20 | 5 [5–5] r:5–5 n=20 | 2 [2–2] r:2–2 n=20 | 4 [4–4] r:4–4 n=20 |
+| JS al primer evento (KiB) | 472 [472–472] r:472–472 n=20 | 472 [472–472] r:472–472 n=20 | 547 [511–547] r:547–547 n=20 | 528 [528–536] r:528–528 n=20 |
+| JS al primer evento (chunks) | 25 [25–25] r:25–25 n=20 | 25 [25–25] r:25–25 n=20 | 34 [27–34] r:34–34 n=20 | 30 [30–33] r:30–30 n=20 |
+| JS en reposo (KiB) | 472 [472–472] r:472–472 n=20 | 472 [472–472] r:472–472 n=20 | 547 [547–547] r:547–547 n=20 | 587 [587–587] r:587–587 n=20 |
+| Guardar: clic → tarjeta pintada (ms) | 73 [45–79] r:70–76 n=20 | 72 [70–119] r:71–75 n=20 | 75 [42–84] r:74–76 n=20 | 72 [70–112] r:72–73 n=20 |
+| Guardar: clic → modal cerrado (ms) | 42 [40–46] r:41–42 n=20 | 42 [38–46] r:40–43 n=20 | 14 [12–20] r:14–14 n=20 | 184 [184–184] r:184–184 n=20 |
+| Guardar: POST /api/appointments (ms) | 70 [62–83] r:65–77 n=20 | 65 [57–163] r:59–76 n=20 | 80 [59–93] r:63–86 n=20 | 82 [59–112] r:76–85 n=20 |
+| Mover: PUT (ms) | 61 [51–74] r:59–68 n=20 | 58 [52–158] r:54–67 n=20 | 66 [50–73] r:62–71 n=20 | 66 [58–166] r:65–76 n=20 |
+| Cancelar: PUT (ms) | 49 [47–66] r:48–50 n=20 | 50 [46–66] r:49–54 n=20 | 58 [48–71] r:51–68 n=20 | 50 [46–75] r:48–56 n=20 |
+
+Notas de lectura:
+- **Abrir con red limitada, `main` sobre la base 14: 1506 ms, frente a 999 ms
+  sobre la base 5.** No es ruido (las 4 rondas 1505–1510; en la base 5, 19 de 20
+  muestras ~1000 y una de 1499). El salto es de ~500 ms exactos, lo que apunta a
+  una espera fija en el cliente de `main` que la base nueva dispara siempre; no
+  lo investigué [D]. Importa para la ventana «base nueva + código viejo»; con el
+  orden decidido (código primero) esa combinación no se da.
+- Con la v2 encendida, abrir cuesta +9 ms en frío y +8 ms con red limitada
+  respecto de apagada, y 2 validaciones más contra Auth (4 frente a 2, las
+  mismas que `main`).
+- Peticiones bloqueantes: `main` 1 al volver del dashboard y 1 al volver a una
+  semana vista; la rama 0 y 0, y 0 tras la precarga.
+- Comparadas con la línea base del equipo nuevo de la guía (apertura 406/406,
+  red limitada 850/855, semana siguiente 88/93, volver 117/123, Auth 2/4, JS
+  547/587 KiB): la rama da lo mismo.
+
+Evidencias: `~/spinus-fusion/ensayo-e1/perf/` (`rondas-e1.sh`, `rondas.log`,
+`crudos/`, `tabla.md`, `analizar-e1.py`, `bases.log`).
+
+### El fragmento de la consola del plan §15 [C]
+
+Probado en Chromium de Playwright sobre `/agenda` con sesión (la rama, base 14),
+caché desactivada, evaluando el texto TAL CUAL (`perf/fragmento.cjs`,
+`frag-*.json`; 3 aperturas por caso). **Funciona**: la promesa se resuelve y
+`console.table` saca las 7 cifras. Con sentido y coherentes con la medición:
+
+| | primer byte | DOMContentLoaded | load | LCP | recursos | /api+/rest | fin de la última | (mi medida: 1er evento) |
+|---|---|---|---|---|---|---|---|---|
+| apagada | 67–75 | 93–113 | 144–154 | **336–340** | 46 | 2 | 215–225 | 308–327 |
+| apagada, red limitada | 49–51 | 302–307 | 640–642 | **828–832** | 46 | 2 | 722–734 | 792–825 |
+| encendida | 54–58 | 77–91 | 129–136 | **328–360** | 53 | 4 | **373–404** | 303–324 |
+| encendida, red limitada | 52–58 | 304–308 | 640–643 | **828–844** | 53 | 4 | **921–935** | 798–804 |
+
+Dónde engaña, y que lo decida Angel (no cambié su regla):
+1. **«load» (la «Carga» de la pestaña Red, la cifra que DECIDE en el plan)
+   llega ANTES de que se pinte la agenda**: 144 ms frente a 313 ms del primer
+   evento (640 frente a 800 con red limitada). Mide la página, no la agenda. El
+   **LCP** sí coincide con la aparición de las citas (+20–30 ms). Propuesta:
+   decidir por la mediana del LCP.
+2. **«fin de la última de /api y /rest» sube con la v2 sin que la agenda tarde
+   más**: con la v2 entran `GET /api/agenda/por-confirmar` y `POST
+   /api/google/sync` DESPUÉS del pintado (inicio ~330 ms, con las citas ya en
+   pantalla), así que esa cifra pasa de ~220 a ~390 ms. No es «la agenda terminó
+   de cargar sus datos» con la v2.
+3. Las cifras dependen de cuándo se pega: «recursos» y «fin de la última»
+   cuentan todo lo que haya pasado hasta ese momento.
+4. Con la red limitada por CDP, el «primer byte» no sube (49–58 ms): la
+   emulación de Chromium no frena esa fase. En una red real sí subiría [D].
+
+En el plan, la nota «pendiente de probar» se sustituye por este resultado.
+
+## Estado al cerrar [C]
+
+Base local: 14 migraciones (`base.sh 14`: 5 + deriva + las 9 con `aplicar.sh`),
+sembrada (365 citas), v2 APAGADA en A y B. Ningún servidor en 3000–3009.
+Worktree de `main` borrado (con su `.env.local` y su `.next`).
