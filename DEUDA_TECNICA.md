@@ -6557,7 +6557,25 @@ existe no depende del rol actual del médico, con una prueba que lo cubra.
 
 ### AG-DT-276 — «Regenerar PDF» compone sin el médico si el navegador no tiene su perfil en caché, y sustituye el PDF guardado
 
-**Estado:** abierta, **sin arreglar** (agente S, 2026-11-23; defecto de la app
+**Estado:** ✅ **cerrada en lo del médico** (agente R, 2026-11-23, orden de
+Angel); **queda abierto el objeto huérfano** (abajo). Arreglo, sólo en
+`PanelDocumentos.tsx`: `regenerarDocumento` → `medicoParaRegenerar` lee el
+médico del servidor en el momento (`/api/me/perfil-medico`, la fuente de la
+emisión vía `useMedicoInfo`; cliente de sesión, sin `createAdminClient()`),
+nunca de `localStorage`. Sólo regenera quien emitió (`subido_por` = la sesión;
+esa ruta da el perfil de quien tiene la sesión, así que con otra sesión saldría
+la cabecera de otro): a los demás, el botón dice «Solo el médico que emitió el
+documento puede regenerarlo.». Sin perfil, con error de red, o sin nombre
+(nombres o apellido) o sin cédula profesional, **no compone, no sube y no toca
+`pdf_url`**, y lo dice («El documento no se regeneró: …»). Prueba:
+`src/lib/tests/regenerarDocumento.test.ts` (8 casos; en rojo 8/8 con el
+comportamiento de antes, en verde con el arreglo). **Sigue abierto:** cada
+«Regenerar» sube con otro nombre y el objeto anterior queda huérfano en
+`documentos-pdf`; y la regeneración no pasa el consultorio que la emisión pasa
+(`consultorioActivo`), así que el bloque de consultorio del PDF puede diferir
+del emitido. Lo que sigue es el texto original del hallazgo.
+
+**Estado original:** abierta, **sin arreglar** (agente S, 2026-11-23; defecto de la app
 encontrado al probar Storage en local, fuera de la agenda). **Archivo:**
 `src/components/expediente/PanelDocumentos.tsx:240-283` (`regenerar`).
 `regenerar()` toma al médico de `getDoctorProfile()`, que lee
