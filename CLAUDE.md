@@ -481,6 +481,10 @@ Hay además dos que **no son de la agenda**,
 `20261126120000_public_sin_truncate.sql`: se aplican solas y pueden ir antes que
 todas (13 en total con las 5 de `main`). En producción no hay nada
 aplicado ni encendido hasta que Angel lo haga (§7).
+Y una séptima de la agenda, aparte del conjunto fundido para no tocar su
+equivalencia: `20261201180000_agenda_sin_truncate.sql` (disparador contra
+TRUNCATE en las 11 tablas de la agenda con datos de personas), que va después
+de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
 
 **Reglas que un editor futuro no debe romper:**
 
