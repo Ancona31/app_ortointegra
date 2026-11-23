@@ -221,3 +221,30 @@ Reintentos guardados en `bateria-20261123/reintentos/<archivo>-<n>/` (salida y
   que la guarda avise en `onBegin` si la línea base ya trae citas que la ventana
   pregunta HOY (no las del peor domingo). No lo toqué (no es de este encargo).
   La cita de la prueba se borró al terminar y la v2 quedó apagada en A y B.
+
+## 5.6 — Rendimiento: NO HECHO
+
+Preparado y probado, pero **sin ninguna cifra**: la corrida de medición se
+lanzó y se paró en el primer cambio de base, antes de la primera muestra, porque
+el agente tuvo que entregar su informe. No hay tabla, ni comparación con `main`,
+ni prueba del fragmento de la consola del plan §15.
+
+Lo que queda listo en `~/spinus-fusion/ensayo-e1/perf/` (fuera del repo):
+- `rondas-e1.sh`: el método de `e2e/resultados/linea-base-equipo-nuevo/rondas.sh`
+  (`medir-carga.e2e.ts` + `peso-js.cjs` + `guardar.cjs`, 4 rondas, mediana) con
+  tres configuraciones, un servidor cada vez en 3001: `main` sobre la base de 5 +
+  deriva (bloques A y C), y `main`, rama apagada y rama encendida sobre la de 14,
+  intercaladas (bloque B). Termina en la base de 5: al acabar, volver a
+  `base.sh 14` y sembrar.
+- `base.sh 5|14`, `medicion.config.ts`, `medicion-v2.config.ts` +
+  `global-setup-v2.ts` (enciende la v2 en A tras la siembra), `guardar.cjs`
+  tolerante a la base de 5 y `mover-cancelar.cjs` (PUT de mover y de cancelar con
+  la sesión del navegador; probado: 200/200, 55–68 ms en la rama).
+- El build de `main` salió bien (`16-build-main.txt`, 1 min 44 s, 6,3 GB de pico);
+  el worktree de `main` se borró al cerrar: hay que recrearlo.
+
+## Estado al cerrar
+
+Base local: 14 migraciones (rehecha con `base.sh 14`: 5 + deriva + las 9 con
+`aplicar.sh`), sembrada (365 citas), v2 apagada en A y B. Ningún servidor en
+3000–3009. Worktree de `main` borrado (con su `.env.local` y `.next`).
