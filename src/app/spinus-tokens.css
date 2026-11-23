@@ -2398,6 +2398,9 @@ html.dark {
 .sp-rx-com, .sp-rx-det { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-rx-com { flex: 0 0 auto; max-width: 75%; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); }
 .sp-rx-det { flex: 0 1 auto; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+/* Sin detalle al lado, el nombre usa todo el renglón (auditoría H4: «Creatina
+   Monohidrat…» se cortaba al 75 % con sitio libre). */
+.sp-rx-linea-1 > .sp-rx-com:last-child { flex-shrink: 1; max-width: 100%; }
 .sp-rx-ind { font-size: 13px; line-height: 18px; color: var(--tinta2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Etiqueta de vía: familia de color (Oral azul tonal, IM ámbar, IV violeta,
@@ -3406,7 +3409,14 @@ html.dark .sp-esc-titulo { background-color: transparent !important; border-colo
   .sp-sup-acciones > .k-b-texto { width: 100%; justify-content: center; }
   /* El peso conserva su ancho aunque la fila pase a una columna. */
   .sp-hon-datos.sp-sup-datos > .sp-sup-peso { flex: 1 1 100%; }
+  /* La dosis es el dato largo («4,200–6,000 UI/día»): su rótulo, a su medida,
+     no a los 104 de la columna (auditoría H4: el texto se recortaba en `ext`). */
+  .sp-rx-campo:has(> .sp-sup-dosis) > .sp-rx-rot { width: auto; }
 }
+/* El desplegable del buscador pasa POR DEBAJO del pie de acciones (sticky,
+   `z-index: 1`, después en el árbol): sigue encima del resto del formulario,
+   pero ya no tapa «Imprimir» (auditoría H5). */
+.sp-rx-lista.sp-sup-lista { z-index: 1; }
 
 /* ── 26.9 · ALTURA COMPARTIDA EN `esc` (recomendación aprobada) ──────────────
    Con un formulario abierto la columna crece a 880 en `esc` (lo decide el
