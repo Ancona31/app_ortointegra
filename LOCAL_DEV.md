@@ -288,6 +288,26 @@ baseline" para detalle de cada migración aplicada.
 
 ## 6. Comandos útiles del día a día
 
+### Supabase local: los almacenes de Storage (2026-11-23)
+
+Ninguna migración crea los buckets de Storage (en producción se crearon en el
+panel) y `supabase db reset --local` los borra. `scripts/local/almacenes-locales.sh`
+(con su `.sql` al lado) deja en la base LOCAL los seis de producción con el
+mismo id, público/privado, `file_size_limit` y `allowed_mime_types`, y crea las
+13 policies de `storage.objects` de producción **sólo si faltan** (las traen
+las migraciones; si una migración cambia una, manda la migración). Es
+idempotente, habla sólo con el contenedor local por `docker exec` y se niega si
+`NEXT_PUBLIC_SUPABASE_URL` no es `127.0.0.1`/`localhost`. La semilla
+(`scripts/agenda-semilla.ts`) lo llama al empezar (~0,1 s), así que tras P5 + P6
+de `GUIA_PRUEBAS_AGENDA_V2.md` ya están. No es una migración y no va a
+producción. Comparados con la foto de producción del 2026-11-22: buckets y
+policies idénticos.
+
+⚠️ `/api/email/enviar-documento` usa Resend directo (no `transporte.ts`): en
+local, con la `RESEND_API_KEY` de `.env.local`, «Enviar al paciente» manda un
+correo de verdad. Arranca la app con `RESEND_API_KEY=re_falsa` (o con un
+`RESEND_BASE_URL` local) para probar.
+
 ### Levantar app local apuntando a producción
 
 ```bash

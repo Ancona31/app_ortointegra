@@ -385,6 +385,26 @@ clínica (unas 350 citas en A y 17 en B) y la lista de usuarios. Si dice
 > Si pruebas al día siguiente, vuelve a sembrar (y repite P7 y P8, porque
 > sembrar los borra).
 
+> **Los almacenes de archivos (Storage) también los pone la semilla.** Lo
+> primero que imprime es `almacenes-locales: 6 buckets`: deja en tu base los
+> seis buckets de producción (`casos-clinicos`, `clinica-logos`,
+> `documentos-pdf`, `firmas-medicos`, `identificaciones`, `labs-documentos`),
+> con el mismo público/privado, límite de tamaño y tipos, y comprueba sus
+> policies (`scripts/local/almacenes-locales.sql`). P5 los borra y ninguna
+> migración los crea; sin ellos el PDF de un documento no se guarda, «Enviar al
+> paciente» dice que no hay PDF y no se suben logo, firma, identificación ni
+> estudios. Para ponerlos sin resembrar: `bash scripts/local/almacenes-locales.sh`
+> (se niega si `.env.local` no apunta a tu computadora).
+>
+> ⚠️ **«Enviar al paciente» de un documento NO pasa por Mailpit**: esa ruta
+> (`/api/email/enviar-documento`) llama a Resend directamente, con la
+> `RESEND_API_KEY` de `.env.local`. Con los almacenes puestos el envío ya
+> funciona, así que **sale un correo de verdad** al correo del paciente. Para
+> probarlo en local arranca la app con `RESEND_API_KEY=re_falsa` delante del
+> comando de P11 (falla sin enviar nada), o con un Resend simulado
+> (`RESEND_BASE_URL`), como en el ensayo del agente S
+> (`docs/despliegue/REPORTE-FINAL.md`).
+
 **P7. Aprobar el aviso de privacidad de la reserva, sólo en tu base local.** El
 enlace de reserva no abre si el aviso no está aprobado. El texto real sigue
 **pendiente de revisión legal**; esto lo aprueba sólo en tu computadora para
