@@ -87,6 +87,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 vi.mock('@/lib/audit', () => ({ logAudit: vi.fn(async () => undefined) }))
+vi.mock('@sentry/nextjs', () => ({ captureMessage: vi.fn() }))
 vi.mock('@/lib/gcalConexion', () => ({
   leerConexionConSecretos: async () => ({
     fila: {
@@ -128,6 +129,10 @@ const db = vi.hoisted(() => ({
   /** D11: las llamadas a `registrarEmpalmesReserva` y su comportamiento. */
   empalmes: [] as string[][],
   empalmesFalla: null as null | 'lanza' | 'ausente',
+  /** W: cuántas de las próximas llamadas fallan antes de funcionar. */
+  empalmesFallan: 0,
+  /** W: la lectura del espejo falla a media página (la sonda vacía del principio, no). */
+  espejoFalla: false,
   /** Tanda J, punto 10: las llamadas a `registrarMovimientoRechazado` y su comportamiento. */
   movimientos: [] as { citaId: string; actualizado: string }[],
   movimientosFalla: null as null | 'lanza' | 'ausente',
@@ -163,6 +168,7 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
     },
     citasDeEventos: async (_c: string, ids: string[], marcas: string[]) => {
       if (db.noDisponibleC2) throw new real.SincronizacionNoDisponible('gcal_citas_por_evento')
+      if (db.espejoFalla && ids.length + marcas.length > 0) throw new Error('la base falló')
       return db.filas.filter((f) => (f.googleEventId && ids.includes(f.googleEventId)) || marcas.includes(f.id))
     },
     aplicarEvento: async (_c: string, _cal: string, a: Aplicacion) => {
@@ -180,6 +186,7 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       db.empalmes.push(ids)
       if (db.empalmesFalla === 'ausente') throw new real.SincronizacionNoDisponible('reserva_empalmes_registrar')
       if (db.empalmesFalla === 'lanza') throw new Error('la base falló')
+      if (db.empalmesFallan > 0) { db.empalmesFallan -= 1; throw new Error('la base falló') }
       return 1
     },
     registrarMovimientoRechazado: async (_c: string, citaId: string, actualizado: string) => {
@@ -197,6 +204,8 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
 
 import { sincronizarClinica, type OpcionesSincronizacion } from '@/lib/gcalSincronizacion'
 import { logAudit } from '@/lib/audit'
+import { captureMessage } from '@sentry/nextjs'
+import { beforeSend } from '@/lib/sentryPiiFilter'
 
 const conexion: ConexionGoogle = {
   id: 'conexion-1', clinicaId: CLINICA, userId: DUENO, rol: 'clinica', calendarId: CAL, estado: 'activa', googleAccountEmail: null,
@@ -231,11 +240,12 @@ beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), rechazarAplicar: new Set(),
-    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, movimientos: [], movimientosFalla: null,
+    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, empalmesFallan: 0, espejoFalla: false, movimientos: [], movimientosFalla: null,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
   h.estado.rpc = { data: null, error: null, args: [] }
   vi.mocked(logAudit).mockClear()
+  vi.mocked(captureMessage).mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   vi.spyOn(console, 'error').mockImplementation(() => undefined)
 })
@@ -760,11 +770,107 @@ describe('D11 · señal de la reserva pública y empalmes con reservas por enlac
   it('un fallo al registrar cuenta en errores y la página avanza; sin la migración, ni eso', async () => {
     db.empalmesFalla = 'lanza'
     h.estado.guion = [pagina([nuevo], { nextSyncToken: 't1' })]
-    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 1 })
+    expect(await conRelojFalso(() => sincronizarClinica(conexion, op))).toMatchObject({ estado: 'ok', errores: 1 })
     expect(db.syncToken).toBe('t1')
     db.empalmesFalla = 'ausente'
+    db.empalmes = []
+    vi.mocked(captureMessage).mockClear()
     h.estado.guion = [pagina([nuevo], { nextSyncToken: 't2' })]
     expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
     expect(db.syncToken).toBe('t2')
+    // Sin la migración no se reintenta ni se avisa a Sentry.
+    expect(db.empalmes).toHaveLength(1)
+    expect(captureMessage).not.toHaveBeenCalled()
+  })
+})
+
+/** Corre la pasada con temporizadores falsos (las pausas entre reintentos no esperan de verdad). */
+async function conRelojFalso<T>(fn: () => Promise<T>): Promise<T> {
+  vi.useFakeTimers()
+  try {
+    let hecho = false
+    const p = fn().finally(() => { hecho = true })
+    while (!hecho) await vi.advanceTimersByTimeAsync(1_000)
+    return await p
+  } finally {
+    vi.useRealTimers()
+  }
+}
+
+describe('W · el aviso de empalmes no se pierde en silencio', () => {
+  const IMPORTADA = '55555555-5555-4555-8555-555555555555'
+
+  it('la base falla una vez y luego funciona: el par se registra y nada va a Sentry', async () => {
+    db.empalmesFallan = 1
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't' })]
+    expect(await conRelojFalso(() => sincronizarClinica(conexion, op))).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(db.empalmes).toEqual([[IMPORTADA], [IMPORTADA]])
+    expect(captureMessage).not.toHaveBeenCalled()
+  })
+
+  it('falla tres veces (dos reintentos): errores sube y Sentry recibe clínica e ids, nada más', async () => {
+    db.empalmesFallan = 3
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't' })]
+    expect(await conRelojFalso(() => sincronizarClinica(conexion, op))).toMatchObject({ estado: 'ok', errores: 1 })
+    expect(db.empalmes).toHaveLength(3)
+    expect(captureMessage).toHaveBeenCalledTimes(1)
+    const [mensaje, contexto] = vi.mocked(captureMessage).mock.calls[0]
+    expect(mensaje).toBe('GCalSync: empalmes con reservas sin registrar')
+    expect(contexto).toEqual({ level: 'error', extra: { clinica: CLINICA, citas: [IMPORTADA] } })
+  })
+
+  it('el evento, tal como sale del filtro de PII: el filtro redacta los uuid (no se toca el filtro)', async () => {
+    db.empalmesFallan = 3
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't' })]
+    await conRelojFalso(() => sincronizarClinica(conexion, op))
+    const [mensaje, contexto] = vi.mocked(captureMessage).mock.calls[0]
+    const extra = typeof contexto === 'object' && contexto !== null && 'extra' in contexto ? contexto.extra : undefined
+    const filtrado = beforeSend({ message: String(mensaje), extra: { ...extra } })
+    expect(filtrado).toEqual({
+      message: 'GCalSync: empalmes con reservas sin registrar',
+      extra: { clinica: '[ID-REDACTADO]', citas: ['[ID-REDACTADO]'] },
+    })
+  })
+
+  it('sin presupuesto: no reintenta (y avisa a Sentry)', async () => {
+    db.empalmesFallan = 3
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't' })]
+    expect(await conRelojFalso(() => sincronizarClinica(conexion, { ...op, presupuestoMs: 0 }))).toMatchObject({ errores: 1 })
+    expect(db.empalmes).toHaveLength(1)
+    expect(captureMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('con la señal abortada (tope de la reserva): no reintenta', async () => {
+    const control = new AbortController()
+    db.empalmesFallan = 3
+    h.estado.guion = [(p) => { control.abort(new Error('tope')); return pagina([nuevo], { nextSyncToken: 't' })(p) }]
+    await conRelojFalso(() => sincronizarClinica(conexion, { ...op, senal: control.signal }))
+    expect(db.empalmes).toHaveLength(1)
+    expect(captureMessage).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('W · el candado se suelta siempre (la pasada que sigue dentro de after())', () => {
+  it('la señal ya abortada al empezar: toma el candado y lo suelta sin error, sin llamar a Google', async () => {
+    const control = new AbortController()
+    control.abort(new Error('tope'))
+    expect(await sincronizarClinica(conexion, { ...op, senal: control.signal })).toMatchObject({ estado: 'parcial' })
+    expect(db).toMatchObject({ candado: null, soltados: [null] })
+    expect(llamadas()).toHaveLength(0)
+  })
+
+  it('la base falla a media página: la pasada no lanza y suelta el candado con código', async () => {
+    db.espejoFalla = true
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'error' })
+    expect(db).toMatchObject({ candado: null, soltados: ['desconocido'], syncToken: null })
+  })
+
+  it('abortada a media página tras el tope: suelta con google_tiempo', async () => {
+    const control = new AbortController()
+    db.espejoFalla = true
+    h.estado.guion = [(p) => { control.abort(new Error('tope')); return pagina([nuevo], { nextSyncToken: 't' })(p) }]
+    expect(await sincronizarClinica(conexion, { ...op, senal: control.signal })).toMatchObject({ estado: 'error' })
+    expect(db).toMatchObject({ candado: null, soltados: ['google_tiempo'] })
   })
 })
