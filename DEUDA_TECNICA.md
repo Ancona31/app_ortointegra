@@ -6977,3 +6977,32 @@ bucal de Actiq y el PRP. La lista entera, con el motivo de cada una, se entregó
 como `catalogo-vias.tsv`. Si el dueño fija alguna, va en su fila (`via:`) y la
 prueba `recetaCompacta.test.ts` exige que un inyectable con vía la diga en su
 presentación o nombre: habría que ajustar esa regla a la vez.
+
+### RED-DT-21 — Capas de consulta rápida y registro rápido de paciente sin `role="dialog"` ni foco atrapado
+
+**Estado:** 🟡 abierta, menor (accesibilidad, **heredada**, no regresión) ·
+**Archivos:** `src/components/launcher/ConsultaRapidaModal.tsx:253-261` (también
+«Nuevo documento» del dashboard), `QuickPatientModal` (auditoría final del
+rediseño, H10, 2026-11-23)
+
+Ninguna de las dos capas declara `role="dialog"`/`aria-modal` ni atrapa el foco:
+con el teclado en `esc`, 24 de 24 tabulaciones salen a la página de detrás. Ya
+era así en `951e31b3`; el rediseño las re-vistió como capas del catálogo sin
+corregirlo. `ModalShell` y la paleta ⌘K sí lo hacen. Arreglo natural: pasarlas a
+`ModalShell` o darles rol, nombre y trampa de foco (~10–15 líneas por capa), en
+su propia rama, porque cambia el comportamiento del teclado.
+
+---
+
+### RED-DT-22 — Orden de tabulación distinto del visual y sin «saltar al contenido»
+
+**Estado:** 🟡 abierta, menor (teclado, **heredada**) · **Archivos:** expediente del
+paciente (`src/app/(app)/expediente/[id]/page.tsx`), lista de expedientes,
+`src/components/layout/Sidebar.tsx` (auditoría final del rediseño, H11,
+2026-11-23; evidencia en `audfinal/tec.log` del cierre)
+
+En el expediente (`esc`) las pestañas de arriba se alcanzan después de la columna
+izquierda; en la lista, «Filtros» va después de «Ordenar». No hay enlace de
+«saltar al contenido»: 15 paradas de la barra antes del contenido. Se arregla
+reordenando el DOM (o con `order` en CSS sin romper la lectura) y añadiendo el
+enlace de salto en el layout; 5–10 líneas, fuera del alcance estético.
