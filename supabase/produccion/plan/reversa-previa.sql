@@ -14,7 +14,8 @@
 --                   UNA confirmación, por adelantado, con la lista entera.
 -- Sin filas = ninguna reversa se va a negar.
 --
--- ⚠️ CADA CONDICIÓN ES COPIA DE LA GUARDA DE SU REVERSA (supabase/reversas/):
+-- ⚠️ CADA CONDICIÓN ES COPIA DE LA GUARDA DE SU REVERSA (supabase/reversas/, su
+-- cabecera «GUARDA DE DATOS» y su pre-vuelo; al día con la corrección A4 de F1):
 -- si cambia una guarda, cambia aquí en el mismo commit. Las reversas siguen
 -- comprobando lo suyo: esto sólo adelanta la pregunta.
 --
@@ -76,9 +77,9 @@ WITH c(version, clase, que, tabla, columnas, consulta) AS (VALUES
      'SELECT count(*) AS n FROM public.appointments WHERE tipo_cita_id IS NOT NULL'),
   ('20261201120000', 'DATOS', 'consultorios con horario revisado', 'public.consultorios', ARRAY['horario_revisado_en'],
      'SELECT count(*) AS n FROM public.consultorios WHERE horario_revisado_en IS NOT NULL'),
-  ('20261201120000', 'DATOS', 'consultorios con horario propio editados o creados tras la copia',
-     'respaldos.consultorios_horario_20261119', ARRAY[]::text[],
-     'SELECT count(*) AS n FROM public.consultorios k WHERE k.horario_propio AND NOT EXISTS (SELECT 1 FROM respaldos.consultorios_horario_20261119 r WHERE r.id = k.id AND r.respaldado_en = k.updated_at)'),
+  ('20261201120000', 'DATOS', 'consultorios con horario editado o creados con horario propio tras la copia',
+     'respaldos.consultorios_horario_20261119', ARRAY['horario_copiado'],
+     'SELECT count(*) AS n FROM public.consultorios k WHERE k.horario_propio AND NOT EXISTS (SELECT 1 FROM respaldos.consultorios_horario_20261119 r WHERE r.id = k.id AND r.horario_copiado IS NOT DISTINCT FROM k.horario)'),
   ('20261201120000', 'DATOS', 'clínicas con huso de fábrica (clinicas.timezone)', 'public.clinicas', ARRAY['timezone'],
      'SELECT count(*) AS n FROM public.clinicas WHERE timezone IS NOT NULL')
 ),
@@ -99,6 +100,12 @@ SELECT 'previo|BLOQUEA|hay que correr la reversa como el rol postgres (current_u
 UNION ALL
 SELECT '20261201120000|BLOQUEA|falta respaldos.consultorios_horario_20261119: la reversa de F1 no podría devolver el horario previo'
  WHERE to_regclass('public.agenda_ajustes') IS NOT NULL
-   AND to_regclass('respaldos.consultorios_horario_20261119') IS NULL;
+   AND to_regclass('respaldos.consultorios_horario_20261119') IS NULL
+UNION ALL
+SELECT '20261201120000|BLOQUEA|respaldos.consultorios_horario_20261119 no tiene horario_antes/horario_copiado (de una F1 anterior a la ronda 1): la reversa de F1 se negaría'
+ WHERE to_regclass('public.agenda_ajustes') IS NOT NULL
+   AND to_regclass('respaldos.consultorios_horario_20261119') IS NOT NULL
+   AND (SELECT count(*) FROM pg_catalog.pg_attribute WHERE attrelid = to_regclass('respaldos.consultorios_horario_20261119')
+         AND NOT attisdropped AND attname IN ('horario_antes', 'horario_copiado')) <> 2;
 
 ROLLBACK;
