@@ -14,33 +14,57 @@
 --     horario de su clínica, con respaldo previo en
 --     respaldos.consultorios_horario_20261119.
 --   · agenda_restablecer_configuracion(uuid, uuid).
--- DEPENDE DE (main): appointments, audit_log, clinicas, consultorios,
---   profiles; get_clinica_id(), soy_admin_de_clinica(), get_my_role()
---   (SECURITY DEFINER), log_tabla_change(), auth.uid(); el esquema respaldos.
---   De ningún bloque de la agenda: va PRIMERO. agenda_restablecer_
---   configuracion toca reserva_enlaces (F3) sólo al ejecutarse (plpgsql).
--- BLOQUEOS (lock_timeout 5 s, statement_timeout 60 s; todo en UNA transacción,
---   así que cada candado se sostiene hasta el COMMIT):
---   · ACCESS EXCLUSIVE sobre appointments (ADD COLUMN, CHECK) y SHARE ROW
---     EXCLUSIVE mientras valida la FK (columnas recién creadas, todo NULL);
---     SHARE ROW EXCLUSIVE sobre appointments por los dos CREATE TRIGGER.
---   · ACCESS EXCLUSIVE sobre consultorios (ADD COLUMN) y ROW EXCLUSIVE por el
---     UPDATE del backfill (dispara audit_consultorios: una fila de audit_log
---     por consultorio, user_id 'system').
---   · ACCESS EXCLUSIVE sobre clinicas (ADD COLUMN timezone, sólo catálogo) y
---     SHARE ROW EXCLUSIVE sobre clinicas, profiles y consultorios por las FK.
+-- DEPENDE DE
+--   · orden: va PRIMERO del conjunto; no necesita ningún otro bloque.
+--     agenda_restablecer_configuracion toca reserva_enlaces (F3) sólo al
+--     ejecutarse (plpgsql).
+--   · main: appointments, audit_log, clinicas, consultorios, profiles;
+--     get_clinica_id(), soy_admin_de_clinica(), get_my_role() (SECURITY
+--     DEFINER), log_tabla_change(), auth.uid(); el esquema respaldos.
+--   · PostgreSQL ≥ 13 (gen_random_uuid() del núcleo); producción es 17.6.
+--   · Ser dueño (o miembro del dueño) de appointments, clinicas, consultorios y
+--     profiles: se aplica como postgres, con psql -X -v ON_ERROR_STOP=1
+--     (supabase/produccion/plan/aplicar.sh). No depende del search_path de la
+--     sesión: todo va calificado y la rejilla no imprime nombres con regclass.
 -- RIESGO: MEDIO. Toca la tabla más escrita de la agenda y reescribe valores
 --   de consultorios (con respaldo). El horario EFECTIVO de cada consultorio no
 --   cambia: con horario_propio = false valía el de la clínica, y es lo que se
 --   copia. Ningún dato de pacientes se escribe.
--- SEGUNDA PASADA: ABORTA LIMPIO en el pre-vuelo si ya existe cualquier objeto
---   de este bloque (salvo el respaldo, que se reutiliza si tiene su forma).
+--   · Bloqueos. Todo es UNA transacción: cada candado se sostiene hasta el
+--     COMMIT. Los fuertes se piden juntos, en dos tiempos, con NOWAIT y
+--     reintentos (50 × 0,1 s): la migración nunca hace cola —una cola sobre
+--     appointments o clinicas frenaría a toda la app que llega detrás—; si
+--     no los consigue en 5 s, aborta sin cambiar nada y se reintenta más
+--     tarde (lo dice el error).
+--       1) §2: SHARE ROW EXCLUSIVE sobre clinicas, profiles y consultorios (los
+--          que toman las FK de agenda_ajustes y tipos_cita). Frena sus
+--          ESCRITURAS, no sus lecturas, durante lo que tarden las tablas,
+--          funciones y policies nuevas.
+--       2) §10: ACCESS EXCLUSIVE sobre appointments, consultorios y clinicas
+--          (ADD COLUMN, la FK y el CHECK de appointments con su comprobación,
+--          el índice, los CREATE TRIGGER, el backfill). Frena lecturas y
+--          escrituras; clinicas la leen las funciones de la RLS, así que
+--          frena casi toda la app. Por eso todo lo que exige este candado va
+--          en UN solo bloque DO (un viaje al servidor, no uno por sentencia)
+--          al final: desde que se toma hasta el COMMIT sólo hay ese bloque,
+--          el post-vuelo y el COMMIT (tres viajes por el pooler).
+--     Las columnas nuevas no reescriben ninguna tabla (sin DEFAULT o con
+--     DEFAULT constante); la FK y el CHECK recorren appointments una vez (las
+--     columnas nacen NULL, no puede fallar). NOT VALID + VALIDATE aparte no
+--     acortaría nada dentro de la misma transacción, y en otra dejaría la
+--     restricción a medias si fallara.
+--   · Duración (clon de la foto, sin datos): ver la nota de F1. Aplicar
+--     cuando no haya consulta.
+--   · Si falla en cualquier punto, se deshace TODO (no queda nada a medias).
+-- SEGUNDA PASADA: ABORTA LIMPIO en el pre-vuelo, antes de pedir ningún
+--   candado, si ya existe cualquier objeto de este bloque (salvo el respaldo,
+--   que se reutiliza si tiene su forma).
 -- CÓMO SE DESHACE: supabase/reversas/20261201120000_agenda_f1_ajustes_
 --   tipos_horarios_reversa.sql, DESPUÉS de las reversas de los bloques
 --   posteriores. Devuelve el horario previo a los consultorios que nadie
---   editó desde la copia y conserva el respaldo.
--- EJECUTAR EN EL SQL EDITOR DE SUPABASE, DE UNA SOLA VEZ, COMPLETO, como
---   postgres. El veredicto es la rejilla del final.
+--   editó desde la copia y conserva el respaldo; se niega si hay datos de la
+--   v2 que se perderían, salvo confirmación explícita.
+-- El veredicto es la rejilla del final (OK / INFO / REVISAR).
 -- ═══════════════════════════════════════════════════════════════════════
 
 BEGIN;
@@ -177,7 +201,28 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------
--- 2 · agenda_ajustes: ajustes por clínica, candado e interruptor.
+-- 2 · Candados, primer tiempo: SHARE ROW EXCLUSIVE sobre clinicas, profiles
+--     y consultorios, los que pedirían las FK de agenda_ajustes y tipos_cita.
+--     NOWAIT: no entra en la cola de candados (nunca frena a quien llega
+--     detrás). 50 intentos cada 0,1 s; un intento fallido se deshace entero
+--     (subtransacción), así que no se queda con la mitad.
+-- ---------------------------------------------------------------------
+DO $$
+BEGIN
+  FOR i IN 1..50 LOOP
+    BEGIN
+      LOCK TABLE public.clinicas, public.profiles, public.consultorios IN SHARE ROW EXCLUSIVE MODE NOWAIT;
+      RETURN;
+    EXCEPTION WHEN lock_not_available THEN
+      PERFORM pg_sleep(0.1);
+    END;
+  END LOOP;
+  RAISE EXCEPTION 'CANDADOS: clinicas, profiles o consultorios siguieron ocupadas 5 s (una transacción larga las escribe). No se cambió nada: reintenta en unos minutos.'
+    USING ERRCODE = '55P03';
+END $$;
+
+-- ---------------------------------------------------------------------
+-- 3 · agenda_ajustes: ajustes por clínica, candado e interruptor.
 --     Sin fila = valores de fábrica e interruptor apagado (el código cae ahí
 --     ante cualquier error): por eso no hay backfill de esta tabla.
 --     Tabla propia y no columnas en clinicas: allí el prefijo ajuste_* es
@@ -280,11 +325,10 @@ CREATE TRIGGER audit_agenda_ajustes
   FOR EACH ROW EXECUTE FUNCTION public.log_tabla_change();
 
 -- ---------------------------------------------------------------------
--- 3 · La lectura común del interruptor. Los demás bloques la llaman.
+-- 4 · La lectura común del interruptor. Los demás bloques la llaman.
 --     ⚠️ INVOKER a propósito: dentro de un disparador INVOKER lee con la RLS
 --     de la sesión (agenda_ajustes_select: sólo la clínica propia), y dentro
---     de una función DEFINER lee como su dueño, igual que la lectura en línea
---     que sustituye. Hacerla DEFINER dejaría a cualquier sesión preguntar por
+--     de una función DEFINER lee como su dueño, igual que una lectura en línea. Hacerla DEFINER dejaría a cualquier sesión preguntar por
 --     el interruptor de otra clínica.
 --     Sin fila = false: falla cerrado.
 -- ---------------------------------------------------------------------
@@ -307,7 +351,7 @@ REVOKE EXECUTE ON FUNCTION public.agenda_v2_encendida(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.agenda_v2_encendida(uuid) TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
--- 4 · tipos_cita. medico_id NULL = de toda la clínica; con valor = sólo de
+-- 5 · tipos_cita. medico_id NULL = de toda la clínica; con valor = sólo de
 --     ese médico. Se archivan, nunca se borran (sin DELETE para la sesión).
 --     La duración de la consulta de un médico ES un tipo suyo con
 --     principal = true; la de un consultorio, otro principal con
@@ -456,25 +500,6 @@ CREATE TRIGGER audit_tipos_cita
   FOR EACH ROW EXECUTE FUNCTION public.log_tabla_change();
 
 -- ---------------------------------------------------------------------
--- 5 · appointments: el tipo de la cita y la instantánea de su nombre.
---     FK COMPUESTA (tipo_cita_id, clinica_id): la base impide que una cita
---     use un tipo de OTRA clínica, y el error es el mismo exista o no el tipo
---     ajeno (no delata ids). Que el tipo sea de toda la clínica o del médico
---     de la cita es un CONVENIO que comprueba la API (va en el COMMENT).
--- ---------------------------------------------------------------------
-ALTER TABLE public.appointments
-  ADD COLUMN tipo_cita_id uuid,
-  ADD COLUMN tipo_cita_nombre text,
-  ADD CONSTRAINT appointments_tipo_cita_fkey
-    FOREIGN KEY (tipo_cita_id, clinica_id) REFERENCES public.tipos_cita (id, clinica_id) ON DELETE RESTRICT,
-  ADD CONSTRAINT appointments_tipo_cita_snapshot_check
-    CHECK ((tipo_cita_id IS NULL) = (tipo_cita_nombre IS NULL));
-
--- El que usa la FK al comprobar RESTRICT desde tipos_cita.
-CREATE INDEX idx_appointments_tipo_cita ON public.appointments (tipo_cita_id)
-  WHERE tipo_cita_id IS NOT NULL;
-
--- ---------------------------------------------------------------------
 -- 6 · Auditoría de citas, SIEMPRE encendida (no depende del interruptor).
 --     Función propia y no log_tabla_change(): ésa escribe sólo TG_OP, y una
 --     cancelación sería indistinguible de mover la hora.
@@ -487,7 +512,7 @@ CREATE INDEX idx_appointments_tipo_cita ON public.appointments (tipo_cita_id)
 --     si es técnica, se añade en los DOS sitios.
 --     AFTER y SECURITY DEFINER: DEFINER sólo para insertar en audit_log (no
 --     tiene policy de INSERT); AFTER para que los BEFORE de protección aborten
---     antes sin dejar auditoría.
+--     antes sin dejar auditoría. Sus disparadores, en §10.
 -- ---------------------------------------------------------------------
 CREATE FUNCTION public.log_cita_change()
 RETURNS trigger
@@ -552,45 +577,9 @@ $fn$;
 REVOKE EXECUTE ON FUNCTION public.log_cita_change() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.log_cita_change() TO anon, authenticated, service_role;
 
-CREATE TRIGGER audit_appointments
-  AFTER INSERT OR DELETE ON public.appointments
-  FOR EACH ROW EXECUTE FUNCTION public.log_cita_change();
-
--- Partido en dos a propósito: un WHEN que lee OLD no se admite en INSERT.
--- ⚠️ La misma lista que c_tecnicas de log_cita_change(). Van juntas.
-CREATE TRIGGER audit_appointments_update
-  AFTER UPDATE ON public.appointments
-  FOR EACH ROW
-  WHEN ((to_jsonb(OLD) - ARRAY['updated_at','client_id','gcal_sync_status','gcal_etag','gcal_calendar_id','google_event_id']::text[])
-        IS DISTINCT FROM
-        (to_jsonb(NEW) - ARRAY['updated_at','client_id','gcal_sync_status','gcal_etag','gcal_calendar_id','google_event_id']::text[]))
-  EXECUTE FUNCTION public.log_cita_change();
-
 -- ---------------------------------------------------------------------
--- 7 · Horarios de consultorio y huso de la clínica (columnas en tablas de
---     main; contrato con spinus-consola: sólo se añaden, nunca se renombran
---     ni cambian de tipo o significado).
---     clinicas.timezone: text NULL sin DEFAULT ni CHECK (NULL = sin elegir).
---     clinicas.horario_consulta NO se escribe nunca: sólo se lee.
--- ---------------------------------------------------------------------
-ALTER TABLE public.consultorios
-  ADD COLUMN horario_propio boolean NOT NULL DEFAULT false,
-  ADD COLUMN horario_revisado_en timestamptz;
-
-ALTER TABLE public.clinicas ADD COLUMN timezone text;
-
--- ---------------------------------------------------------------------
--- 8 · Backfill (el ÚNICO del conjunto): cada consultorio hereda UNA vez el
---     horario de su clínica como punto de partida. La única fuente de la
---     disponibilidad pasa a ser el consultorio; editar el de la clínica ya no
---     mueve el de ningún consultorio. El horario EFECTIVO no cambia: con
---     horario_propio = false, horarioEfectivo() daba el de la clínica.
---     Para TODAS las clínicas, también las de la v2 apagada: con ella apagada
---     ningún código lee horario_propio ni consultorios.horario.
---     El valor previo de consultorios.horario era INERTE (nadie lo leía) y
---     queda en el respaldo, escrito ANTES del UPDATE. respaldado_en y el
---     updated_at que pone trg_consultorios_updated_at son el mismo now() de
---     esta transacción: así la reversa sabe qué filas nadie editó después.
+-- 7 · El respaldo del backfill (la copia y el UPDATE, en §10). Tabla propia
+--     del esquema respaldos: no toma candados sobre tablas de main.
 -- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS respaldos.consultorios_horario_20261119 (
   id             uuid PRIMARY KEY,
@@ -603,24 +592,8 @@ ALTER TABLE respaldos.consultorios_horario_20261119 ENABLE ROW LEVEL SECURITY;
 -- Sin privilegios para nadie más que su dueño; el esquema no se expone a PostgREST.
 REVOKE ALL ON TABLE respaldos.consultorios_horario_20261119 FROM PUBLIC, anon, authenticated, service_role;
 
--- Si el respaldo ya existía (un reintento tras la reversa), se conserva la
--- PRIMERA copia de cada consultorio.
-INSERT INTO respaldos.consultorios_horario_20261119 (id, clinica_id, horario, horario_propio)
-SELECT k.id, k.clinica_id, k.horario, k.horario_propio
-  FROM public.consultorios k
- WHERE NOT k.horario_propio
-ON CONFLICT (id) DO NOTHING;
-
--- También los archivados: si se reactivan, conservan el punto de partida.
-UPDATE public.consultorios k
-   SET horario = c.horario_consulta,
-       horario_propio = true
-  FROM public.clinicas c
- WHERE c.id = k.clinica_id
-   AND NOT k.horario_propio;
-
 -- ---------------------------------------------------------------------
--- 9 · «Restablecer configuración de la agenda» de UNA clínica. La llama sólo
+-- 8 · «Restablecer configuración de la agenda» de UNA clínica. La llama sólo
 --     POST /api/agenda/restablecer con service_role, tras comprobar que el
 --     actor administra la clínica; la función lo vuelve a comprobar, PRIMERO
 --     (antes de mirar el interruptor: nadie sondea otra clínica por aquí).
@@ -711,7 +684,8 @@ REVOKE EXECUTE ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) F
 GRANT  EXECUTE ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) TO service_role;
 
 -- ---------------------------------------------------------------------
--- 10 · Los convenios, donde viajan con la base.
+-- 9 · Los convenios, donde viajan con la base (los de las columnas nuevas
+--     de appointments, consultorios y clinicas, en §10).
 -- ---------------------------------------------------------------------
 COMMENT ON TABLE public.agenda_ajustes IS
   'Ajustes de agenda por clínica (mejora_agendaV2 §2). Sin fila = valores de fábrica (24 h, 2 h, 60 d, 7 d) e interruptor apagado. Los límites viven aquí en CHECK y en LIMITES_AJUSTES_AGENDA (src/lib/agenda/ajustesAgenda.ts): cambiar los dos.';
@@ -731,22 +705,118 @@ COMMENT ON COLUMN public.tipos_cita.principal IS
   'La duración de la consulta del médico: su tipo principal, creado al contestar «¿cuánto dura tu consulta?». Sólo con medico_id (tipos_cita_principal_check); uno activo por médico y, aparte, uno por médico y consultorio (tipos_cita_principal_unico).';
 COMMENT ON COLUMN public.tipos_cita.consultorio_id IS
   'Sólo en un tipo principal (tipos_cita_consultorio_check): la duración distinta del médico en ESE consultorio, que allí sustituye a su principal general. El consultorio es del mismo médico y clínica (validar_tipo_cita_consultorio). CONVENIO QUE LA BASE NO IMPONE: reservar_por_enlace acepta el tipo en cualquier consultorio del médico; la ruta pública lo filtra antes (tiposDelConsultorio en src/lib/agenda/tiposCita.ts). En la agenda interna es sólo la lista del selector.';
-COMMENT ON COLUMN public.appointments.tipo_cita_id IS
-  'Tipo de la cita. La FK compuesta garantiza la misma clínica. CONVENIO QUE LA BASE NO IMPONE: el tipo es de toda la clínica (medico_id NULL) o del medico_id de la cita, y la cita tiene paciente O está por ligar (reserva_canal no nulo). Lo comprueban reservar_por_enlace y POST/PUT /api/appointments (validarTipoParaCita en src/lib/agenda/tiposCita.ts, que mientras no se amplíe sólo admite tipo con paciente). Un camino que escriba la columna sin pasar por ahí puede dejar un tipo de otro médico sin que nada lo note.';
-COMMENT ON COLUMN public.appointments.tipo_cita_nombre IS
-  'Instantánea del nombre del tipo al asignarlo (como consultorio_nombre). Renombrar el tipo no la cambia. Va junto con tipo_cita_id: las dos nulas o las dos con valor (appointments_tipo_cita_snapshot_check); quitar el tipo es poner las dos a NULL.';
 COMMENT ON FUNCTION public.log_cita_change() IS
   'Auditoría de public.appointments (AG-DT-10). Escribe NOMBRES de columnas y estado de→a, nunca valores: audit_log es inmutable y no admite ARCO. "via" sólo sin auth.uid() y con el GUC spinus.via en la lista blanca c_vias: google y google_rsvp (sincronización con Google), enlace_paciente (confirmación y reagendo por enlace); otro literal no se escribe. La lista c_tecnicas está también en el WHEN de audit_appointments_update: cambiar las dos.';
-COMMENT ON COLUMN public.consultorios.horario_propio IS
-  'false = la disponibilidad de este consultorio es clinicas.horario_consulta; true = manda consultorios.horario (un tramo por día, sin pausa; con true y todos los días inactivos el consultorio está CERRADO, no hereda). Lo resuelve horarioEfectivo() en src/lib/agenda/disponibilidad.ts. Al crearse esta columna, todos los consultorios existentes heredaron una vez el horario de su clínica (true; respaldo en respaldos.consultorios_horario_20261119) y, con la agenda v2, la rejilla, los avisos y la reserva usan el de cada consultorio; clinicas.horario_consulta sólo queda como respaldo de los consultorios nuevos que sigan en false.';
-COMMENT ON COLUMN public.consultorios.horario_revisado_en IS
-  'Agenda v2: cuándo una persona confirmó o guardó el horario de este consultorio desde la configuración de la agenda. NULL = por revisar (lo heredó de la clínica al crearse la columna, lo dejó «Restablecer» o nadie lo ha confirmado). La escribe PATCH /api/consultorios/[id] con la v2; agenda_restablecer_configuracion la vuelve a NULL.';
-COMMENT ON COLUMN public.clinicas.timezone IS
-  'Huso horario IANA «de fábrica» de la clínica; NULL = aún sin elegir. Lo escribe sólo PUT /api/me/horario (administrador, validado contra Intl.supportedValuesOf). CONVENIO: NO lo lee la rejilla, ni la reserva, ni los correos: cada consultorio tiene su propio consultorios.timezone, que cambiar éste NO toca. Sólo propone el huso de los consultorios que se creen.';
 COMMENT ON TABLE respaldos.consultorios_horario_20261119 IS
   'consultorios.horario y horario_propio de cada consultorio sin horario propio, ANTES de heredar el de su clínica (backfill de 20261201120000_agenda_f1). respaldado_en es el instante de la copia: una fila de consultorios con updated_at igual no se ha editado desde entonces (lo usa la reversa de F1).';
 COMMENT ON FUNCTION public.agenda_restablecer_configuracion(uuid, uuid) IS
   'Restablece la configuración de la agenda v2 de UNA clínica: consultorios al horario de partida de la v2 (el de la clínica copiado como horario propio) y POR REVISAR (horario_revisado_en NULL), tipos de cita archivados, enlaces de reserva vigentes revocados, plazos de fábrica y recordatorio apagado; una fila en audit_log. No toca citas, pacientes, auditoría ni contactos bloqueados. Sólo service_role; la llama POST /api/agenda/restablecer tras comprobar que p_actor es el administrador de p_clinica_id (y la función lo vuelve a comprobar).';
+
+-- ---------------------------------------------------------------------
+-- 10 · Candados, segundo tiempo, y TODO lo que exige ACCESS EXCLUSIVE sobre
+--      tablas de main, en UN solo bloque: un viaje al servidor desde que se
+--      toman hasta que acaba. ACCESS EXCLUSIVE sobre appointments,
+--      consultorios y clinicas a la vez, NOWAIT, 50 intentos cada 0,1 s.
+-- ---------------------------------------------------------------------
+DO $tablas_main$
+DECLARE
+  v_intento integer := 0;
+BEGIN
+  LOOP
+    v_intento := v_intento + 1;
+    BEGIN
+      LOCK TABLE public.appointments, public.consultorios, public.clinicas IN ACCESS EXCLUSIVE MODE NOWAIT;
+      EXIT;
+    EXCEPTION WHEN lock_not_available THEN
+      IF v_intento >= 50 THEN
+        RAISE EXCEPTION 'CANDADOS: appointments, consultorios o clinicas siguieron ocupadas 5 s (una transacción larga las lee o escribe). No se cambió nada: reintenta en unos minutos.'
+          USING ERRCODE = '55P03';
+      END IF;
+      PERFORM pg_sleep(0.1);
+    END;
+  END LOOP;
+
+  -- appointments: el tipo de la cita y la instantánea de su nombre.
+  -- FK COMPUESTA (tipo_cita_id, clinica_id): la base impide que una cita
+  -- use un tipo de OTRA clínica, y el error es el mismo exista o no el tipo
+  -- ajeno (no delata ids). Que el tipo sea de toda la clínica o del médico
+  -- de la cita es un CONVENIO que comprueba la API (va en el COMMENT).
+  ALTER TABLE public.appointments
+    ADD COLUMN tipo_cita_id uuid,
+    ADD COLUMN tipo_cita_nombre text,
+    ADD CONSTRAINT appointments_tipo_cita_fkey
+      FOREIGN KEY (tipo_cita_id, clinica_id) REFERENCES public.tipos_cita (id, clinica_id) ON DELETE RESTRICT,
+    ADD CONSTRAINT appointments_tipo_cita_snapshot_check
+      CHECK ((tipo_cita_id IS NULL) = (tipo_cita_nombre IS NULL));
+
+  -- El que usa la FK al comprobar RESTRICT desde tipos_cita.
+  CREATE INDEX idx_appointments_tipo_cita ON public.appointments (tipo_cita_id)
+    WHERE tipo_cita_id IS NOT NULL;
+
+  -- Los dos disparadores de la auditoría de citas (log_cita_change, §6).
+  CREATE TRIGGER audit_appointments
+    AFTER INSERT OR DELETE ON public.appointments
+    FOR EACH ROW EXECUTE FUNCTION public.log_cita_change();
+
+  -- Partido en dos a propósito: un WHEN que lee OLD no se admite en INSERT.
+  -- ⚠️ La misma lista que c_tecnicas de log_cita_change(). Van juntas.
+  CREATE TRIGGER audit_appointments_update
+    AFTER UPDATE ON public.appointments
+    FOR EACH ROW
+    WHEN ((to_jsonb(OLD) - ARRAY['updated_at','client_id','gcal_sync_status','gcal_etag','gcal_calendar_id','google_event_id']::text[])
+          IS DISTINCT FROM
+          (to_jsonb(NEW) - ARRAY['updated_at','client_id','gcal_sync_status','gcal_etag','gcal_calendar_id','google_event_id']::text[]))
+    EXECUTE FUNCTION public.log_cita_change();
+
+  -- Horarios de consultorio y huso de la clínica (columnas en tablas de
+  -- main; contrato con spinus-consola: sólo se añaden, nunca se renombran
+  -- ni cambian de tipo o significado).
+  -- clinicas.timezone: text NULL sin DEFAULT ni CHECK (NULL = sin elegir).
+  -- clinicas.horario_consulta NO se escribe nunca: sólo se lee.
+  ALTER TABLE public.consultorios
+    ADD COLUMN horario_propio boolean NOT NULL DEFAULT false,
+    ADD COLUMN horario_revisado_en timestamptz;
+
+  ALTER TABLE public.clinicas ADD COLUMN timezone text;
+
+  -- Backfill (el ÚNICO del conjunto): cada consultorio hereda UNA vez el
+  -- horario de su clínica como punto de partida. La única fuente de la
+  -- disponibilidad pasa a ser el consultorio; editar el de la clínica ya no
+  -- mueve el de ningún consultorio. El horario EFECTIVO no cambia: con
+  -- horario_propio = false, horarioEfectivo() daba el de la clínica.
+  -- Para TODAS las clínicas, también las de la v2 apagada: con ella apagada
+  -- ningún código lee horario_propio ni consultorios.horario.
+  -- El valor previo de consultorios.horario era INERTE (nadie lo leía) y
+  -- queda en el respaldo, escrito ANTES del UPDATE. respaldado_en y el
+  -- updated_at que pone trg_consultorios_updated_at son el mismo now() de
+  -- esta transacción: así la reversa sabe qué filas nadie editó después.
+  -- Si el respaldo ya existía (un reintento tras la reversa), se conserva la
+  -- PRIMERA copia de cada consultorio.
+  INSERT INTO respaldos.consultorios_horario_20261119 (id, clinica_id, horario, horario_propio)
+  SELECT k.id, k.clinica_id, k.horario, k.horario_propio
+    FROM public.consultorios k
+   WHERE NOT k.horario_propio
+  ON CONFLICT (id) DO NOTHING;
+
+  -- También los archivados: si se reactivan, conservan el punto de partida.
+  UPDATE public.consultorios k
+     SET horario = c.horario_consulta,
+         horario_propio = true
+    FROM public.clinicas c
+   WHERE c.id = k.clinica_id
+     AND NOT k.horario_propio;
+
+  COMMENT ON COLUMN public.appointments.tipo_cita_id IS
+    'Tipo de la cita. La FK compuesta garantiza la misma clínica. CONVENIO QUE LA BASE NO IMPONE: el tipo es de toda la clínica (medico_id NULL) o del medico_id de la cita, y la cita tiene paciente O está por ligar (reserva_canal no nulo). Lo comprueban reservar_por_enlace y POST/PUT /api/appointments (validarTipoParaCita en src/lib/agenda/tiposCita.ts, que mientras no se amplíe sólo admite tipo con paciente). Un camino que escriba la columna sin pasar por ahí puede dejar un tipo de otro médico sin que nada lo note.';
+  COMMENT ON COLUMN public.appointments.tipo_cita_nombre IS
+    'Instantánea del nombre del tipo al asignarlo (como consultorio_nombre). Renombrar el tipo no la cambia. Va junto con tipo_cita_id: las dos nulas o las dos con valor (appointments_tipo_cita_snapshot_check); quitar el tipo es poner las dos a NULL.';
+  COMMENT ON COLUMN public.consultorios.horario_propio IS
+    'false = la disponibilidad de este consultorio es clinicas.horario_consulta; true = manda consultorios.horario (un tramo por día, sin pausa; con true y todos los días inactivos el consultorio está CERRADO, no hereda). Lo resuelve horarioEfectivo() en src/lib/agenda/disponibilidad.ts. Al crearse esta columna, todos los consultorios existentes heredaron una vez el horario de su clínica (true; respaldo en respaldos.consultorios_horario_20261119) y, con la agenda v2, la rejilla, los avisos y la reserva usan el de cada consultorio; clinicas.horario_consulta sólo queda como respaldo de los consultorios nuevos que sigan en false.';
+  COMMENT ON COLUMN public.consultorios.horario_revisado_en IS
+    'Agenda v2: cuándo una persona confirmó o guardó el horario de este consultorio desde la configuración de la agenda. NULL = por revisar (lo heredó de la clínica al crearse la columna, lo dejó «Restablecer» o nadie lo ha confirmado). La escribe PATCH /api/consultorios/[id] con la v2; agenda_restablecer_configuracion la vuelve a NULL.';
+  COMMENT ON COLUMN public.clinicas.timezone IS
+    'Huso horario IANA «de fábrica» de la clínica; NULL = aún sin elegir. Lo escribe sólo PUT /api/me/horario (administrador, validado contra Intl.supportedValuesOf). CONVENIO: NO lo lee la rejilla, ni la reserva, ni los correos: cada consultorio tiene su propio consultorios.timezone, que cambiar éste NO toca. Sólo propone el huso de los consultorios que se creen.';
+END $tablas_main$;
 
 -- ---------------------------------------------------------------------
 -- 11 · Post-vuelo. Si algo no quedó como debe, aborta y se deshace TODO.
@@ -902,14 +972,14 @@ FROM (
          'true / search_path="" / true'
   UNION ALL
   SELECT 7, 'disparadores de appointments de F1',
-         (SELECT string_agg(tgname || '→' || tgfoid::regproc::text, ',' ORDER BY tgname) FROM pg_trigger
-           WHERE tgrelid = 'public.appointments'::regclass AND tgname LIKE 'audit_appointments%' AND tgenabled = 'O'),
+         (SELECT string_agg(t.tgname || '→' || p.proname, ',' ORDER BY t.tgname) FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+           WHERE t.tgrelid = 'public.appointments'::regclass AND t.tgname LIKE 'audit_appointments%' AND t.tgenabled = 'O'),
          'audit_appointments→log_cita_change,audit_appointments_update→log_cita_change'
   UNION ALL
   SELECT 8, 'disparadores de agenda_ajustes y tipos_cita',
-         (SELECT string_agg(tgrelid::regclass::text || '.' || tgname, ',' ORDER BY tgrelid::regclass::text, tgname) FROM pg_trigger
-           WHERE tgrelid IN (to_regclass('public.agenda_ajustes'), to_regclass('public.tipos_cita'))
-             AND NOT tgisinternal AND tgenabled = 'O'),
+         (SELECT string_agg(c.relname || '.' || t.tgname, ',' ORDER BY c.relname, t.tgname) FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+           WHERE t.tgrelid IN (to_regclass('public.agenda_ajustes'), to_regclass('public.tipos_cita'))
+             AND NOT t.tgisinternal AND t.tgenabled = 'O'),
          'agenda_ajustes.audit_agenda_ajustes,agenda_ajustes.trg_agenda_ajustes_proteger,tipos_cita.audit_tipos_cita,tipos_cita.trg_tipos_cita_consultorio,tipos_cita.trg_tipos_cita_medico,tipos_cita.trg_tipos_cita_updated_at'
   UNION ALL
   SELECT 9, 'FK RESTRICT (agenda_ajustes, tipos_cita ×3, appointments_tipo_cita_fkey)',
@@ -920,10 +990,11 @@ FROM (
          'agenda_ajustes_clinica_id_fkey=r,appointments_tipo_cita_fkey=r,tipos_cita_clinica_id_fkey=r,tipos_cita_consultorio_id_fkey=r,tipos_cita_medico_id_fkey=r'
   UNION ALL
   SELECT 10, 'columnas en tablas de main (tipo / NOT NULL / default)',
-         (SELECT string_agg(a.attrelid::regclass::text || '.' || a.attname || '=' || format_type(a.atttypid, a.atttypmod)
+         (SELECT string_agg(c.relname || '.' || a.attname || '=' || format_type(a.atttypid, a.atttypmod)
                             || '/' || a.attnotnull::text || '/' || coalesce(pg_get_expr(d.adbin, d.adrelid), '-'), ','
-                            ORDER BY a.attrelid::regclass::text, a.attname)
-            FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+                            ORDER BY c.relname, a.attname)
+            FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
+            LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
            WHERE NOT a.attisdropped
              AND (a.attrelid, a.attname) IN (('public.appointments'::regclass, 'tipo_cita_id'), ('public.appointments'::regclass, 'tipo_cita_nombre'),
                                              ('public.consultorios'::regclass, 'horario_propio'), ('public.consultorios'::regclass, 'horario_revisado_en'),
