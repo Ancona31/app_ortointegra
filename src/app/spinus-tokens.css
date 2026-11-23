@@ -1247,7 +1247,7 @@ input[type="date"].sp-input {
 .sv-celda[data-estado="vigilar"] .sv-celda__punto { color: var(--aviso-punto); }
 .sv-celda[data-estado="fuera"] .sv-celda__punto   { color: var(--mal-tinta); }
 .sv-celda__v { display: block; min-width: 0; font-size: 21px; line-height: 26px; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sv-celda[data-estado="vacio"] .sv-celda__v { color: var(--tinta3); font-weight: 500; }
+.sv-celda[data-estado="vacio"] .sv-celda__v { color: var(--tinta2); font-weight: 500; } /* --tinta3 daba 2,8:1 (auditoría H8) */
 .sv-celda__u { font-size: 12px; line-height: 16px; color: var(--tinta2); white-space: nowrap; }
 .sv-hoja .sv-in { font-size: 17px; }
 .sv-hoja .sv-in[data-estado]           { color: var(--tinta) !important; }

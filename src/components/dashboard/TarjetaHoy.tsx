@@ -245,7 +245,7 @@ export default function TarjetaHoy({ medicoId }: {
       <ol className={TIRA}>
         {dia.semana.map(d => (
           <li key={d.fecha} aria-current={d.esHoy ? 'date' : undefined} className="flex flex-col items-center gap-0.5">
-            <span className={`text-[12px] font-semibold uppercase leading-4 ${d.esHoy ? 'text-tinta' : 'text-tinta3'}`}>{d.inicial}</span>
+            <span className={`text-[12px] font-semibold uppercase leading-4 ${d.esHoy ? 'text-tinta' : 'text-tinta2'}`}>{d.inicial}</span>
             <span className={`k-num flex size-8 items-center justify-center rounded-full text-[15px] ih:size-7 ${d.esHoy ? 'bg-tonal font-bold text-tonal-tinta' : 'text-tinta2'}`}>
               {d.numero}
             </span>
