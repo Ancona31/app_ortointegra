@@ -9,8 +9,17 @@
 --   orden (20261125170000 y F5a con su huella md5 normalizada a \n, en copias
 --   fuera del repo), luego ésta (rejilla 4/4 OK); segunda pasada sin cambios;
 --   prueba t_agenda_sin_truncate.sql en verde; reversa; otra vez la ida.
--- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. PENDIENTE DE AUDITORÍA
---   INDEPENDIENTE (supabase/AUDITORIA-MIGRACIONES.md): no se ha auditado.
+-- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. AUDITADA (auditor independiente,
+--   dentro del conjunto de las 9; el SQL de este archivo no cambió desde
+--   entonces):
+--   · ronda 1, 2026-11-22 (supabase/produccion/auditoria/RONDA-1.md): aplicada
+--     en orden sobre un clon de la foto con rc=0 y 0 filas REVISAR, segunda
+--     pasada en verde y reversa en verde; ningún hallazgo es de este archivo
+--     (A6 era de las rejillas de 20261126120000 y F5a, que ésta hacía saltar;
+--     corregido). Veredicto del conjunto: «ninguno es BLOQUEANTE».
+--   · ronda 2, pasada 2, 2026-11-22/23 (RONDA-2.md, P2-1, fila T): pre-vuelo y
+--     post-vuelo leídos enteros; defectos: «ninguno». Veredicto: «no hay
+--     hallazgos que impidan aplicar las 9 migraciones a producción».
 --
 -- Qué hace:
 --   1. Disparador de sentencia trg_<tabla>_sin_truncate (BEFORE TRUNCATE FOR

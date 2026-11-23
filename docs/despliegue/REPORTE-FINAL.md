@@ -25,11 +25,7 @@
 3. **Hora sin consulta** [C: plan paso 0].
 4. **Variables de Vercel** antes de desplegar, `CRON_SECRET` la primera; `AGENDA_RSVP_GOOGLE` sin definir [C: VARIABLES-VERCEL.md; plan §6.2].
 5. **Integración Supabase–GitHub sin conectar**, confirmado antes de fusionar a main [C: plan paso 0 y §12.6].
-6. **La auditoría de T, en papel.**
-   - Su cabecera (`20261201180000_agenda_sin_truncate.sql:12-13`) y `mejora_agendaV2.md` §7.1 fila 14 dicen «PENDIENTE DE AUDITORÍA INDEPENDIENTE» [C].
-   - Las rondas 1 y 2 auditaron las 9, T incluida (RONDA-2 P2-1, fila T: «ninguno») [C].
-   - Si Angel las da por buenas, hay que cambiar la cabecera y regenerar `huellas.sha256` en el mismo commit (plan §12.1) [D].
-   - Lo mismo pasa con la 2: plan §1 y §7.1 fila 7 dicen «pendiente», pero su cabecera ya dice «AUDITADA» [C].
+6. ~~**La auditoría de T, en papel.**~~ **Hecho (agente BP, 2026-11-23):** la cabecera de T dice ya «AUDITADA» con las dos rondas (RONDA-1 y RONDA-2 P2-1, fila T: «ninguno»), sólo en comentarios; `huellas.sha256` regenerado (cambia sólo la línea de T). Plan §1 y `mejora_agendaV2.md` §7.1 (filas 7, 14 y 51) al día también para la 2 [C].
 7. **El aviso de privacidad de la reserva** (`avisoReserva.ts`, pendiente de revisión legal).
    - No impide aplicar ni desplegar.
    - Con la marca puesta, en Vercel no abre la página de reserva por enlace, aunque se apruebe el hash [C: `avisoReserva.ts:88-93`].
@@ -166,7 +162,7 @@ Fuente: ENSAYO-PRINCIPAL §5.6. Mediana de 20 muestras; servidor y base en la mi
 11. Los 28 worktrees de agentes en `.claude/worktrees/`, 4,4 GB [C: du].
 12. AG-DT-257 sigue abierta aunque pasó en la última batería.
 13. AG-DT-260 sigue abierta (corrida que cruza la medianoche).
-14. La auditoría de T en papel (sección 1, punto b.6).
+14. ~~La auditoría de T en papel (sección 1, punto b.6).~~ Hecho (agente BP).
 15. `docs/despliegue/` cae bajo `docs/*` en `.gitignore`: los archivos se añadieron con `git add -f`. Decidir si se añade `!docs/despliegue/`.
 
 **Otras contradicciones entre documentos (sin corregir):**

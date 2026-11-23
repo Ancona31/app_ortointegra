@@ -50,14 +50,14 @@ Los conteos de sólo lectura de antes están en `../conteos/` (`LEEME.md`).
 | # | Versión | Archivo | Qué es | Rol exigido |
 |---|---|---|---|---|
 | 1 | 20261125170000 | `audit_log_sin_truncate` | `audit_log` sin TRUNCATE (no es de la agenda) | dueño de `audit_log` |
-| 2 | 20261126120000 | `public_sin_truncate` | `public` sin TRUNCATE (no es de la agenda; **pendiente de auditoría independiente**) | `postgres` exacto |
+| 2 | 20261126120000 | `public_sin_truncate` | `public` sin TRUNCATE (no es de la agenda; auditada: `../auditoria/RONDA-1.md` y `RONDA-2.md`) | `postgres` exacto |
 | 3 | 20261201120000 | `agenda_f1_ajustes_tipos_horarios` | F1: ajustes, interruptor, tipos, auditoría de citas, **el único backfill** | dueño de 4 tablas |
 | 4 | 20261201130000 | `agenda_f5a_bloqueos` | F5a: bloqueos | dueño |
 | 5 | 20261201140000 | `agenda_f3_reserva_enlace` | F3: reserva por enlace | dueño |
 | 6 | 20261201150000 | `agenda_f2_google` | F2: Google | dueño |
 | 7 | 20261201160000 | `agenda_f4_confirmacion_correos_avisos` | F4: confirmación, correos, avisos | `postgres` exacto |
 | 8 | 20261201170000 | `agenda_f5b_protecciones_cita` | F5b: protecciones de `appointments` | `postgres` exacto, con BYPASSRLS |
-| 9 | 20261201180000 | `agenda_sin_truncate` | T: disparador contra TRUNCATE en las 11 tablas de la agenda con datos de personas (**aparte del conjunto fundido**, va la última; pendiente de auditoría independiente) | dueño |
+| 9 | 20261201180000 | `agenda_sin_truncate` | T: disparador contra TRUNCATE en las 11 tablas de la agenda con datos de personas (**aparte del conjunto fundido**, va la última; auditada dentro de las 9: `RONDA-1.md` y `RONDA-2.md` P2-1, fila T, «ninguno») | dueño |
 
 **Con qué rol se conecta:** `postgres`, por el **Session pooler**
 (`aws-0-us-west-2.pooler.supabase.com:5432`, usuario
@@ -277,8 +277,11 @@ encendido.
 
 ### Paso 0 · Requisitos previos (si falta uno, no se empieza)
 
-- [ ] Auditoría global aprobada (`supabase/AUDITORIA-MIGRACIONES.md`; la 2 y la
-      9 dicen «PENDIENTE DE AUDITORÍA INDEPENDIENTE»).
+- [ ] Auditoría global aprobada (`supabase/AUDITORIA-MIGRACIONES.md`). Las 9,
+      la 2 y la 9 incluidas, las auditó el auditor independiente en dos rondas
+      (`../auditoria/RONDA-1.md`: «ninguno es BLOQUEANTE»; `RONDA-2.md`: «no hay
+      hallazgos que impidan aplicar»); sus cabeceras ya lo dicen (agente BP,
+      2026-11-23). Falta el visto bueno de Angel.
 - [ ] La equivalencia (E0) y el ensayo de código ↔ base (E2) en verde.
 - [ ] `huellas.sha256` regenerado con los archivos aprobados (§12, punto 1).
 - [ ] Los conteos en OK (paso 3), corridos por Angel **ese mismo día**, justo
@@ -1331,7 +1334,11 @@ una petición por archivo, §5.0) y la duración de las rutas en Vercel (Fluid
 Compute confirmado por Angel; se mira el panel en el paso 4).
 
 1. **`huellas.sha256`:** regenerado con el SQL definitivo (fase 2 de CA: 17 de
-   los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Si se toca
+   los 18 archivos cambiaron con la ronda 1; sólo T sigue igual). Regenerado otra
+   vez el 2026-11-23 (agente BP): la cabecera de T pasa de «PENDIENTE DE
+   AUDITORÍA» a «AUDITADA»; **sólo comentarios** (md5 sin líneas `--` ni blancas
+   idéntico antes y después en los 18; `~/spinus-fusion/ensayo-bp/demostracion-punto1.txt`),
+   así que cambia sólo la huella de T. Si se toca
    cualquier migración o reversa, se regenera en el mismo commit:
    `sha256sum supabase/migrations/2026112* supabase/migrations/202612* supabase/reversas/2026112* supabase/reversas/202612* supabase/produccion/plan/reversa-previa.sql > supabase/produccion/plan/huellas.sha256`
    (desde la fase 4 de CA lleva también `reversa-previa.sql`, G10). Y la huella
