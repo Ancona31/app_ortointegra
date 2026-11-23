@@ -366,6 +366,159 @@ Recórrelas todas, en orden. Esta lista crece con cada auditoría (ver sección 
     entero, no sólo el renglón cambiado. Quien escribe tiende a leer lo que
     quiso poner, y quien corrige, a dar por buena su propia corrección.
 
+> **Dimensiones 26 a 28: añadidas el 2026-11-22 por orden de Angel** («entran
+> al documento de auditoría las tres dimensiones que nombraste»). Son tres de
+> las diez que se habían propuesto en auditorías anteriores y no se habían
+> añadido (AG-DT-254, AG-DT-143 y `AUDITORIA-CONJUNTO-AGENDA-V2.md` §9.7). Las
+> otras siete siguen sin añadir, a la espera de Angel.
+
+26. **El otorgante del privilegio.** Un `REVOKE` sólo quita lo que concedió el
+    rol que lo ejecuta (o un rol del que es miembro). Un privilegio concedido
+    por otro otorgante —`supabase_admin`, o los privilegios por omisión de otro
+    dueño— **sobrevive al `REVOKE` sin ningún error ni aviso**: la sentencia
+    «funciona» y el privilegio sigue ahí. Qué mirar: por cada privilegio que la
+    migración dice quitar, quién lo concedió. Cómo se comprueba: en el catálogo,
+    `aclexplode(relacl)` (o `proacl`) con su columna `grantor`, o
+    `information_schema.role_table_grants.grantor`, antes de aplicar; y después,
+    no leyendo el ACL sino preguntando el privilegio efectivo
+    (`has_table_privilege(rol, tabla, 'TRUNCATE')`, que cuenta también PUBLIC y
+    la pertenencia a roles) o intentando la acción como ese rol en una prueba.
+    *Ejemplos del proyecto:* el post-vuelo de
+    `20261125170000_audit_log_sin_truncate.sql` aborta antes del `COMMIT` si un
+    rol conserva TRUNCATE «por ejemplo, concedido por otro otorgante», y el
+    pre-vuelo de `20261126120000_public_sin_truncate.sql` aborta con el nombre de
+    la tabla cuando el TRUNCATE lo concedió alguien distinto del dueño
+    (`a.grantor <> c.relowner`). En la foto de producción, los privilegios por
+    omisión de `supabase_admin` en `public` conceden ALL a `anon`,
+    `authenticated` y `service_role`: una tabla de `public` creada por
+    `supabase_admin` traería privilegios que un `REVOKE` hecho como `postgres` no
+    alcanza. Es distinta de la 20 (qué recibió cada rol): ésta pregunta si lo
+    que se quita se puede quitar desde quien aplica.
+
+27. **Contadores dentro de una transacción que puede fallar.** Un contador
+    (intentos, cupos, topes) que se incrementa en la misma transacción que
+    después lanza una excepción **se deshace con ella**: el `ROLLBACK` borra el
+    conteo y el tope no cuenta nunca. Qué mirar: en cada función que cuenta, qué
+    se comprueba o se escribe DESPUÉS del incremento, y si quien llama puede
+    provocar ahí una excepción (un `unique_violation`, un CHECK, un
+    `RAISE`). Lo que vaya después del contador no puede lanzar nada provocable
+    por quien llama: se comprueba antes, o la sentencia que puede chocar va en
+    su propio bloque `BEGIN … EXCEPTION … END` (un subbloque de plpgsql, que
+    deshace sólo lo suyo) y devuelve un resultado en vez de propagar el error.
+    Comprobar antes no basta si otra transacción puede adelantarse entre la
+    comprobación y la escritura (un `EXISTS` no ve lo que otra transacción aún
+    no confirmó). Cómo se comprueba: una prueba que provoque la excepción y mire
+    que el contador subió, y una carrera de dos sesiones. *Ejemplo del
+    proyecto:* el tope de 5 intentos del enlace de un solo uso
+    (`reserva_enlaces.intentos` y `agotado_en`, en `reservar_por_enlace`,
+    `20261201140000`): `client_id_en_uso` se comprueba antes del contador, y el
+    INSERT de la cita va en su propio `BEGIN … EXCEPTION WHEN unique_violation`
+    para que una carrera no deshaga el conteo (escenario 5 de
+    `reserva-carrera.sh`; nació del hallazgo H1 de la antigua `20261122120000` y
+    de la carrera que cerró `20261122120100`, hoy fundidas en F3; AG-DT-143).
+
+28. **Pre-vuelos acotados.** Un pre-vuelo aborta sólo por lo que de verdad
+    afecta a lo que la migración crea o supone, y su mensaje dice qué encontró y
+    qué hacer. Ni tan laxo que deje pasar una suposición falsa, ni tan amplio
+    que aborte por algo ajeno: un pre-vuelo que se dispara por algo que no
+    importa enseña a quien aplica a saltárselo, y entonces deja de proteger.
+    Qué mirar: por cada condición del pre-vuelo, sobre qué universo se evalúa
+    (¿la tabla entera, o las filas que la sentencia va a tocar?; ¿cualquier
+    índice de la tabla, o los que la migración crea?) y si una diferencia que no
+    cambia el comportamiento (espacios, fines de línea) lo hace abortar. Un
+    pre-vuelo que anticipa que «el disparador X abortaría» se acota al `WHERE`
+    de la sentencia, no a la tabla entera (propuesta del auditor de
+    `20261119130000`, `AUDITORIA-CONJUNTO-AGENDA-V2.md` §9.7). Cómo se
+    comprueba: correr el pre-vuelo sobre la foto de producción y sobre una base
+    con algo ajeno sembrado a propósito, y ver que sólo aborta en el segundo
+    caso cuando debe. *Ejemplos del proyecto:*
+    - **Huellas por md5 de `prosrc` (2026-11-22, comprobado contra la foto de
+      producción, `supabase/produccion/DERIVA.md`):** en producción 32 de las 47
+      funciones de `public` tienen el cuerpo con `\r\n`, idénticas al repo
+      salvo los fines de línea. Los pre-vuelos con md5 exacto abortaban: el de
+      `20261125170000` sobre `prevent_audit_modification()` y el de F5a
+      (`20261201130000`) sobre `clinica_no_suspendida()` y
+      `clinica_tiene_acceso()`. La huella se compara normalizando **sólo** los
+      fines de línea, `md5(replace(prosrc, E'\r\n', E'\n'))` (como ya hace la
+      rejilla de F2, `20261201150000`); normalizar más (todo espacio, `\s+`)
+      aceptaría cambios que no son sólo de fines de línea, y eso hay que
+      decidirlo a propósito, no por comodidad.
+    - **Índices inválidos:** el pre-vuelo de F5b (`20261201170000`) aborta sólo
+      si uno de SUS tres índices existe y está INVALID, y dice qué hacer
+      («DROP INDEX y volver a correr»). Abortar por cualquier índice inválido de
+      la tabla haría fallar la migración por un resto ajeno de un
+      `CREATE INDEX CONCURRENTLY` de otro, sin relación con lo que ella crea.
+
+---
+
+## 4-bis. Cambio de privilegios por omisión (`20261126120000`)
+
+> **PENDIENTE DE JUICIO DEL AUDITOR GLOBAL.** Por orden de Angel («el cambio de
+> privilegios por omisión de P se queda, en sección aparte, y que lo juzgue el
+> auditor»), esta sección sólo describe el cambio y lo que podría romper; no da
+> veredicto. Quien audite `20261126120000_public_sin_truncate.sql` decide si se
+> queda, se acota o se quita, y lo anota aquí.
+
+**Qué hace, exactamente** (paso 3 de la migración, línea 260):
+
+```sql
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE TRUNCATE ON TABLES FROM anon, authenticated, service_role;
+```
+
+- **Rol:** sólo los objetos que cree `postgres` (`FOR ROLE postgres`). El
+  pre-vuelo exige que quien aplica sea miembro de `postgres`.
+- **Esquema:** sólo `public` (`IN SCHEMA public`).
+- **Objetos:** sólo `TABLES` (según la documentación de Postgres, `TABLES`
+  incluye vistas y tablas foráneas). No toca los privilegios por omisión
+  de secuencias ni de funciones, ni ningún otro privilegio de tablas (SELECT,
+  INSERT, UPDATE, DELETE, REFERENCES, TRIGGER, MAINTAIN siguen como están).
+- **Efecto:** toda tabla que `postgres` cree en `public` DESPUÉS de aplicarla
+  nace sin TRUNCATE para esos tres roles. En la foto de producción los
+  privilegios por omisión de `postgres` en `public` son `GRANT ALL ON TABLES` a
+  `anon`, `authenticated` y `service_role` (por esquema); tras el cambio son ALL
+  menos TRUNCATE. No cambia ninguna tabla que ya exista: eso lo hace el paso 2
+  (REVOKE dinámico sobre el catálogo).
+- **Sobre las migraciones posteriores:** las de la agenda que revocan TRUNCATE
+  tabla a tabla pasan a hacer un REVOKE sin efecto (lo dice la cabecera; no lo
+  comprobé). El post-vuelo exige que el ACL por omisión de `postgres` en
+  `public` ya no dé TRUNCATE a los tres, y la rejilla enseña como INFO los de
+  `postgres` (fila 6) y los de `supabase_admin` (fila 7).
+
+**Lo que no cubre:**
+
+- **Tablas creadas por otro rol.** Los privilegios por omisión de
+  `supabase_admin` en `public` (en la foto: `GRANT ALL ON TABLES` a los tres
+  roles) no cambian: `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin` exige
+  ser miembro de ese rol, y la cabecera dice que `postgres` no lo es en
+  Supabase. Una tabla de `public` creada por `supabase_admin` (la plataforma,
+  una extensión) o por cualquier otro rol nacería con TRUNCATE para los tres.
+  Lo mismo vale para la dimensión 26: ese TRUNCATE lo concedería otro
+  otorgante. La cabecera dice que, al volver a correr la migración, el
+  pre-vuelo abortaría nombrando esa tabla.
+- **Privilegios por omisión globales** (sin `IN SCHEMA`). Un `REVOKE` por
+  esquema no quita lo que concede una entrada global (documentación de
+  `ALTER DEFAULT PRIVILEGES`: las de esquema se suman a las globales). En
+  `03-esquema-completo.sql` de la foto no aparece ninguna entrada sin
+  `IN SCHEMA`; que la foto incluya las globales no lo comprobé. El post-vuelo
+  sólo mira la entrada de `public` (`defaclnamespace = 'public'`).
+
+**Qué podría romper (a juzgar por el auditor; nada de esto se probó):**
+
+- Código o herramientas que hagan `TRUNCATE` con `anon`, `authenticated` o
+  `service_role` sobre una tabla nueva de `public`. La cabecera dice que en el
+  repo no hay ninguno (grep de `truncate` en `src`, `scripts`, `e2e` y
+  `supabase`, 2026-11-22), y que `spinus-consola`, si lo hiciera con
+  `service_role`, fallaría.
+- Herramientas de Supabase que esperen TRUNCATE en tablas de `public` con esos
+  roles (por ejemplo, un «vaciar tabla» del panel, o una herramienta que se
+  conecte como `service_role`). No sé qué rol usa cada una: no lo verifiqué.
+- Un `supabase db reset` o una semilla que vacíen con TRUNCATE como uno de esos
+  roles. La cabecera dice que la semilla y las e2e limpian con DELETE.
+- Para volver atrás, la reversa
+  (`supabase/reversas/20261126120000_public_sin_truncate_reversa.sql`, línea 64)
+  devuelve también el privilegio por omisión (`GRANT TRUNCATE ON TABLES`).
+
 ---
 
 ## 5. Formato de respuesta
