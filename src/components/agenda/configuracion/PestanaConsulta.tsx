@@ -81,7 +81,7 @@ function MiDuracion({ p, mia }: { p: Props; mia: TipoCita | null }) {
         Con esto sabemos cuántas citas caben en tu día.
       </p>
       <div className={LISTA}>
-        <div className={`${FILA} grid grid-cols-5 gap-[6px]`}>
+        <div className={`${FILA} grid grid-cols-3 gap-[6px] tel:grid-cols-5 ih:grid-cols-5 iv:grid-cols-5 esc:grid-cols-5`}>
           {DURACIONES.map(d => (
             <button key={d} type="button" aria-pressed={actual === d} disabled={ocupado} onClick={() => void elegir(d)} className={opcion(actual === d)}>{d} min</button>
           ))}
@@ -137,10 +137,13 @@ export default function PestanaConsulta(p: Props) {
   const mia = p.tipos?.find(t => t.activo && t.principal && t.medico_id === p.usuarioId && !t.consultorio_id) ?? null
   return (
     <div className={PANEL}>
-      <div className="flex flex-col gap-[6px]">
-        <h2 className={TITULO_PANEL}>{p.esMedico ? 'Tu consulta' : 'Tipos de cita'}</h2>
-        {!p.esMedico && <p className={SUB_PANEL}>La duración de la consulta de cada médico y los demás tipos de cita de la clínica.</p>}
-      </div>
+      {/* El médico no tiene frase aquí (la suya va con la duración): sin envoltorio, el h2 (fuera del flujo) no deja hueco. */}
+      {p.esMedico ? <h2 className={TITULO_PANEL}>Tu consulta</h2> : (
+        <div className="flex flex-col gap-[6px]">
+          <h2 className={TITULO_PANEL}>Tipos de cita</h2>
+          <p className={SUB_PANEL}>La duración de la consulta de cada médico y los demás tipos de cita de la clínica.</p>
+        </div>
+      )}
       {/* Tanda M (punto 15): la secretaria no cambia ningún tipo (`/api/agenda/tipos-cita`: 403). */}
       {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN_TIPOS}</p>}
       {!p.tipos ? <p className={`m-0 ${AYUDA}`}>No se pudieron leer los tipos de cita. Recarga la página.</p> : (
