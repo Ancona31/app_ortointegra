@@ -479,7 +479,7 @@ SELECT 48, 'F1.9', '20261201120000', 'respaldos.consultorios_horario_20261119: ¬
        CASE WHEN to_regclass('respaldos.consultorios_horario_20261119') IS NULL THEN 'no existe'
             WHEN (SELECT string_agg(attname || ':' || format_type(atttypid, atttypmod), ',' ORDER BY attnum) FROM pg_attribute
                    WHERE attrelid = to_regclass('respaldos.consultorios_horario_20261119') AND attnum > 0 AND NOT attisdropped)
-                 = 'id:uuid,clinica_id:uuid,horario:jsonb,horario_propio:boolean,respaldado_en:timestamp with time zone'
+                 = 'id:uuid,clinica_id:uuid,horario:jsonb,horario_propio:boolean,respaldado_en:timestamp with time zone,horario_antes:jsonb,horario_copiado:jsonb,copiado_en:timestamp with time zone'
             THEN 'existe, con su forma, ' || (xpath('/table/row/n/text()', query_to_xml(
                    'SELECT count(*) AS n FROM respaldos.consultorios_horario_20261119', false, false, '')))[1]::text || ' filas'
             ELSE 'existe, con OTRA forma' END,
@@ -488,7 +488,7 @@ SELECT 48, 'F1.9', '20261201120000', 'respaldos.consultorios_horario_20261119: ¬
        CASE WHEN to_regclass('respaldos.consultorios_horario_20261119') IS NOT NULL
              AND coalesce((SELECT string_agg(attname || ':' || format_type(atttypid, atttypmod), ',' ORDER BY attnum) FROM pg_attribute
                             WHERE attrelid = to_regclass('respaldos.consultorios_horario_20261119') AND attnum > 0 AND NOT attisdropped), '')
-                 <> 'id:uuid,clinica_id:uuid,horario:jsonb,horario_propio:boolean,respaldado_en:timestamp with time zone'
+                 <> 'id:uuid,clinica_id:uuid,horario:jsonb,horario_propio:boolean,respaldado_en:timestamp with time zone,horario_antes:jsonb,horario_copiado:jsonb,copiado_en:timestamp with time zone'
             THEN 'ALTO' ELSE 'AVISO' END
 UNION ALL
 SELECT 49, 'F1.10', '20261201120000', 'm√©dicos con consultorios activos y NINGUNO predeterminado (pre-vuelo 1.4: el backfill abortar√≠a)',

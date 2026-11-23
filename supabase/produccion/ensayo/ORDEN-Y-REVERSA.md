@@ -221,7 +221,9 @@ añade las de la vuelta del horario. De 48 al empezar el ensayo a 616 al termina
 `comparar-estructura.sh` entre la base «5 de main + deriva» del principio y la de
 después de r9: **10 diferencias, todas de `respaldos.consultorios_horario_20261119`**
 (la tabla, sus 5 columnas, su PK, su dueño, su privilegio): se queda a propósito.
-Nada más. Encima de esa base:
+Nada más. *(Nota del 2026-11-22, agente CA: tras la corrección A4 de la
+auditoría, ronda 1, el respaldo tiene 8 columnas y son **13** diferencias;
+comprobado en el ensayo de la fase 2 de CA. Este ensayo E2 no se repitió.)* Encima de esa base:
 
 - **la rama** (`11-app-r9-rama*`): como en (b): 200 en los gestos, 409
   `nota_ligada`, 404 `no_disponible` en la v2, un `warn` por petición;

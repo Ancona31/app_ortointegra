@@ -1448,7 +1448,7 @@ controlada, documentada y aceptada.
 
 Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y momento previsto. No reordenar prioridades sin discusión.
 
-### QW3 — Restringir endpoint ARCO a super_admin y admin
+### QW3 — Restringir endpoint ARCO a super_admin y al médico administrador de la clínica
 
 **Archivo afectado:** `src/app/api/paciente/[id]/exportar/route.ts`
 
@@ -1457,7 +1457,7 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 **Origen:** Endpoint creado en sesión anterior como preparación para cumplimiento legal ARCO. Nunca se integró a UI de super-admin.
 
 **Fix planeado:**
-1. Agregar validación post-auth: `role IN ('super_admin', 'admin')`
+1. Agregar validación post-auth: `role = 'super_admin'`, o `role = 'medico'` con `es_admin_de_clinica = true` (médico administrador de la clínica; el rol `admin` no existe: los roles son `super_admin`, `medico` y `secretaria`, `profiles_role_check`)
 2. Si role no cumple → responder `403 Forbidden`
 3. Registrar intentos denegados en `audit_log` con `accion='arco_intento_denegado'`
 4. Mantener el registro de accesos exitosos con `accion='arco_acceso'` (ya existe)
@@ -1467,7 +1467,7 @@ Hardening conocido pero no aplicado todavía. Cada ítem tiene fix planeado y mo
 **Alcance estimado:** 1 archivo, ~15 líneas, 20 min.
 
 **Decisiones ya tomadas:**
-- Roles permitidos: `super_admin` + `admin` (admin de clínica puede ejecutar ARCO para pacientes de su clínica; super_admin global puede para cualquier clínica).
+- Quién puede: `super_admin` + el médico administrador de la clínica (`role = 'medico'` con `es_admin_de_clinica`; puede ejecutar ARCO para pacientes de su clínica; super_admin global puede para cualquier clínica).
 - Respuesta denegada: `403 Forbidden` con JSON `{ error: "forbidden" }`.
 - Audit log: sí registrar intentos denegados.
 

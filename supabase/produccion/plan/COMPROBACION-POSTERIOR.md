@@ -52,9 +52,13 @@ Lo que tiene que salir (salió así en el ensayo [C]):
 - el clon: `14 diferencias (14 esperadas, 0 inesperadas)` (los avisos de dos
   esperadas que no aparecen son normales con la foto real);
 - `aplicar.sh`: `Las 9 aplicadas y registradas.`; rejillas iguales a
-  `rejillas-del-ensayo.txt` (63 OK, 10 INFO, 0 REVISAR);
-- el comparador: `Resumen: 2629 objetos en antes, 3503 en despues; 958
-  diferencias` (`exit 1`, normal: no se le dan esperadas). Sus claves son las de
+  `rejillas-del-ensayo.txt` (63 OK, 10 INFO, 0 REVISAR). Con el guion nuevo
+  (cada archivo en una petición, desde la oleada 3, ronda 1) cada `*.salida.txt`
+  empieza además por la línea «sesión: idle_in_transaction_session_timeout=10s,
+  lock_timeout=5s, statement_timeout=2min»; las rejillas salieron idénticas
+  [C-CA];
+- el comparador: `Resumen: 2629 objetos en antes, 3510 en despues; 965
+  diferencias` (con el SQL definitivo de la ronda 1; antes eran 3503 y 958: +3 columnas del respaldo de F1 y +4 comentarios de columna, A4 y A9) (`exit 1`, normal: no se le dan esperadas). Sus claves son las de
   `diferencias-antes-despues.clon-foto.tsv` de esta carpeta (comprobado: tres
   corridas sobre clones nuevos, mismas claves). La referencia del día es
   `referencia.claves`.
@@ -88,7 +92,7 @@ cut -f1-5 ~/spinus-produccion-foto-despues/difs-antes-despues.tsv | sort \
   | diff ~/spinus-produccion-ensayo/referencia.claves - && echo "IGUAL QUE EL ENSAYO"
 ```
 
-- El comparador sale con `exit 1` y **958 diferencias** (o las del ensayo del §0
+- El comparador sale con `exit 1` y **965 diferencias** (o las del ensayo del §0
   si se repitió con otra foto).
 - **El `diff` tiene que salir vacío y escribir `IGUAL QUE EL ENSAYO`.** Una línea
   `<` es algo que el ensayo cambió y producción no; una `>`, algo que cambió en
@@ -110,7 +114,7 @@ echo "salida: $?"
   foto ↔ clon de `esperadas-clon.tsv` (configuración de roles y de la base que
   `pg_dump` no vuelca, y tres CHECK con otro deparseo). No se añade ninguna
   esperada el día: una diferencia nueva es un hallazgo. (En el ensayo, foto
-  ↔ clon después dio 972 = 958 + 14, el mismo cálculo.)
+  ↔ clon después dio 979 = 965 + 14, el mismo cálculo; [C-CA, fase 2].)
 
 ## 4. El historial
 
@@ -262,3 +266,52 @@ pacientes) y se decide entre arreglar o revertir (`PLAN-DE-APLICACION.md` §8 y
   necesitó.
 - La línea `-- ESTADO · PRODUCCIÓN` de los 9 archivos, con la fecha y la
   comprobación (las de §2–§6), en un commit (`AUDITORIA-MIGRACIONES.md` §7).
+
+---
+
+## 10. Comprobación periódica: que el ajuste de privilegios por omisión sigue ahí
+
+Lo pidió el auditor (`../auditoria/RONDA-1.md`, «Juicio sobre la sección
+4-bis»): la nº 2 (`20261126120000`) quita TRUNCATE a `anon`, `authenticated` y
+`service_role` en los privilegios por omisión de `postgres` en `public`, y nada
+vigila que siga así (`DEUDA_TECNICA.md` AG-DT-270; dónde se corre de forma
+automática lo decide Angel). Si la plataforma o alguien los repone, la siguiente tabla
+nace con TRUNCATE y no se nota hasta volver a correr la nº 2. **Sólo lee.** Se
+corre el día de la aplicación (tras el §5), y después **una vez al mes** y tras
+cualquier cambio de la plataforma o migración nueva:
+
+```bash
+read -rs PGPASSWORD; export PGPASSWORD
+docker run --rm -i -e PGPASSWORD public.ecr.aws/supabase/postgres:17.6.1.167 psql -X -q -v ON_ERROR_STOP=1 -P pager=off \
+  "host=aws-0-us-west-2.pooler.supabase.com port=5432 user=postgres.qpnegmmpneseirfyplbf dbname=postgres sslmode=require" <<'SQL'
+BEGIN TRANSACTION READ ONLY;
+SELECT 1 AS n, 'tablas de public con TRUNCATE para anon/authenticated/service_role' AS que,
+       (SELECT count(DISTINCT c.oid) FROM pg_class c CROSS JOIN (VALUES ('anon'),('authenticated'),('service_role')) r(rol)
+         WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r','p','f')
+           AND has_table_privilege(r.rol, c.oid, 'TRUNCATE'))::text AS valor, '0' AS esperado
+UNION ALL SELECT 2, 'privilegios por omisión de postgres en public con TRUNCATE para los tres roles',
+       (SELECT count(*) FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+         WHERE d.defaclrole = 'postgres'::regrole AND d.defaclnamespace = 'public'::regnamespace AND d.defaclobjtype = 'r'
+           AND a.privilege_type = 'TRUNCATE' AND a.grantee IN ('anon'::regrole,'authenticated'::regrole,'service_role'::regrole))::text, '0'
+UNION ALL SELECT 3, 'privilegios por omisión GLOBALES (sin esquema) de postgres con TRUNCATE para los tres roles',
+       (SELECT count(*) FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+         WHERE d.defaclrole = 'postgres'::regrole AND d.defaclnamespace = 0 AND d.defaclobjtype = 'r'
+           AND a.privilege_type = 'TRUNCATE' AND a.grantee IN ('anon'::regrole,'authenticated'::regrole,'service_role'::regrole))::text, '0'
+UNION ALL SELECT 4, 'disparadores BEFORE TRUNCATE con prohibir_truncate(), habilitados',
+       (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgfoid = to_regprocedure('public.prohibir_truncate()') AND tgenabled = 'O')::text, '22'
+UNION ALL SELECT 5, 'INFO · privilegios por omisión de supabase_admin en public con TRUNCATE para los tres (límite conocido de la nº 2)',
+       (SELECT count(*) FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+         WHERE d.defaclrole = 'supabase_admin'::regrole AND d.defaclnamespace = 'public'::regnamespace AND d.defaclobjtype = 'r'
+           AND a.privilege_type = 'TRUNCATE' AND a.grantee IN ('anon'::regrole,'authenticated'::regrole,'service_role'::regrole))::text, '—';
+ROLLBACK;
+SQL
+unset PGPASSWORD
+```
+
+En el clon de la foto con las 9 aplicadas salió [C, agente CA, 2026-11-22]:
+`0 | 0`, `0 | 0`, `0 | 0`, `22 | 22` y la INFO en `3` (las tablas que cree
+`supabase_admin` nacen con TRUNCATE: es el límite que la propia nº 2 describe).
+**Si la 1, la 2 o la 3 no dan 0:** no se cambia nada a mano; se anota y se
+decide con el coordinador (volver a correr la nº 2 la repone: su segunda pasada
+no cambia nada más). La 4 en menos de 22 significa que alguien quitó un
+disparador contra TRUNCATE (de la nº 2 o de T): igual.

@@ -1380,7 +1380,7 @@ COMMENT ON COLUMN public.reserva_enlaces.pausado_en IS
 COMMENT ON TABLE public.reserva_incidencias IS
   'Cancelaciones y no_show de citas por enlace (el candado). La escribe SÓLO reserva_registrar_incidencia(). anulada_en = la cita se reactivó. Seudónimos (HMAC), sin datos en claro. El conteo automático (reserva_contacto_estado) mira sólo correo_hmac; tel_hmac se guarda pero no cuenta.';
 COMMENT ON TABLE public.reserva_contactos IS
-  'Bloqueo (bloqueado_en) y desbloqueo (perdonado_en) manuales por contacto y médico. Desbloquear también descuenta las incidencias anteriores. Lo escribe reserva_contacto_marcar(). medico_id es siempre un médico de clinica_id (proteger_reserva_contactos, para todos salvo postgres/supabase_admin; auditoría ronda 1, A3): la FK es de una sola columna.';
+  'Bloqueo (bloqueado_en) y desbloqueo (perdonado_en) manuales por contacto y médico. Desbloquear también descuenta las incidencias anteriores. Lo escribe reserva_contacto_marcar(). medico_id es siempre un médico de clinica_id (proteger_reserva_contactos, para todos salvo postgres/supabase_admin; auditoría ronda 1, A3): la FK es de una sola columna. Es la MISMA condición que proteger_reserva_enlaces() exige al médico de un enlace: un perfil con role = ''medico'' y la clinica_id de la fila; ninguna de las dos filtra por activo o eliminado (profiles no tiene esas columnas), y las dos exentan sólo a postgres/supabase_admin. Ser administrador de la clínica es es_admin_de_clinica de un médico, no otro rol.';
 
 COMMENT ON COLUMN public.appointments.reserva_enlace_id IS
   'Enlace de reserva_enlaces del que nació la cita. La FK compuesta (reserva_enlace_id, clinica_id) impide colgarla de un enlace de otra clínica. Va junto con reserva_canal (appointments_reserva_check).';
