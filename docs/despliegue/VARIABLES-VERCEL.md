@@ -3,8 +3,21 @@
 > Agente B7, 2026-11-23. Fuente: `supabase/produccion/plan/PLAN-DE-APLICACION.md`
 > §6.2, **comprobada contra el código**. Sólo nombres y formatos: **ningún valor
 > real** aquí ni en ningún archivo. Los valores se generan en la terminal de Angel
-> y se pegan en Vercel → Project → Settings → Environment Variables, entorno
-> **Production**, como «Sensitive» las secretas.
+> y se pegan en Vercel → Project → Settings → Environment Variables, entornos
+> **Production y Preview** (ver abajo), como «Sensitive» las secretas.
+>
+> **Cambio del agente BP (2026-11-23), por «base primero» (plan §6.1):** Angel
+> probará la rama en los **previews**, que apuntan a la base de PRODUCCIÓN, con la
+> v2 encendida en su clínica. Por eso **las nuevas van TAMBIÉN en Preview, y
+> `RESERVA_SECRETO` con el MISMO valor en los dos entornos.** Por qué: el código
+> de cada enlace de reserva y de confirmación es un HMAC derivado de
+> `RESERVA_SECRETO` y **la base sólo guarda su sha256**
+> (`src/lib/reserva/secretos.ts:1-26`); con otro secreto, un enlace emitido en un
+> entorno da otro código en el otro y no abre, y los seudónimos del candado
+> (incidencias, contactos bloqueados por teléfono o correo) tampoco casan, así
+> que el historial de lo probado en los previews se pierde al pasar a producción.
+> Las que no deben existir en Production **tampoco en Preview**. Riesgos de los
+> previews contra producción: `VENTANA-BASE-PRIMERO.md` §3.
 >
 > **Resultado de la comprobación: el plan y el código COINCIDEN.** No hay ninguna
 > variable que el código nuevo lea y el plan no liste, ni al revés.
@@ -33,17 +46,20 @@ Las nueve nuevas = las cuatro del plan §6.2 «nuevas» + las tres «no deben ex
 
 | Nombre | ¿Nueva? | Formato y cómo generarla (sin valores) | Cuándo se pone | Qué pasa si falta | Origen en el código |
 |---|---|---|---|---|---|
-| **`CRON_SECRET`** | sí | cadena no vacía; se compara `Authorization` con `Bearer <CRON_SECRET>` en tiempo constante. Generar con `openssl rand -hex 32`. Secreta | **⚠️ ANTES de desplegar** (plan §4 paso 4 y §6.3): las dos tareas de `vercel.json` (`google-sync` cada 10 min, `recordatorios` cada 15) **nacen con el despliegue** | `/api/cron/google-sync` y `/api/cron/recordatorios` responden **401** y no hacen nada; hay que ponerla y volver a desplegar | `src/lib/cronAutorizacion.ts:20-24`; rutas `src/app/api/cron/*/route.ts` |
-| **`RESERVA_SECRETO`** | sí | hexadecimal, **≥ 64 caracteres y longitud par**, sólo `[0-9a-f]` (se recorta y pasa a minúsculas); si no cumple, cuenta como ausente. Generar con `openssl rand -hex 32` **una sola vez** y guardarla en el gestor de contraseñas. Secreta. **Rotarla invalida todos los enlaces y el historial del candado** | antes del despliegue (Vercel sólo aplica una variable a los despliegues posteriores) | falla cerrado: no se emiten enlaces de reserva ni de confirmación y el recordatorio no sale; con la v2 apagada no se nota | `src/lib/reserva/secretos.ts:38-42` |
-| **`EMAIL_TRANSPORT`** | sí | el literal **`resend`**. Exige además `RESEND_API_KEY` y una `NEXT_PUBLIC_SUPABASE_URL` `https` remota; vacío o cualquier otro valor = apagado | antes del despliegue | apagado: los correos de la agenda no salen (nada falla). Las rutas viejas (registro, invitación…) siguen llamando a Resend directo y NO la leen (`.env.example`) | `src/lib/correo/transporte.ts:127-136` |
+| **`CRON_SECRET`** | sí | cadena no vacía; se compara `Authorization` con `Bearer <CRON_SECRET>` en tiempo constante. Generar con `openssl rand -hex 32`. Secreta | **⚠️ ANTES de desplegar** el día del código (plan §4-bis C0 y §6.3): las dos tareas de `vercel.json` (`google-sync` cada 10 min, `recordatorios` cada 15) **nacen con el despliegue a producción**. En Preview no hace falta: Vercel no ejecuta tareas en los previews («Cron jobs run only on production deployments», *Managing Cron Jobs*, leída el 2026-11-23); ponerla no hace daño | `/api/cron/google-sync` y `/api/cron/recordatorios` responden **401** y no hacen nada; hay que ponerla y volver a desplegar | `src/lib/cronAutorizacion.ts:20-24`; rutas `src/app/api/cron/*/route.ts` |
+| **`RESERVA_SECRETO`** | sí | hexadecimal, **≥ 64 caracteres y longitud par**, sólo `[0-9a-f]` (se recorta y pasa a minúsculas); si no cumple, cuenta como ausente. Generar con `openssl rand -hex 32` **una sola vez** y guardarla en el gestor de contraseñas. Secreta. **Rotarla invalida todos los enlaces y el historial del candado** | **en Preview ANTES de encender la v2 para los previews** (plan §4 paso 8) y en Production antes del despliegue del día del código, **con el MISMO valor** (arriba, por qué). Vercel sólo aplica una variable a los despliegues posteriores: tras ponerla, volver a desplegar el preview | falla cerrado: no se emiten enlaces de reserva ni de confirmación y el recordatorio no sale; con la v2 apagada no se nota | `src/lib/reserva/secretos.ts:38-42` |
+| **`EMAIL_TRANSPORT`** | sí | el literal **`resend`**. Exige además `RESEND_API_KEY` y una `NEXT_PUBLIC_SUPABASE_URL` `https` remota; vacío o cualquier otro valor = apagado | Production: antes del despliegue del día del código. **Preview: decisión de Angel** — con `resend`, los correos de la agenda de un preview salen a pacientes reales y sus enlaces usan `NEXT_PUBLIC_APP_URL` de Preview (con el dominio de producción llevan a `main`, que no tiene `/confirmar`): `VENTANA-BASE-PRIMERO.md` §3 | apagado: los correos de la agenda no salen (nada falla). Las rutas viejas (registro, invitación…) siguen llamando a Resend directo y NO la leen (`.env.example`) | `src/lib/correo/transporte.ts:127-136` |
 
 ## 2. Nueva que se deja SIN DEFINIR
 
 | Nombre | ¿Nueva? | Formato | Cuándo se pone | Qué pasa si estuviera |
 |---|---|---|---|---|
-| **`AGENDA_RSVP_GOOGLE`** | sí | sólo el literal exacto `encendido` la enciende; ausente, vacía o cualquier otro valor = apagada (`src/lib/gcalRsvp.ts:21-23`) | **NO en este despliegue.** `encendido` sólo después de probar Google real (RSVP) en la clínica de Angel (plan §6.2 y §13) | con `encendido`, confirmaría citas por la respuesta a la invitación de Google sin haberlo probado contra Google real |
+| **`AGENDA_RSVP_GOOGLE`** | sí | sólo el literal exacto `encendido` la enciende; ausente, vacía o cualquier otro valor = apagada (`src/lib/gcalRsvp.ts:21-23`) | **NO en este despliegue, ni en Production ni en Preview.** `encendido` sólo después de probar Google real (RSVP) en la clínica de Angel (plan §6.2 y §13) | con `encendido`, confirmaría citas por la respuesta a la invitación de Google sin haberlo probado contra Google real |
 
-## 3. Las que NO deben existir en producción
+## 3. Las que NO deben existir en producción (ni en Preview)
+
+Con los previews contra la base de producción, esta tabla vale igual para el
+entorno **Preview**.
 
 | Nombre | Por qué no | Qué haría si estuviera (comprobado leyendo) |
 |---|---|---|
@@ -77,10 +93,11 @@ coincide con la del plan §6.2.]
 
 - Que las variables estén puestas en el panel, ni con qué valor ni en qué entorno
   [D: hay que mirarlo en Vercel].
-- Que las previews no usen la agenda v2 (el plan pone las nuevas sólo en
-  Production, «ASUMIENDO que las previews no usan la agenda v2»: un
-  `RESERVA_SECRETO` distinto contra la misma base daría enlaces que producción no
-  reconoce).
+- ~~Que las previews no usen la agenda v2~~ *(sustituido el 2026-11-23: SÍ la
+  usan, en la clínica de Angel; por eso las nuevas van también en Preview, con el
+  mismo `RESERVA_SECRETO`).* Qué tiene hoy el entorno Preview (en particular
+  `NEXT_PUBLIC_APP_URL`, `GOOGLE_TOKEN_SECRET` y la llave de servicio) [D: hay que
+  mirarlo en el panel].
 - Que Vercel mande `Authorization: Bearer <CRON_SECRET>` a las tareas (lo dice la
   documentación de Vercel Cron Jobs citada en `mejora_agendaV2.md`; no releída por
   este agente). Se verifica tras el despliegue: Schedules → Cron Jobs → View Logs,

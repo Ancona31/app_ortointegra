@@ -10,7 +10,8 @@
 > (decisión de Angel; plan §6.1). Dos tableros: el del **día de la base** (pasos
 > 0–7, con `main` en producción), con el paso 8 (encender la v2 en la clínica de
 > Angel para los previews, otro día), y el del **día del código** (C0–C6, plan
-> §4-bis). Lo que ven los usuarios entretanto: `VENTANA-BASE-PRIMERO.md`.
+> §4-bis). Lo que ven los usuarios entretanto, y los riesgos de los previews
+> contra producción: [`VENTANA-BASE-PRIMERO.md`](VENTANA-BASE-PRIMERO.md).
 >
 > «Despliegue 1» = la agenda v2 (código de `feature/agenda-v2-produccion` + las 9
 > migraciones). El rediseño estético (`feature/rediseno-estetico`) es **otro

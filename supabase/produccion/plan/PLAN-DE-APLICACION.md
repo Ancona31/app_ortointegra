@@ -918,9 +918,13 @@ o ya no se usan: no se tocan).
 | `AGENDA_RSVP_GOOGLE` = `encendido` | todavía no: falta la prueba con Google real | confirmaría citas por la respuesta a la invitación de Google |
 
 - Los valores se generan en la terminal de Angel y se pegan en Vercel como
-  «Sensitive», entorno **Production** sólo (ASUMIENDO que las previews no usan la
-  agenda v2: un `RESERVA_SECRETO` distinto contra la misma base daría enlaces
-  que producción no reconoce). No se escriben en ningún archivo.
+  «Sensitive», entornos **Production y Preview** (desde el 2026-11-23, «base
+  primero»: los previews usan la v2 contra la base de producción), **con el MISMO
+  `RESERVA_SECRETO` en los dos**: un secreto distinto contra la misma base daría
+  enlaces que el otro entorno no reconoce y un historial del candado que no casa.
+  Las que no deben existir, tampoco en Preview. Detalle:
+  `docs/despliegue/VARIABLES-VERCEL.md` y `docs/despliegue/VENTANA-BASE-PRIMERO.md`
+  §3. No se escriben en ningún archivo.
 - **Vercel está en Pro** (confirmado por Angel): las dos tareas de `vercel.json`
   (cada 10 y 15 min) se admiten. Tras el despliegue: Schedules → Cron Jobs →
   View Logs, la primera invocación en 2xx.
