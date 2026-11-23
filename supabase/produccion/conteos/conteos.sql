@@ -2,12 +2,16 @@
 -- Conteos ANTES de aplicar el conjunto a producción (bloque 7.1)
 -- ───────────────────────────────────────────────────────────────────────
 -- QUÉ ES: las condiciones de los pre-vuelos (y de los post-vuelos que miran
---   el estado de antes) de las 8 migraciones nuevas, reescritas como
---   consultas de SÓLO LECTURA, más lo que depende de la versión, del
---   historial de migraciones, del tamaño de las tablas y de la actividad en
---   ese momento. Si una fila sale ALTO, la migración que nombra abortaría en
---   su pre-vuelo (o el estado no es el que el conjunto supone): no se aplica
---   nada hasta resolverla. Qué hacer con cada fila: LEEME.md.
+--   el estado de antes) de las 9 migraciones nuevas, reescritas como
+--   consultas de SÓLO LECTURA, más lo que sólo los datos reales dicen: el
+--   historial, el número de citas, las transacciones y candados abiertos en
+--   ese momento, los trabajos de pg_cron y las filas que harían abortar el
+--   backfill de F1. Si una fila sale ALTO, la migración que nombra abortaría
+--   en su pre-vuelo (o el estado no es el que el conjunto supone): no se
+--   aplica nada hasta resolverla. Qué hacer con cada fila: LEEME.md.
+--   Al día con la foto de producción del 2026-11-22 (PostgreSQL 17.6, 32
+--   funciones de public con fines de línea \r\n: las huellas md5 se comparan
+--   como las migraciones, md5(replace(prosrc, E'\r\n', E'\n'))).
 --     20261125170000_audit_log_sin_truncate          (M1)
 --     20261126120000_public_sin_truncate             (M2)
 --     20261201120000_agenda_f1_ajustes_tipos_horarios (F1)
@@ -16,6 +20,7 @@
 --     20261201150000_agenda_f2_google                (F2)
 --     20261201160000_agenda_f4_confirmacion_correos_avisos (F4)
 --     20261201170000_agenda_f5b_protecciones_cita    (F5b)
+--     20261201180000_agenda_sin_truncate             (T, aparte del conjunto)
 -- QUÉ DEVUELVE: UNA rejilla, una fila por comprobación:
 --     id | migración | qué mira | valor | esperado | veredicto
 --   veredicto: OK · ALTO (no seguir) · AVISO (seguir sólo tras leer el LEEME)
@@ -34,8 +39,11 @@
 --   cualquier escritura, también de catálogo) y ROLLBACK al final. No crea
 --   funciones ni tablas temporales: las cuentas sobre tablas que pueden no
 --   existir van con query_to_xml, que sólo lee. Las cuentas de filas son de
---   main (consultorios, el historial y, si existiera, el respaldo de F1);
---   appointments NO se recorre: su tamaño sale de pg_class.reltuples.
+--   main (consultorios, clinicas, el historial y, si existiera, el respaldo
+--   de F1) y G.13b cuenta appointments entera (count(*): un recorrido de
+--   lectura, ACCESS SHARE, no frena a nadie). Ninguna fila devuelve datos de
+--   personas, ni texto de consultas: sólo recuentos, nombres de objetos,
+--   nombres de roles, estados y edades.
 -- BLOQUEOS: ACCESS SHARE sobre lo que lee (como cualquier SELECT). Si una
 --   tabla está tomada en exclusiva, espera como mucho lock_timeout (2 s) y
 --   aborta con error: entonces es G.15 la que tiene la respuesta; repetir.
@@ -60,11 +68,11 @@ h AS (
                                                      false, false, ''))) v)
          END AS versiones
 ),
--- Las 13 versiones del repo (supabase/migrations/, sin descartadas/).
+-- Las 14 versiones del repo (supabase/migrations/, sin descartadas/): 5 de main y las 9 nuevas.
 repo AS (
   SELECT ARRAY['20260912190416', '20260913', '20260914', '20260919', '20260919230000'] AS main,
          ARRAY['20261125170000', '20261126120000', '20261201120000', '20261201130000', '20261201140000',
-               '20261201150000', '20261201160000', '20261201170000'] AS nuevas
+               '20261201150000', '20261201160000', '20261201170000', '20261201180000'] AS nuevas
 ),
 -- Las 11 tablas clínicas de M2.
 m2 AS (
@@ -100,9 +108,9 @@ s3 AS (
 filas (orden, id, migracion, que, valor, esperado, ok, si_falla) AS (
 
 -- ─── G · general ─────────────────────────────────────────────────────
-SELECT 1, 'G.01', 'todas', 'versión de PostgreSQL (F3 concede MAINTAIN, que sólo existe desde la 17; CREATE OR REPLACE TRIGGER pide 14)',
-       current_setting('server_version'), '≥ 17',
-       current_setting('server_version_num')::int >= 170000, 'ALTO'
+SELECT 1, 'G.01', 'todas', 'versión de PostgreSQL: la 17 de la foto (17.6) y del psql de aplicar.sh; si Supabase la cambió, repetir el ensayo',
+       current_setting('server_version'), '17.x',
+       current_setting('server_version_num')::int / 10000 = 17, 'ALTO'
 UNION ALL
 SELECT 2, 'G.02', 'F4 (y todas)', 'rol con el que se corre esto (= el que aplicará); F4 exige postgres exacto',
        current_user::text, 'postgres', current_user = 'postgres', 'ALTO'
@@ -136,37 +144,18 @@ SELECT 8, 'G.08', 'historial', 'las 5 de main registradas (falta = la CLI intent
        'ninguna falta',
        (SELECT bool_and(v = ANY (h.versiones)) FROM repo, h, unnest(repo.main) v), 'ALTO'
 UNION ALL
-SELECT 9, 'G.09', '20260919230000', 'auth_02 registrada (la foto del 2026-11-22 ya la enseña registrada y con su ACL)',
-       (SELECT ('20260919230000' = ANY (versiones))::text FROM h), 'true',
-       (SELECT '20260919230000' = ANY (versiones) FROM h), 'ALTO'
-UNION ALL
-SELECT 9.5, 'G.09b', '20260919230000', 'efecto de auth_02 presente: EXECUTE de rate_limit_intento / rate_limit_reset sólo para service_role (anon, authenticated, service_role)',
-       coalesce((SELECT string_agg(f || '=' || has_function_privilege('anon', to_regprocedure(f), 'EXECUTE')::text || ','
-                                   || has_function_privilege('authenticated', to_regprocedure(f), 'EXECUTE')::text || ','
-                                   || has_function_privilege('service_role', to_regprocedure(f), 'EXECUTE')::text, ' / ')
-                   FROM unnest(ARRAY['public.rate_limit_intento(text,text,integer,integer)', 'public.rate_limit_reset(text)']) f
-                  WHERE to_regprocedure(f) IS NOT NULL), 'NO EXISTEN'),
-       'public.rate_limit_intento(text,text,integer,integer)=false,false,true / public.rate_limit_reset(text)=false,false,true',
-       coalesce((SELECT string_agg(f || '=' || has_function_privilege('anon', to_regprocedure(f), 'EXECUTE')::text || ','
-                                   || has_function_privilege('authenticated', to_regprocedure(f), 'EXECUTE')::text || ','
-                                   || has_function_privilege('service_role', to_regprocedure(f), 'EXECUTE')::text, ' / ')
-                   FROM unnest(ARRAY['public.rate_limit_intento(text,text,integer,integer)', 'public.rate_limit_reset(text)']) f
-                  WHERE to_regprocedure(f) IS NOT NULL), '')
-         = 'public.rate_limit_intento(text,text,integer,integer)=false,false,true / public.rate_limit_reset(text)=false,false,true',
-       'AVISO'
-UNION ALL
-SELECT 10, 'G.10', 'historial', 'alguna de las 8 nuevas YA registrada (la CLI la saltaría)',
+SELECT 10, 'G.10', 'historial', 'alguna de las 9 nuevas YA registrada (aplicar.sh la saltaría)',
        coalesce((SELECT string_agg(v, ', ') FROM repo, h, unnest(repo.nuevas) v WHERE v = ANY (h.versiones)), 'ninguna'),
        'ninguna',
        NOT EXISTS (SELECT 1 FROM repo, h, unnest(repo.nuevas) v WHERE v = ANY (h.versiones)), 'ALTO'
 UNION ALL
-SELECT 11, 'G.11', 'historial', 'versiones registradas que el repo no conoce (la CLI se niega a empujar)',
+SELECT 11, 'G.11', 'historial', 'versiones registradas que el repo no conoce (alguien aplicó algo fuera de este plan)',
        coalesce((SELECT string_agg(v, ', ' ORDER BY v) FROM h, repo, unnest(h.versiones) v
                   WHERE NOT (v = ANY (repo.main || repo.nuevas))), 'ninguna'),
        'ninguna',
        NOT EXISTS (SELECT 1 FROM h, repo, unnest(h.versiones) v WHERE NOT (v = ANY (repo.main || repo.nuevas))), 'ALTO'
 UNION ALL
-SELECT 12, 'G.12', 'todas', 'extensiones instaladas (las 8 no usan ninguna; btree_gist la usa consultorios_default_unico de main)',
+SELECT 12, 'G.12', 'todas', 'extensiones instaladas (las 9 no usan ninguna; btree_gist la usa consultorios_default_unico de main)',
        (SELECT string_agg(e.extname || ' ' || e.extversion || ' @' || n.nspname, ', ' ORDER BY e.extname)
           FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace),
        'btree_gist presente', EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'btree_gist'), 'AVISO'
@@ -179,12 +168,19 @@ SELECT 13, 'G.13', 'F1, F3, F2, F5b', 'tamaño de las tablas que toman ACCESS EX
                          to_regclass('public.audit_log'), to_regclass('public.profiles'))),
        NULL, NULL, 'INFO'
 UNION ALL
-SELECT 14, 'G.14', 'todas', 'otras sesiones con una transacción abierta hace más de 60 s / de ellas, «idle in transaction»',
-       (SELECT count(*)::text || ' / ' || count(*) FILTER (WHERE state LIKE 'idle in transaction%')::text
-          FROM pg_stat_activity
-         WHERE pid <> pg_backend_pid() AND backend_type = 'client backend'
-           AND xact_start < now() - interval '60 seconds'),
-       '0 / 0',
+SELECT 13.5, 'G.13b', 'F1, F3, F2, F5b', 'citas en appointments (count exacto; ventanas medidas hasta 200 000: con más, las de F3, F2 y F5b crecen en proporción)',
+       (SELECT count(*)::text FROM public.appointments),
+       '≤ 200000',
+       (SELECT count(*) <= 200000 FROM public.appointments), 'AVISO'
+UNION ALL
+SELECT 14, 'G.14', 'todas', 'otras sesiones con una transacción abierta hace más de 60 s: usuario:estado:edad (sin el texto de la consulta)',
+       coalesce((SELECT string_agg(coalesce(usename::text, '?') || ':' || coalesce(state, '?') || ':'
+                                   || extract(epoch FROM now() - xact_start)::bigint || ' s', ', '
+                                   ORDER BY xact_start)
+                   FROM pg_stat_activity
+                  WHERE pid <> pg_backend_pid() AND backend_type = 'client backend'
+                    AND xact_start < now() - interval '60 seconds'), 'ninguna'),
+       'ninguna',
        (SELECT count(*) = 0 FROM pg_stat_activity
          WHERE pid <> pg_backend_pid() AND backend_type = 'client backend' AND xact_start < now() - interval '60 seconds'),
        'AVISO'
@@ -207,6 +203,37 @@ UNION ALL
 SELECT 16, 'G.16', 'todas', 'este rol ve la actividad de las demás sesiones (pg_read_all_stats); si no, G.14 y G.15 cuentan de menos',
        coalesce(pg_has_role(current_user, to_regrole('pg_read_all_stats'), 'MEMBER')::text, 'false'), 'true',
        coalesce(pg_has_role(current_user, to_regrole('pg_read_all_stats'), 'MEMBER'), false), 'AVISO'
+UNION ALL
+SELECT 17, 'G.17', 'F1, F3, F2, F5b', 'trabajos de pg_cron activos que nombran appointments o clinicas: nombre@horario (sólo eso; ni el comando ni su usuario) / total de activos',
+       CASE WHEN to_regclass('cron.job') IS NULL THEN 'pg_cron sin la tabla cron.job'
+            WHEN NOT has_table_privilege(current_user, 'cron.job', 'SELECT') THEN 'NO LEGIBLE (cron.job)'
+            ELSE coalesce((SELECT string_agg(x.n::text || '@' || y.h::text, ', ' ORDER BY x.i)
+                             FROM unnest(xpath('/table/row/n/text()', query_to_xml(
+                                    $q$SELECT coalesce(jobname, 'jobid ' || jobid) AS n FROM cron.job
+                                        WHERE active AND (command ILIKE '%appointments%' OR command ILIKE '%clinicas%') ORDER BY jobid$q$,
+                                    false, false, ''))) WITH ORDINALITY x(n, i)
+                             JOIN unnest(xpath('/table/row/h/text()', query_to_xml(
+                                    $q$SELECT schedule AS h FROM cron.job
+                                        WHERE active AND (command ILIKE '%appointments%' OR command ILIKE '%clinicas%') ORDER BY jobid$q$,
+                                    false, false, ''))) WITH ORDINALITY y(h, i) ON y.i = x.i), 'ninguno')
+                 || ' / ' || (xpath('/table/row/c/text()', query_to_xml('SELECT count(*) AS c FROM cron.job WHERE active', false, false, '')))[1]::text
+                 || ' activos'
+       END,
+       'ninguno / N activos',
+       CASE WHEN to_regclass('cron.job') IS NULL THEN true
+            WHEN NOT has_table_privilege(current_user, 'cron.job', 'SELECT') THEN false
+            ELSE (xpath('/table/row/c/text()', query_to_xml(
+                    $q$SELECT count(*) AS c FROM cron.job WHERE active AND (command ILIKE '%appointments%' OR command ILIKE '%clinicas%')$q$,
+                    false, false, '')))[1]::text = '0' END,
+       'AVISO'
+UNION ALL
+SELECT 18, 'G.18', 'F5b (y todas)', 'índices inválidos o a medias en public (resto de un CREATE INDEX CONCURRENTLY o REINDEX abortado): índice',
+       coalesce((SELECT string_agg(c.relname, ', ' ORDER BY c.relname) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                  WHERE c.relnamespace = 'public'::regnamespace AND NOT (i.indisvalid AND i.indisready)), 'ninguno'),
+       'ninguno',
+       NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                    WHERE c.relnamespace = 'public'::regnamespace AND NOT (i.indisvalid AND i.indisready)),
+       'AVISO'
 
 -- ─── M1 · 20261125170000_audit_log_sin_truncate ──────────────────────
 UNION ALL
@@ -217,13 +244,13 @@ SELECT 20, 'M1.1', '20261125170000', 'public.audit_log existe y quien aplica act
        coalesce((SELECT pg_has_role(current_user, relowner, 'USAGE') FROM pg_class WHERE oid = to_regclass('public.audit_log')), false),
        'ALTO'
 UNION ALL
-SELECT 21, 'M1.2', '20261125170000', 'prevent_audit_modification(): RETURNS trigger, plpgsql, md5 exacto del cuerpo (y md5 con espacios normalizados)',
-       coalesce((SELECT l.lanname || ' / ' || p.prorettype::regtype::text || ' / ' || md5(p.prosrc)
-                        || ' / norm ' || md5(regexp_replace(p.prosrc, '\s+', ' ', 'g'))
+SELECT 21, 'M1.2', '20261125170000', 'prevent_audit_modification(): RETURNS trigger, plpgsql, md5 del cuerpo con \r\n→\n (el que compara la migración) / tal cual',
+       coalesce((SELECT l.lanname || ' / ' || p.prorettype::regtype::text || ' / ' || md5(replace(p.prosrc, E'\r\n', E'\n'))
+                        || ' / tal cual ' || md5(p.prosrc)
                    FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
                   WHERE p.oid = to_regprocedure('public.prevent_audit_modification()')), 'NO EXISTE'),
-       'plpgsql / trigger / f1fe023a49dae586103b5e80b52841ea',
-       coalesce((SELECT md5(p.prosrc) = 'f1fe023a49dae586103b5e80b52841ea' AND l.lanname = 'plpgsql'
+       'plpgsql / trigger / f1fe023a49dae586103b5e80b52841ea / tal cual (cualquiera; en la foto 7f0318cb142b6710cfec33ec3d8249eb)',
+       coalesce((SELECT md5(replace(p.prosrc, E'\r\n', E'\n')) = 'f1fe023a49dae586103b5e80b52841ea' AND l.lanname = 'plpgsql'
                         AND p.prorettype = 'pg_catalog.trigger'::regtype
                    FROM pg_proc p JOIN pg_language l ON l.oid = p.prolang
                   WHERE p.oid = to_regprocedure('public.prevent_audit_modification()')), false),
@@ -267,9 +294,8 @@ SELECT 25, 'M1.6', '20261125170000', 'policies de audit_log (la rejilla de M1, f
 
 -- ─── M2 · 20261126120000_public_sin_truncate ─────────────────────────
 UNION ALL
-SELECT 30, 'M2.1', '20261126120000', 'quien aplica es miembro de postgres (ALTER DEFAULT PRIVILEGES FOR ROLE postgres)',
-       coalesce(pg_has_role(current_user, to_regrole('postgres'), 'MEMBER')::text, 'false'), 'true',
-       coalesce(pg_has_role(current_user, to_regrole('postgres'), 'MEMBER'), false), 'ALTO'
+SELECT 30, 'M2.1', '20261126120000', 'quien aplica ES postgres (el pre-vuelo lo exige: ALTER DEFAULT PRIVILEGES FOR ROLE postgres)',
+       current_user::text, 'postgres', current_user = 'postgres', 'ALTO'
 UNION ALL
 SELECT 31, 'M2.2', '20261126120000', 'las 11 tablas clínicas existen y quien aplica actúa como su dueño (las que no)',
        coalesce((SELECT string_agg(t, ', ' ORDER BY t) FROM m2, unnest(m2.tablas) t
@@ -341,7 +367,7 @@ SELECT 36, 'M2.7', '20261126120000', 'tablas de public cuyo dueño no es postgre
                     AND c.relowner <> to_regrole('postgres')),
        'AVISO'
 UNION ALL
-SELECT 37, 'M2.8', '20261126120000', 'tablas de public que hoy conceden TRUNCATE a alguno de los tres roles (lo que M1 y M2 quitarán; 29 en un clon de main sin M1 ni M2)',
+SELECT 37, 'M2.8', '20261126120000', 'tablas de public que hoy conceden TRUNCATE a alguno de los tres roles (lo que M1 y M2 quitarán; 29 en la foto: audit_log y las 28 del inventario de la reversa de M2)',
        (SELECT count(DISTINCT c.oid)::text FROM pg_class c CROSS JOIN (VALUES ('anon'), ('authenticated'), ('service_role')) x(rol)
          WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'f')
            AND to_regrole(x.rol) IS NOT NULL AND has_table_privilege(x.rol, c.oid, 'TRUNCATE')),
@@ -574,18 +600,20 @@ SELECT 70, 'F5a.1', '20261201130000', 'clinicas, profiles y las funciones de mai
                                                     'public.perfil_completo()', 'public.log_tabla_change()']) f WHERE to_regprocedure(f) IS NULL),
        'ALTO'
 UNION ALL
-SELECT 71, 'F5a.2', '20261201130000 (y F2)', 'clinica_no_suspendida(): md5 exacto del cuerpo (y con espacios normalizados)',
-       coalesce((SELECT md5(prosrc) || ' / norm ' || md5(regexp_replace(prosrc, '\s+', ' ', 'g')) FROM pg_proc
+SELECT 71, 'F5a.2', '20261201130000 (y F2)', 'clinica_no_suspendida(): md5 del cuerpo con \r\n→\n (el que comparan F5a y F2) / tal cual',
+       coalesce((SELECT md5(replace(prosrc, E'\r\n', E'\n')) || ' / tal cual ' || md5(prosrc) FROM pg_proc
                   WHERE oid = to_regprocedure('public.clinica_no_suspendida()')), 'NO EXISTE'),
-       'a2dcfa8f2cfda91bc9c7a7ff7b642e1e / norm 588de29d551f6d474eb24346748e1148',
-       coalesce((SELECT md5(prosrc) = 'a2dcfa8f2cfda91bc9c7a7ff7b642e1e' FROM pg_proc WHERE oid = to_regprocedure('public.clinica_no_suspendida()')), false),
+       'a2dcfa8f2cfda91bc9c7a7ff7b642e1e / tal cual (cualquiera; en la foto bff6c20339c0046954e2591bbb732613)',
+       coalesce((SELECT md5(replace(prosrc, E'\r\n', E'\n')) = 'a2dcfa8f2cfda91bc9c7a7ff7b642e1e' FROM pg_proc
+                  WHERE oid = to_regprocedure('public.clinica_no_suspendida()')), false),
        'ALTO'
 UNION ALL
-SELECT 72, 'F5a.3', '20261201130000 (y F2)', 'clinica_tiene_acceso(): md5 exacto del cuerpo (y con espacios normalizados)',
-       coalesce((SELECT md5(prosrc) || ' / norm ' || md5(regexp_replace(prosrc, '\s+', ' ', 'g')) FROM pg_proc
+SELECT 72, 'F5a.3', '20261201130000 (y F2)', 'clinica_tiene_acceso(): md5 del cuerpo con \r\n→\n (el que comparan F5a y F2) / tal cual',
+       coalesce((SELECT md5(replace(prosrc, E'\r\n', E'\n')) || ' / tal cual ' || md5(prosrc) FROM pg_proc
                   WHERE oid = to_regprocedure('public.clinica_tiene_acceso()')), 'NO EXISTE'),
-       '2efd7734772dd4c7bea262e43a3779b5 / norm 59d2accdf9baff7f8cc5b4f95b7d77dc',
-       coalesce((SELECT md5(prosrc) = '2efd7734772dd4c7bea262e43a3779b5' FROM pg_proc WHERE oid = to_regprocedure('public.clinica_tiene_acceso()')), false),
+       '2efd7734772dd4c7bea262e43a3779b5 / tal cual (cualquiera; en la foto 038f41ee17b76273028c1a7070c07e12)',
+       coalesce((SELECT md5(replace(prosrc, E'\r\n', E'\n')) = '2efd7734772dd4c7bea262e43a3779b5' FROM pg_proc
+                  WHERE oid = to_regprocedure('public.clinica_tiene_acceso()')), false),
        'ALTO'
 UNION ALL
 SELECT 73, 'F5a.4', '20261201130000', 'objetos de F5a que YA existen (agenda_bloqueos, agenda_bloqueo_preparar)',
@@ -759,6 +787,17 @@ SELECT 96, 'F2.7', '20261201150000 y F5b', 'disparadores BEFORE de fila que appo
        NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.appointments')
                     AND NOT tgisinternal AND (tgtype & 2) = 2 AND (tgtype & 1) = 1),
        'AVISO'
+UNION ALL
+SELECT 97, 'F2.8', '20261201150000', 'appointments.google_asignacion, si ya existiera: filas con valor / filas que no cumplirían su CHECK (el pre-vuelo aborta con alguna)',
+       CASE WHEN NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.appointments')
+                              AND attname = 'google_asignacion' AND NOT attisdropped) THEN 'no existe la columna'
+            ELSE (xpath('/table/row/n/text()', query_to_xml(
+                    'SELECT count(*) FILTER (WHERE google_asignacion IS NOT NULL) || '' / '' || count(*) FILTER (WHERE NOT coalesce(google_asignacion IS NULL OR (origen = ''google'' AND google_asignacion IN (''por_asignar'', ''evento'')), true)) AS n FROM public.appointments',
+                    false, false, '')))[1]::text END,
+       'no existe la columna',
+       NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = to_regclass('public.appointments')
+                    AND attname = 'google_asignacion' AND NOT attisdropped),
+       'ALTO'
 
 -- ─── F4 · 20261201160000_agenda_f4_confirmacion_correos_avisos ───────
 UNION ALL
@@ -864,11 +903,16 @@ SELECT 111, 'F5b.2', '20261201170000', 'consultas.appointment_id y paciente_id, 
          AND coalesce((SELECT prorettype = 'uuid'::regtype FROM pg_proc WHERE oid = to_regprocedure('public.get_clinica_id()')), false),
        'ALTO'
 UNION ALL
-SELECT 112, 'F5b.3', '20261201170000', 'índices de appointments que NO son válidos (el post-vuelo de F5b aborta con cualquiera)',
-       coalesce((SELECT string_agg(indexrelid::regclass::text, ', ') FROM pg_index WHERE indrelid = to_regclass('public.appointments')
-                  AND NOT (indisvalid AND indisready)), 'ninguno'),
+SELECT 112, 'F5b.3', '20261201170000', 'índices inválidos de appointments que hacen abortar F5b: la llave primaria o uno de sus tres (los ajenos sólo dan WARNING: G.18)',
+       coalesce((SELECT string_agg(c.relname, ', ') FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                  WHERE i.indrelid = to_regclass('public.appointments') AND NOT (i.indisvalid AND i.indisready)
+                    AND (i.indisprimary OR c.relname IN ('idx_appointments_clinica_inicio', 'idx_appointments_clinica_medico_inicio',
+                                                         'idx_appointments_sustituida_por'))), 'ninguno'),
        'ninguno',
-       NOT EXISTS (SELECT 1 FROM pg_index WHERE indrelid = to_regclass('public.appointments') AND NOT (indisvalid AND indisready)),
+       NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid
+                    WHERE i.indrelid = to_regclass('public.appointments') AND NOT (i.indisvalid AND i.indisready)
+                      AND (i.indisprimary OR c.relname IN ('idx_appointments_clinica_inicio', 'idx_appointments_clinica_medico_inicio',
+                                                           'idx_appointments_sustituida_por'))),
        'ALTO'
 UNION ALL
 SELECT 113, 'F5b.4', '20261201170000', 'objetos de F5b que YA existen (el pre-vuelo sólo admite los que tengan su forma exacta)',
@@ -898,6 +942,36 @@ SELECT 113, 'F5b.4', '20261201170000', 'objetos de F5b que YA existen (el pre-vu
          AND NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.appointments') AND tgname IN (
              'trg_appointments_horario_bloqueado', 'trg_appointments_proteger_atendida', 'trg_appointments_proteger_borrado',
              'trg_appointments_proteger_cierre', 'trg_appointments_proteger_eleccion', 'trg_appointments_proteger_reserva')),
+       'ALTO'
+-- ─── T · 20261201180000_agenda_sin_truncate ──────────────────────────
+UNION ALL
+SELECT 120, 'T.1', '20261201180000', 'por qué hace falta: privilegios por omisión de postgres en public que dan TRUNCATE (M2 los quita; sin M2, las 16 tablas de la agenda nacerían con él): roles',
+       coalesce((SELECT string_agg(DISTINCT a.grantee::regrole::text, ', ') FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a, r
+                  WHERE d.defaclrole = to_regrole('postgres') AND d.defaclobjtype = 'r'
+                    AND d.defaclnamespace IN (0, 'public'::regnamespace)
+                    AND a.privilege_type = 'TRUNCATE' AND a.grantee IN (r.anon, r.authn, r.srv)), 'ninguno'),
+       NULL, NULL, 'INFO'
+UNION ALL
+SELECT 121, 'T.2', '20261201180000', 'privilegios por omisión de supabase_admin en public que dan TRUNCATE (postgres no los puede cambiar; sólo afectan a tablas que cree supabase_admin): roles',
+       coalesce((SELECT string_agg(DISTINCT a.grantee::regrole::text, ', ') FROM pg_default_acl d CROSS JOIN LATERAL aclexplode(d.defaclacl) a, r
+                  WHERE d.defaclrole = to_regrole('supabase_admin') AND d.defaclobjtype = 'r'
+                    AND d.defaclnamespace IN (0, 'public'::regnamespace)
+                    AND a.privilege_type = 'TRUNCATE' AND a.grantee IN (r.anon, r.authn, r.srv)), 'ninguno'),
+       NULL, NULL, 'INFO'
+UNION ALL
+SELECT 122, 'T.3', '20261201180000', 'disparadores con los nombres de T que YA existen en public (con otra forma el pre-vuelo aborta)',
+       coalesce((SELECT string_agg(c.relname || '.' || t.tgname, ', ' ORDER BY t.tgname) FROM pg_trigger t
+                  JOIN pg_class c ON c.oid = t.tgrelid
+                 WHERE c.relnamespace = 'public'::regnamespace AND NOT t.tgisinternal
+                   AND t.tgname IN (SELECT 'trg_' || x || '_sin_truncate' FROM unnest(ARRAY['agenda_bloqueos', 'avisos_clinica',
+                        'cita_confirmaciones', 'cita_correos', 'cita_reagendos', 'gcal_movimientos_rechazados', 'reserva_contactos',
+                        'reserva_empalmes_google', 'reserva_enlaces', 'reserva_incidencias', 'reserva_verificaciones']) x)), 'ninguno'),
+       'ninguno',
+       NOT EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+                 WHERE c.relnamespace = 'public'::regnamespace AND NOT t.tgisinternal
+                   AND t.tgname IN (SELECT 'trg_' || x || '_sin_truncate' FROM unnest(ARRAY['agenda_bloqueos', 'avisos_clinica',
+                        'cita_confirmaciones', 'cita_correos', 'cita_reagendos', 'gcal_movimientos_rechazados', 'reserva_contactos',
+                        'reserva_empalmes_google', 'reserva_enlaces', 'reserva_incidencias', 'reserva_verificaciones']) x)),
        'ALTO'
 )
 SELECT id, migracion AS "migración", que AS "qué mira", coalesce(valor, '∅') AS valor, coalesce(esperado, '—') AS esperado,

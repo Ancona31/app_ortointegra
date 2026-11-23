@@ -281,6 +281,7 @@ solo_b	disparador	public	public.agenda_ajustes.audit_agenda_ajustes
 solo_b	disparador	public	public.agenda_ajustes.trg_agenda_ajustes_proteger	
 solo_b	disparador	public	public.agenda_bloqueos.audit_agenda_bloqueos	
 solo_b	disparador	public	public.agenda_bloqueos.trg_agenda_bloqueos_preparar	
+solo_b	disparador	public	public.agenda_bloqueos.trg_agenda_bloqueos_sin_truncate	
 solo_b	disparador	public	public.appointments.audit_appointments	
 solo_b	disparador	public	public.appointments.audit_appointments_update	
 solo_b	disparador	public	public.appointments.trg_appointments_asignacion_google	
@@ -296,28 +297,38 @@ solo_b	disparador	public	public.appointments.trg_appointments_sin_truncate
 solo_b	disparador	public	public.audit_log.prevent_audit_truncate	
 solo_b	disparador	public	public.avisos_clinica.audit_avisos_clinica	
 solo_b	disparador	public	public.avisos_clinica.trg_avisos_clinica_revisar	
+solo_b	disparador	public	public.avisos_clinica.trg_avisos_clinica_sin_truncate	
 solo_b	disparador	public	public.calculadora_resultados.trg_calculadora_resultados_sin_truncate	
 solo_b	disparador	public	public.casos_clinicos.trg_casos_clinicos_sin_truncate	
 solo_b	disparador	public	public.casos_clinicos_recursos.trg_casos_clinicos_recursos_sin_truncate	
 solo_b	disparador	public	public.cita_confirmaciones.audit_cita_confirmaciones	
 solo_b	disparador	public	public.cita_confirmaciones.trg_cita_confirmaciones_aviso_clinica	
 solo_b	disparador	public	public.cita_confirmaciones.trg_cita_confirmaciones_aviso_confirmacion	
+solo_b	disparador	public	public.cita_confirmaciones.trg_cita_confirmaciones_sin_truncate	
 solo_b	disparador	public	public.cita_correos.audit_cita_correos	
+solo_b	disparador	public	public.cita_correos.trg_cita_correos_sin_truncate	
 solo_b	disparador	public	public.cita_reagendos.audit_cita_reagendos	
 solo_b	disparador	public	public.cita_reagendos.trg_cita_reagendos_aviso_clinica	
+solo_b	disparador	public	public.cita_reagendos.trg_cita_reagendos_sin_truncate	
 solo_b	disparador	public	public.consultas.trg_consultas_sin_truncate	
 solo_b	disparador	public	public.documentos.trg_documentos_sin_truncate	
 solo_b	disparador	public	public.gcal_movimientos_rechazados.trg_gcal_movimientos_aviso_clinica	
+solo_b	disparador	public	public.gcal_movimientos_rechazados.trg_gcal_movimientos_rechazados_sin_truncate	
 solo_b	disparador	public	public.mediciones_analitos.trg_mediciones_analitos_sin_truncate	
 solo_b	disparador	public	public.paciente_medico.trg_paciente_medico_sin_truncate	
 solo_b	disparador	public	public.pacientes.trg_pacientes_sin_truncate	
 solo_b	disparador	public	public.reserva_avisos.audit_reserva_avisos	
 solo_b	disparador	public	public.reserva_contactos.audit_reserva_contactos	
 solo_b	disparador	public	public.reserva_contactos.trg_reserva_contactos_proteger	
+solo_b	disparador	public	public.reserva_contactos.trg_reserva_contactos_sin_truncate	
 solo_b	disparador	public	public.reserva_empalmes_google.trg_reserva_empalmes_aviso_clinica	
+solo_b	disparador	public	public.reserva_empalmes_google.trg_reserva_empalmes_google_sin_truncate	
 solo_b	disparador	public	public.reserva_enlaces.audit_reserva_enlaces	
 solo_b	disparador	public	public.reserva_enlaces.trg_reserva_enlaces_proteger	
+solo_b	disparador	public	public.reserva_enlaces.trg_reserva_enlaces_sin_truncate	
 solo_b	disparador	public	public.reserva_enlaces.trg_reserva_enlaces_unico	
+solo_b	disparador	public	public.reserva_incidencias.trg_reserva_incidencias_sin_truncate	
+solo_b	disparador	public	public.reserva_verificaciones.trg_reserva_verificaciones_sin_truncate	
 solo_b	disparador	public	public.solicitudes_arco.trg_solicitudes_arco_sin_truncate	
 solo_b	disparador	public	public.tipos_cita.audit_tipos_cita	
 solo_b	disparador	public	public.tipos_cita.trg_tipos_cita_consultorio	
@@ -700,7 +711,6 @@ solo_b	permiso	public	tabla public.cita_correos → postgres
 solo_b	permiso	public	tabla public.cita_correos → service_role	
 solo_b	permiso	public	tabla public.cita_reagendos → postgres	
 solo_b	permiso	public	tabla public.cita_reagendos → service_role	
-distinto	permiso	public	tabla public.clinica_conexiones_google → anon	privilegios
 distinto	permiso	public	tabla public.clinica_conexiones_google → service_role	privilegios
 distinto	permiso	public	tabla public.clinicas → anon	privilegios
 distinto	permiso	public	tabla public.clinicas → authenticated	privilegios
@@ -714,10 +724,7 @@ distinto	permiso	public	tabla public.consultorios → service_role	privilegios
 distinto	permiso	public	tabla public.documentos → anon	privilegios
 distinto	permiso	public	tabla public.documentos → authenticated	privilegios
 distinto	permiso	public	tabla public.documentos → service_role	privilegios
-distinto	permiso	public	tabla public.firmas_documento → anon	privilegios
 distinto	permiso	public	tabla public.firmas_documento → service_role	privilegios
-distinto	permiso	public	tabla public.folios_contador → anon	privilegios
-distinto	permiso	public	tabla public.folios_contador → authenticated	privilegios
 distinto	permiso	public	tabla public.folios_contador → service_role	privilegios
 solo_b	permiso	public	tabla public.gcal_movimientos_rechazados → postgres	
 solo_b	permiso	public	tabla public.gcal_movimientos_rechazados → service_role	
@@ -747,7 +754,6 @@ distinto	permiso	public	tabla public.pacientes → service_role	privilegios
 distinto	permiso	public	tabla public.pdf_jobs → anon	privilegios
 distinto	permiso	public	tabla public.pdf_jobs → authenticated	privilegios
 distinto	permiso	public	tabla public.pdf_jobs → service_role	privilegios
-distinto	permiso	public	tabla public.plantillas_documento → anon	privilegios
 distinto	permiso	public	tabla public.plantillas_documento → authenticated	privilegios
 distinto	permiso	public	tabla public.plantillas_documento → service_role	privilegios
 distinto	permiso	public	tabla public.plantillas_honorarios → anon	privilegios

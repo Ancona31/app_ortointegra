@@ -787,7 +787,7 @@ abstracción) y la lista del caso 3 de `p1` si no la ejecutan los tres roles.
 | `agenda_bloqueos_insert ON agenda_bloqueos` | policy | F5 | k1_bloqueos DROP → k1_bloqueos CREATE | k1_bloqueos |  |
 | `agenda_bloqueos_select ON agenda_bloqueos` | policy | F5 | k1_bloqueos DROP → k1_bloqueos CREATE | k1_bloqueos |  |
 | `agenda_bloqueos_update ON agenda_bloqueos` | policy | F5 | k1_bloqueos DROP → k1_bloqueos CREATE | k1_bloqueos |  |
-| `agenda_bloqueo_preparar()` | función | F5 | k1_bloqueos C/R | k1_bloqueos | k1 (f1f887ec). Candado 1790 (ver gcal_bloqueo_aplicar). |
+| `agenda_bloqueo_preparar()` | función | F5 | k1_bloqueos C/R | k1_bloqueos | k1 (f1f887ec; desde la poda de C1, `dc778b4cbd29cedba8066caae5a7354f`). Candado 1790 (ver gcal_bloqueo_aplicar). |
 | `cita_proteger_atendida()` | función | F5 | h5_atendida_con_nota C/R → i4_atendida_no_se_mueve C/R | i4_atendida_no_se_mueve | h5 sin efecto; final i4-atendida (cfc4fcd7). Llama cita_tiene_nota_ligada. |
 | `cita_proteger_bloqueo()` | función | F5 | l1_bloqueo_total C/R | l1_bloqueo_total | l1 (d084da26). Exime Google (spinus.via, F2), el enlace (reserva_canal, F3) y lo que no se mueve. |
 | `cita_proteger_borrado()` | función | F5 | seg_borrado_cita C/R | seg_borrado_cita | seg-borrado. 42501 a todo rol salvo postgres/supabase_admin, también service_role, con la v2. La semilla y /quitar dependen de ello. |

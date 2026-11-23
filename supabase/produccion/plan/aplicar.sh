@@ -1,28 +1,36 @@
 #!/usr/bin/env bash
 # supabase/produccion/plan/aplicar.sh
 #
-# Aplica las 8 migraciones nuevas del conjunto «agenda v2 lista para
-# producción» UNA A UNA, con psql y confirmación escrita antes de cada una, y
-# registra cada versión en supabase_migrations.schema_migrations con
+# Aplica las 9 migraciones nuevas («agenda v2 lista para producción») UNA A
+# UNA, con psql y confirmación escrita antes de cada una, y registra cada
+# versión en supabase_migrations.schema_migrations con
 # `supabase migration repair --status applied` (CLI 2.117.0). Lo corre Angel,
 # desde la raíz del repo, con Docker encendido. Ver PLAN-DE-APLICACION.md.
 #
-#   bash supabase/produccion/plan/aplicar.sh estado     # sólo lee: versión, historial, qué falta
-#   bash supabase/produccion/plan/aplicar.sh respaldo   # volcado lógico CIFRADO (estructura + datos)
-#   bash supabase/produccion/plan/aplicar.sh aplicar    # las 8, una a una
-#   bash supabase/produccion/plan/aplicar.sh reversa    # las 6 reversas de la agenda, en orden inverso
+#   bash supabase/produccion/plan/aplicar.sh estado            # sólo lee: versión, cuentas, historial, qué falta
+#   bash supabase/produccion/plan/aplicar.sh respaldo          # volcado lógico CIFRADO (estructura + datos)
+#   bash supabase/produccion/plan/aplicar.sh aplicar           # las 9, una a una
+#   bash supabase/produccion/plan/aplicar.sh reversa           # las 7 reversas de la agenda (T, F5b … F1), en orden inverso
+#   bash supabase/produccion/plan/aplicar.sh reversa-truncate  # las 2 de TRUNCATE (20261126, luego 20261125); reabre el hueco
 #
-# La contraseña se pide con `read -rs`: no va a la línea de comandos ni al
-# historial de zsh, ni se escribe en disco. Vive en el entorno de este proceso
-# y de los contenedores efímeros (`docker run -e PGPASSWORD`, sin valor en la
-# línea). La URL que recibe la CLI va SIN contraseña: la toma de PGPASSWORD.
-# Nunca usa `supabase link` ni `--linked`, y nunca `db push`.
+# La contraseña: si PGPASSWORD ya está en el entorno, se usa esa; si no, se
+# pide con `read -rs`. Nunca va en la línea de comandos ni al historial de
+# zsh, nunca se escribe en disco ni en los registros, nunca se imprime. Vive en
+# el entorno de este proceso y de los contenedores efímeros (`docker run -e
+# PGPASSWORD`, sin valor en la línea). La URL que recibe la CLI va SIN
+# contraseña: la toma de PGPASSWORD. Nunca usa `supabase link`, `--linked` ni
+# `db push`.
 #
-# Ensayo contra una base local (lo que se probó; ver el plan):
-#   APL_HOST=127.0.0.1 APL_PUERTO=54415 APL_USUARIO=postgres APL_SSL=disable \
+# Destino: si APL_HOST es 127.0.0.1, localhost o ::1, es un ENSAYO; cualquier
+# otro host (por omisión, el pooler de producción) es PRODUCCIÓN y exige
+# escribir PRODUCCION antes de pedir la contraseña.
+#
+# Ensayo contra un clon local (lo que se probó; ver el plan):
+#   APL_HOST=127.0.0.1 APL_PUERTO=54373 APL_USUARIO=postgres APL_SSL=disable \
 #   APL_RED=host APL_DESTINO=/ruta/ensayo bash supabase/produccion/plan/aplicar.sh aplicar
-# Sin terminal (ensayos automáticos) lee de stdin, una por línea: la contraseña,
-# [la frase del cifrado, sólo en «respaldo»] y cada confirmación.
+# Sin terminal (ensayos automáticos) lee de stdin, una por línea: [la
+# contraseña, si no está en PGPASSWORD], [la frase del cifrado, sólo en
+# «respaldo»] y cada confirmación.
 set -euo pipefail
 
 HOST="${APL_HOST:-aws-0-us-west-2.pooler.supabase.com}"
@@ -37,7 +45,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$DIR/../../.." && pwd)"
 MODO="${1:-}"
 
-# El orden es el de nombre de archivo, y es obligatorio (ver el plan, §4).
+# El orden es el de nombre de archivo, y es obligatorio (ver el plan, §1).
 MIGRACIONES=(
   20261125170000_audit_log_sin_truncate
   20261126120000_public_sin_truncate
@@ -47,9 +55,11 @@ MIGRACIONES=(
   20261201150000_agenda_f2_google
   20261201160000_agenda_f4_confirmacion_correos_avisos
   20261201170000_agenda_f5b_protecciones_cita
+  20261201180000_agenda_sin_truncate
 )
-# Orden inverso de bloques (F5b, F4, F2, F3, F5a, F1). Las dos de TRUNCATE no entran.
+# Orden inverso: T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
 REVERSAS=(
+  20261201180000_agenda_sin_truncate
   20261201170000_agenda_f5b_protecciones_cita
   20261201160000_agenda_f4_confirmacion_correos_avisos
   20261201150000_agenda_f2_google
@@ -57,10 +67,14 @@ REVERSAS=(
   20261201130000_agenda_f5a_bloqueos
   20261201120000_agenda_f1_ajustes_tipos_horarios
 )
+REVERSAS_TRUNCATE=(
+  20261126120000_public_sin_truncate
+  20261125170000_audit_log_sin_truncate
+)
 MAIN=(20260912190416 20260913 20260914 20260919 20260919230000)
 
 die() { echo "ALTO: $*" >&2; exit 1; }
-[[ "$MODO" =~ ^(estado|respaldo|aplicar|reversa)$ ]] || { sed -n '2,24p' "$0"; exit 2; }
+[[ "$MODO" =~ ^(estado|respaldo|aplicar|reversa|reversa-truncate)$ ]] || { sed -n '2,35p' "$0"; exit 2; }
 [[ -f "$REPO/supabase/config.toml" && -d "$REPO/supabase/migrations" ]] || die "córrelo desde el repo (no encuentro supabase/)."
 docker info >/dev/null 2>&1 || die "Docker no responde; enciéndelo primero."
 IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
@@ -74,16 +88,23 @@ leer() {  # $1 = aviso; $2 = s para no mostrar lo escrito. Deja la respuesta en 
 }
 
 preparar() {
-  if [[ "$HOST" == "aws-0-us-west-2.pooler.supabase.com" ]]; then
-    echo "Destino: PRODUCCIÓN ($USUARIO@$HOST:$PUERTO/$BASE)."
-    leer "Escribe PRODUCCION para seguir: "; [[ "$RESP" == PRODUCCION ]] || die "no confirmado."
-  else
-    echo "Destino: ENSAYO ($USUARIO@$HOST:$PUERTO/$BASE)."
-  fi
+  case "$HOST" in
+    127.0.0.1|localhost|::1)
+      echo "Destino: ENSAYO ($USUARIO@$HOST:$PUERTO/$BASE)." ;;
+    *)
+      echo "Destino: PRODUCCIÓN ($USUARIO@$HOST:$PUERTO/$BASE)."
+      [[ "$HOST" == "aws-0-us-west-2.pooler.supabase.com" ]] \
+        || echo "AVISO: no es el pooler de siempre; trátalo como producción."
+      leer "Escribe PRODUCCION para seguir: "; [[ "$RESP" == PRODUCCION ]] || die "no confirmado." ;;
+  esac
   umask 077
   mkdir -p "$DESTINO"; chmod 700 "$DESTINO"
   LOG="$DESTINO/$MODO-$FECHA.log"
-  leer "Contraseña de la base ($USUARIO@$HOST): " s; PGPASSWORD="$RESP"
+  if [[ -n "${PGPASSWORD:-}" ]]; then
+    echo "Uso la contraseña de PGPASSWORD del entorno (no se imprime)."
+  else
+    leer "Contraseña de la base ($USUARIO@$HOST): " s; PGPASSWORD="$RESP"; RESP=""
+  fi
   [[ -n "$PGPASSWORD" ]] || die "contraseña vacía."
   export PGPASSWORD PGHOST="$HOST" PGPORT="$PUERTO" PGUSER="$USUARIO" PGDATABASE="$BASE" PGSSLMODE="$SSL"
   URL="postgresql://${USUARIO}@${HOST}:${PUERTO}/${BASE}?sslmode=${SSL}"
@@ -103,13 +124,13 @@ registradas() {  # versiones del historial, una por línea (vacío si la tabla n
 }
 
 estado() {
-  echo "── servidor"; q "select version()"
+  echo "── servidor y sesión"; q "select version()"; q "select current_user, current_setting('search_path')"
   echo "── tamaños (sólo cuentas; ningún dato): citas, consultorios, clínicas, audit_log"
   q "select (select count(*) from public.appointments), (select count(*) from public.consultorios),
             (select count(*) from public.clinicas), (select count(*) from public.audit_log)"
   local hist; hist="$(registradas)"
   echo "── historial (supabase_migrations.schema_migrations)"
-  [[ -n "$hist" ]] && echo "$hist" || echo "(vacío o NO EXISTE la tabla: ver el plan, §1.4, antes de seguir)"
+  [[ -n "$hist" ]] && echo "$hist" || echo "(vacío o NO EXISTE la tabla: ver el plan, §1, antes de seguir)"
   local v falta=0
   for v in "${MAIN[@]}"; do grep -qx "$v" <<<"$hist" || { echo "FALTA de main: $v"; falta=1; }; done
   for v in "${MIGRACIONES[@]}"; do
@@ -125,11 +146,13 @@ huella_ok() {  # $1 = ruta relativa al repo; compara con huellas.sha256 del plan
   [[ -n "$esperada" && "$esperada" == "$actual" ]]
 }
 
-correr_sql() {  # $1 = ruta relativa a supabase/. Devuelve el código de psql; la salida va a pantalla y al registro.
-  local salida rc
+correr_sql() {  # $1 = ruta relativa a supabase/; $2 = «con-datos» para confirmar la pérdida en una reversa.
+  local salida rc pre=()
   salida="$DESTINO/$(basename "$1" .sql).salida.txt"
+  # Ajuste de SESIÓN (no del archivo): las reversas leen current_setting('spinus.reversa_con_datos').
+  [[ "${2:-}" == con-datos ]] && pre=(-c "SET spinus.reversa_con_datos = 'si'")
   set +e
-  pg psql -X -v ON_ERROR_STOP=1 -P pager=off -f "/s/$1" 2>&1 | tee "$salida" | tee -a "$LOG"
+  pg psql -X -v ON_ERROR_STOP=1 -P pager=off "${pre[@]}" -f "/s/$1" 2>&1 | tee "$salida" | tee -a "$LOG"
   rc=${PIPESTATUS[0]}
   set -e
   ULTIMA_SALIDA="$salida"
@@ -149,22 +172,22 @@ aplicar_una() {  # $1 = nombre sin .sql
   leer "Para aplicarla escribe su versión ($v); cualquier otra cosa para parar: "
   [[ "$RESP" == "$v" ]] || die "parado antes de $1, a petición. Nada a medias."
   t0=$(date +%s.%N)
-  correr_sql "$f" || die "$1 FALLÓ (ver arriba). Va en una transacción: no quedó nada de ella y NO se registró. Plan §7."
+  correr_sql "$f" || die "$1 FALLÓ (ver arriba). Va en una transacción: no quedó nada de ella y NO se registró. Plan §8 (tabla de abortos)."
   t1=$(date +%s.%N)
   echo "duración: $(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f s", b-a}')" | tee -a "$LOG"
   if grep -Eq '\|[[:space:]]*REVISAR[[:space:]]*$' "$ULTIMA_SALIDA"; then
-    die "la rejilla de $1 tiene filas REVISAR. Quedó APLICADA (COMMIT hecho) pero NO registrada. No sigas; plan §7."
+    die "la rejilla de $1 tiene filas REVISAR. Quedó APLICADA (COMMIT hecho) pero NO registrada. No sigas; plan §8."
   fi
   grep -Eq '\|[[:space:]]*OK[[:space:]]*$' "$ULTIMA_SALIDA" || die "no veo la rejilla de $1 con filas OK. No se registra; revísalo."
   registrar "$v" applied
-  grep -qx "$v" <<<"$(registradas)" || die "$1 se aplicó pero no quedó en el historial. Repite sólo: migration repair --status applied $v (plan §1.3)."
+  grep -qx "$v" <<<"$(registradas)" || die "$1 se aplicó pero no quedó en el historial. Repite sólo: migration repair --status applied $v (plan §8)."
   echo "✓ $1 aplicada y registrada."
 }
 
 aplicar() {
-  estado || { leer "Faltan versiones de main en el historial (plan §1.4). Escribe SEGUIR si ya lo decidiste: "; [[ "$RESP" == SEGUIR ]] || die "parado."; }
+  estado || { leer "Faltan versiones de main en el historial (plan §1). Escribe SEGUIR si ya lo decidiste: "; [[ "$RESP" == SEGUIR ]] || die "parado."; }
   local m; for m in "${MIGRACIONES[@]}"; do aplicar_una "$m"; done
-  echo; echo "Las 8 aplicadas y registradas. Sigue con COMPROBACION-POSTERIOR.md."
+  echo; echo "Las 9 aplicadas y registradas. Sigue con COMPROBACION-POSTERIOR.md."
 }
 
 revertir_una() {  # $1 = nombre de la migración sin .sql
@@ -174,15 +197,30 @@ revertir_una() {  # $1 = nombre de la migración sin .sql
   huella_ok "supabase/$f" || die "la huella de supabase/$f no es la de huellas.sha256."
   leer "Para DESHACERLA escribe REVERTIR $v; cualquier otra cosa para parar: "
   [[ "$RESP" == "REVERTIR $v" ]] || die "parado antes de la reversa de $1."
-  correr_sql "$f" || die "la reversa de $1 FALLÓ (va en una transacción: no tocó nada). Plan §7.3."
+  if ! correr_sql "$f"; then
+    grep -q 'reversa_con_datos' "$ULTIMA_SALIDA" \
+      || die "la reversa de $1 FALLÓ (va en una transacción: no tocó nada). Plan §10.1."
+    echo "La reversa se negó porque hay DATOS que se perderían (arriba dice cuáles). No tocó nada."
+    leer "¿Respaldados ya? Para repetirla PERDIENDO esos datos escribe PERDER DATOS $v; cualquier otra cosa para parar: "
+    [[ "$RESP" == "PERDER DATOS $v" ]] || die "parado: la reversa de $1 no se hizo."
+    correr_sql "$f" con-datos || die "la reversa de $1 FALLÓ también confirmando (no tocó nada). Plan §10.1."
+  fi
   registrar "$v" reverted
+  grep -qx "$v" <<<"$(registradas)" && die "la reversa de $1 se hizo pero $v sigue en el historial. Repite sólo: migration repair --status reverted $v."
   echo "✓ reversa de $1 hecha y su versión quitada del historial."
 }
 
 reversa() {
   estado || true
   local m; for m in "${REVERSAS[@]}"; do revertir_una "$m"; done
-  echo; echo "Reversa de la agenda completa. Las dos de TRUNCATE NO se deshicieron (plan §7.4)."
+  echo; echo "Reversa de la agenda completa. Las dos de TRUNCATE NO se deshicieron (reversa-truncate; plan §10.2)."
+}
+
+reversa_truncate() {
+  estado || true
+  echo "OJO: deshacer estas dos REABRE el TRUNCATE de los tres roles sobre audit_log y las tablas de public (plan §10.2)."
+  local m; for m in "${REVERSAS_TRUNCATE[@]}"; do revertir_una "$m"; done
+  echo; echo "Las dos de TRUNCATE deshechas."
 }
 
 respaldo() {
@@ -195,7 +233,7 @@ respaldo() {
     pg pg_dump -Fc --no-password --lock-wait-timeout=30s ${RESPALDO_EXTRA:-} \
       | gpg --symmetric --cipher-algo AES256 -o "$out"
   else
-    leer "Frase del cifrado: " s; frase="$RESP"
+    leer "Frase del cifrado: " s; frase="$RESP"; RESP=""
     pg pg_dump -Fc --no-password --lock-wait-timeout=30s ${RESPALDO_EXTRA:-} \
       | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --symmetric --cipher-algo AES256 -o "$out" 3<<<"$frase"
   fi
@@ -207,9 +245,10 @@ respaldo() {
 
 preparar
 case "$MODO" in
-  estado)   estado | tee -a "$LOG" ;;
-  respaldo) respaldo 2>&1 | tee -a "$LOG" ;;
-  aplicar)  aplicar ;;
-  reversa)  reversa ;;
+  estado)           estado | tee -a "$LOG" ;;
+  respaldo)         respaldo 2>&1 | tee -a "$LOG" ;;
+  aplicar)          aplicar ;;
+  reversa)          reversa ;;
+  reversa-truncate) reversa_truncate ;;
 esac
 unset PGPASSWORD
