@@ -80,8 +80,9 @@
 -- (scripts/agenda-semilla.ts) sólo inserta en audit_log.
 --
 -- ═══ APLICACIÓN ════════════════════════════════════════════════════════
--- EJECUTAR EN EL SQL EDITOR DE SUPABASE, DE UNA SOLA VEZ, COMPLETO. PG ≥ 14
--- (CREATE OR REPLACE TRIGGER).
+-- La aplica Angel con la CLI y psql (supabase/produccion/plan/aplicar.sh:
+-- psql -X -v ON_ERROR_STOP=1, como postgres), de una sola vez y completa; no
+-- por el SQL Editor. PG ≥ 14 (CREATE OR REPLACE TRIGGER).
 -- Bloqueos (lock_timeout 5 s): REVOKE no bloquea la tabla; CREATE TRIGGER
 --   toma SHARE ROW EXCLUSIVE un instante sobre audit_log: bloquea las
 --   escrituras (cada acción auditada espera ese instante), no las lecturas.
