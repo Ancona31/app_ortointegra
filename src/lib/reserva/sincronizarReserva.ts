@@ -19,7 +19,9 @@
  *   · Tope: `TIEMPO_GOOGLE_MS` para todo lo anterior. Al agotarse se aborta
  *     la señal que llevan `events.list` y el `patch` del restablecimiento (se
  *     cancelan de verdad) y, por si algo que no la lleva tarda (el refresco
- *     del token, la base), una carrera con el reloj deja de esperar.
+ *     del token, la base), una carrera con el reloj deja de esperar. La
+ *     pasada que pierde la carrera no queda suelta: se entrega a `after()`
+ *     (`mantenerViva`), que la mantiene viva hasta soltar el candado.
  *   · Si la pasada no terminó `ok`: se reserva sólo si la última buena tiene
  *     menos de `VENTANA_TOLERADA_MS`; si no, «no se puede reservar por ahora».
  *
@@ -39,6 +41,7 @@
  * con `.eq('clinica_id')`; las RPC con `p_clinica_id`).
  * Nunca lanza.
  */
+import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { sincronizarClinica, type ResultadoSincronizacion } from '@/lib/gcalSincronizacion'
@@ -64,7 +67,10 @@ interface Reloj { ahora: () => number; dormir: (ms: number) => Promise<void> }
 
 const RELOJ: Reloj = { ahora: Date.now, dormir: (ms) => new Promise((ok) => setTimeout(ok, ms)) }
 
-/** `fn` con su señal, o `'tiempo'` si no termina en `ms` (y entonces la señal se aborta). */
+/**
+ * `fn` con su señal, o `'tiempo'` si no termina en `ms` (y entonces la señal se aborta).
+ * W · la pasada que pierde la carrera no se deja suelta: va a `after()`.
+ */
 async function conTope<T>(ms: number, fn: (senal: AbortSignal) => Promise<T>): Promise<T | 'tiempo'> {
   const control = new AbortController()
   let reloj: ReturnType<typeof setTimeout> | undefined
@@ -72,10 +78,33 @@ async function conTope<T>(ms: number, fn: (senal: AbortSignal) => Promise<T>): P
     // Razón propia (no TimeoutError): gaxios no reintenta una petición abortada así.
     reloj = setTimeout(() => { control.abort(new Error('tope de la reserva')); ok('tiempo') }, Math.max(0, ms))
   })
+  const pasada = fn(control.signal)
   try {
-    return await Promise.race([fn(control.signal), tope])
+    const r = await Promise.race([pasada, tope])
+    if (r === 'tiempo') mantenerViva(pasada)
+    return r
   } finally {
     clearTimeout(reloj)
+  }
+}
+
+/**
+ * W · la pasada sigue tras responder (la señal ya está abortada: acaba la
+ * página en curso, que no la lleva, y suelta el candado). `after()` la
+ * mantiene viva hasta que termine, con `waitUntil` en serverless, dentro del
+ * `maxDuration` de la ruta (docs de Next 16.2.1, `after.md`, «Duration» y
+ * «Reference: supporting `after` for serverless platforms»). Su fallo se
+ * atrapa aquí. Fuera de una petición `after` lanza: la pasada sigue suelta,
+ * como antes.
+ */
+function mantenerViva(pasada: Promise<unknown>): void {
+  const atrapada = pasada.then(() => undefined, () => {
+    logger.error('reserva', 'pasada tras el tope fallida')
+  })
+  try {
+    after(() => atrapada)
+  } catch {
+    // Sin ámbito de petición (pruebas, scripts): nada que entregar.
   }
 }
 
