@@ -980,6 +980,33 @@ formatos; franjas de `tel` emuladas por CDP):
   accesible; comentarios de `Avatar.tsx` y `PiezasCita.tsx` corregidos.
 * **H10/H11** a `DEUDA_TECNICA.md` (RED-DT-21, RED-DT-22). H12 sin tocar.
 
+### Negrita del escrito y foco de la consulta rápida · notas (2026-11-23)
+
+* **Negrita del PDF del escrito a 700** (`0361d125`, autorizado por el dueño):
+  `public/fonts/IBMPlexSans-Bold.ttf` y `-BoldItalic.ttf` (Google Fonts, IBM
+  Plex Sans v23, 3.201, OFL 1.1; las tres caras previas salen byte a byte de la
+  misma petición), registradas en `v2/fonts.ts`; `estiloTramo` pide 700, y
+  negrita + cursiva ya no cede el peso (700 itálica). Los otros formatos,
+  generados antes y después desde el taller, salen idénticos en texto y ráster;
+  sólo cambia la negrita del escrito. Prueba nueva en `escritoMedico.test.ts`
+  (fuente incrustada). Sustituye a «La negrita sigue en 500» de la hoja del
+  escrito y al riesgo abierto del cierre.
+* **RED-DT-21, parcial** (`3d9dc9cb`): `ConsultaRapidaModal` (y «Nuevo
+  documento») es diálogo con nombre, atrapa Tab/Mayús+Tab (24 + 24 sin salir,
+  también tras un clic en el velo y en «Registro rápido») y devuelve el foco al
+  disparador; Escape y la ✕ como antes, el velo sigue sin cerrar, táctil sin
+  cambios. `QuickPatientModal` se queda en deuda (cada llamador de la agenda
+  decide el foco al cerrarlo). `rediseno-formatos.e2e.ts`: 26 pasadas.
+* **Pie fijo con lista desplazable (receta, laboratorio, cotización): NO
+  hecho.** Medido a 1280×800 con el formulario VACÍO: receta 1068 (la lista, un
+  medicamento abierto, 304), laboratorio 876 (lista vacía, 18), honorarios en
+  cotización 1127 (conceptos con totales, 255); en `ih` 1178 / 926 / 1195 para
+  una vista de 669. Lo que no es la lista ya pasa de 800 en laboratorio y
+  cotización, y en receta dejaría ~36 px a la lista: «sólo la lista desplaza y
+  la página no» no cabe sin decidir qué más se pliega o se va arriba (p. ej. la
+  hoja pegada del escrito, con la cabecera que sale por arriba). Pendiente de
+  decisión del dueño.
+
 ## Estado al cierre de pantallas y formularios
 
 * **Hecho:** cimientos, primitivas, capas, navegación por formato (B1–B4);
@@ -994,7 +1021,7 @@ formatos; franjas de `tel` emuladas por CDP):
   imagen «como están».
 * **Riesgos abiertos:** la detección del Duo por `screen.width/height` sigue
   sin verificar en el aparato (se retiró la línea de diagnóstico de `/ayuda`
-  sin lectura); la negrita del PDF del escrito sale en peso 500; las e2e que
+  sin lectura); las e2e que
   dependen de la hora («¿Asistió el paciente?», citas de «mañana») fallan de
   noche; el Storage local no tiene el cubo de PDF (`Bucket not found`), así que
   la descarga desde la lista no se probó en local. (El desplegable de
