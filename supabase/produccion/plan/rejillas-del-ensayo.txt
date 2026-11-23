@@ -1,6 +1,9 @@
 # Rejillas del ensayo de punta a punta sobre un CLON NUEVO DE LA FOTO REAL de producción
 # (~/spinus-produccion-foto/, 2026-11-22; contenedor clon-spinus-ql-e, sin datos),
 # aplicando con aplicar.sh como postgres NO superusuario, primera ida (agente QL).
+# Repetido el 2026-11-22 por el agente CA con el aplicar.sh NUEVO (cada archivo en
+# UNA sola petición, psql -c; clon-spinus-ca-1): el cuerpo de este archivo salió
+# IDÉNTICO, byte a byte, rejillas y NOTICE incluidos (diff vacío).
 # Salida literal de psql: la rejilla final de cada archivo, más sus NOTICE/WARNING.
 # Las filas con cuentas (0 consultorios, 28 tablas…) cambian en producción; toda fila
 # con estado debe salir OK o INFO. Total: INFO 10, OK 63.

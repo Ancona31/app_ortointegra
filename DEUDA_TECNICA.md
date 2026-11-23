@@ -6343,7 +6343,8 @@ Reglas:
   pisan. `google/sync`: el candado (30 s) es **igual** al límite (30 s), no
   mayor; como se toma después de arrancar, caduca un poco después de que muera la
   función, y el presupuesto (8 s) queda muy por debajo. Si alguien sube su
-  `maxDuration`, sube antes `LEASE_SEG`.
+  `maxDuration`, sube antes `LEASE_SEG`. Esa igualdad tiene entrada propia:
+  AG-DT-269.
 * **La frecuencia de `vercel.json` > `maxDuration`.** Hoy 600 > 60 y 900 > 120.
 * **Los dos candados viven en la base.** El de Google lo toma por clínica
   `gcal_sync_tomar` con `leaseSeg` (`src/lib/gcalSincronizacionBase.ts:135`),
@@ -6352,6 +6353,44 @@ Reglas:
   10 min exige migración y revisar esta tabla.
 * Las pruebas fijan los valores: `src/lib/tests/cronGoogleSync.test.ts:89` (60) y
   `src/lib/tests/cronRecordatorios.test.ts:106` (120).
+
+### AG-DT-269 — En `/api/google/sync` el candado dura lo mismo que el límite de la función, no más
+
+**Estado:** observación, **sin tocar** (oleada 3, 2026-11-22; orden de Angel).
+Sale de AG-DT-268, donde era una nota dentro de las reglas. En
+`src/app/api/google/sync/route.ts` (el sondeo al abrir la agenda) el candado de
+la clínica, `LEASE_SEG = 30` (`:43`), es **igual** a `maxDuration = 30` (`:37`),
+no mayor como en `/api/cron/google-sync` (90 frente a 60). Hoy no muerde: el
+candado se toma después de arrancar la función, así que caduca un poco después
+de que muera, y el presupuesto interno (`PRESUPUESTO_MS`, 8 s, `:41`) queda muy
+por debajo de los dos. Lo que no hay es margen: si alguien sube `maxDuration`
+sin subir antes `LEASE_SEG`, otra ejecución podría sincronizar la misma clínica
+mientras la primera sigue viva. No se cambia código; queda para que nadie toque
+uno sin el otro (relación de los tres límites con sus candados: AG-DT-268).
+
+### AG-DT-270 — Las acciones referenciales pasan por encima de los candados de la cita (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, hallazgo
+A10: `supabase/produccion/auditoria/RONDA-1.md`). Un `ON DELETE SET NULL` o
+`CASCADE` corre como el dueño (`postgres`) y no lo frenan los disparadores de
+protección de `appointments`: comprobado por el auditor, como `service_role`,
+`delete from public.consultorios` deja `consultorio_id = NULL` en una cita
+reservada por enlace futura aunque su candado de elección lo prohíba. Hoy no
+muerde porque la app archiva consultorios y no los borra
+(`src/app/api/consultorios/[id]/route.ts:320`). Quien añada un borrado de una
+tabla padre de `appointments` lo mira antes.
+
+### AG-DT-271 — F5b sube de candado sobre `appointments` dentro de su transacción (nota)
+
+**Estado:** nota, **sin arreglo** (auditoría independiente, ronda 1, hallazgo
+A11). `20261201170000_agenda_f5b_protecciones_cita.sql` pide SHARE (índices de
+rango), luego SHARE ROW EXCLUSIVE (disparadores) y al final ACCESS EXCLUSIVE
+sobre `appointments`. Una transacción ajena que ya leyó la tabla y luego quiere
+escribirla puede acabar en abrazo mortal con ella; PostgreSQL mata a una de las
+dos al segundo (DEDUCIDO por el auditor, no ensayado). Con el archivo en una
+sola petición (`aplicar.sh`, oleada 3) la ventana es la del servidor, decenas de
+milisegundos, y se aplica a una hora sin consulta: improbable. Si pasa, F5b
+aborta entera y se repite.
 
 ---
 
