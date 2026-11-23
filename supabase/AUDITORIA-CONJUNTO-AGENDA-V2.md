@@ -1101,7 +1101,9 @@ del proyecto en orden de nombre, ANTES del código; la v2 se enciende después.
 - **L5 · `20260919230000_auth_02_reasentar_grants_rate_limit.sql` dice en su
   cabecera «PRODUCCIÓN: PENDIENTE DE APLICAR»**, mientras §7 cuenta las 5 de
   `main` como aplicadas. No se comprobó en producción (prohibido en esta tanda):
-  a mirar en `schema_migrations` antes del ensayo.
+  a mirar en `schema_migrations` antes del ensayo. *(Cerrado el 2026-11-22:
+  está en el historial de producción y la foto de estructura confirma el ACL
+  que deja; cabecera corregida. `supabase/produccion/DERIVA.md`, §2.)*
 - **L6 · El candado de lo elegido sólo protege lo que no ha empezado** (revisor
   del §11): `cita_proteger_eleccion` deja libre una cita por enlace con
   `OLD.start_time <= now()`, así que una que ya empezó se puede mover a una hora
