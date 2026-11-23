@@ -210,21 +210,29 @@
 
      B13 · AG0: LA ESCALA ES LA DEL REDISEÑO (`sistema.css`, PLAN §2.6). Los
      nombres `--ag-*` se quedan (los leen la hoja, `movimientoAgenda.ts` y los
-     componentes), pero apuntan a los tokens del catálogo: toque 100, salida
-     240, entrada 360 con el resorte (amortiguación 1). El tope de la regla de
+     componentes), pero apuntan a los tokens del catálogo: toque 100 y entrada
+     360 con el resorte (amortiguación 1); `base` se queda en 180 (nota abajo).
+     El tope de la regla de
      la agenda (`REGLA_AGENDA`) sube con ellos a 400 ms, el del catálogo.
      Una agenda es herramienta de consulta: el movimiento sirve para que un
      cambio no aparezca de la nada, no para lucirse.
      ⚠️ Las páginas públicas (`agendaPublica.css`) fijan sus valores de antes en
      `body:has(.rp)`: no cambian de aspecto ni de ritmo.
      ⚠️ Si cambias un valor, cambia su respaldo en `movimientoAgenda.ts`
-     (`RESPALDO_DURACION`) y el `dragRevertDuration` literal de `AgendaCliente`.
+     (`RESPALDO_DURACION`) y, si es `base`, el `dragRevertDuration` literal de
+     `AgendaCliente`.
 
      ⚠️ SÓLO SE ANIMAN `opacity` Y `transform: translateY()`. Nunca `height`,
      `top` ni `width`: FullCalendar recalcula posiciones a partir del layout y
      animar algo que lo dispare sale como temblor de la rejilla entera. */
   --ag-dur-micro: var(--dur-toque);   /* 100 ms · hover, press, focus */
-  --ag-dur-base:  var(--dur-sale);    /* 240 ms · entrada de evento, cambio de vista, salidas */
+  /* ⚠️ `--ag-dur-base` SE QUEDA EN 180 ms y NO pasa a `--dur-sale` (240): con 240
+     el FLIP de las tarjetas (`flipTarjetas.ts`) y su entrada duran lo bastante
+     para que un arrastre que empieza justo después de navegar coja la rejilla en
+     vez de la tarjeta (`agenda-empalme` «un 409 empalme… aunque el cliente crea
+     el interruptor apagado»: 4 de 8 en rojo con 240, 5 de 5 en verde con 180;
+     en la base, 8 de 8). Subirlo pide antes resolver esa carrera. */
+  --ag-dur-base:  180ms;              /* entrada de evento, cambio de vista, salidas */
   --ag-dur-lento: var(--dur-entra);   /* 360 ms · aviso, panel, entrada del modal */
 
   --ag-ease-out: var(--resorte-entra);          /* algo llega */

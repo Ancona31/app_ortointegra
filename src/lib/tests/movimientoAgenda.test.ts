@@ -28,9 +28,9 @@ describe('interpretarDuracion', () => {
 
 describe('duracionToken y curvaToken', () => {
   it('sin navegador cae a los respaldos, que son la escala de la hoja', () => {
-    /* B13 · AG0: la escala del catálogo del rediseño (toque, salida, entrada). */
+    /* B13 · AG0: toque y entrada del catálogo; base sigue en 180 (nota en globals.css). */
     expect(duracionToken('--ag-dur-micro')).toBe(100)
-    expect(duracionToken('--ag-dur-base')).toBe(240)
+    expect(duracionToken('--ag-dur-base')).toBe(180)
     expect(duracionToken('--ag-dur-lento')).toBe(360)
     expect(curvaToken('--ag-ease')).toBe('cubic-bezier(.4, 0, .2, 1)')
   })

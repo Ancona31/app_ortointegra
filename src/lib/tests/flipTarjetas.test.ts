@@ -61,7 +61,7 @@ describe('animarFlip', () => {
     expect(animarFlip(raiz, 'c1', aplicar)).toBe('trasladada')
     expect(aplicar).toHaveBeenCalledTimes(1)
     expect(n.animaciones[0].fotogramas[0]).toEqual({ transform: 'translate(0px, -120px)' })
-    expect(n.animaciones[0].opciones).toEqual({ duration: 240, easing: 'cubic-bezier(.4, 0, .2, 1)' })  // 240 = respaldo de --ag-dur-base (--dur-sale desde B13 · AG0; era 180)
+    expect(n.animaciones[0].opciones).toEqual({ duration: 180, easing: 'cubic-bezier(.4, 0, .2, 1)' })
   })
   it('en una fila de lista sólo funde la opacidad', () => {
     const n = nodo(R(0, 100), true)

@@ -29,9 +29,9 @@ export type TokenDuracion = '--ag-dur-micro' | '--ag-dur-base' | '--ag-dur-lento
 export type TokenCurva = '--ag-ease-out' | '--ag-ease-in' | '--ag-ease'
 
 const RESPALDO_DURACION: Record<TokenDuracion, number> = {
-  /* B13 · AG0: `--dur-toque`, `--dur-sale` y `--dur-entra` de `sistema.css`. */
+  /* B13 · AG0: `--dur-toque` y `--dur-entra` de `sistema.css`; base sigue en 180. */
   '--ag-dur-micro': 100,
-  '--ag-dur-base': 240,
+  '--ag-dur-base': 180, // se queda en 180: ver la nota de `--ag-dur-base` en globals.css
   '--ag-dur-lento': 360,
 }
 

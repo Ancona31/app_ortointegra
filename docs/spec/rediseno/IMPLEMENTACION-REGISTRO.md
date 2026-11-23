@@ -1044,13 +1044,18 @@ formatos; franjas de `tel` emuladas por CDP):
   * Regla de uso en un bloque: `--b-fondo` relleno, `--b-barra` barra de 3 px
     (gráfico ≥ 3:1), `--b-tinta` hora e icono (texto ≥ 4,5:1); nombre en
     `--tinta` (`--tinta2` pasado o cancelado).
-* **Movimiento** (`globals.css`, `:root`): `--ag-dur-micro/base/lento` =
-  `var(--dur-toque/--dur-sale/--dur-entra)` (100/240/360 ms) y
+* **Movimiento** (`globals.css`, `:root`): `--ag-dur-micro` y `--ag-dur-lento` =
+  `var(--dur-toque)`/`var(--dur-entra)` (100/360 ms); **`--ag-dur-base` se queda
+  en 180 ms**: con `--dur-sale` (240) el FLIP y la entrada de las tarjetas duran
+  lo bastante para que un arrastre recién navegado coja la rejilla en vez de la
+  tarjeta (`agenda-empalme` «un 409 empalme…»: 4 de 8 en rojo con 240, 5 de 5 en
+  verde con 180, 8 de 8 en la base sin AG0); subirlo pide resolver antes esa
+  carrera. Y
   `--ag-ease-out/-in` = `var(--resorte-entra/-sale)`; `--ag-ease` (FLIP,
   arrastre) se queda en la cúbica, sin resorte. `src/lib/agenda/movimientoAgenda.ts`
   (permiso del dueño para presentación): `TOPE_MOVIMIENTO_MS` 240 → **400** (el
-  del catálogo; `REGLA_AGENDA` lo usa) y respaldos 100/240/360.
-  `dragRevertDuration` de `AgendaCliente` 180 → 240 (= `--ag-dur-base`). Sigue
+  del catálogo; `REGLA_AGENDA` lo usa) y respaldos 100/180/360;
+  `dragRevertDuration` sigue en 180 (= `--ag-dur-base`). Sigue
   siendo sólo `opacity`/`transform` (más los colores de hover y foco).
 * **Las páginas públicas no cambian de ritmo:** `agendaPublica.css` fija en `.rp`
   la escala de antes (120/180/240 y las cúbicas). Va en `.rp` y NO en
@@ -1073,8 +1078,8 @@ formatos; franjas de `tel` emuladas por CDP):
   ese bloque (la v2 los re-apunta dentro de su raíz, AG1). Ningún token nuevo en
   `html.dark`: el conjunto que `agendaPublicaTokens.test.ts` recorre no cambió.
 * **Pruebas al día:** `movimientoAgenda.test.ts` (respaldos, tope 400 y su
-  caso nuevo), `marcasMovimiento.test.ts` y `flipTarjetas.test.ts` (respaldos
-  120 → 100 y 180 → 240), `agenda-f-movimiento.e2e.ts` (el tope sale de
+  caso nuevo), `marcasMovimiento.test.ts` (respaldo 120 → 100),
+  `agenda-f-movimiento.e2e.ts` (el tope sale de
   `TOPE_MOVIMIENTO_MS`).
 
 ### B13 · AG1 · notas (piezas base, 2026-11-23)
