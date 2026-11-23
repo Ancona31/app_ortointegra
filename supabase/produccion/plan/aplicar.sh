@@ -31,8 +31,9 @@
 # La contraseña: si PGPASSWORD ya está en el entorno, se usa esa; si no, se
 # pide con `read -rs`. Nunca va en la línea de comandos ni al historial de
 # zsh, nunca se escribe en disco ni en los registros, nunca se imprime. Vive en
-# el entorno de este proceso y de los contenedores efímeros (`docker run -e
-# PGPASSWORD`, sin valor en la línea). La URL que recibe la CLI va SIN
+# el entorno de este proceso; a cada contenedor efímero le llega por su entrada
+# estándar y sólo la ve el proceso de psql/pg_dump de dentro (no la
+# configuración del contenedor: ver pg()). La URL que recibe la CLI va SIN
 # contraseña: la toma de PGPASSWORD. Nunca usa `supabase link`, `--linked` ni
 # `db push`.
 #
