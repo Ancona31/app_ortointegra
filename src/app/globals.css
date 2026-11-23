@@ -7501,7 +7501,7 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 :root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 40px; font-size: 15px; }
 .ag-modal-panel[data-form-v2] :is(input, select, textarea):focus-visible { outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none; }
 .ag-modal-panel[data-form-v2] .border-b, .ag-modal-panel[data-form-v2] .border-t { border-color: var(--linea) !important; }
-.ag-form-grupo { margin: 4px 0 -4px; font-size: 15px; line-height: 20px; font-weight: 700; color: var(--tinta); }
+.ag-form-grupo { margin: 8px 0 8px; font-size: 15px; line-height: 20px; font-weight: 700; color: var(--tinta); }
 
 /* B13 · AG7 · la ventana de ligar: el eslabón junto al título, y el pie con el principal a la derecha. */
 .ag-ligar-icono { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--enlace); background: var(--tonal); }
@@ -7947,6 +7947,27 @@ li + li > .ag-aviso-fila { border-top: 1px solid var(--linea); border-radius: 0;
 .ag-menu-opcion[aria-disabled="true"] { opacity: .6; cursor: default; }
 .ag-menu-icono { display: inline-grid; place-items: center; color: var(--enlace); }
 .ag-menu-sep { margin: 6px 12px; border: 0; border-top: 1px solid var(--linea); }
+/* B13 · AG8 (CALMA §25–§28; maqueta `ag-herr`) · las capas de la barra (campana, engrane, leyenda):
+   en computadora cuelgan de su botón, sin velo (`colocarBajo`); en Duo (`ext`, `ih`, `iv`) son TARJETA
+   CENTRADA en el área de contenido, con velo (310 en `ext`, 400 en `ih`/`iv`); en el teléfono, HOJA
+   desde abajo. El JS no las coloca fuera de `esc`. */
+.ag-capa-barra-velo { display: none; }
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="ih"], [data-formato="iv"]) .ag-capa-barra-velo { display: block; }
+:root:is([data-formato="ext"], [data-formato="ih"], [data-formato="iv"]) .ag-capa.ag-capa-barra {
+  inset: var(--capa-arr) var(--capa-der) var(--capa-abj) var(--capa-izq);
+  width: 400px; height: fit-content; margin: auto;
+  max-width: calc(100vw - var(--fijo-izq) - var(--fijo-der) - 16px);
+  max-height: calc(100dvh - var(--capa-arr) - var(--capa-abj));
+  border-radius: 20px; box-shadow: var(--sombra-capa);
+}
+:root[data-formato="ext"] .ag-capa.ag-capa-barra { width: 310px; }
+:root[data-formato="tel"] .ag-capa.ag-capa-barra {
+  inset: auto 0 0 0; width: auto; max-width: none; max-height: calc(100dvh - var(--it, 0px) - 16px);
+  padding-bottom: calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; box-shadow: var(--sombra-capa);
+  animation-name: ag-hoja-entra;
+}
+:root[data-formato="tel"] .ag-capa.ag-capa--menu.ag-capa-barra { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="ih"], [data-formato="iv"]) .ag-capa--menu .ag-menu-opcion { min-height: 48px; }
 .ag-capa--leyenda { width: 280px; }
 .ag-capa--leyenda .ag-leyenda { display: flex; flex-direction: column; gap: 8px; }
 .ag-capa--leyenda .ag-leyenda > [aria-hidden] { display: none; }
