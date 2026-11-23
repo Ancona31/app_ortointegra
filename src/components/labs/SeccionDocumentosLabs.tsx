@@ -201,7 +201,7 @@ export default function SeccionDocumentosLabs({ pacienteId }: Props) {
               zona de arrastre al pie. */}
           <div className="k-lista">
             {visibles.map(d => (
-              <CardDocumento key={d.id} layout="list" documento={d} onClick={() => setDocPreview(d)} onDelete={() => setDocDelete(d)} />
+              <CardDocumento key={d.id} documento={d} onClick={() => setDocPreview(d)} onDelete={() => setDocDelete(d)} />
             ))}
           </div>
           <div className="pt-2">{zonaArrastre}</div>
