@@ -334,3 +334,15 @@ Stack local de Supabase (CLI 2.117.0, Docker) con las 14 migraciones anteriores 
 - **Canal que usa hoy la agenda** (confirmado en `useTiempoRealAgenda.ts:124-131`):
   `appointments-realtime`, `postgres_changes` de `public.appointments`, todos los eventos, sin
   filtro; es el único `.channel(` de `src/`.
+
+## 9. Resultados de M2 en local (2026-11-24)
+
+- **Ensayo:** ida (rejilla 3/3 OK) → reversa → segunda pasada de la reversa → ida → segunda ida:
+  aborta en el pre-vuelo. `supabase db reset --local` aplica las 16 migraciones desde cero.
+- **Prueba:** `supabase/pruebas-sql/av2_rsvp_rechazo.sql` (7 casos): el «No» cancela, avisa a toda
+  la clínica (`cancelacion_paciente`) y audita `via: google_rsvp`; repetido no hace nada; el «Sí»
+  posterior no reabre; una confirmada también se cancela; una reserva por enlace cuenta para el
+  candado; nueve situaciones que no cambian nada; a un paciente dado de baja se le cancela y no se
+  le escribe. Batería SQL entera: 50 archivos en verde.
+- El repaso del autor contra las 31 dimensiones, con lo que NO se pudo comprobar, está en
+  `docs/spec/avisos-globales/AUDITORIA-PREVIA-M1-M2.md`. No sustituye a la auditoría independiente.
