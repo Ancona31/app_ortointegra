@@ -19,7 +19,7 @@ import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
  */
 config({ path: resolve(process.cwd(), '.env.local'), quiet: true })
 
-const BASE_URL = 'http://localhost:3001'
+const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3001'
 const CRON = process.env.CRON_SECRET ?? ''
 const ASUNTO = 'Recordatorio: tu cita del'
 

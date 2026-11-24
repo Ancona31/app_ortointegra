@@ -48,7 +48,7 @@ function sqlLocal(sql: string): string {
 async function crearEventoAjeno(titulo: string, desde: string, hasta: string): Promise<void> {
   const adminId = sqlLocal(`select id from auth.users where email='admin.a@semilla.spinus.test'`)
   const consultorioId = sqlLocal(`select id from consultorios where medico_id='${adminId}' and activo order by es_default desc limit 1`)
-  const sec = await request.newContext({ baseURL: 'http://localhost:3001', storageState: SESION.secretariaA })
+  const sec = await request.newContext({ baseURL: test.info().project.use.baseURL, storageState: SESION.secretariaA })
   try {
     const res = await sec.post('/api/appointments', {
       data: {

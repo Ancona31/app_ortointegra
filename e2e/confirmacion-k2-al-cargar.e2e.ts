@@ -33,7 +33,7 @@ soloEscritorio()
 test.use({ storageState: SESION.adminA })
 
 const TZ = 'America/Merida'
-const BASE = 'http://localhost:3001'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3001'
 const TITULO = 'Cita K2 al cargar'
 let e: Escenario
 
