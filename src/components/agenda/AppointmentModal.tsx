@@ -46,6 +46,7 @@ import {
 } from '@/lib/agenda/fechasAgenda'
 import { ESTADOS_CITA, ICONO_ETIQUETA, COLOR_ETIQUETA, STATUS_CONFIG, esEventoGenerico, esPorAsignar, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { textoDeConfirmacion } from '@/lib/agenda/accionesTarjeta'
+import IconoEstadoCita from '@/components/ui/IconoEstadoCita'
 import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
 import { BOTON_SECUNDARIO } from '@/components/agenda/configuracion/clasesConfig'
 import BloqueReservaPorLigar from '@/components/agenda/BloqueReservaPorLigar'
@@ -1707,7 +1708,10 @@ export default function AppointmentModal({
                         ? { background: `var(--ag-status-${key}-bg)`, color: `var(--ag-status-${key}-text)`, border: `1.5px solid var(--ag-status-${key}-dot)` }
                         : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', border: '1.5px solid var(--ag-input-border)' }}
                     >
-                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `var(--ag-status-${key}-dot)` }} />
+                      {/* B13 · AG6 · con la v2, el icono del estado en círculo (§24.4), decorativo: el nombre es el texto. */}
+                      {agendaV2
+                        ? <span aria-hidden="true"><IconoEstadoCita estado={key} texto="nunca" compacto /></span>
+                        : <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: `var(--ag-status-${key}-dot)` }} />}
                       {cfg.label}
                     </button>
                   )

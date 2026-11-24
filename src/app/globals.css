@@ -7530,6 +7530,18 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 /* Fichas (duración, tipo, estado y el «Qué vas a crear»): 44 en táctil, 36 en `ih`/`esc`. */
 .ag-modal-panel[data-form-v2] :is([role="radio"], .grid > button) { min-height: 44px; font-size: 14px; border-radius: 12px; }
 :root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is([role="radio"], .grid > button) { min-height: 36px; }
+/* Las fichas, del kit: `--sup2` sin borde; la elegida tonal con contorno `--enlace` (los colores van en
+   línea en el componente: `!important`). El estado elegido conserva su icono de color y lleva el contorno. */
+.ag-modal-panel[data-form-v2] :is(.grid > button, [role="radio"]) {
+  background: var(--sup2) !important; color: var(--tinta) !important; border: 0 !important; box-shadow: none;
+}
+.ag-modal-panel[data-form-v2] :is(.grid > button.text-white, [role="radio"].text-white) {
+  background: var(--tonal) !important; color: var(--tonal-tinta) !important; box-shadow: inset 0 0 0 2px var(--enlace);
+}
+.ag-modal-panel[data-form-v2] .grid > button[style*="--ag-status-"] { background: var(--sup) !important; box-shadow: inset 0 0 0 2px var(--enlace); }
+.ag-modal-panel[data-form-v2] .grid-cols-5 > button { font-size: 12px; font-weight: 600; }
+/* Duo cerrado: los pares de campos (fecha | hora) en una columna; en 310 no caben dos fechas. */
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] .grid-cols-2:has(input) { grid-template-columns: minmax(0, 1fr); }
 /* El resto de textos pequeños del cuerpo, al mínimo de 12. */
 .ag-modal-panel[data-form-v2] :is(.text-\[11px\], .text-\[10px\], .text-\[10\.5px\]) { font-size: 12px; }
 /* Las acciones del cuerpo como filas de enlace (maqueta: «Agregar invitados», «Enviar confirmación»,
