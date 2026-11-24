@@ -1,0 +1,10 @@
+Huellas sha256 de referencia (calculadas sobre los archivos tal cual, UTF-8, sin salto de línea final)
+
+3-aviso-simplificado-reserva.txt   f8117597893e8726d19625445fa0d0489884b18f3f8864baedd601eeff259884
+3-casilla.txt                      67c7dfd5af49974e084c3043690f73b7927dca55b00e62f148ed17696e0611a3
+aviso + "\n\n" + casilla           04e1c370fc803665957655ce8f0876e6443d823a9b76d38c11f5afc0ac7e4054
+
+La huella que vale para aprobar es la que imprima `npx tsx scripts/aviso-reserva-hash.ts` después de pegar
+el texto en AVISO_PLANTILLA. Hoy ese script solo resume el aviso (primera línea); la tercera línea es la
+que correspondería si la huella pasa a cubrir también la casilla (ver PENDIENTES-TECNICOS.md).
+Versión propuesta: reserva-2026-12-v1
