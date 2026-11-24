@@ -131,7 +131,9 @@ test('F1.19 · los iconos van centrados en su botón', async ({ page }, info) =>
    resto) miden uno de esos dos altos, y los nuevos, al menos 44 px (maqueta). Tanda M (M2, punto 2):
    en computadora los controles de la configuración miden 40; en el teléfono siguen en 44. */
 test('T2 · configuración: paneles alineados, títulos a la misma sangría y botones en sus altos', async ({ page }, info) => {
-  const minimo = info.project.name === 'telefono' ? 44 : 40
+  /* B13 · AG9: la escala del kit por formato, la que vigila `configuracionEscala.test.ts`: 44 en táctil,
+     36 en computadora (eran 40). */
+  const minimo = info.project.name === 'telefono' ? 44 : 36
   interruptorAgenda('A', true)
   const deshacer = sinPendientesAgenda(CORREO.adminA)
   try {
@@ -151,7 +153,14 @@ test('T2 · configuración: paneles alineados, títulos a la misma sangría y bo
         const viejo = (b: HTMLElement) => /\bh-(8|9)\b/.test(b.className)
         return {
           caja: { left: r.left, width: r.width },
-          sangria: (tarjeta.querySelector('h2')?.getBoundingClientRect().left ?? 0) - r.left,
+          /* B13 · AG9 (maqueta `ag-config`, aprobada): el `h2` de cada pestaña es `sr-only` (lo dice la
+             pestaña); los títulos visibles son los rótulos de grupo (`h3` o el rótulo en versalitas), y son
+             ellos los que van a la misma sangría. Una pestaña sin rótulo da 0 y no cuenta. */
+          sangria: (() => {
+            const t = Array.from(panel.querySelectorAll<HTMLElement>('h3, p.uppercase')).find(e => e.offsetParent !== null)
+            if (!t) return 0
+            return t.getBoundingClientRect().left + parseFloat(getComputedStyle(t).paddingLeft) - r.left
+          })(),
           viejos: botones.filter(viejo).map(b => Math.round(b.getBoundingClientRect().height)),
           nuevos: botones.filter(b => !viejo(b)).map(b => Math.round(b.getBoundingClientRect().height)),
         }
