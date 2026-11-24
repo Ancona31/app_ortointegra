@@ -9714,3 +9714,17 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-verdia::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: 44px; translate: 0 -50%; }
 /* «Ir a una fecha» en computadora: 7 columnas de 38 (días de 36) en vez de 264 de ancho (días de 30). */
 :root[data-formato="esc"] .ag-capa.ag-capa--fecha { width: 306px; }
+
+/* ═══ AUDITORÍA B13 · 3 · CONTRASTE (≥ 4,5:1 en claro y en oscuro) ═══════════════════════════════════
+   Las capas viven en `body`, donde `--ag-muted` y `--ag-segment-text` siguen en #7c8aa0 (3,09–3,50:1):
+   el formulario v2 y la campana los re-apuntan a `--tinta2`, como la raíz v2 (AG1). */
+.ag-modal-panel[data-form-v2], .ag-capa--campana { --ag-muted: var(--tinta2); --ag-segment-text: var(--tinta2); }
+/* El día sin consulta de la cabecera («DOM»): `--tinta2`; lo inhábil lo sigue diciendo el número. */
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-dow { color: var(--tinta2) !important; }
+/* Los días de otro mes del mini mes (panel del Día e «Ir a una fecha»). */
+.agenda-raiz[data-agenda-v2="encendida"] .ag-minimes-dia[data-fuera="true"],
+.ag-capa .ag-minimes-dia[data-fuera="true"] { color: var(--tinta2); }
+/* Los números de otro mes del Mes en rejilla: FullCalendar los deja al 30 % (1,32:1). Se quedan
+   atenuados por el fondo de la celda (`--fondo` al 55 %) y se leen: `--tinta2` sin transparencia. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-top { opacity: 1; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-number { color: var(--tinta2); }
