@@ -69,6 +69,7 @@ siguen importando lo que importaban.
   44·14 / 48·15; interruptor igual).
 * `agenda-k3-configuracion` 13 (teléfono): pestañas de TEXTO en pista deslizable (antes iconos), sin
   `data-titulo-pestana`.
+* `agenda-h2-configuracion` 5 (teléfono): una fila que SE DESLIZA (antes «cabe sin desplazarse»).
 * `agenda-h2-configuracion` 7: la regla «borde y fondo en reposo» (tanda H, punto 7, y su lista de botones de
   texto de J5) se sustituye por la de los cuatro niveles del kit: todo botón se LEE (letra ≥ 4,5:1 contra su relleno
   o su entorno); interruptores ≥ 3:1. ⚠️ Esto contradice la línea de CLAUDE.md «Los botones de la configuración
@@ -85,6 +86,17 @@ siguen importando lo que importaban.
 * El asistente no lleva cabecera y pie fijos con el centro desplazable: la página entera se desplaza.
 * El aviso «Sin citas esta semana» con enlace en la rejilla (vista 0 de `ag-pv`) es un aviso de página de la línea de
   VISTAS/AG1: aquí sólo va el enlace de la LISTA vacía. Petición a VISTAS: el mismo enlace en el aviso de semana vacía.
+
+## Verificación (comprobado)
+
+* tsc limpio; eslint 87 errores / 61 avisos (= tope); Vitest 2591/2591 sin TZ, `TZ=UTC` y `TZ=America/Hermosillo`.
+* `npm run build` exit 0.
+* e2e de la línea (17 archivos, escritorio + teléfono, contra :3004): 128 en verde, 3 en rojo en la 1.ª vuelta
+  (`agenda-g2-turnos` 147 y 169, y h2 5, ésta por la presentación nueva, ya actualizada); repetidos h2 + g2: 15/15
+  en verde (g2 147 es de las conocidas de la base; 169, arrastre, intermitente). `agenda-interruptor` y la vuelta con
+  la v2 apagada de `agenda-configuracion` en verde.
+* Capturas después: 190 (4 vistas × 5 formatos × 2 temas); 0 errores de consola, 0 textos < 12, 0 fijos al borde en
+  `ext`/`ih`; único «pequeño» medido, el dibujo del interruptor (52×30, área 46/40 por `::before`).
 
 ## Peticiones a otras líneas / pendientes
 
