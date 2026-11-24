@@ -572,10 +572,10 @@ async function sembrarEquipo(): Promise<{ ses: Record<Clave, Sesion>; ctx: Conte
   const centro = await crearConsultorio(adminA, { nombre: 'Consultorio Centro (ficticio)', nombre_corto: 'Centro', direccion: 'Calle Ficticia 1, Centro, Mérida', telefono: '9990000001', timezone: TZ, horario: horarioSemana('08:00', '14:00', false) })
   const norte = await crearConsultorio(adminA, { nombre: 'Hospital Norte (ficticio)', nombre_corto: 'Hosp Norte', direccion: 'Avenida Ficticia 2, Norte, Mérida', telefono: '9990000002', timezone: TZ, horario: horarioSemana('15:00', '18:00', true) })
   const invitadoA = await invitar(PERSONAS.invitadoA, adminA)
-  const rehab = await crearConsultorio(invitadoA, { nombre: 'Rehabilitación (ficticio)', nombre_corto: 'Rehab', direccion: 'Calle Ficticia 3, Mérida', telefono: null, timezone: TZ, horario: horarioSemana('08:00', '18:00', false) })
+  const rehab = await crearConsultorio(invitadoA, { nombre: 'Rehabilitación (ficticio)', nombre_corto: 'Rehab', direccion: 'Calle Ficticia 3, Mérida', telefono: '9990000003', timezone: TZ, horario: horarioSemana('08:00', '18:00', false) })
   const secretariaA = await invitar(PERSONAS.secretariaA, adminA)
   const adminB = await crearDueno(PERSONAS.adminB, NOMBRE_B)
-  const b = await crearConsultorio(adminB, { nombre: 'Consultorio Clínica B (ficticio)', nombre_corto: 'Clínica B', direccion: 'Calle Ficticia 4, Mérida', telefono: null, timezone: TZ })
+  const b = await crearConsultorio(adminB, { nombre: 'Consultorio Clínica B (ficticio)', nombre_corto: 'Clínica B', direccion: 'Calle Ficticia 4, Mérida', telefono: '9990000004', timezone: TZ })
   const ses = { adminA, invitadoA, secretariaA, adminB }
   const pac: Contexto['pac'] = { adminA: [], invitadoA: [], adminB: [] }
   for (let i = 1; i <= 25; i++) {

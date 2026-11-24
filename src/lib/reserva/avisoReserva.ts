@@ -1,63 +1,61 @@
 /**
- * avisoReserva.ts — el aviso de privacidad que acepta quien reserva por enlace
- * (agenda D9). SÓLO SERVIDOR para decidir si se publica; el texto ya
- * rellenado viaja a la página como prop.
+ * avisoReserva.ts — el aviso de privacidad SIMPLIFICADO que acepta quien
+ * reserva por enlace (agenda D9) y su casilla. SÓLO SERVIDOR para decidir si
+ * se publica; el texto ya rellenado viaja a la página como prop.
  *
- * ⚠️ ESTE TEXTO ES UN BORRADOR SIN REVISIÓN LEGAL. Lleva la marca
- * `PENDIENTE DE REVISIÓN LEGAL — no publicar` y, mientras la lleve, la reserva
- * NO SE PUBLICA aunque alguien apruebe su hash en la base (doble cierre).
- * Los `[VERIFICAR: …]` son preguntas para la revisión, no texto para el
- * público: se quitan al aprobarlo, junto con la marca.
+ * ⚠️ TEXTO LEGAL APROBADO PARA LA BETA (2026-12). `AVISO_PLANTILLA` y
+ * `AVISO_CASILLA` son copia LITERAL de
+ * `docs/spec/privacidad-2026-12/3-aviso-simplificado-reserva.txt` y
+ * `3-casilla.txt`; `avisoReserva.test.ts` lo exige byte a byte. No se
+ * redacta, no se resume y no se «mejora» aquí: un cambio sale de la revisión
+ * legal, con versión nueva.
+ *
+ * DOBLE CIERRE, sigue en pie para un borrador futuro: si la plantilla llevara
+ * la marca `PENDIENTE DE REVISIÓN LEGAL — no publicar`, la reserva no se
+ * publica aunque alguien apruebe su huella en la base.
  *
  * CÓMO SE APRUEBA (lo hace Angel, nadie más):
- *   1. Revisar y corregir AVISO_PLANTILLA contra la LFPDPPP vigente (DOF
- *      20/03/2025, reformada 14/11/2025) y su reglamento cuando exista; quitar
- *      la marca y los `[VERIFICAR]`; subir AVISO_VERSION.
- *   2. `npx tsx scripts/aviso-reserva-hash.ts` imprime versión, sha256 y el
- *      INSERT en `public.reserva_avisos`, que se pega en el SQL Editor.
- *   Cambiar una coma cambia el hash y vuelve a cerrar todos los enlaces hasta
- *   aprobar la versión nueva. La cita guarda la versión aceptada y la hora.
+ *   `npx tsx scripts/aviso-reserva-hash.ts` imprime versión, sha256 y el
+ *   INSERT en `public.reserva_avisos`, que se pega en el SQL Editor.
+ *   Cambiar una coma —del aviso O DE LA CASILLA— cambia la huella y vuelve a
+ *   cerrar todos los enlaces hasta aprobar la versión nueva. La cita guarda la
+ *   versión aceptada y la hora.
  *
- * El hash es de la PLANTILLA (con sus marcadores `{MEDICO}`…), no del texto
- * rellenado: una aprobación vale para todos los médicos.
+ * LA HUELLA es de la PLANTILLA (con sus marcadores `{MEDICO}`…, no del texto
+ * rellenado: una aprobación vale para todos los médicos) MÁS LA CASILLA:
+ * sha256(plantilla + "\n\n" + casilla). La base no calcula nada: compara la
+ * versión y la huella que le manda el servidor con la fila aprobada de
+ * `reserva_avisos` (`reserva_contexto` y `reservar_por_enlace`,
+ * `20261201140000`), así que meter la casilla no toca ninguna migración.
  */
 import { createHash } from 'node:crypto'
 import { supabaseEsRemota } from '@/lib/correo/transporte'
 
-export const AVISO_VERSION = 'reserva-2026-11-v1'
+export const AVISO_VERSION = 'reserva-2026-12-v1'
 
+/** La marca de un borrador. La plantilla vigente NO la lleva; ver «doble cierre» arriba. */
 export const MARCA_PENDIENTE = 'PENDIENTE DE REVISIÓN LEGAL — no publicar'
 
-/** Plazo de conservación PROPUESTO del historial (lista A, 23). Lo fija Angel. */
-export const PLAZO_PROPUESTO = '12 meses'
+export const AVISO_PLANTILLA = `Aviso de privacidad simplificado para reservar una cita en línea
+Versión reserva-2026-12-v1
 
-export const AVISO_PLANTILLA = `${MARCA_PENDIENTE} · versión ${AVISO_VERSION}
+Responsable. {MEDICO}, con domicilio en {DIRECCION} ({CONSULTORIO}), es responsable de los datos personales que proporcionas al reservar tu cita. Spinus es la plataforma con la que el consultorio administra su agenda y trata tus datos por cuenta del consultorio.
 
-Aviso de privacidad para reservar una cita en línea
+Datos que tratamos. Tu nombre, tu teléfono y tu correo electrónico; la fecha, la hora, el consultorio y el tipo de cita que elijas; el historial de las citas que reservas en línea con este médico, incluidas las que se cancelan y aquellas a las que no asistes; y, convertidos en un código que no permite leerlos, la red desde la que te conectas y un identificador de tu navegador (una cookie técnica). No te pedimos datos de salud ni otros datos personales sensibles.
 
-Quién es responsable. {MEDICO} ({CONSULTORIO}, {DIRECCION}) es responsable de los datos que nos das al reservar. Spinus es la plataforma con la que el consultorio administra su agenda y trata tus datos por cuenta y bajo instrucciones del consultorio. [VERIFICAR: que esta descripción del responsable y de quien trata los datos por su cuenta corresponda a las figuras de la LFPDPPP vigente (DOF 20/03/2025, reformada 14/11/2025) y a los contratos entre Spinus y las clínicas; si el responsable es el médico, la clínica o los dos.]
+Para qué los usamos. Todo es necesario para la reserva en línea: agendar tu cita, administrarla y comunicarnos contigo sobre ella; verificar tu correo; aplicar las reglas de reserva del consultorio, con las que el sistema puede limitar de forma automática tus reservas en línea después de varias cancelaciones o inasistencias (si te ocurre, podrás agendar por teléfono y pedir al consultorio que revise tu caso); y proteger el servicio contra abusos. No usamos tus datos para publicidad.
 
-Qué datos pedimos. Tu nombre, tu teléfono y tu correo electrónico, y la fecha, la hora, el consultorio y el tipo de cita que elijas. [VERIFICAR: si agendar con un médico de cierta especialidad y el tipo de cita revelan el estado de salud y son, por tanto, datos personales sensibles; si lo son, qué forma de consentimiento exige la ley vigente y si una casilla electrónica basta.]
+Cómo limitar su uso y ejercer tus derechos. Para limitar el uso o la divulgación de tus datos, acceder a ellos, rectificarlos, cancelarlos, oponerte a su uso o revocar tu consentimiento, comunícate con el consultorio al {TELEFONO} o acude a {DIRECCION}. Si revocas tu consentimiento no podrás reservar en línea, pero podrás agendar por teléfono. La autoridad en materia de protección de datos personales es la Secretaría Anticorrupción y Buen Gobierno.
 
-Para qué los usamos.
-1. Agendar tu cita y administrarla.
-2. Enviarte por correo el código para verificar tu dirección y el comprobante de tu cita.
-3. Aplicar las reglas de reserva en línea del consultorio. Conservamos el historial de las citas que reservas en línea con este médico, incluidas las que se cancelan (las canceles tú o el consultorio) y aquellas a las que no asistes, asociado a tu teléfono y a tu correo. Con ese historial el sistema puede limitar tus reservas en línea, por ejemplo después de varias cancelaciones o inasistencias; en ese caso podrás agendar llamando al consultorio. El historial se guarda seudonimizado (tu teléfono y tu correo se sustituyen por un código que no permite leerlos) y se conserva durante {PLAZO}. [VERIFICAR: el plazo de conservación (HOY NO HAY PURGA AUTOMÁTICA de reserva_incidencias ni de reserva_contactos: el plazo no se cumple solo hasta que se construya); si la seudonimización basta; y si conservar el historial de cancelaciones para limitar reservas es una finalidad que requiere consentimiento propio o puede ir en este.]
-4. Proteger el servicio contra abusos. Registramos, de forma seudonimizada, la red desde la que te conectas y un identificador técnico de tu navegador (una cookie) para limitar el número de intentos. [VERIFICAR: qué obliga a informar la ley vigente sobre cookies y otras tecnologías de rastreo, y si esta cookie técnica necesita consentimiento.]
+Aviso de privacidad integral. Consúltalo en {URL}`
 
-Con quién se comparten. No vendemos tus datos ni los compartimos con terceros para sus propios fines. Para prestar el servicio intervienen proveedores que los tratan por cuenta del consultorio: el alojamiento y la base de datos de la plataforma, y el servicio de envío de correo. Si el consultorio tiene conectado su calendario de Google, tu nombre y la hora de la cita aparecen en ese calendario; nunca tu teléfono, tu correo ni tus notas. [VERIFICAR: si estas comunicaciones son remisiones o transferencias en los términos de la ley vigente; si algún proveedor está fuera de México; qué debe informarse de cada uno y si hay que nombrarlos.]
-
-Tus derechos. Puedes pedir el acceso, la rectificación o la cancelación de tus datos, oponerte a su uso o revocar este consentimiento, comunicándote con el consultorio al {TELEFONO}. Si lo revocas quizá no puedas reservar en línea, pero siempre podrás agendar por teléfono. Si consideras que tus datos no se trataron conforme a la ley, puedes acudir a la Secretaría Anticorrupción y Buen Gobierno, autoridad en materia de protección de datos personales. [VERIFICAR: los medios, plazos y requisitos que la ley vigente exige para ejercer estos derechos; cómo debe mencionarse a la autoridad. No citar artículos sin verificarlos contra el texto vigente.]
-
-Aviso integral. {URL} [VERIFICAR: /privacidad está escrito para los usuarios de Spinus (médicos); falta un aviso integral que cubra a quien reserva, o confirmar que el del consultorio lo cubre, y poner aquí su dirección.]`
-
-/** Lo que dice la casilla. Nace desmarcada; sin marcarla no se reserva. */
+/** Lo que dice la casilla. Nace desmarcada; sin marcarla no se reserva. Entra en la huella. */
 export const AVISO_CASILLA =
-  'Leí este aviso y acepto que se traten mis datos para reservar mi cita, incluido conservar el historial de mis reservas, cancelaciones e inasistencias asociado a mi teléfono y a mi correo.'
+  'Leí el aviso de privacidad y acepto que se traten mis datos para reservar mi cita, incluido conservar el historial de mis reservas, cancelaciones e inasistencias.'
 
-/** sha256 (hex) de la plantilla: lo que aprueba `reserva_avisos.texto_sha256`. */
-export function hashAviso(plantilla: string = AVISO_PLANTILLA): string {
-  return createHash('sha256').update(plantilla, 'utf8').digest('hex')
+/** sha256 (hex) de plantilla + "\n\n" + casilla: lo que aprueba `reserva_avisos.texto_sha256`. */
+export function hashAviso(plantilla: string = AVISO_PLANTILLA, casilla: string = AVISO_CASILLA): string {
+  return createHash('sha256').update(`${plantilla}\n\n${casilla}`, 'utf8').digest('hex')
 }
 
 type Entorno = Readonly<Record<string, string | undefined>>
@@ -105,9 +103,20 @@ export interface DatosAviso {
 export function textoAviso(d: DatosAviso, plantilla: string = AVISO_PLANTILLA): string {
   const valores: Record<string, string> = {
     '{MEDICO}': d.medico, '{CONSULTORIO}': d.consultorio, '{DIRECCION}': d.direccion,
-    '{TELEFONO}': d.telefono, '{PLAZO}': PLAZO_PROPUESTO, '{URL}': d.url,
+    '{TELEFONO}': d.telefono, '{URL}': d.url,
   }
-  return plantilla.replace(/\{(MEDICO|CONSULTORIO|DIRECCION|TELEFONO|PLAZO|URL)\}/g, m => valores[m] ?? m)
+  return plantilla.replace(/\{(MEDICO|CONSULTORIO|DIRECCION|TELEFONO|URL)\}/g, m => valores[m] ?? m)
+}
+
+/** La página pública del aviso integral del consultorio de ESTE enlace (documento 2). */
+export function rutaAvisoIntegral(codigo: string): string {
+  return `/reservar/${codigo}/privacidad`
+}
+
+/** La misma, absoluta: lo que el aviso simplificado escribe en `{URL}`. */
+export function urlAvisoIntegral(codigo: string, env: Entorno = process.env): string {
+  const base = (env.NEXT_PUBLIC_APP_URL || 'https://www.spinus.com.mx').trim().replace(/\/+$/, '')
+  return `${base}${rutaAvisoIntegral(codigo)}`
 }
 
 /** El INSERT de aprobación que imprime el script. Literales ya validados por forma. */

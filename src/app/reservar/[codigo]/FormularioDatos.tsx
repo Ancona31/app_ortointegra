@@ -6,6 +6,9 @@ export interface Datos { nombre: string; telefono: string; correo: string }
 
 interface Props {
   aviso: string
+  /** La dirección del aviso integral como va escrita al final del aviso, y la ruta a la que enlaza. */
+  avisoUrl: string
+  avisoRuta: string
   casilla: string
   ocupado: boolean
   textoBoton: string
@@ -29,8 +32,24 @@ interface Props {
   sinCorreo?: boolean
 }
 
+/**
+ * El aviso simplificado, ABIERTO (privacidad 2026-12: nunca plegado ni tras un
+ * clic). El texto es el aprobado, sin tocar; sólo la dirección del aviso
+ * integral con la que termina se pinta como enlace, en otra pestaña para no
+ * perder lo escrito.
+ */
+function TextoDelAviso({ aviso, url, ruta }: { aviso: string; url: string; ruta: string }): ReactElement {
+  const conEnlace = url.length > 0 && aviso.endsWith(url)
+  return (
+    <div className="rp-aviso-legal" data-aviso-reserva>
+      {conEnlace ? aviso.slice(0, -url.length) : aviso}
+      {conEnlace && <a href={ruta} target="_blank" rel="noopener noreferrer">{url}</a>}
+    </div>
+  )
+}
+
 /** Nombre, teléfono y correo, y el aviso con su casilla (nace desmarcada). El texto del aviso NO se toca. */
-export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, sinCorreo = false }: Props): ReactElement {
+export default function FormularioDatos({ aviso, avisoUrl, avisoRuta, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, sinCorreo = false }: Props): ReactElement {
   const [d, setDatos] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
   const setD = (nuevos: Datos) => { setDatos(nuevos); onCambio?.(nuevos) }
   const [acepta, setAcepta] = useState(false)
@@ -53,10 +72,7 @@ export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, o
             onChange={e => setD({ ...d, correo: e.target.value })} />
         </label>
       )}
-      <details className="rp-aviso-legal">
-        <summary>Aviso de privacidad</summary>
-        <div style={{ marginTop: 'var(--ag-2)', whiteSpace: 'pre-line' }}>{aviso}</div>
-      </details>
+      <TextoDelAviso aviso={aviso} url={avisoUrl} ruta={avisoRuta} />
       <label className="rp-acepto">
         <input type="checkbox" checked={acepta} onChange={e => setAcepta(e.target.checked)} />
         <span>{casilla}</span>

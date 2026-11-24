@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import type { ReactElement } from 'react'
 import { notFound } from 'next/navigation'
-import { AVISO_CASILLA, textoAviso } from '@/lib/reserva/avisoReserva'
-import { abrirEnlace, nombreDelMedico, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
+import { AVISO_CASILLA, rutaAvisoIntegral, textoAviso, urlAvisoIntegral } from '@/lib/reserva/avisoReserva'
+import { abrirEnlace, datosDelAviso, nombreDelMedico, telefonoDeContacto } from '@/lib/reserva/puertaReserva'
 import { resolverEnlaceConfirmacion } from '@/lib/confirmacion/enlaceConfirmacion'
 import { fechaHoraEnZona } from '@/lib/reserva/correosReserva'
 import { esCodigoDeEnlace } from '@/lib/reserva/secretos'
@@ -106,7 +106,11 @@ export default async function Page({ params, searchParams }: PageProps<'/reserva
   if (motivos.some(cierraLaPagina) || consultorios.length === 0) return <NoDisponible telefono={telefonoDeContacto(ctx)} />
 
   const medico = nombreDelMedico(ctx)
-  const principal = consultorios[0]
+  /* Con consultorios, `abrirEnlace` ya exigió dirección y teléfono: aquí no es
+     null. El aviso simplificado y el integral se rellenan con lo MISMO. */
+  const delAviso = datosDelAviso(ctx)
+  if (!delAviso) notFound()
+  const avisoUrl = urlAvisoIntegral(codigo)
   const datos: DatosPagina = {
     codigo,
     clase: ctx.clase,
@@ -114,13 +118,9 @@ export default async function Page({ params, searchParams }: PageProps<'/reserva
     especialidad: ctx.medico.especialidad,
     consultorios: consultorios.map(c => ({ id: c.id, nombre: c.nombre, direccion: c.direccion, telefono: c.telefono, zona: c.timezone })),
     tiposPorConsultorio,
-    aviso: textoAviso({
-      medico,
-      consultorio: principal?.nombre ?? '',
-      direccion: principal?.direccion ?? '',
-      telefono: telefonoDeContacto(ctx) ?? '',
-      url: '',
-    }),
+    aviso: textoAviso({ medico, ...delAviso, url: avisoUrl }),
+    avisoUrl,
+    avisoRuta: rutaAvisoIntegral(codigo),
     casilla: AVISO_CASILLA,
     origen: ctx.clase === 'fijo' ? await origenDe((await searchParams).origen, enlace) : null,
   }

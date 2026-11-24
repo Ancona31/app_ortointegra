@@ -82,7 +82,7 @@ export const TEXTO_MOTIVO: Record<MotivoApertura, string> = {
   enlace_caducado: 'ya caducó',
   /* j2 (punto 3): sólo para la clínica; al paciente, el mensaje genérico, sin la causa. */
   enlace_agotado: 'agotó sus intentos de reserva',
-  no_abre: 'la clínica no puede recibir reservas ahora (aviso de privacidad sin aprobar o clínica sin acceso)',
+  no_abre: 'la clínica no puede recibir reservas ahora (aviso de privacidad sin aprobar, clínica sin acceso, o consultorio principal sin dirección o sin teléfono)',
   sin_consultorio: 'el médico no tiene un consultorio activo',
   /* G2 (punto 7): «tipo de cita» deja de ser un requisito visible; lo que falta es la duración. */
   sin_tipos: 'falta la duración de la consulta del médico',

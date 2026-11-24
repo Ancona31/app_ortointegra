@@ -25,6 +25,9 @@ export interface DatosPagina {
   /** Los tipos que valen en cada consultorio (`tiposDelConsultorio`, en page.tsx). */
   tiposPorConsultorio: Record<string, TipoPagina[]>
   aviso: string
+  /** La dirección del aviso integral tal como la escribe el aviso (absoluta) y su ruta en este sitio. */
+  avisoUrl: string
+  avisoRuta: string
   casilla: string
   /** E6: la cita cancelada que se reagenda (su código de confirmación y su fecha), o null. */
   origen: { codigo: string; cuando: string } | null
@@ -353,7 +356,7 @@ function VistaDatos({ datos, r, consultorio, tipos, zona }: Vista): ReactElement
       <Encabezado titulo={enCodigo ? 'Revisa tu correo' : 'Tus datos'} />
       <ResumenCita consultorio={consultorio} tipo={tipos.length > 1 ? tipos.find(t => t.id === r.tipoId) : null}
         cuando={r.turno ? cuandoEnZona(r.turno.inicio, zona) : null} />
-      {!enCodigo && <FormularioDatos aviso={datos.aviso} casilla={datos.casilla} ocupado={r.ocupado}
+      {!enCodigo && <FormularioDatos aviso={datos.aviso} avisoUrl={datos.avisoUrl} avisoRuta={datos.avisoRuta} casilla={datos.casilla} ocupado={r.ocupado}
         textoBoton={datos.clase === 'fijo' && !r.conFicha ? 'Enviar código a mi correo' : 'Reservar cita'} onEnviar={r.alEnviarDatos}
         inicial={r.borrador} onCambio={r.setBorrador} volver={volver} sinCorreo={datos.clase === 'unico'} />}
       {enCodigo && r.envio && <PasoCodigo key={r.codigoCorreo ?? ''} codigoInicial={r.codigoCorreo} correo={r.envio.correo} ocupado={r.ocupado} onVerificar={r.alVerificar}
