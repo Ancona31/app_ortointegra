@@ -123,16 +123,19 @@ test.describe('teléfono', () => {
     await expect(page.getByRole('button', { name: 'Buscar citas de un paciente' })).toHaveCount(0)
   })
 
-  test('encendido: la lupa de la banda (44 px) abre el buscador dentro de la pantalla', async ({ page }) => {
+  /* B13 · barra por formato (PIEZAS §4, maqueta `ag-herr`): en el teléfono la lupa es la primera opción de
+     «Opciones de la agenda» (fila de 44 px o más) y el periodo de la barra abre «Ir a una fecha». */
+  test('encendido: «Buscar citas de un paciente» del menú «···» abre el buscador dentro de la pantalla', async ({ page }) => {
     interruptorAgenda('A', true)
     await abrirAgendaV2(page)
     const banda = page.locator('.ag-banda-movil')
-    const boton = banda.getByRole('button', { name: 'Buscar citas de un paciente' })
-    const caja = await boton.boundingBox()
-    expect(caja?.width).toBeGreaterThanOrEqual(44)
-    expect(caja?.height).toBeGreaterThanOrEqual(44)
-    await expect(banda.getByRole('button', { name: 'Ir a una fecha' })).toHaveCount(0)
+    await expect(banda.getByRole('button', { name: 'Buscar citas de un paciente' })).toHaveCount(0)
+    await expect(banda.getByRole('button', { name: /^Ir a una fecha/ })).toBeVisible()
     await expect(banda.getByRole('button', { name: 'Atajos de teclado' })).toHaveCount(0)
+    await banda.getByRole('button', { name: 'Opciones de la agenda' }).click()
+    const boton = page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem', { name: 'Buscar citas de un paciente' })
+    const caja = await boton.boundingBox()
+    expect(caja?.height).toBeGreaterThanOrEqual(44)
     await boton.click()
     const dialogo = page.getByRole('dialog', { name: 'Buscar citas' })
     await expect(dialogo.getByRole('combobox')).toBeFocused()
@@ -141,6 +144,7 @@ test.describe('teléfono', () => {
     expect(d && d.x >= 0 && d.x + d.width <= ancho).toBe(true)
     await page.keyboard.press('Escape')
     await expect(dialogo).toHaveCount(0)
-    await expect(boton).toBeFocused()
+    // El foco vuelve al botón del menú que lo abrió («···»).
+    await expect(banda.getByRole('button', { name: 'Opciones de la agenda' })).toBeFocused()
   })
 })

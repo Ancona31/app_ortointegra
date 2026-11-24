@@ -57,6 +57,10 @@ test.describe('teléfono', () => {
        final del día, fuera de las citas de la semilla. */
     const franja = page.locator('td.fc-timegrid-slot-lane').last()
     await franja.scrollIntoViewIfNeeded()
+    /* B13 · la píldora «Agendar» flota al pie (PIEZAS §4): la rejilla se desplaza hasta el final para que la
+       última franja quede por encima de ella, como haría el dedo. */
+    await page.locator('.fc-timegrid-body').locator('xpath=ancestor::div[contains(@class,"fc-scroller")][1]')
+      .evaluate(e => { e.scrollTop = e.scrollHeight })
     /* Con el dedo, en la columna del día a la altura de esa franja (la franja
        queda debajo de la capa de columnas: un `tap()` sobre ella no llega). */
     const caja = await franja.boundingBox()

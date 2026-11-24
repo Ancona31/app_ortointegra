@@ -128,6 +128,8 @@ test('puntos 18 y 19 · teléfono: «Pop-up de eventos» también está, con su 
   await abrirAgendaV2(page)
   await page.locator('.ag-banda-movil').getByRole('button', { name: 'Opciones de la agenda' }).click()
   const menu = page.getByRole('menu', { name: 'Opciones de la agenda' })
-  await expect(menu.getByRole('menuitem')).toHaveText(['Configuración de la agenda', 'Leyenda de estados'])
+  /* B13 · barra por formato (PIEZAS §4): en el teléfono la lupa, el médico y el candado viven en este menú. */
+  await expect(menu.getByRole('menuitem')).toHaveText(['Buscar citas de un paciente', /Médico/, 'Bloquear horario',
+    'Configuración de la agenda', 'Leyenda de estados'])
   await expect(menu.getByRole('menuitemcheckbox', { name: 'Pop-up de eventos' }).locator('[data-interruptor]')).toBeVisible()
 })

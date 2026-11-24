@@ -46,6 +46,9 @@ import { CabeceraDiaLista } from '@/components/agenda/CabeceraDiaLista'
 import { BandaMovil } from '@/components/agenda/BandaMovil'
 import { PanelDelDia } from '@/components/agenda/PanelDelDia'
 import { PanelDia } from '@/components/agenda/PanelDia'
+import { CardHuecos } from '@/components/agenda/CardHuecos'
+import { OPCION_TODOS } from '@/components/agenda/FiltrosBandaMovil'
+import type { OpcionesDeBanda } from '@/components/agenda/MenuEngraneAgenda'
 import { renderSinEventos } from '@/components/agenda/renderSinEventos'
 import { vaciarCacheCitas } from '@/lib/agenda/cacheRangosCitas'
 import { bloqueoDe, bloqueoEnInstante, displayDeBloqueo, esBloqueo, mensajeCitasEnBloqueo, tocaBloqueo, type AperturaBloqueo, type BloqueoAgenda } from '@/lib/agenda/bloqueosAgenda'
@@ -163,7 +166,6 @@ interface BarraV2 {
   CampanaAgenda: typeof import('@/components/agenda/CampanaAgenda').CampanaAgenda
   MenuEngraneAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').MenuEngraneAgenda
   /** Tanda L, punto 11 · el botón de la leyenda en la barra de computadora (mismo chunk que el engrane). */
-  BotonLeyendaAgenda: typeof import('@/components/agenda/MenuEngraneAgenda').BotonLeyendaAgenda
   /** Tanda L (L1, punto 8) · el candado junto a la campana; mismo chunk que el engrane (integración L). */
   BotonBloquearHorario: typeof import('@/components/agenda/MenuEngraneAgenda').BotonBloquearHorario
 }
@@ -173,7 +175,7 @@ const V2_APAGADA: InterruptorYBarra = { leido: false, barra: null }
 function leerInterruptorYBarra(v: boolean | null): Promise<InterruptorYBarra> | InterruptorYBarra {
   if (v !== true) return V2_APAGADA
   return Promise.all([import('@/components/agenda/CampanaAgenda'), import('@/components/agenda/MenuEngraneAgenda')]).then(
-    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda, BotonLeyendaAgenda: m.BotonLeyendaAgenda, BotonBloquearHorario: m.BotonBloquearHorario } }),
+    ([c, m]) => ({ leido: true, barra: { CampanaAgenda: c.CampanaAgenda, MenuEngraneAgenda: m.MenuEngraneAgenda, BotonBloquearHorario: m.BotonBloquearHorario } }),
     (err: unknown) => {
       logger.warn('agenda', `barra v2 sin cargar, se queda la de antes: ${err instanceof Error ? err.message : 'error'}`)
       return V2_APAGADA
@@ -1506,15 +1508,35 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      completos» marcado, hoy; al desmarcarlo propone 09:00–10:00). */
   const abrirBloqueoDesdeBarra = (): void =>
     abrirAltaBloqueo({ fecha: partirFechaHora(new Date().toISOString()).fecha, hora: null, medicoId: filtroEfectivo || null })
+  /* B13 · En la banda (`ext`/`tel`/`ih`/`iv`) el candado no va en la barra: es «Bloquear horario» del
+     menú «···» (PIEZAS §4, `opcionesDeBanda`). En computadora, junto a la campana, como siempre. */
   const campanaV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
     <>
       <barraV2.CampanaAgenda recarga={recargaPanel} confirmar={guardado.cambiarEstadoCita} cambiosRef={cambiosPorConfirmarRef}
         alAbrirCita={abrirCitaDeAviso} enBanda={enBanda} />
-      <barraV2.BotonBloquearHorario enBanda={enBanda} alPulsar={abrirBloqueoDesdeBarra} />
+      {!enBanda && <barraV2.BotonBloquearHorario enBanda={enBanda} alPulsar={abrirBloqueoDesdeBarra} />}
     </>
   ) : undefined
+  /* B13 · Barra por formato (PIEZAS §4, maqueta `ag-herr`): lo que la banda lleva en «Opciones de la
+     agenda». La lupa, sólo en `ext`/`tel` (en `ih`/`iv` sigue en la barra): la opción pulsa el MISMO
+     botón que la tecla `/` (`InteraccionesV2`). «Huecos disponibles» (§28), sólo en `ih`/`iv`, en Día y
+     con un médico: la misma tarjeta, los mismos huecos y turnos que el panel del Día de computadora. */
+  const opcionesDeBanda: OpcionesDeBanda = {
+    buscar: formatoV2 === 'telefono' ? () => document.querySelector<HTMLButtonElement>('[data-buscar-citas]')?.click() : null,
+    medico: medicos.length > 1 ? {
+      opciones: medicos.map(m => ({ id: m.id, nombre: componerNombreMedicoCompleto(m) })),
+      elegido: filtroEfectivo ?? '', todos: OPCION_TODOS(mesSinTodos), todosDesactivado: mesSinTodos,
+      elegir: id => aplicarFiltro(id, false),
+    } : null,
+    huecos: formatoV2 === 'tableta' && currentView === 'timeGridDay' && unMedico ? cerrar => (
+      <CardHuecos resumen={resumenDia} incompleto={citasIncompletas}
+        onHueco={(t, esTurno) => { cerrar(); abrirHueco(t, esTurno) }}
+        turnos={agendaV2 ? { delHueco: turnosDelHueco, duracion: duracionDelPanel, tipos: tiposPanel } : undefined} />
+    ) : null,
+    bloquear: abrirBloqueoDesdeBarra,
+  }
   const engraneV2 = (enBanda: boolean) => agendaV2 && barraV2 ? (
-    <barraV2.MenuEngraneAgenda enBanda={enBanda}
+    <barraV2.MenuEngraneAgenda enBanda={enBanda} banda={enBanda && formatoV2 !== null ? opcionesDeBanda : undefined}
       onConfiguracion={verEngrane ? abrirConfiguracion : null}
       compactar={vistaAdmiteCompactar(currentView) ? {
         encendida: compactar, alternar: () => setCompactar(v => !v), etiqueta: etiquetaCompactar(currentView, true),
@@ -1619,6 +1641,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           /* F3 · Sólo la lupa (sin minicalendario, decisión 21; sin el botón de
              la ayuda, que no cabe con el filtro a 360 px). */
           buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} enBanda /> : undefined}
+          /* B13 · Con la v2, el periodo abre «Ir a una fecha» también aquí (PIEZAS §4). */
+          selectorFecha={agendaV2 && montarV2 && formatoV2 !== null ? <SelectorFechaV2 rango={rangoVisible} titulo={tituloVista} alIrAFecha={irAFecha} enBanda /> : undefined}
           atajos={atajos}
           /* I5 (puntos 15 y 18) · La campana y el menú del engrane, también aquí. */
           campana={campanaV2(true)}
@@ -1889,7 +1913,6 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
             /* I5 · Con el engrane, la fila de la v2 (punto 13). */
             engrane={engraneV2(false)}
             /* Tanda L, punto 11 · la leyenda con su botón, sólo en computadora; también sigue en el engrane. */
-            leyenda={agendaV2 && barraV2 && !isMobile ? <barraV2.BotonLeyendaAgenda /> : undefined}
             /* F3 · Las herramientas v2 en sus ranuras; apagado, ni se descargan. */
             selectorFecha={agendaV2 && montarV2 ? <SelectorFechaV2 rango={rangoVisible} titulo={tituloVista} alIrAFecha={irAFecha} /> : undefined}
             buscar={agendaV2 && montarV2 ? <BuscarV2 apiRef={interaccionesRef} atajos={atajos} /> : undefined}

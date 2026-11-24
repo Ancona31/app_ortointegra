@@ -171,8 +171,22 @@ function Desplegable({ ancla, etiqueta, disparador, enfocar, clase, alCerrar, ch
  * «Ir a una fecha», que sale de la barra. El título nativo se oculta por CSS
  * en cuanto este botón existe (`.agenda-fc:has([data-selector-fecha])`).
  */
-function SelectorFecha({ rango, titulo, alIrAFecha }: {
-  rango: RangoVisibleV2; titulo: string; alIrAFecha: (fecha: string) => void
+/** B13 · En la barra de fuera de la computadora el periodo parte en líneas limpias: la mayúscula
+    inicial va escrita (`::first-letter` no alcanza a un texto en línea) y la última palabra viaja
+    con su flecha (`.ag-fecha-nw`, PIEZAS §13.4). */
+function TextoEnLineas({ titulo }: { titulo: string }): ReactElement {
+  const texto = titulo.charAt(0).toUpperCase() + titulo.slice(1)
+  const corte = texto.lastIndexOf(' ')
+  return (
+    <span className="ag-fecha-boton-texto">
+      {corte > 0 ? texto.slice(0, corte + 1) : ''}
+      <span className="ag-fecha-nw">{corte > 0 ? texto.slice(corte + 1) : texto}<ChevronDown size={16} aria-hidden="true" /></span>
+    </span>
+  )
+}
+
+function SelectorFecha({ rango, titulo, alIrAFecha, enLineas = false }: {
+  rango: RangoVisibleV2; titulo: string; alIrAFecha: (fecha: string) => void; enLineas?: boolean
 }): ReactElement {
   const [ancla, setAncla] = useState<Caja | null>(null)
   const cerrar = useCallback(() => setAncla(null), [])
@@ -187,8 +201,12 @@ function SelectorFecha({ rango, titulo, alIrAFecha }: {
            a null al acabar el despacho, y el actualizador puede correr después, en el
            render (reabrir tras Escape tumbaba la pantalla; I1, punto 7). */
         onClick={e => { const caja = cajaDe(e.currentTarget); setAncla(a => (a ? null : caja)) }}>
-        <span className="ag-fecha-boton-texto">{titulo}</span>
-        <ChevronDown size={16} aria-hidden="true" />
+        {enLineas ? <TextoEnLineas titulo={titulo} /> : (
+          <>
+            <span className="ag-fecha-boton-texto">{titulo}</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </>
+        )}
       </button>
       {ancla && (
         <Desplegable ancla={ancla} etiqueta="Elegir fecha" disparador="[data-selector-fecha]" clase="ag-capa--fecha"
@@ -230,14 +248,16 @@ function BotonBuscar({ apiRef, clase, icono, atajos }: {
 }
 
 /** Ranura `selectorFecha` de la barra de escritorio: la fecha, que abre el minicalendario. */
-export function SelectorFechaV2({ rango, titulo, alIrAFecha }: {
+export function SelectorFechaV2({ rango, titulo, alIrAFecha, enBanda = false }: {
   rango: RangoVisibleV2
+  /** B13 · En la barra de `ext`/`tel`/`ih`/`iv`: el periodo en líneas limpias (`TextoEnLineas`). */
+  enBanda?: boolean
   /** I5 · El texto del periodo (`view.title`, el mismo que pintaba FullCalendar). */
   titulo: string
   /** `api.gotoDate(fecha)`: conserva la vista. */
   alIrAFecha: (fecha: string) => void
 }): ReactElement {
-  return <SelectorFecha rango={rango} titulo={titulo} alIrAFecha={alIrAFecha} />
+  return <SelectorFecha rango={rango} titulo={titulo} alIrAFecha={alIrAFecha} enLineas={enBanda} />
 }
 
 export interface PropsBuscarV2 {

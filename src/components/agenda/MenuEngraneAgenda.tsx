@@ -23,18 +23,18 @@
  * compacta): es interruptor y su fila dice «Densidad compacta».
  *
  * La leyenda se abre en su propia capa, colgada del mismo engrane (diálogo,
- * `useDialogoModal`). Tanda L, punto 11: en computadora además tiene su botón
- * en la barra (`BotonLeyendaAgenda`), que abre ESA MISMA capa colgada de él.
+ * `useDialogoModal`). B13 (§28): es su ÚNICA puerta; el botón de la barra de
+ * computadora (tanda L, punto 11) se retiró.
  */
 import { useCallback, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
-import { ChevronsDownUp, Info, Keyboard, MousePointer2, Rows4, Settings, X } from 'lucide-react'
+import { CalendarPlus, ChevronDown, ChevronsDownUp, Info, Keyboard, Lock, MoreHorizontal, MousePointer2, Rows4, Search, Settings, User, X } from 'lucide-react'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { CapaBarra } from '@/components/agenda/CapaBarra'
 import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { teclasDeAccion } from '@/lib/agenda/atajosAgenda'
 import { guardarTarjetaAlPasar, leerTarjetaAlPasar } from '@/lib/agenda/tarjetaAlPasar'
 
-/* Integración L · el candado de L1 viaja en ESTE chunk (el de la barra v2, como `BotonLeyendaAgenda`): importado en
+/* Integración L · el candado de L1 viaja en ESTE chunk (el de la barra v2): importado en
    estático desde `AgendaCliente` bajaba también con la v2 apagada (regla de J1, AG-DT-136). */
 export { default as BotonBloquearHorario } from '@/components/agenda/BotonBloquearHorario'
 
@@ -55,6 +55,31 @@ interface Props {
       como el botón que sustituye. */
   atajos: { abrir: () => void; listos: boolean; encendidos: boolean } | null
   enBanda?: boolean
+  /** B13 · La barra por formato (PIEZAS §4): lo que fuera de la computadora sale de la barra y vive en
+      este menú. Sin ella (computadora), el menú de siempre. */
+  banda?: OpcionesDeBanda
+}
+
+/** B13 · Lo que la banda (`ext`/`tel`/`ih`/`iv`) pasa al menú: cada opción, o null si no aplica ahí. */
+export interface OpcionesDeBanda {
+  /** «Buscar citas de un paciente» (en `ext`/`tel`; en `ih`/`iv` la lupa sigue en la barra). */
+  buscar: (() => void) | null
+  /** El filtro de médico (sólo con varios médicos). */
+  medico: MedicoDelMenu | null
+  /** «Huecos disponibles» (`ih`/`iv`, Día, un médico): el contenido de su capa; `cerrar` la cierra. */
+  huecos: ((cerrar: () => void) => ReactNode) | null
+  /** «Bloquear horario» (el candado de la barra de computadora). */
+  bloquear: (() => void) | null
+}
+
+export interface MedicoDelMenu {
+  opciones: readonly { id: string; nombre: string }[]
+  /** '' = todos los médicos. */
+  elegido: string
+  /** El rótulo de «Todos los médicos» (`OPCION_TODOS`) y si se puede elegir (en Mes, no). */
+  todos: string
+  todosDesactivado: boolean
+  elegir: (id: string) => void
 }
 
 const SELECTOR_OPCION = '[role^="menuitem"]:not([aria-disabled="true"])'
@@ -73,9 +98,10 @@ function moverFoco(menu: HTMLElement, clave: string): boolean {
   return destino !== null && destino !== undefined
 }
 
-export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos, enBanda = false }: Props): ReactElement {
+export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos, enBanda = false, banda }: Props): ReactElement {
   const [abierto, setAbierto] = useState<{ boton: HTMLElement; foco: 'primera' | 'ultima' } | null>(null)
   const [leyenda, setLeyenda] = useState<HTMLElement | null>(null)
+  const [huecos, setHuecos] = useState<HTMLElement | null>(null)
   const botonRef = useRef<HTMLButtonElement | null>(null)
   const cerrar = useCallback((devolverFoco = true) => {
     setAbierto(null)
@@ -89,14 +115,16 @@ export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos
       <button type="button" ref={botonRef} data-engrane-agenda=""
         className={enBanda ? 'ag-banda-movil-ctrl ag-banda-movil-ctrl--marco' : 'ag-herramienta'}
         aria-label="Opciones de la agenda" title="Opciones de la agenda" aria-haspopup="menu" aria-expanded={abierto !== null}
-        onClick={() => { setLeyenda(null); if (abierto) cerrar(); else abrir('primera') }}
+        onClick={() => { setLeyenda(null); setHuecos(null); if (abierto) cerrar(); else abrir('primera') }}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); abrir(e.key === 'ArrowUp' ? 'ultima' : 'primera') }
         }}>
-        <Settings size={enBanda ? 18 : 16} aria-hidden="true" />
+        {/* B13 · En la banda, «···» (PIEZAS §4); en computadora, el engrane. */}
+        {banda ? <MoreHorizontal size={20} aria-hidden="true" /> : <Settings size={enBanda ? 18 : 16} aria-hidden="true" />}
       </button>
       {abierto && (
         <MenuAbierto boton={abierto.boton} foco={abierto.foco} cerrar={cerrar}>
+          {banda && <OpcionesDeLaBanda banda={banda} ejecutar={ejecutar} abrirHuecos={() => setHuecos(abierto.boton)} />}
           {onConfiguracion && <Opcion icono={<Settings size={16} />} texto="Configuración de la agenda" id="configuracion" alPulsar={ejecutar(onConfiguracion)} />}
           {onConfiguracion && <hr className="ag-menu-sep" />}
           {compactar && (
@@ -117,7 +145,73 @@ export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos
         </MenuAbierto>
       )}
       {leyenda && <CapaLeyenda boton={leyenda} alCerrar={() => setLeyenda(null)} />}
+      {huecos && banda?.huecos && <CapaHuecos boton={huecos} contenido={banda.huecos} alCerrar={() => setHuecos(null)} />}
     </>
+  )
+}
+
+/** B13 · Las opciones que la banda trae a la cabeza del menú (maqueta `ag-herr`, «Opciones de la agenda»). */
+function OpcionesDeLaBanda({ banda, ejecutar, abrirHuecos }: {
+  banda: OpcionesDeBanda; ejecutar: (accion: () => void) => () => void; abrirHuecos: () => void
+}): ReactElement | null {
+  const { buscar, medico, huecos, bloquear } = banda
+  if (!buscar && !medico && !huecos && !bloquear) return null
+  return (
+    <>
+      {buscar && <Opcion icono={<Search size={16} />} texto="Buscar citas de un paciente" id="buscar" alPulsar={ejecutar(buscar)} />}
+      {medico && <OpcionMedico medico={medico} ejecutar={ejecutar} />}
+      {huecos && <Opcion icono={<CalendarPlus size={16} />} texto="Huecos disponibles" id="huecos" alPulsar={ejecutar(abrirHuecos)} />}
+      {bloquear && <Opcion icono={<Lock size={16} />} texto="Bloquear horario" id="bloquear" alPulsar={ejecutar(bloquear)} />}
+      <hr className="ag-menu-sep" />
+    </>
+  )
+}
+
+/** «Médico» con el elegido debajo; se despliega en el sitio con una opción por médico (`menuitemradio`). */
+function OpcionMedico({ medico, ejecutar }: { medico: MedicoDelMenu; ejecutar: (accion: () => void) => () => void }): ReactElement {
+  const [desplegado, setDesplegado] = useState(false)
+  const nombreElegido = medico.opciones.find(m => m.id === medico.elegido)?.nombre ?? medico.todos
+  const filas = [{ id: '', nombre: medico.todos }, ...medico.opciones]
+  return (
+    <>
+      <button type="button" tabIndex={-1} className="ag-menu-opcion ag-menu-opcion--medico" data-opcion="medico"
+        role="menuitem" aria-haspopup="true" aria-expanded={desplegado} onClick={() => setDesplegado(d => !d)}>
+        <span className="ag-menu-icono" aria-hidden="true"><User size={16} /></span>
+        <span className="ag-menu-dos-lineas"><span>Médico</span><span className="ag-menu-detalle">{nombreElegido}</span></span>
+        <ChevronDown size={16} aria-hidden="true" className="ag-menu-chevron" />
+      </button>
+      {desplegado && (
+        <div role="group" aria-label="Médico" className="ag-menu-sub">
+          {filas.map(f => {
+            const desactivada = f.id === '' && medico.todosDesactivado
+            return (
+              <button key={f.id || 'todos'} type="button" tabIndex={-1} className="ag-menu-opcion ag-menu-radio"
+                role="menuitemradio" aria-checked={f.id === medico.elegido} aria-disabled={desactivada || undefined}
+                data-opcion-medico={f.id} onClick={() => { if (!desactivada) ejecutar(() => medico.elegir(f.id))() }}>
+                <span>{f.nombre}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </>
+  )
+}
+
+/** B13 · «Huecos disponibles» en `ih`/`iv` (§28): la tarjeta de huecos del panel del Día, en su capa. */
+function CapaHuecos({ boton, contenido, alCerrar }: {
+  boton: HTMLElement; contenido: (cerrar: () => void) => ReactNode; alCerrar: () => void
+}): ReactElement {
+  const { montarPanel, alPulsarTecla } = useDialogoModal(alCerrar)
+  return (
+    <CapaBarra boton={boton} rol="dialog" etiqueta="Huecos disponibles" clase="ag-capa--huecos"
+      alCerrar={alCerrar} alMontar={montarPanel} alPulsarTecla={alPulsarTecla} datos={{ 'data-capa-huecos': '' }}>
+      <div className="ag-capa-cab">
+        <p className="ag-capa-titulo">Huecos disponibles</p>
+        <button type="button" className="ag-capa-cerrar" onClick={alCerrar} aria-label="Cerrar"><X size={16} aria-hidden="true" /></button>
+      </div>
+      {contenido(alCerrar)}
+    </CapaBarra>
   )
 }
 
@@ -190,28 +284,6 @@ function OpcionPopUp(): ReactElement {
     setEncendida(!encendida)
   }
   return <Opcion icono={<MousePointer2 size={16} />} texto="Pop-up de eventos" id="tarjeta-al-pasar" marcada={encendida} alPulsar={alternar} />
-}
-
-/**
- * Tanda L, punto 11 · El botón de la leyenda en la barra de computadora, a la izquierda de
- * Mes/Semana/Día (lo coloca `CabeceraEscritorio`). Abre la MISMA capa que la opción del
- * engrane (`CapaLeyenda`, con `LeyendaEstados`), colgada de este botón; no la duplica. Vive
- * en este módulo porque es el chunk de la barra v2: con la v2 apagada no se descarga.
- */
-export function BotonLeyendaAgenda(): ReactElement {
-  const [abierta, setAbierta] = useState<HTMLElement | null>(null)
-  const botonRef = useRef<HTMLButtonElement | null>(null)
-  const cerrar = useCallback(() => setAbierta(null), [])
-  return (
-    <>
-      <button type="button" ref={botonRef} data-boton-leyenda="" className="ag-herramienta"
-        aria-label="Leyenda de estados" title="Leyenda de estados" aria-haspopup="dialog" aria-expanded={abierta !== null}
-        onClick={() => setAbierta(a => (a ? null : botonRef.current))}>
-        <Info size={16} aria-hidden="true" />
-      </button>
-      {abierta && <CapaLeyenda boton={abierta} alCerrar={cerrar} />}
-    </>
-  )
 }
 
 function CapaLeyenda({ boton, alCerrar }: { boton: HTMLElement; alCerrar: () => void }): ReactElement {

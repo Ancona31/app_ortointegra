@@ -23,7 +23,8 @@ test.beforeEach(({}, info) => {
 })
 test.afterEach(() => { interruptorAgenda('A', false) })
 
-const fecha = (page: Page) => page.locator('.ag-banda-movil-fecha')
+/* B13 · con la v2 el periodo es el botón «Ir a una fecha» de la barra (`.ag-fecha-boton-texto`); apagada, la fecha de la banda. */
+const fecha = (page: Page) => page.locator('.ag-banda-movil .ag-banda-movil-fecha, .ag-banda-movil .ag-fecha-boton-texto')
 
 /** Un deslizamiento horizontal de `dx` px por la mitad de la lista, empezando en `x0`. */
 async function deslizar(page: Page, x0: number, dx: number): Promise<void> {

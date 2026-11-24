@@ -9,11 +9,10 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { CabeceraEscritorio } from '@/components/agenda/CabeceraEscritorio'
 import { BandaMovil } from '@/components/agenda/BandaMovil'
-import { BotonLeyendaAgenda } from '@/components/agenda/MenuEngraneAgenda'
 
 const nada = (): void => undefined
 
-function cabecera(extra: { atajos?: boolean; selectorFecha?: string; buscar?: string; leyenda?: boolean }): string {
+function cabecera(extra: { atajos?: boolean; selectorFecha?: string; buscar?: string; engrane?: boolean }): string {
   return renderToStaticMarkup(
     <CabeceraEscritorio
       resumenConteo="3 citas" currentView="timeGridWeek" isMobile={false} onVista={nada}
@@ -23,7 +22,7 @@ function cabecera(extra: { atajos?: boolean; selectorFecha?: string; buscar?: st
       atajos={extra.atajos}
       selectorFecha={extra.selectorFecha ? <span data-ranura="fecha">{extra.selectorFecha}</span> : undefined}
       buscar={extra.buscar ? <span data-ranura="buscar">{extra.buscar}</span> : undefined}
-      leyenda={extra.leyenda ? <BotonLeyendaAgenda /> : undefined}
+      engrane={extra.engrane ? <button type="button" data-engrane-agenda="">···</button> : undefined}
     />,
   )
 }
@@ -54,19 +53,42 @@ describe('CabeceraEscritorio · contrato de F3', () => {
   })
 })
 
-/* Tanda L, punto 11: el botón de la leyenda, a la IZQUIERDA de Mes/Semana/Día, cerrado al pintarse;
-   sin la ranura (v2 apagada o teléfono), la barra de siempre. MUTACIÓN: `{leyenda}` después del
-   tablist en `CabeceraEscritorio` → rojo. */
-describe('CabeceraEscritorio · el botón de la leyenda (tanda L, punto 11)', () => {
-  it('va justo antes de las vistas, con su nombre y cerrado', () => {
-    const html = cabecera({ leyenda: true })
-    const boton = html.indexOf('data-boton-leyenda')
-    expect(boton).toBeGreaterThan(-1)
-    expect(boton).toBeLessThan(html.indexOf('aria-label="Vista del calendario"'))
-    expect(html).toMatch(/data-boton-leyenda=""[^>]*aria-label="Leyenda de estados"[^>]*aria-haspopup="dialog" aria-expanded="false"/)
+/* B13 (§28): la leyenda salió de la barra; su única puerta es «Opciones de la agenda». Sustituye a
+   la prueba del botón de la tanda L, punto 11. */
+describe('CabeceraEscritorio · la leyenda no está en la barra (B13, §28)', () => {
+  it('con la barra v2 (engrane) no hay botón de la leyenda', () => {
+    const html = cabecera({ engrane: true })
+    expect(html).toContain('data-engrane-agenda')
+    expect(html).not.toContain('data-boton-leyenda')
+    expect(html).not.toContain('Leyenda de estados')
   })
-  it('sin la ranura, no hay botón', () => {
-    expect(cabecera({})).not.toContain('data-boton-leyenda')
+})
+
+/* B13 · La barra por formato (PIEZAS §4): con la v2 (engrane + conmutador de cuatro) la banda es la
+   barra de la maqueta: sin «Abrir menú» (el encabezado de la app vuelve) y con el periodo en la ranura
+   de la fecha. Apagada, la banda de siempre. */
+describe('BandaMovil · la barra de la v2 (B13)', () => {
+  const conV2 = (): string => renderToStaticMarkup(
+    <BandaMovil
+      conteo="3 citas" vistaActual="timeGridDay" onVista={nada} titulo="Jue, 19 de noviembre"
+      onPrev={nada} onNext={nada} onHoy={nada} hoyDeshabilitado={false} onMenu={nada}
+      medicos={[]} filtroMedico="" onFiltroMedico={nada} onHorario={null} onCompactar={null}
+      compactado={false} mesSinTodos={false} cuatroVistas="telefono"
+      selectorFecha={<span data-ranura="fecha">fecha</span>}
+      engrane={<button type="button" data-engrane-agenda="">···</button>}
+    />,
+  )
+  it('marca la barra, sin «Abrir menú», con el periodo en la ranura y las cuatro vistas', () => {
+    const html = conV2()
+    expect(html).toContain('data-barra-v2=""')
+    expect(html).not.toContain('Abrir menú')
+    expect(html).toContain('data-ranura="fecha"')
+    expect(html).toMatch(/>3 días</)
+    expect(html).toContain('aria-label="Periodo anterior"')
+  })
+  it('apagada (sin engrane) es la banda de siempre', () => {
+    expect(banda(false)).not.toContain('data-barra-v2')
+    expect(banda(false)).toContain('Abrir menú')
   })
 })
 

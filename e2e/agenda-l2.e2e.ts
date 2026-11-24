@@ -108,29 +108,21 @@ test('Eliminar cita: pregunta, «Cancelar» no hace nada; «Aceptar» la quita d
   } finally { await otra.close() }
 })
 
-test('el botón de la leyenda: a la izquierda de las vistas, abre la leyenda de siempre; Escape la cierra y devuelve el foco', async ({ page }) => {
+/* B13 (§28, diseño aprobado): la leyenda SALE de la barra; su única puerta es «Opciones de la agenda». Sustituye
+   a la prueba del botón (tanda L, punto 11): sin botón en ningún formato, el menú la abre y Escape la cierra. */
+test('la leyenda no tiene botón en la barra: se abre desde «Opciones de la agenda»; Escape la cierra', async ({ page }) => {
   await abrirAgendaV2(page)
-  const boton = page.getByRole('button', { name: 'Leyenda de estados', exact: true })
-  if (test.info().project.name === 'telefono') {
-    await expect(boton).toHaveCount(0)
-    return
-  }
-  await expect(boton).toBeVisible()
-  const [b, vistas] = await Promise.all([boton.boundingBox(), page.getByRole('tablist', { name: 'Vista del calendario' }).boundingBox()])
-  expect(b && vistas && b.x + b.width <= vistas.x).toBe(true)
-  await boton.click()
+  await expect(page.getByRole('button', { name: 'Leyenda de estados', exact: true })).toHaveCount(0)
+  await expect(page.locator('[data-boton-leyenda]')).toHaveCount(0)
+  const engrane = page.locator('[data-engrane-agenda]').first()
+  await engrane.click()
+  await page.locator('[data-opcion="leyenda"]').click()
   const capa = page.locator('[data-capa-leyenda]')
   await expect(capa).toBeVisible()
   await expect(capa).toContainText('Agendada')
   await expect(capa).toContainText('Bloqueo')
-  await expect(boton).toHaveAttribute('aria-expanded', 'true')
   await page.keyboard.press('Escape')
   await expect(capa).toHaveCount(0)
-  await expect(boton).toBeFocused()
-  // En el engrane sigue también.
-  await page.locator('[data-engrane-agenda]').first().click()
-  await page.locator('[data-opcion="leyenda"]').click()
-  await expect(capa).toBeVisible()
 })
 
 test('con la v2 apagada no hay botón de la leyenda', async ({ page }) => {

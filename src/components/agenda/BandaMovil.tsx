@@ -121,6 +121,25 @@ export function BandaMovil(
   },
 ) {
   const bandaV2 = engrane !== undefined
+  /* B13 · La barra por formato (PIEZAS §4), sólo con la v2 (conmutador de cuatro y menú «···»): la de
+     la maqueta, sobre el fondo y no en navy. Mismos controles, nombres y clases que la banda; lo que
+     sale de la barra (médico, candado y, en `ext`/`tel`, la lupa) vive en «Opciones de la agenda». El
+     reparto por formato es de `globals.css` («B13 · CIERRE · LA BARRA POR FORMATO»). */
+  if (bandaV2 && cuatroVistas) {
+    return (
+      <header className="ag-banda-movil" data-barra-v2="">
+        <h1 className="sr-only">Agenda</h1>
+        <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} atajos={atajos} />
+        <span className="ag-banda-movil-titulo">
+          {selectorFecha ?? <span className="ag-banda-movil-fecha">{titulo}</span>}
+        </span>
+        <VistasBanda vistaActual={vistaActual} onVista={onVista} cuatroVistas={cuatroVistas} tableta={tableta} atajos={atajos} />
+        {buscar}
+        {campana}
+        {engrane}
+      </header>
+    )
+  }
   return (
     <header className="ag-banda-movil">
       <h1 className="sr-only">Agenda</h1>
@@ -137,23 +156,7 @@ export function BandaMovil(
         <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} atajos={atajos} />
       </div>
       <div className="ag-banda-movil-filtros">
-        <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
-          {(cuatroVistas ? VIEWS_V2 : VIEWS).map(v => {
-            /* El mismo traductor que el segmentado de escritorio y que el efecto
-               del ancho: aquí `isMobile` es true por construcción —esta banda sólo
-               se monta en móvil—, así que «Semana» apunta a `listWeek`. Con la v2,
-               la tabla de la v2 (`vistaDelFormato`). */
-            const tipo = cuatroVistas
-              ? vistaDelFormato(v.type, cuatroVistas === 'telefono')
-              : vistaEnElOtroFormato(v.type, true, tableta)
-            const atajo = ATAJO_DE_VISTA[v.type]
-            return (
-              <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
-                aria-keyshortcuts={atajos && atajo ? teclasDeAccion(atajo) : undefined}
-                onClick={() => onVista(tipo)}>{!cuatroVistas && tipo === 'timeGridTresDias' ? '3 días' : v.label}</button>
-            )
-          })}
-        </div>
+        <VistasBanda vistaActual={vistaActual} onVista={onVista} cuatroVistas={cuatroVistas} tableta={tableta} atajos={atajos} />
         {buscar}
         <FiltrosBandaMovil
           medicos={medicos} filtroMedico={filtroMedico}
@@ -165,5 +168,30 @@ export function BandaMovil(
         {engrane}
       </div>
     </header>
+  )
+}
+
+/* El conmutador de la banda (sacado de `BandaMovil` en B13 para usarlo en las dos formas de la banda). */
+function VistasBanda({ vistaActual, onVista, cuatroVistas, tableta, atajos }: {
+  vistaActual: string; onVista: (tipo: string) => void; cuatroVistas?: 'telefono' | 'rejilla'; tableta: boolean; atajos: boolean
+}) {
+  return (
+    <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
+      {(cuatroVistas ? VIEWS_V2 : VIEWS).map(v => {
+        /* El mismo traductor que el segmentado de escritorio y que el efecto
+           del ancho: aquí `isMobile` es true por construcción —esta banda sólo
+           se monta en móvil—, así que «Semana» apunta a `listWeek`. Con la v2,
+           la tabla de la v2 (`vistaDelFormato`). */
+        const tipo = cuatroVistas
+          ? vistaDelFormato(v.type, cuatroVistas === 'telefono')
+          : vistaEnElOtroFormato(v.type, true, tableta)
+        const atajo = ATAJO_DE_VISTA[v.type]
+        return (
+          <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
+            aria-keyshortcuts={atajos && atajo ? teclasDeAccion(atajo) : undefined}
+            onClick={() => onVista(tipo)}>{!cuatroVistas && tipo === 'timeGridTresDias' ? '3 días' : v.label}</button>
+        )
+      })}
+    </div>
   )
 }

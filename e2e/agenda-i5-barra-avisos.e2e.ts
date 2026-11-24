@@ -265,7 +265,11 @@ for (const [nombre, ancho, alto] of [['teléfono', 390, 844], ['tableta', 820, 1
     await page.keyboard.press('Escape')
     await banda.getByRole('button', { name: 'Opciones de la agenda' }).click()
     const menu = page.getByRole('menu', { name: 'Opciones de la agenda' })
-    await expect(menu.getByRole('menuitem')).toHaveText(['Configuración de la agenda', 'Leyenda de estados'])
+    /* B13 · barra por formato (PIEZAS §4, `ag-herr`): fuera de la computadora el médico y el candado viven
+       en el menú «···», y en el teléfono también la lupa (en la tableta sigue en la barra). */
+    await expect(menu.getByRole('menuitem')).toHaveText([
+      ...(nombre === 'teléfono' ? ['Buscar citas de un paciente'] : []),
+      /Médico/, 'Bloquear horario', 'Configuración de la agenda', 'Leyenda de estados'])
   })
 }
 

@@ -2315,7 +2315,9 @@ a.nav-avatar::after { content: ''; position: absolute; inset: -2px; border-radiu
    `ErrorBoundary` no se monta nunca. Si `:has()` falla quedan DOS menús un
    instante; con una condición de JS que no llega a tiempo quedaban CERO. Se
    elige el fallo con salida. No le añadas una media query «para afinar». */
-body:has(.ag-banda-movil) .nav-encabezado { display: none; }
+/* B13 · Con la v2 la banda es la barra de la maqueta (`[data-barra-v2]`, sin «Abrir menú»): el
+   encabezado de la app vuelve, como en cualquier otra página (bloque «B13 · CIERRE», al final). */
+body:has(.ag-banda-movil:not([data-barra-v2])) .nav-encabezado { display: none; }
 /* ⚠️ Y EN `ih` LA BANDA ESCONDE SU HAMBURGUESA: allí la barra lateral está
    siempre a la vista. Hasta que la agenda se rediseñe (B13). */
 [data-formato="ih"] .ag-banda-movil-ctrl[aria-label="Abrir menú"] { display: none; }
@@ -9371,3 +9373,176 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
   color: var(--ag-ink-600);
   cursor: pointer;
 }
+
+/* ═══ B13 · CIERRE · LA BARRA POR FORMATO (PIEZAS §4; maquetas `agenda-base` vista 3 y `ag-herr`) ════
+   Sólo con la v2 (`.ag-banda-movil[data-barra-v2]`, la monta `BandaMovil` con el conmutador de cuatro y
+   el menú «···»); apagada, la banda navy de siempre. Fuera de la computadora la barra es de la página
+   (sobre `--fondo`, no navy) y el encabezado de la app vuelve en `tel`/`iv` (regla de `.nav-encabezado`).
+     ext / tel   ‹ periodo › · campana · «···»  /  Hoy · conmutador estirado; «Agendar», píldora al pie.
+     ih / iv     periodo grande ‖ «Agendar»     /  ‹ Hoy › · conmutador ‖ lupa · campana · «···».
+   Médico, candado (y en `ext`/`tel` la lupa) viven en «Opciones de la agenda» (`OpcionesDeBanda`).
+   Un mismo DOM: las filas son áreas de la rejilla; `.ag-banda-movil-nav` es `display: contents`. */
+@media (max-width: 1023px) {
+  main > div:has(.ag-banda-movil[data-barra-v2]) { padding-top: calc(var(--it) + var(--cromo-enc)); }
+  main > div:has(.ag-banda-movil[data-barra-v2]) .agenda-raiz { height: calc(100dvh - var(--it) - var(--cromo-enc)); }
+  :root:is([data-formato="ext"], [data-formato="ih"]) main > div:has(.ag-banda-movil[data-barra-v2]) { padding-top: var(--it); }
+  :root:is([data-formato="ext"], [data-formato="ih"]) main > div:has(.ag-banda-movil[data-barra-v2]) .agenda-raiz { height: calc(100dvh - var(--it)); }
+}
+:root .agenda-raiz .ag-banda-movil[data-barra-v2] {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px 44px 44px;
+  grid-template-areas: "ant tit sig cam mas" "hoy vis vis vis vis";
+  align-items: center;
+  gap: 8px 4px;
+  padding: 8px 16px 10px;
+  background: transparent;
+  color: var(--tinta);
+}
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-nav { display: contents; }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-nav > button:first-child { grid-area: ant; }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-nav > button:last-child { grid-area: sig; }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-hoy { grid-area: hoy; }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-titulo { grid-area: tit; min-width: 0; }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas { grid-area: vis; }
+:root .ag-banda-movil[data-barra-v2] [data-buscar-citas] { grid-area: bus; }
+:root .ag-banda-movil[data-barra-v2] [data-campana] { grid-area: cam; }
+:root .ag-banda-movil[data-barra-v2] [data-engrane-agenda] { grid-area: mas; }
+/* Los iconos: glifo `--tinta2` sin caja; `--sup2` sólo al pulsar o abierto (PIEZAS §4). */
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-ctrl {
+  width: 44px; height: 44px;
+  background: transparent; border: 0;
+  border-radius: var(--r-control);
+  color: var(--tinta2);
+}
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-nav > .ag-banda-movil-ctrl:not(.ag-banda-movil-hoy) { color: var(--tinta); }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-ctrl:hover,
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-ctrl[aria-expanded="true"] { background: var(--sup2); color: var(--tinta); }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-hoy {
+  width: auto; padding: 0 4px;
+  color: var(--enlace); font-size: 15px; font-weight: 600;
+}
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-hoy[aria-disabled="true"]:hover { background: transparent; }
+:root .ag-banda-movil[data-barra-v2] .ag-campana-punto { border-color: var(--fondo); right: -2px; }
+/* El periodo abre «Ir a una fecha»: 17/700 en dos líneas limpias (la flecha va con la última palabra). */
+:root .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-fecha-boton {
+  display: block; width: 100%; height: auto; min-height: 44px; margin: 0;
+  padding: 2px 4px; text-align: left; white-space: normal;
+  font-size: 17px; font-weight: 700; line-height: 22px; letter-spacing: -.2px;
+  color: var(--tinta); border: 0;
+}
+:root .ag-banda-movil[data-barra-v2] .ag-fecha-boton-texto { overflow: visible; }
+:root .ag-banda-movil[data-barra-v2] .ag-fecha-nw { white-space: nowrap; }
+:root .ag-banda-movil[data-barra-v2] .ag-fecha-nw > svg { display: inline-block; vertical-align: -3px; margin-left: 2px; color: var(--tinta2); }
+:root .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-fecha-boton[aria-expanded="true"] { background: var(--sup2); }
+:root .ag-banda-movil[data-barra-v2] .ag-banda-movil-fecha { font-size: 17px; font-weight: 700; line-height: 22px; }
+/* El conmutador del kit: pista `--sup2` con 3 px, elegido `--sup` con sombra; 38 de alto. */
+:root .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas {
+  display: flex; gap: 2px; padding: 3px;
+  background: var(--sup2); border-radius: calc(var(--r-control) + 3px);
+}
+:root .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas > button {
+  flex: 1 1 auto; min-height: 38px; padding: 0 10px;
+  border-radius: var(--r-control);
+  color: var(--tinta2); font-size: 13px; font-weight: 600; white-space: nowrap;
+}
+:root .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas > button[aria-selected="true"] {
+  background: var(--sup); color: var(--tinta);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--tinta) 14%, transparent);
+}
+/* En `ext`/`tel` la lupa es una opción del menú: el botón queda (lo pulsan la opción y la tecla `/`). */
+:root:is([data-formato="ext"], [data-formato="tel"]) .ag-banda-movil[data-barra-v2] [data-buscar-citas] { display: none; }
+/* «Agendar» en `ext`/`tel`: la píldora flotante al pie del área de contenido (nunca bajo el riel). */
+:root:is([data-formato="ext"], [data-formato="tel"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .ag-barra-movil {
+  position: fixed; z-index: 20;
+  left: var(--cromo-izq); right: var(--cromo-der); bottom: calc(var(--ib) + 16px);
+  display: flex; justify-content: center;
+  padding: 0; background: none; border: 0; pointer-events: none;
+}
+:root:is([data-formato="ext"], [data-formato="tel"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .ag-barra-movil-cta {
+  width: auto; min-height: 48px; padding: 0 22px;
+  border-radius: 999px; pointer-events: auto;
+  font-size: 16px; font-weight: 600;
+  box-shadow: var(--sombra-capa);
+}
+/* `ih` / `iv`: el periodo grande arriba y «Agendar» primario a su derecha, en la primera fila. */
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz .ag-banda-movil[data-barra-v2] {
+  grid-template-columns: 44px auto 44px auto minmax(0, 1fr) 44px 44px 44px;
+  grid-template-areas: "tit tit tit tit tit tit tit tit" "ant hoy sig vis . bus cam mas";
+  padding: 12px 24px 10px;
+}
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-titulo { padding-right: 150px; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-fecha-boton {
+  display: inline-block; width: auto; max-width: 100%;
+  font-size: 28px; font-weight: 800; line-height: 34px;
+}
+:root[data-formato="ih"] .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-fecha-boton { font-size: 26px; line-height: 32px; max-width: 431px; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas { margin-left: 8px; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas > button { font-size: 14px; padding: 0 12px; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) { position: relative; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .ag-barra-movil {
+  position: absolute; top: 14px; right: 24px;
+  padding: 0; background: none; border: 0;
+}
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .ag-barra-movil-cta {
+  width: auto; min-height: 40px; padding: 0 16px;
+  border-radius: var(--r-control); font-size: 15px; font-weight: 600; box-shadow: none;
+}
+/* `ih` (pantalla de computadora en el Duo): controles de 36 (PIEZAS §4); el conmutador, 30 con área 36. */
+:root[data-formato="ih"] .agenda-raiz .ag-banda-movil[data-barra-v2] {
+  grid-template-columns: 36px auto 36px auto minmax(0, 1fr) 36px 36px 36px;
+}
+:root[data-formato="ih"] .ag-banda-movil[data-barra-v2] .ag-banda-movil-ctrl { width: 36px; height: 36px; }
+:root[data-formato="ih"] .ag-banda-movil[data-barra-v2] .ag-banda-movil-hoy { width: auto; }
+:root[data-formato="ih"] .agenda-raiz .ag-banda-movil[data-barra-v2] .ag-banda-movil-vistas > button { min-height: 30px; font-size: 13px; }
+:root[data-formato="ih"] .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .ag-barra-movil-cta { min-height: 36px; }
+/* El menú «Opciones de la agenda»: «Médico» con el elegido debajo y su lista desplegada en el sitio. */
+.ag-menu-dos-lineas { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.ag-menu-detalle { font-size: 13px; line-height: 16px; color: var(--tinta2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-menu-chevron { margin-left: auto; flex: none; color: var(--tinta2); transition: transform var(--dur-toque, 100ms); }
+.ag-menu-opcion--medico[aria-expanded="true"] .ag-menu-chevron { transform: rotate(180deg); }
+.ag-menu-sub { display: flex; flex-direction: column; }
+.ag-menu-sub .ag-menu-radio { padding-left: 48px; }
+.ag-menu-sub .ag-menu-radio[aria-checked="true"] { color: var(--enlace); font-weight: 600; }
+.ag-menu-sub .ag-menu-radio[aria-disabled="true"] { color: var(--tinta3); cursor: default; }
+/* «Huecos disponibles» en su capa: la tarjeta del panel del Día sin su propio título. */
+.ag-capa--huecos .ag-panelcard { padding: 0; background: none; border: 0; box-shadow: none; }
+.ag-capa--huecos .ag-panelcard-tit { display: none; }
+@media (prefers-reduced-motion: reduce) { .ag-menu-chevron { transition: none; } }
+/* La tarjeta del calendario vuelve a tener su margen fuera de la computadora (16 · 24 en `ih`/`iv`) y su
+   radio (PIEZAS §3): la barra ya no es una banda a sangre. */
+:root .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) > .ag-dia > .agenda-fc { margin: 0 16px 12px; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) > .ag-dia > .agenda-fc { margin: 0 24px 16px; }
+:root .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .agenda-fc .fc-view-harness { border-radius: 16px; overflow: clip; }
+:root:is([data-formato="ih"], [data-formato="iv"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .agenda-fc .fc-view-harness { border-radius: 18px; }
+/* La píldora de «Agendar» flota sobre la rejilla y la lista (`ext`/`tel`): su alto más su margen se suma
+   al final de lo que se desplaza, para que la última franja y la última fila puedan subir por encima. */
+:root:is([data-formato="ext"], [data-formato="tel"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .fc-scroller-liquid-absolute,
+:root:is([data-formato="ext"], [data-formato="tel"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .fc-list .fc-scroller,
+:root:is([data-formato="ext"], [data-formato="tel"]) .agenda-raiz:has(.ag-banda-movil[data-barra-v2]) .ag-mespanel { padding-bottom: 72px; }
+/* Las capas viven en `body`: «Huecos disponibles» y el mini mes de «Ir a una fecha» leen el kit con las
+   medidas de su pieza en el panel del Día (AG1). Nada por debajo de 12 px. */
+.ag-capa--huecos .ag-hueco-grupo,
+.ag-capa--huecos .ag-hueco {
+  padding: 10px 0; background: transparent; border: 0;
+  border-bottom: 1px solid var(--linea); border-radius: 0;
+}
+.ag-capa--huecos :is(.ag-hueco-grupo, .ag-hueco):last-child { border-bottom: 0; padding-bottom: 0; }
+.ag-capa--huecos .ag-hueco:hover, .ag-capa--huecos .ag-hueco:focus-visible { background: var(--sup2); }
+.ag-capa--huecos .ag-hueco-rango { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.ag-capa--huecos .ag-hueco-dur { font-size: 13px; color: var(--tinta2); }
+.ag-capa--huecos .ag-turno {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 14px;
+  border: 0; border-radius: var(--r-pildora); background: var(--tonal); color: var(--tonal-tinta);
+  font-size: 15px; font-weight: 600;
+}
+.ag-capa--huecos .ag-turno::before { content: '+'; font-size: 14px; font-weight: 600; }
+.ag-capa--huecos :is(.ag-turnos-vacio, .ag-panelcard-vacio) { font-size: 13px; color: var(--tinta2); }
+.ag-capa .ag-minimes-titulo { font-size: 15px; font-weight: 600; color: var(--tinta); }
+.ag-capa .ag-minimes-rejilla th { font-size: 12px; font-weight: 600; color: var(--tinta2); }
+.ag-capa .ag-minimes-dia { font-size: 13px; color: var(--tinta); }
+.ag-capa .ag-minimes-dia[data-fuera="true"] { color: var(--tinta3); }
+.ag-capa td[aria-selected="true"] > .ag-minimes-dia { background: var(--sup2); }
+.ag-capa .ag-minimes-dia[aria-current="date"],
+.ag-capa td[aria-selected="true"] > .ag-minimes-dia[aria-current="date"] { color: var(--enlace); background: transparent; font-weight: 700; }
+.ag-capa td[aria-selected="true"] > .ag-minimes-dia[aria-current="date"] { background: var(--sup2); }
