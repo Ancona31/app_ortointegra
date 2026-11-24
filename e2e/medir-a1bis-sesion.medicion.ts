@@ -47,7 +47,7 @@ test('A1-bis: sesión de uso normal (~2 min)', async ({ page }) => {
   await marcar('hoy')
   await page.locator('.fc-today-button').click()
   await marcar('vista Día')
-  await page.getByRole('tab', { name: 'Día' }).click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).click()
   await marcar('vista Mes')
   await page.getByRole('tab', { name: 'Mes' }).click()
   await marcar('vista Semana')

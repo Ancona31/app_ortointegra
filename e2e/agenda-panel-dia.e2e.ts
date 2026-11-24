@@ -34,7 +34,7 @@ async function irADiaFijo(page: Page, destino: string): Promise<void> {
 
 test('panel lateral de Día, en un laborable fijo de la semilla: resumen y huecos; pulsar un hueco abre «Nueva cita»', async ({ page }) => {
   await irAAgenda(page)
-  await page.getByRole('tab', { name: 'Día' }).click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).click()
   await expect(page.locator('.fc-timeGridDay-view')).toBeVisible()
   await irADiaFijo(page, DIA_LABORABLE_FIJO)
 

@@ -42,7 +42,7 @@ async function deslizar(page: Page, x0: number, dx: number): Promise<void> {
 }
 
 async function aDia(page: Page): Promise<void> {
-  await page.getByRole('tab', { name: 'Día' }).or(page.getByRole('button', { name: 'Día', exact: true })).first().click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).or(page.getByRole('button', { name: 'Día', exact: true })).first().click()
   await expect(page.locator('.fc-listDay-view')).toBeVisible()
 }
 

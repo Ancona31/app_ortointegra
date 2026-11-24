@@ -7673,3 +7673,47 @@ izquierda; en la lista, «Filtros» va después de «Ordenar». No hay enlace de
 «saltar al contenido»: 15 paradas de la barra antes del contenido. Se arregla
 reordenando el DOM (o con `order` en CSS sin romper la lectura) y añadiendo el
 enlace de salto en el layout; 5–10 líneas, fuera del alcance estético.
+
+---
+
+### AG-DT-279 — Formulario de la cita en `ih`/`esc`: rótulo a la izquierda y fechas/horas en píldoras (maqueta `ag-form`)
+
+**Estado:** 🟡 abierta, presentación (B13, cierre, 2026-11-24) · **Archivos:**
+`src/components/agenda/AppointmentModal.tsx`, `src/app/globals.css` (bloque de capas)
+
+La maqueta aprobada pone en `ih`/`esc` cada rótulo a la izquierda del campo (columna de 150) y fechas y horas
+como píldoras en línea; «Iniciar consulta» y «Expediente» como filas del grupo Paciente; y la cabecera del
+formulario en `ext` con más aire. Hoy: rótulo encima en todos los formatos y las dos acciones en cabecera y
+pie. Hacerlo pide rehacer el marcado de cada campo de un archivo de ~2 000 líneas sin tocar su lógica
+(`handleSave`, vetos, ajuste al turno, escudo del doble clic) y pasar `agenda-citas`, `-cancelar`,
+`-iniciar-consulta`, `-tipos-cita`, `-g3-*` y `-modal-diferido`. No se hizo en el cierre por tiempo.
+
+### AG-DT-280 — Pendientes de vistas del rediseño de la agenda
+
+**Estado:** 🟡 abierta, presentación (B13, cierre) · **Archivos:** `src/app/(app)/agenda/AgendaCliente.tsx`,
+`opcionesCalendario.ts`, `MonthChip.tsx`, `PanelDelDia.tsx`, `InteraccionesV2.tsx`, `globals.css`
+
+De `docs/spec/rediseno/b13/vistas.md`, sin hacer: capa propia de «+N más» en Mes (sigue el popover de
+FullCalendar); conteo por día en la cabecera de Semana; domingo sin horario en `--cal-fuera`; número del día
+arriba a la izquierda en Mes; filas del panel del Mes del teléfono con el estilo de la Semana; y decidir si
+el deslizamiento lateral (`deslizarActivo`) vale en las rejillas de Día y 3 días del teléfono (hoy sólo en
+listas).
+
+### AG-DT-281 — 80 px por hora (`--cal-h`) sin aplicar
+
+**Estado:** 🟡 abierta, presentación (B13) · **Archivos:** `globals.css`, `AgendaCliente.tsx`
+
+La rejilla sigue en 36/42/48 px por media hora (por alto de ventana). Pasar a 80 por hora exige declarar el
+alto antes del primer pintado (o `updateSize()` al encender el atributo de la v2) y que `agenda-arrastre`,
+`agenda-empalme` y `agenda-g2-turnos:169` salgan 5 de 5 (AG1 lo probó re-apuntando `--ag-slot-h` y el
+arrastre cayó en otra hora 2 de 3). No se intentó en el cierre.
+
+### AG-DT-282 — Barra de computadora: el título grande de la maqueta no cabe en el reparto de M3
+
+**Estado:** 🟡 abierta, decisión pendiente (B13) · **Archivos:** `CabeceraEscritorio.tsx`, `globals.css` (M3)
+
+PIEZAS §4 pone en `esc` el periodo a 32/800 en su propia fila con buscar · campana · candado · engrane ·
+Agendar, y debajo ‹ Hoy › · médico · vistas. La regla M3 de CLAUDE.md (dos ítems de rejilla, una fila desde
+1360, dos limpias de 1024 a 1359, fecha y nombre enteros: `agenda-m3-barra`) se midió con la fecha a 15 px:
+a 32 no cabe en la fila única de 1360 (holgura de 28 px en Semana y 4 en Mes) ni entera a 1024. Hoy `esc`
+conserva el reparto de M3 con la piel nueva. Cambiarlo es rehacer M3 (y su prueba) con la decisión del dueño.

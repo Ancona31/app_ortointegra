@@ -52,7 +52,7 @@ test.describe('escritorio', () => {
     const cita = eventoConTexto(page, 'Paciente')
     await expect(cita.locator('.ag-tarjeta-telefono')).toBeHidden()
     await expect(cita.locator('.ag-tarjeta-consultorio')).toBeHidden()
-    await page.getByRole('tab', { name: 'Día' }).click()
+    await page.getByRole('tab', { name: 'Día', exact: true }).click()
     const enDia = page.locator('.fc-timeGridDay-view .fc-event', { hasText: 'Paciente' }).first()
     await expect(enDia.locator('.ag-tarjeta-telefono')).toBeVisible()
     await expect(enDia.locator('.ag-tarjeta-telefono')).toHaveText(/^99900\d{5}$/)
@@ -106,7 +106,7 @@ test.describe('escritorio', () => {
     await expect(glifo('confirmed').first()).toHaveText('●')
     const titulo = await eventoConTexto(page, 'Paciente').locator('.ag-tarjeta').getAttribute('title')
     expect(titulo).toMatch(/· (Agendada|Confirmada|Atendida|No asistió|Cancelada)$/)
-    await page.getByRole('tab', { name: 'Día' }).click()
+    await page.getByRole('tab', { name: 'Día', exact: true }).click()
     await expect(page.locator('.fc-timeGridDay-view .ag-tarjeta-pildora').first()).toBeVisible()
   }
 
@@ -237,7 +237,7 @@ test.describe('teléfono', () => {
   test('F1.14 · la lista de Día en dos líneas: cada fila con paciente mide 72 px o menos', async ({ page }) => {
     await fijarDia(page, LUNES)
     await irAAgenda(page)
-    await page.getByRole('tab', { name: 'Día' }).click()
+    await page.getByRole('tab', { name: 'Día', exact: true }).click()
     const filas = page.locator('.fc-listDay-view .fc-list-event', { hasText: 'Paciente' })
     await expect(filas.first()).toBeVisible()
     const altos = await filas.evaluateAll(els => els.map(e => e.getBoundingClientRect().height))
@@ -320,7 +320,7 @@ test.describe('escritorio · paso 2', () => {
     await irAAgenda(page)
     await filaUnica()
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.getByRole('tab', { name: 'Día' }).click()
+    await page.getByRole('tab', { name: 'Día', exact: true }).click()
     await expect(page.locator('.ag-dia--con-panel')).toBeVisible()
     await filaUnica()
   })

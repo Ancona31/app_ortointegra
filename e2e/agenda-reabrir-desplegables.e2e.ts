@@ -55,5 +55,18 @@ test('«Ir a una fecha» se vuelve a abrir tras cerrarlo con Escape, sin «Algo 
 
 test('la lupa «Buscar citas» se vuelve a abrir tras cerrarla con Escape, sin «Algo salió mal»', async ({ page }) => {
   await abrirAgendaV2(page)
-  await abrirCerrarAbrir(page, '[data-buscar-citas]', 'Buscar citas')
+  if (test.info().project.name !== 'telefono') {
+    await abrirCerrarAbrir(page, '[data-buscar-citas]', 'Buscar citas')
+    return
+  }
+  /* B13 · barra por formato (PIEZAS §4): en el teléfono la lupa es una opción de «Opciones de la agenda»;
+     se abre por ahí dos veces (la segunda, tras cerrar con Escape) y la pantalla no se cae. */
+  for (let vez = 0; vez < 2; vez++) {
+    await page.locator('.ag-banda-movil').getByRole('button', { name: 'Opciones de la agenda' }).click()
+    await page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem', { name: 'Buscar citas de un paciente' }).click()
+    await expect(page.getByRole('dialog', { name: 'Buscar citas' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Buscar citas' })).toHaveCount(0)
+  }
+  await expect(page.getByText('Algo salió mal')).toHaveCount(0)
 })

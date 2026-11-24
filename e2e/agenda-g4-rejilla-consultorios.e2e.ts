@@ -149,7 +149,7 @@ test('el consultorio activo del menú lateral: el gris, los huecos y la hora a l
   await semanaVacia(page)
   // admin.a abre filtrado a sí mismo; su consultorio activo es Hosp Norte (15:00–19:00).
   await expect.poll(() => grisDelLunes(page)).toEqual(['07:00-15:00', '19:00-21:00'])
-  await page.getByRole('tab', { name: 'Día' }).click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).click()
   // Un lunes sin citas: un solo hueco, la jornada entera del consultorio.
   for (let i = 0; i < 7; i++) {
     const fecha = await page.locator('.fc-timegrid-col[data-date]').first().getAttribute('data-date')

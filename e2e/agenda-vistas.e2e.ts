@@ -27,7 +27,7 @@ test('conmutador Mes, Semana y Día', async ({ page }) => {
   await page.getByRole('tab', { name: 'Mes' }).click()
   await expect(page.locator('.fc-dayGridMonth-view')).toBeVisible()
 
-  await page.getByRole('tab', { name: 'Día' }).click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).click()
   await expect(page.locator('.fc-timeGridDay-view')).toBeVisible()
 
   await page.getByRole('tab', { name: 'Semana' }).click()

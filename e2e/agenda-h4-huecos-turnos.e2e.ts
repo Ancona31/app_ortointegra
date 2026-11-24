@@ -94,7 +94,7 @@ function consultaDe45(): void {
 async function abrirDia(page: Page): Promise<void> {
   await abrirAgendaV2(page)
   for (let i = 0; i < semana; i++) await page.locator('.fc-next-button').click()
-  await page.getByRole('tab', { name: 'Día' }).click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).click()
   for (let i = 0; i < 14; i++) {
     const actual = await page.locator('.fc-timegrid-col[data-date]').first().getAttribute('data-date')
     if (actual === dia) break

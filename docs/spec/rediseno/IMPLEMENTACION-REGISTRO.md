@@ -1191,3 +1191,57 @@ modales) se pintan en `body`, fuera de la raíz: tampoco lo ven.
   noche; el Storage local no tiene el cubo de PDF (`Bucket not found`), así que
   la descarga desde la lista no se probó en local. (El desplegable de
   suplementos ya no tapa el pie: corrección H5.)
+
+### B13 · cierre · notas (2026-11-24)
+
+Un solo agente sobre `feature/integracion-rediseno-agenda` (desde `3766bb41`), tras fundir las líneas de
+vistas, capas y configuración. Registro de cada línea: `docs/spec/rediseno/b13/{vistas,capas,configuracion}.md`.
+
+* **Barra por formato (PIEZAS §4, maquetas `agenda-base` vista 3 y `ag-herr`).** Con la v2, fuera de la
+  computadora `BandaMovil` deja de ser la banda navy y pinta la barra de la maqueta sobre `--fondo`
+  (`header.ag-banda-movil[data-barra-v2]`), sin «Abrir menú»: el encabezado de la app (`.nav-encabezado`)
+  vuelve en `tel`/`iv` (la regla que lo escondía ahora sólo mira la banda de siempre). Un DOM; las filas son
+  áreas de rejilla por `data-formato` (bloque «B13 · CIERRE · LA BARRA POR FORMATO», al final de
+  `globals.css`; `.ag-banda-movil-nav` es `display: contents`):
+  * `ext`/`tel`: «‹ periodo › · campana · «···»» / «Hoy · conmutador estirado»; «Agendar» = la barra de
+    siempre convertida en píldora flotante al pie del área de contenido (entre `--cromo-izq/-der`: no toca el
+    riel). Lo que se desplaza (rejilla, lista, panel del Mes) lleva 72 px más abajo para que nada quede bajo
+    la píldora.
+  * `ih`/`iv`: periodo grande (28/800; 26 y ≤ 431 px en `ih`) ‖ «Agendar» primario arriba a la derecha /
+    «‹ Hoy › · conmutador ‖ lupa · campana · «···»»; controles de 36 en `ih`.
+  * El periodo es «Ir a una fecha» (`SelectorFechaV2 enBanda`): mayúscula inicial escrita y la última palabra
+    unida a su flecha (`.ag-fecha-nw`, PIEZAS §13.4).
+  * La tarjeta del calendario vuelve a tener margen (16 · 24 en `ih`/`iv`) y radio (16 · 18).
+  * `esc`: SIN CAMBIOS de reparto (M3: dos ítems de rejilla, una fila desde 1360, dos de 1024 a 1359). El
+    título grande de la maqueta (32/800 en su propia fila) no cabe en la fila única de 1360 (holgura medida en
+    M3: 28 px en Semana, 4 en Mes) ni deja la fecha entera a 1024, que `agenda-m3-barra` exige: queda como
+    diferencia con la maqueta.
+* **«Opciones de la agenda» en la banda** (`MenuEngraneAgenda`, prop `banda: OpcionesDeBanda`; icono «···»):
+  «Buscar citas de un paciente» (sólo `ext`/`tel`; pulsa el MISMO botón oculto que la tecla `/`), «Médico»
+  (con el elegido debajo; se despliega en el sitio, `menuitemradio`; «Todos» apagado en Mes), «Huecos
+  disponibles» (§28: `ih`/`iv`, Día, un médico; la tarjeta `CardHuecos` del panel, mismos huecos, turnos y
+  duración, en su capa), «Bloquear horario» (el mismo `abrirBloqueoDesdeBarra`). El candado sale de la banda.
+* **Leyenda (§28):** se retiró `BotonLeyendaAgenda` y la ranura `leyenda` de `CabeceraEscritorio`; su única
+  puerta es la opción del menú.
+* **Configuración:** las preguntas de los enlaces («¿Apagarlo?», «¿Cambiarlo?») usan la alerta del catálogo
+  con verbo (`alertaDeEnlace`): «Apagar» (destructiva) y «Cambiar» (aviso). «Configuración de la agenda»
+  también en el aviso de periodo vacío de la rejilla (§29.12).
+* **Capas en `body` a 12 px o más:** «Huecos disponibles», el mini mes de «Ir a una fecha» (días de la semana
+  estaban a 10,5; hoy en `--enlace` también dentro de la semana a la vista) y la leyenda (11 → 13).
+  `ext`: «Qué vas a crear» cabe en 310.
+
+Pruebas actualizadas (presentación aprobada; ninguna saltada ni debilitada): `ranurasCabecera.test.tsx`;
+`agenda-l2` (la leyenda sin botón), `-i5-barra-avisos` y `-j1-engrane` (opciones del menú en teléfono y
+tableta), `-f-buscador` (lupa en el menú; foco vuelve a «···»), `-l1-bloqueo-telefono` (candado en el menú;
+la flecha en lugar del candado al medir la fila), `-f-deslizar` (el periodo es el botón), `-b13-vistas` (la
+rejilla se desplaza al final antes de tocar, por la píldora), `-enlaces-reserva`, `-j5-configuracion`,
+`-k3-configuracion` («Aceptar» → verbo), `-f-simetria` (configuración: sangría en los rótulos de grupo y 36 en
+computadora, AG9), `-reabrir-desplegables` (la lupa del teléfono por el menú), y `getByRole('tab', { name: 'Día' })`
+con `exact: true` en siete archivos (con la v2 «3 días» también casa con «Día»: `agenda-g4-rejilla-consultorios`
+y `agenda-h4-huecos-turnos` fallaban 3 de 3 desde la fusión del conmutador de cuatro).
+
+No hecho en el cierre (queda en `DEUDA_TECNICA.md`, AG-DT-279 a AG-DT-282): el formulario con el rótulo a la
+izquierda y fechas/horas en píldoras en `ih`/`esc` y «Iniciar consulta»/«Expediente» como filas del grupo
+Paciente; los pendientes de vistas (capa propia de «+N más», conteo en la cabecera de Semana, domingo sin
+horario en `--cal-fuera`, número del día arriba a la izquierda, filas del panel del Mes, deslizar en las
+rejillas del teléfono); 80 px por hora (no se intentó: sigue 36/42/48); título grande en `esc`.

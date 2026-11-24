@@ -13,7 +13,7 @@ test('teléfono: Semana y Día son listas (.fc-list-*), nunca rejilla', async ({
   await expect(page.locator('.fc-list-event, .fc-list-empty').first()).toBeVisible()
   await expect(page.locator('.fc-timegrid')).toHaveCount(0)
 
-  await page.getByRole('tab', { name: 'Día' }).click()
+  await page.getByRole('tab', { name: 'Día', exact: true }).click()
   // MEDIA «Día en teléfono»: no basta con ver una fila de lista — hay que
   // exigir que la vista sea realmente `listDay` y que no haya NINGUNA
   // rejilla de tiempo escondida detrás.
