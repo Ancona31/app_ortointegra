@@ -45,6 +45,9 @@ function principal(): { id: string; nombre: string; direccion: string; telefono:
 test('«Tus datos»: el aviso va abierto y relleno, con la casilla nueva y el enlace al aviso integral', async ({ page }) => {
   const c = principal()
   await page.goto(`/reservar/${codigo}`)
+  // Con otros archivos corridos antes puede haber más de un tipo: se elige el del escenario.
+  const tipo = page.locator(`input[name="tipo"][value="${e.tipoId}"]`)
+  if (await tipo.count()) await tipo.check()
   await page.getByRole('button', { name: 'Elegir día y hora' }).click()
   await primerTurnoDeLaSemanaSiguiente(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
@@ -67,6 +70,9 @@ test('«Tus datos»: el aviso va abierto y relleno, con la casilla nueva y el en
   await expect(enlace).toHaveAttribute('href', `/reservar/${codigo}/privacidad`)
   await expect(enlace).toHaveAttribute('target', '_blank')
   await expect(enlace).toHaveText(new RegExp(`/reservar/${codigo}/privacidad$`))
+  // El aviso abierto alarga el paso: los botones siguen a la vista sin desplazar.
+  await expect(page.getByRole('button', { name: 'Volver', exact: true })).toBeInViewport()
+  await expect(page.getByRole('button', { name: 'Reservar cita' })).toBeInViewport()
 })
 
 test('el aviso integral: público, relleno con el consultorio, sin marcadores y en claro', async ({ browser }) => {

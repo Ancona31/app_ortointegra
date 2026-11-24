@@ -325,6 +325,14 @@ body:has(.rp) {
   .rp-main { padding-top: var(--ag-6); }
   .rp-tarjeta { padding: var(--ag-6); gap: var(--ag-5); }
   .rp-pie { position: static; margin: 0; padding: 0; border: 0; background: none; }
+  /* Privacidad 2026-12: en «Tus datos» el aviso va ABIERTO y el paso ya no cabe
+     en la pantalla; ahí el pie se queda pegado abajo también en escritorio,
+     para que «Volver» y el botón principal sigan a la vista (tanda H, punto 1). */
+  .rp-paso:has(.rp-aviso-legal) .rp-pie {
+    position: sticky; margin: 0 calc(var(--ag-6) * -1) calc(var(--ag-6) * -1);
+    padding: var(--ag-3) var(--ag-6) var(--ag-4);
+    background: var(--ag-surface); border-top: 1px solid var(--ag-border-card);
+  }
   .rp-titulo { font-size: 20px; }
   .rp-fecha { font-size: 28px; }
 }
