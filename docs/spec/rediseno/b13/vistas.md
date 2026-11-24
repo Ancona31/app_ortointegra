@@ -81,3 +81,15 @@ ni los bloques de AG0/AG1.
 * CAPAS (`InteraccionesV2.tsx`, `deslizarActivo`): con la v2, Día y «3 días» del teléfono son rejilla y el
   deslizar sólo vale en listas. Decidir si el gesto debe valer también en esas rejillas.
 * Atajo de teclado para «3 días»: no existe (`atajosAgenda.ts`); el segmento no lleva `aria-keyshortcuts`.
+
+## Verificación (build final)
+
+* build exit 0; eslint 87/61; Vitest 2623/2623 sin TZ, UTC y Hermosillo.
+* e2e contra :3002 (escritorio, telefono, tableta): b13-vistas, movil, vistas, arrastre, filtro, f-pulido,
+  f-deslizar, interruptor, f-tableta, empalme, g2-turnos → 71 pasan; falla `agenda-g2-turnos:147`, que ya
+  fallaba en la base. `agenda-cache-rangos` y `agenda-candado-gesto` no se pudieron validar aquí: escriben por
+  API contra `localhost:3001` fijo en la prueba (sin servidor en 3001 en esta copia).
+* Capturas: `S/b13/vistas/despues` (v2, 5 formatos × claro/oscuro, 0 errores de consola) y
+  `S/b13/vistas/apagada` (v2 apagada, sin cambios).
+* Arreglo tras las capturas: en `ext` la fila de la Semana ensanchaba la tabla y el estado quedaba bajo el
+  riel; `contain: inline-size` en el cuerpo de la fila.
