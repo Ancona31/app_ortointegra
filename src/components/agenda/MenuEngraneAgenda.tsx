@@ -111,7 +111,9 @@ export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos
           {atajos && <Opcion icono={<Keyboard size={16} />} texto="Atajos de teclado" id="atajos" desactivada={!atajos.listos}
             teclas={atajos.encendidos ? teclasDeAccion('ayuda') : undefined} alPulsar={ejecutar(atajos.abrir)} />}
           <hr className="ag-menu-sep" />
-          <Opcion texto="Leyenda de estados" id="leyenda" alPulsar={ejecutar(() => setLeyenda(abierto.boton))} />
+          {/* B13 · AG8: todas las filas llevan su icono (maqueta `ag-herr`). La leyenda se abre desde aquí: si el
+              botón de la barra se retira (§28), no se pierde. */}
+          <Opcion icono={<Info size={16} />} texto="Leyenda de estados" id="leyenda" alPulsar={ejecutar(() => setLeyenda(abierto.boton))} />
         </MenuAbierto>
       )}
       {leyenda && <CapaLeyenda boton={leyenda} alCerrar={() => setLeyenda(null)} />}
