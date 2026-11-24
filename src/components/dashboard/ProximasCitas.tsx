@@ -77,6 +77,23 @@ async function leerAgendaV2(supabase: Supabase, clinicaId: string): Promise<bool
   }
 }
 
+/* VELOCIDAD · El interruptor ya leído, por clínica, mientras viva la pestaña.
+   Antes se recordaba por MONTAJE (`v2Ref`), así que cada regreso al dashboard
+   pagaba `agenda_ajustes` → `appointments` EN SERIE: dos idas y vueltas al
+   otro lado del continente donde basta una. Sólo se recuerda una lectura
+   buena (`true`/`false`); `null` (no se pudo leer) se vuelve a preguntar, como
+   antes. Un cambio del interruptor se ve al recargar la pestaña. */
+const v2PorClinica = new Map<string, boolean>()
+
+/** El interruptor de la clínica: de memoria si ya se leyó en esta pestaña; si no, se lee y se recuerda. */
+export async function agendaV2DeClinica(supabase: Supabase, clinicaId: string): Promise<boolean> {
+  const recordado = v2PorClinica.get(clinicaId)
+  if (recordado !== undefined) return recordado
+  const leido = await leerAgendaV2(supabase, clinicaId)
+  if (leido !== null) v2PorClinica.set(clinicaId, leido)
+  return leido === true
+}
+
 /** La consulta de la región (ver los filtros en `cargar`). `v2` añade las citas por ligar y por asignar. */
 function consultaProximas(supabase: Supabase, o: { clinicaId: string; medicoId: string | null; v2: boolean }) {
   let consulta = supabase
@@ -306,9 +323,6 @@ export default function ProximasCitas({ medicoId, acciones, ligar, claseHero = '
      no debe martillear. Para eso está «Reintentar», que no pasa por el tope. */
   const ultimaTraidaRef = useRef(0)
 
-  /* I3 · El interruptor de la v2, leído una vez por montaje (`null` = sin leer). */
-  const v2Ref = useRef<boolean | null>(null)
-
   const cargar = useCallback(async () => {
     if (!clinicaId) return
     const mia = ++peticionRef.current
@@ -343,10 +357,9 @@ export default function ProximasCitas({ medicoId, acciones, ligar, claseHero = '
          resumen.
          I3 (punto 8) · Con la agenda v2 encendida entran también las citas POR
          LIGAR y las «por asignar» de Google (`CON_PACIENTE_O_POR_LIGAR`); el
-         interruptor se lee una vez por montaje (`v2Ref`). Apagada, la consulta
-         es la de siempre, byte a byte. */
-      if (v2Ref.current === null) v2Ref.current = await leerAgendaV2(supabase, clinicaId)
-      const v2 = v2Ref.current === true
+         interruptor se lee una vez por pestaña (`agendaV2DeClinica`). Apagada,
+         la consulta es la de siempre, byte a byte. */
+      const v2 = await agendaV2DeClinica(supabase, clinicaId)
       let { data, error: errConsulta } = await consultaProximas(supabase, { clinicaId, medicoId, v2 })
       if (v2 && errConsulta && sinColumna(errConsulta.code)) {
         ({ data, error: errConsulta } = await consultaProximas(supabase, { clinicaId, medicoId, v2: false }))
