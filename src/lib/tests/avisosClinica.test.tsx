@@ -7,7 +7,7 @@
  *
  * MUTACIONES (comprobadas en rojo): `avisosParaEmergente` sin el filtro de
  * tipo (salen las cancelaciones, que ya avisa E8) o sin el de 2 min;
- * `textoEmergente` con el nombre; `citaDelEnlace` aceptando `nueva`;
+ * `textoEmergente` SIN el nombre (desde 2026-11-24 lo lleva); `citaDelEnlace` aceptando `nueva`;
  * `cambioPuedeAvisar` sin la rama de Google; `FilaManana` sin la celda vacía
  * del botón que falta; `CabeceraEscritorio` pintando el conteo con la v2.
  */
@@ -64,12 +64,15 @@ describe('textos', () => {
     expect(textoAviso(aviso('google_por_asignar'))).toBe('Evento nuevo de Google por asignar: Cita de enlace')
     expect(textoAviso(aviso('empalme_google'))).toContain('se empalma con un evento de Google')
   })
-  it('el aviso emergente NO lleva el nombre (como E8 y D11), sí la fecha en la zona del consultorio', () => {
-    for (const t of ['reserva_enlace', 'reagendado_paciente', 'google_por_asignar'] as const) {
-      const texto = textoEmergente(aviso(t))
-      expect(texto).not.toContain('María')
-      expect(texto).toContain('10:45') // 16:45 UTC = 10:45 en Mérida
-    }
+  /* Avisos globales (2026-11-24): decisión de Angel, la burbuja lleva el nombre. Mutación en
+     rojo: `textoEmergente` con «Un paciente» en vez del nombre. */
+  it('el aviso emergente lleva el nombre y la fecha en la zona del consultorio; nada más de la cita', () => {
+    expect(textoEmergente(aviso('reserva_enlace'))).toBe('María Ejemplo reservó por enlace para el jueves, 17 de diciembre a las 10:45.')
+    expect(textoEmergente(aviso('cancelacion_paciente'))).toBe('María Ejemplo canceló su cita del jueves, 17 de diciembre a las 10:45.')
+    expect(textoEmergente(aviso('reagendado_paciente'))).toBe('María Ejemplo reagendó su cita para el jueves, 17 de diciembre a las 10:45.')
+    expect(textoEmergente(aviso('empalme_google'))).toBe('La reserva de María Ejemplo se empalma con un evento de Google.')
+    // El evento de Google por asignar no es de un paciente todavía: sin nombre, con la hora (16:45 UTC = 10:45 en Mérida).
+    expect(textoEmergente(aviso('google_por_asignar'))).toBe('Evento nuevo de Google por asignar el jueves, 17 de diciembre a las 10:45.')
   })
 })
 

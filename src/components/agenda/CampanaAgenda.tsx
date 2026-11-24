@@ -46,9 +46,12 @@ import {
 /**
  * Los que lanzan aviso emergente desde aquí. La cancelación (E8) y el empalme
  * (D11) ya tienen el suyo en la agenda y NO se repiten. Tanda L (punto 13):
- * la confirmación del paciente por su enlace, que no tenía ninguno.
+ * la confirmación del paciente por su enlace, que no tenía ninguno. Avisos
+ * globales (2026-11-24): la reservada por enlace que alguien movió en Google.
  */
-const EMERGENTES: readonly TipoAviso[] = ['reserva_enlace', 'reagendado_paciente', 'google_por_asignar', 'confirmacion_paciente']
+const EMERGENTES: readonly TipoAviso[] = [
+  'reserva_enlace', 'reagendado_paciente', 'google_por_asignar', 'confirmacion_paciente', 'google_movimiento_rechazado',
+]
 
 /** Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. */
 export function textoBurbuja(pendientes: number): string {

@@ -317,9 +317,9 @@ test('19: reserva, cancelación y reagendado del paciente → avisos con aviso e
   const fijo = emitirEnlace(e, 'fijo').codigo
   const p = personaNueva()
 
-  // Reserva por enlace, con la agenda abierta: aviso emergente (sin el nombre) y el aviso en la campana.
+  // Reserva por enlace, con la agenda abierta: aviso emergente (con el nombre, desde 2026-11-24) y el aviso en la campana.
   const primera = await reservarFijo(fijo, p)
-  await expect(toastConTexto(page, 'Nueva reserva por enlace para el')).toBeVisible({ timeout: 15000 })
+  await expect(toastConTexto(page, `${p.nombre} reservó por enlace para el`)).toBeVisible({ timeout: 15000 })
   await expect(campana(page).locator('[data-punto-rojo]')).toBeVisible()
   await abrirAvisos(page)
   await expect(aviso(page, 'reserva_enlace', primera.id)).toContainText(`${p.nombre} reservó por enlace`)
@@ -333,7 +333,7 @@ test('19: reserva, cancelación y reagendado del paciente → avisos con aviso e
 
   // Reagenda con el mismo enlace: la cita nueva avisa como «reagendó», no como reserva nueva.
   const nueva = await reservarFijo(fijo, { ...personaNueva(), telefono: p.telefono, nombre: p.nombre }, primera.codigo)
-  await expect(toastConTexto(page, 'Un paciente reagendó su cita')).toBeVisible({ timeout: 15000 })
+  await expect(toastConTexto(page, `${p.nombre} reagendó su cita para el`)).toBeVisible({ timeout: 15000 })
   await abrirAvisos(page)
   await expect(aviso(page, 'reagendado_paciente', nueva.id)).toContainText(`${p.nombre} reagendó su cita`)
   await expect(aviso(page, 'reserva_enlace', nueva.id)).toHaveCount(0)

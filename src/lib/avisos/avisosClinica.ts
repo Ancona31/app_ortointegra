@@ -162,20 +162,26 @@ export function haceCuanto(creadoEn: string, ahora: number): string {
   return `hace ${d} ${d === 1 ? 'día' : 'días'}`
 }
 
-/** El aviso emergente: SIN nombre (como E8 y D11), sólo qué pasó y cuándo es la cita. */
+/**
+ * El aviso emergente (la burbuja que sale y se quita sola). CON el nombre, por
+ * decisión de Angel (bloque «avisos globales», 2026-11-24; hasta entonces iba
+ * sin él, como E8 y D11): dice lo mismo que la campana (`textoAviso`, mismas
+ * reglas de quién) más el día y la hora de la cita en la zona de su consultorio.
+ * ⚠️ Nada clínico: ni tipo de cita, ni motivo, ni observaciones, ni contacto.
+ */
 export function textoEmergente(a: AvisoClinica): string {
   const fecha = enZona(a.cita.start_time, a.cita.zona, { weekday: 'long', day: 'numeric', month: 'long' })
   const hora = enZona(a.cita.start_time, a.cita.zona, { hour: '2-digit', minute: '2-digit', hour12: false })
   const cuando = fecha && hora ? ` para el ${fecha} a las ${hora}` : ''
+  const n = quien(a.cita)
   switch (a.tipo) {
-    case 'reserva_enlace': return `Nueva reserva por enlace${cuando}.`
-    case 'cancelacion_paciente': return fecha && hora ? `Un paciente canceló su cita del ${fecha} a las ${hora}.` : 'Un paciente canceló su cita.'
-    case 'reagendado_paciente': return `Un paciente reagendó su cita${cuando}.`
+    case 'reserva_enlace': return `${n} reservó por enlace${cuando}.`
+    case 'cancelacion_paciente': return `${n} canceló su cita${delDiaALaHora(a.cita)}.`
+    case 'reagendado_paciente': return `${n} reagendó su cita${cuando}.`
     case 'google_por_asignar': return `Evento nuevo de Google por asignar${fecha && hora ? ` el ${fecha} a las ${hora}` : ''}.`
-    case 'empalme_google': return 'Una reserva por enlace se empalma con un evento de Google.'
+    case 'empalme_google': return `La reserva de ${n} se empalma con un evento de Google.`
     case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
-    /* Sin el nombre, como la cancelación (E8): el emergente se ve por encima del hombro. */
-    case 'confirmacion_paciente': return `Un paciente confirmó su cita${delDiaALaHora(a.cita)}.`
+    case 'confirmacion_paciente': return `${quienConfirmo(a.cita)} confirmó su cita${delDiaALaHora(a.cita)}.`
   }
 }
 

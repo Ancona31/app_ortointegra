@@ -117,7 +117,7 @@ async function cuentas(page: Page): Promise<{ n: number; m: number }> {
 const etiquetaDe = ({ n, m }: { n: number; m: number }): string =>
   `Por confirmar (${n}) y avisos (${m})${n + m > 0 ? `: ${n + m} ${n + m === 1 ? 'pendiente' : 'pendientes'}` : ''}`
 
-test('13 y 14: el paciente confirma por su enlace → emergente sin nombre, aviso con su nombre, la burbuja lo sigue; uno solo', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'cita de mañana; la borra el afterEach' } }, async ({ page, playwright, baseURL }) => {
+test('13 y 14: el paciente confirma por su enlace → emergente y aviso con su nombre, la burbuja lo sigue; uno solo', { annotation: { type: ANOTACION_A_PROPOSITO, description: 'cita de mañana; la borra el afterEach' } }, async ({ page, playwright, baseURL }) => {
   const base = baseURL ?? ''
   const nombre = tituloUnico('Paciente L5 Confirma')
   const { cita, codigo } = citaDeManana('07:20', nombre)
@@ -130,8 +130,8 @@ test('13 y 14: el paciente confirma por su enlace → emergente sin nombre, avis
   const ctx = await playwright.request.newContext({ baseURL: base, extraHTTPHeaders: { 'x-forwarded-for': ipAlAzar() } })
   try {
     await confirmarComoPaciente(ctx, base, codigo)
-    // El emergente, sin el nombre (se ve por encima del hombro), con el día y la hora del consultorio.
-    const emergente = toastConTexto(page, `Un paciente confirmó su cita ${delDia('07:20')}.`)
+    // El emergente, con el nombre (decisión de Angel, 2026-11-24), el día y la hora del consultorio.
+    const emergente = toastConTexto(page, `${nombre} L5 confirmó su cita ${delDia('07:20')}.`)
     await expect(emergente).toBeVisible({ timeout: 15000 })
     // La burbuja, sin recargar: la cita sale de «Por confirmar» y su aviso entra en «Avisos»
     // (el total no cambia; el desglose, sí), y la burbuja dice ese total.
@@ -176,5 +176,5 @@ test('13: la confirmación marcada por el personal no genera aviso', async ({ pa
   await page.waitForTimeout(1500)
   expect(sqlLocal(`select status from public.appointments where id = :'c'`, { c: cita })).toBe('confirmed')
   expect(avisosDe(cita)).toBe('')
-  await expect(toastConTexto(page, 'Un paciente confirmó su cita')).toHaveCount(0)
+  await expect(toastConTexto(page, 'confirmó su cita')).toHaveCount(0)
 })

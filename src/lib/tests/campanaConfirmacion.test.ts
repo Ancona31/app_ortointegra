@@ -11,7 +11,7 @@
  * e2e `agenda-l5-campana`; la regla de la base, en `l5_aviso_confirmacion.sql`.
  *
  * MUTACIONES (comprobadas en rojo): `quienConfirmo` con el nombre tecleado
- * antes que el del paciente ligado; `textoEmergente` con el nombre;
+ * antes que el del paciente ligado; `textoEmergente` sin el nombre (desde 2026-11-24 lo lleva);
  * `cambioPuedeAvisar` sin mirar `pintado` (toda confirmada recarga) o sin
  * `listada`; `textoBurbuja` sin el tope de 9; `etiquetaCampana` sin el
  * singular.
@@ -46,10 +46,8 @@ describe('aviso «confirmó su cita» (tanda L, punto 13)', () => {
   it('la hora es la del consultorio de la cita, no la del dispositivo', () => {
     expect(textoAviso(confirmacion({ zona: 'America/Tijuana' }))).toBe('Hugo Interián Pérez confirmó su cita del jueves, 19 de noviembre a las 08:45')
   })
-  it('el emergente no lleva el nombre (como la cancelación, E8)', () => {
-    const t = textoEmergente(confirmacion())
-    expect(t).toBe('Un paciente confirmó su cita del jueves, 19 de noviembre a las 10:45.')
-    expect(t).not.toContain('Hugo')
+  it('el emergente lleva el nombre, como la campana (avisos globales, decisión de Angel del 2026-11-24)', () => {
+    expect(textoEmergente(confirmacion())).toBe('Hugo Interián Pérez confirmó su cita del jueves, 19 de noviembre a las 10:45.')
   })
   it('el lector lo acepta, sale como emergente si es reciente y abre la cita sin destacar nada', () => {
     expect(leerRespuestaAvisos({ avisos_disponibles: true, avisos: [confirmacion()] })?.avisos).toHaveLength(1)
