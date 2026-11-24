@@ -27,7 +27,7 @@ import type { CitaDelAviso } from '@/lib/avisos/avisosClinica'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
 import {
-  VISTAS_FC, VISTAS_FC_MOVIL, VISTAS_FC_TABLETA, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
+  VISTAS_FC, VISTAS_FC_MOVIL, VISTAS_FC_TABLETA, VISTAS_FC_V2, VISTAS_FC_V2_TABLETA, VISTAS_FC_V2_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
 } from '@/components/agenda/opcionesCalendario'
 /* ⚠️ A2.6: `AppointmentModal`, `HorarioModal` y `ModalInvitacionCita` se
    cargan en diferido más abajo, con `next/dynamic` — son los tres modales más
@@ -87,8 +87,10 @@ import { rangosDeLaVista, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { frasearConteo, frasearConteoBreve } from '@/lib/agenda/conteoAgenda'
 import {
   esVistaDeRejilla, vistaEnElOtroFormato, vistaAdmiteCompactar, etiquetaCompactar,
-  periodoDeLaVista, ANCHO_TABLETA,
+  periodoDeLaVista, ANCHO_TABLETA, vistaDelFormato, vistaDeLaV1EnLaV2, esFormatoTelefono,
 } from '@/lib/agenda/vistasAgenda'
+import { TiraSemana } from '@/components/agenda/TiraSemana'
+import { leerFormato, clasificarFormato, alCambiarFormato } from '@/lib/formatoPantalla'
 import { clasesDelEvento } from '@/lib/agenda/tarjetasAgenda'
 import { desplazarListaAHoyEstable, diaLocalISO, type DestinoLista } from '@/lib/agenda/listaHoy'
 import { podarMarcas } from '@/lib/agenda/marcasMovimiento'
@@ -237,6 +239,18 @@ const SALIDA_DEL_MODAL: boolean = true
    pasó a tener fila propia también en escritorio, así que ya no hay nada que
    redeclarar por debajo del umbral. */
 const ANCHO_MOVIL = 1024
+/* B13 · AG2 · Sin sonda (no debería pasar en la app): el formato por el ancho, sin franjas. */
+const SIN_INSETS = { top: 0, right: 0, bottom: 0, left: 0 } as const
+
+/* Las opciones por vista que le tocan al formato. Con la v2, las suyas (sólo
+   cambian los títulos y «3 días»); apagada, las tres de siempre. Todas son
+   literales de módulo: la identidad sigue estable. */
+function tablaDeVistas(formatoV2: 'ancho' | 'tableta' | 'telefono' | null, isMobile: boolean, esTableta: boolean) {
+  if (formatoV2 === 'ancho') return VISTAS_FC_V2
+  if (formatoV2 === 'tableta') return VISTAS_FC_V2_TABLETA
+  if (formatoV2 === 'telefono') return VISTAS_FC_V2_MOVIL
+  return !isMobile ? VISTAS_FC : esTableta ? VISTAS_FC_TABLETA : VISTAS_FC_MOVIL
+}
 
 /* ═══ F1.3 · DENSIDAD, PREFERENCIA DEL NAVEGADOR ════════════════════════════
    Mismo patrón que la barra plegada de `Sidebar` (copiado a propósito, dos usos):
@@ -348,6 +362,14 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   /* F1.16 · El tramo de tableta (768–1023): banda azul como el teléfono, pero
      Semana y Día en rejilla (Semana de tres días). */
   const [esTableta,    setEsTableta]    = useState(false)
+  /* B13 · AG2 · Con la v2, el formato de la sonda reducido a lo que decide las
+     tablas de vistas: `ancho` (esc), `tableta` (ih/iv) o `telefono` (ext/tel).
+     Apagada se queda en `null` y manda `esTableta`, como siempre. */
+  const [formatoV2, setFormatoV2] = useState<'ancho' | 'tableta' | 'telefono' | null>(null)
+  /* B13 · AG4 · ¿El Mes es el del teléfono (puntos + panel del día)? Apagada,
+     todo lo que no es computadora (`isMobile`), como siempre. Con la v2, sólo
+     `ext`/`tel`: en `ih`/`iv` el Mes es la rejilla con chips (PIEZAS-MES §2). */
+  const mesDeTelefono = formatoV2 ? formatoV2 === 'telefono' : isMobile
   const [currentView,  setCurrentView]  = useState<string>('timeGridWeek')
   /* La etiqueta de fecha de la banda móvil. Con `headerToolbar={false}` ya no
      hay toolbar nativo que la pinte, así que se guarda lo que compone
@@ -703,7 +725,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
 
   const {
     diaSel, setDiaSel, filasDia, aplicarPanel, sincronizarDiaDelPanel, dayCellClassNames,
-  } = usePanelDelMes({ calendarRef, isMobile })
+  } = usePanelDelMes({ calendarRef, isMobile: mesDeTelefono })
 
   const { resumenDia, aplicarResumen } = useResumenDelDia({ calendarRef, horario, horarioRef, rangoDeVista })
 
@@ -732,6 +754,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      `setCurrentView` no se toca aquí: lo escribe `datesSet`, que `changeView`
      reemite. Escribirlo también aquí serían dos fuentes para el mismo dato. */
   useEffect(() => {
+    if (agendaV2) return seguirFormatoV2()
     function check() {
       const movil = window.innerWidth < ANCHO_MOVIL
       const tableta = movil && window.innerWidth >= ANCHO_TABLETA
@@ -745,7 +768,40 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
-  }, [])
+  }, [agendaV2])
+
+  /* ── B13 · AG2 · EL FORMATO CON LA V2, DE LA SONDA Y NO DEL ANCHO ──────
+     Mismo contrato que el efecto de arriba (conservar el periodo, comparar
+     antes de `changeView`, sin fecha), pero el formato sale de `data-formato`
+     (`leerFormato`): así React y las hojas de estilo cruzan en el mismo píxel.
+     La sonda escucha `resize` antes que nadie (va en el `<head>`), así que al
+     leer aquí ya está al día; `spinus:formato` cubre lo que cambia sin
+     redimensionar (la franja del Duo al girar).
+     ⚠️ La PRIMERA vez traduce desde la v2 apagada (`vistaDeLaV1EnLaV2`): ahí
+     `timeGridTresDias` era la Semana de la tableta, no «3 días».
+     `esTableta` se queda en `false`: con la v2 no hay Semana de tres días, y
+     así `vistaEnElOtroFormato(…, isMobile, esTableta)` nunca la devuelve. */
+  function seguirFormatoV2(): () => void {
+    let primera = true
+    function check(): void {
+      const leido = leerFormato()
+      const formato = leido === 'desconocido' ? clasificarFormato(window.innerWidth, SIN_INSETS) : leido
+      const telefono = esFormatoTelefono(formato)
+      setIsMobile(formato !== 'esc')
+      setEsTableta(false)
+      setFormatoV2(formato === 'esc' ? 'ancho' : telefono ? 'telefono' : 'tableta')
+      const api = calendarRef.current?.getApi()
+      if (!api) return
+      const t = api.view.type
+      const destino = primera ? vistaDeLaV1EnLaV2(t, telefono) : vistaDelFormato(t, telefono)
+      primera = false
+      if (destino !== t) api.changeView(destino)
+    }
+    check()
+    window.addEventListener('resize', check)
+    const dejar = alCambiarFormato(check)
+    return () => { window.removeEventListener('resize', check); dejar() }
+  }
 
   /* ── F2.7 · LA SALIDA DEL MODAL DE LA CITA ─────────────────────────────
      `modal` sigue siendo la ÚNICA verdad de si está abierto: se cierra al
@@ -879,9 +935,13 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      por aquí: no hay persistencia de la vista, `initialView` es Semana, el
      toolbar de escritorio no lleva botones de vista y el efecto del ancho empareja
      Mes consigo mismo. */
-  function cambiarVista(tipo: string, fecha?: Date) {
+  function cambiarVista(pedida: string, fecha?: Date) {
     const api = calendarRef.current?.getApi()
     if (!api) return
+    /* B13 · AG2 · Con la v2 se pide un PERIODO y el formato lo pone la tabla de
+       la v2: un `listDay` o un `timeGridWeek` que llegue de un llamador de
+       siempre sale como el Día o la Semana de este formato. */
+    const tipo = formatoV2 ? vistaDelFormato(pedida, formatoV2 === 'telefono') : pedida
     if (tipo === 'dayGridMonth') forzarMedicoParaElMes()
     else revertirMedicoForzado()
     if (fecha) api.changeView(tipo, fecha)
@@ -997,7 +1057,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   const { handleEventDrop, handleEventResize, handleSave, handleDelete, handleCancelar } = guardado
 
   const { handleDateClick, handleSelect, handleEventClick, abrirCita, abrirHueco } = crearAltaCitas({
-    calendarRef, isMobile, setDiaSel, subState, openBloqueoModal, avisosHorario, setModal, setConfirm,
+    calendarRef, isMobile: mesDeTelefono, setDiaSel, subState, openBloqueoModal, avisosHorario, setModal, setConfirm,
     resumenDia, citasIncompletas, agendaV2, interacciones: interaccionesRef, seleccionDesdeHueco, ajustarTurno,
   })
 
@@ -1087,7 +1147,11 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      mano en dos sitios y el tercero la habría hecho tres. Si divergen, se puede
      acabar con el panel pintado y la selección de rango encendida, que es la
      combinación que se lleva por delante el toque en una celda. */
-  const esMesMovil = isMobile && currentView === 'dayGridMonth'
+  const esMesMovil = mesDeTelefono && currentView === 'dayGridMonth'
+  /* B13 · AG2 · Con la v2, en el teléfono (`ext`, `tel`) las rejillas —Día y
+     «3 días»— no tienen hueco para agendar (CALMA §28): ni arrastrar un tramo
+     ni tocar uno abren el alta. Agendar es la barra de abajo. */
+  const sinHuecoParaAgendar = formatoV2 === 'telefono' && esVistaDeRejilla(currentView)
 
   /* ── EL PANEL LATERAL DE LA VISTA DÍA (bloque 8) ───────────────────────
      ⚠️ POR EL TIPO DE VISTA Y POR `isMobile`, NUNCA POR UN MEDIA QUERY. El
@@ -1361,8 +1425,11 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   function alPulsarHueco(arg: DateClickArg) {
     /* En el Mes del teléfono un toque ELIGE el día del panel (una lectura,
        `handleDateClick`): no agenda nada, así que el bloqueo no lo intercepta. */
-    const b = isMobile && arg.view.type === 'dayGridMonth' ? null : bloqueoDelGesto(arg.date)
+    const b = mesDeTelefono && arg.view.type === 'dayGridMonth' ? null : bloqueoDelGesto(arg.date)
     if (b) { setModalBloqueo({ tipo: 'editar', bloqueo: b }); return }
+    /* B13 · AG2 · La misma regla que `sinHuecoParaAgendar`, pero con la vista
+       del gesto: un bloqueo se sigue editando; un hueco no abre nada. */
+    if (formatoV2 === 'telefono' && esVistaDeRejilla(arg.view.type)) return
     handleDateClick(arg)
   }
   function alSeleccionar(arg: DateSelectArg) {
@@ -1542,6 +1609,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              condición que el de escritorio (`verEngrane`). */
           onHorario={verEngrane ? abrirConfiguracion : null}
           engraneConfiguracion={agendaV2}
+          /* B13 · AG2 · Con la v2, las cuatro vistas (CALMA §29.1). */
+          cuatroVistas={formatoV2 === null ? undefined : formatoV2 === 'telefono' ? 'telefono' : 'rejilla'}
           /* Misma forma y misma pregunta que el de escritorio: en móvil las dos
              vistas que `vistaAdmiteCompactar` acepta se reducen a Mes, porque
              Semana y Día son listas aquí. */
@@ -1801,6 +1870,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
             onHorario={abrirConfiguracion}
             /* T3 · Con la v2 abre la configuración: sólo icono, «Configuración de la agenda». */
             engraneConfiguracion={agendaV2}
+            cuatroVistas={formatoV2 !== null}
             /* ⚠️ NO FUNDIR con el `onAgendar` de `BarraAgendarMovil` ni con el
                de la banda vacía, aunque el cuerpo sea idéntico: el plan A2.5
                los deja como tres cierres separados a propósito (§invariantes,
@@ -1927,6 +1997,10 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
           compactaElMes={compactaElMes}
           onSalirCompacta={() => setCompactar(false)}
           leyendaHusos={leyendaDeHusos}
+          /* B13 · AG3 · La tira de fechas, sólo en la Semana del teléfono con la v2. */
+          tira={formatoV2 === 'telefono' && currentView === 'listWeek' && rangoVisible
+            ? <TiraSemana desde={rangoVisible.split('/')[0]} raizRef={raizRef} />
+            : undefined}
         />
         <FullCalendar
           ref={calendarRef}
@@ -2003,7 +2077,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              así que la identidad sigue siendo estable en los dos lados y
              FullCalendar no vuelve a refinar opciones por culpa de esto. Lo
              único que cambia entre ellas es la entrada de Mes. */
-          views={!isMobile ? VISTAS_FC : esTableta ? VISTAS_FC_TABLETA : VISTAS_FC_MOVIL}
+          views={tablaDeVistas(formatoV2, isMobile, esTableta)}
           /* Marca la celda del día que enseña el panel. Sólo pinta en móvil. */
           dayCellClassNames={dayCellClassNames}
           /* El número de día del mes lleva a la vista Día de ESE día. Antes no
@@ -2047,7 +2121,7 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              Apagado, en Mes móvil sólo queda el toque, y de paso desaparece el
              resaltado azul de selección, que competía con el contorno del día
              elegido. En cualquier otra vista y en escritorio no cambia nada. */
-          selectable={!esMesMovil}
+          selectable={!esMesMovil && !sinHuecoParaAgendar}
           selectOverlap={seleccionSinBloqueoFc}
           selectMirror
           /* F3: tocar dentro de una capa (la burbuja) no suelta el tramo

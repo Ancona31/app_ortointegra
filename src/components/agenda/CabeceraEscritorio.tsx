@@ -17,11 +17,11 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { teclasDeAccion, type AccionAtajo } from '@/lib/agenda/atajosAgenda'
 import { ChevronDown, Settings, Plus, ChevronsDownUp, Rows4 } from 'lucide-react'
-import { VIEWS } from '@/components/agenda/BandaMovil'
+import { VIEWS, VIEWS_V2 } from '@/components/agenda/BandaMovil'
 import { OPCION_TODOS } from '@/components/agenda/FiltrosBandaMovil'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
-import { vistaEnElOtroFormato, etiquetaCompactar, vistaAdmiteCompactar } from '@/lib/agenda/vistasAgenda'
+import { vistaEnElOtroFormato, vistaDelFormato, etiquetaCompactar, vistaAdmiteCompactar } from '@/lib/agenda/vistasAgenda'
 
 interface Props {
   resumenConteo: string
@@ -63,10 +63,13 @@ interface Props {
   /** Tanda L, punto 11 · El botón de la leyenda de estados, a la izquierda de las vistas
       (sólo computadora y v2; sin él, la barra de siempre). */
   leyenda?: ReactNode
+  /** B13 · AG2 · Con la v2, el conmutador de cuatro: Mes, Semana, 3 días y Día
+      (CALMA §29.1). Sin él, los tres de siempre. */
+  cuatroVistas?: boolean
 }
 
 /* La acción de atajo de cada segmento de vista (por su tipo ancho). */
-const ATAJO_DE_VISTA: Record<string, AccionAtajo> = {
+const ATAJO_DE_VISTA: Partial<Record<string, AccionAtajo>> = {
   dayGridMonth: 'vista-mes', timeGridWeek: 'vista-semana', timeGridDay: 'vista-dia',
 }
 /* Los botones nativos de FullCalendar y su acción. No aceptan atributos propios
@@ -85,7 +88,7 @@ export function CabeceraEscritorio({
   resumenConteo, currentView, isMobile, onVista, compactar, onCompactar, isSingleDoctor,
   filtroEfectivo, mesSinTodos, medicos, onFiltroMedico, canEditHorario, onHorario, onAgendar,
   onIntencionAgendar, porConfirmar, densidadCompacta, onDensidad, selectorFecha, buscar, atajos = false,
-  engraneConfiguracion = false, engrane, leyenda,
+  engraneConfiguracion = false, engrane, leyenda, cuatroVistas = false,
 }: Props) {
   const barraV2 = engrane !== undefined
   const rotuloEngrane = engraneConfiguracion ? 'Configuración de la agenda' : 'Configurar horario de consulta'
@@ -156,7 +159,7 @@ export function CabeceraEscritorio({
            F1.1: 36 px de pista, como el resto de controles de la barra. */
         style={{ background: 'var(--ag-segment-bg)', borderRadius: 'calc(var(--ag-r-btn) + 3px)', padding: 3, gap: 2 }}
       >
-        {VIEWS.map(v => {
+        {(cuatroVistas ? VIEWS_V2 : VIEWS).map(v => {
           /* ⚠️ EL SEGMENTO NOMBRA UN PERIODO, NO UNA VISTA, Y POR ESO
              TRADUCE. `VIEWS` guarda el tipo ANCHO de cada uno —es la lista
              del segmentado desde el bloque 4 y no se toca—, así que en un
@@ -168,14 +171,17 @@ export function CabeceraEscritorio({
              que las listas vienen a evitar.
              Es el mismo `vistaEnElOtroFormato` del efecto del ancho, y tiene
              que serlo: dos tablas de parejas divergen. */
-          const tipo = vistaEnElOtroFormato(v.type, isMobile)
+          /* B13 · AG2 · Con la v2, la tabla de cuatro (`vistaDelFormato`): la de
+             siempre traduciría «3 días» a la Semana. */
+          const tipo = cuatroVistas ? vistaDelFormato(v.type, false) : vistaEnElOtroFormato(v.type, isMobile)
           const active = currentView === tipo
+          const atajo = ATAJO_DE_VISTA[v.type]
           return (
             <button
               key={v.type}
               role="tab"
               aria-selected={active}
-              aria-keyshortcuts={atajos ? teclasDeAccion(ATAJO_DE_VISTA[v.type]) : undefined}
+              aria-keyshortcuts={atajos && atajo ? teclasDeAccion(atajo) : undefined}
               onClick={() => onVista(tipo)}
               className={`inline-flex items-center ${active ? '' : 'bg-transparent hover:bg-[var(--ag-btn-ghost-hover)]'}`}
               style={{

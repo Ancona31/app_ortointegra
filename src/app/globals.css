@@ -6472,6 +6472,239 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 /* Las dos piezas que sólo pinta la v2 (fuera de la raíz v2, ocultas). */
 .ag-tarjeta-pildora-ico, .ag-desglose-icono { display: none; }
 
+/* ═══ B13 · VISTAS (AG2 Día y 3 días · AG3 Semana · AG4 Mes) ═══════════════════
+   Línea de VISTAS del rediseño de la agenda (registro:
+   `docs/spec/rediseno/b13/vistas.md`). Todo va bajo la raíz v2, como AG1, y
+   con `:root` delante: este bloque va ANTES del de AG1 en el archivo y tiene
+   que ganarle a igualdad de selector. La v2 apagada no ve nada de aquí. */
+
+/* AG2 · El conmutador de cuatro (CALMA §29.1, PIEZAS §12). En el teléfono
+   (`ext`, `tel`) va en su propia fila, estirado, con los rótulos enteros a 13;
+   el buscador, el filtro y el engrane bajan a la siguiente. En `ih`/`iv` cabe
+   en la fila del filtro, por contenido. La cuarta pestaña sólo existe con la v2,
+   así que `:has(… :nth-child(4))` no alcanza a la banda de siempre. */
+:root[data-formato="ext"] .agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil-filtros:has(> .ag-banda-movil-vistas > button:nth-child(4)),
+:root[data-formato="tel"] .agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil-filtros:has(> .ag-banda-movil-vistas > button:nth-child(4)) {
+  flex-wrap: wrap;
+  row-gap: var(--ag-1-5);
+}
+:root[data-formato="ext"] .agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil-vistas:has(> button:nth-child(4)),
+:root[data-formato="tel"] .agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil-vistas:has(> button:nth-child(4)) {
+  flex: 1 0 100%;
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil-vistas:has(> button:nth-child(4)) {
+  flex: 0 0 auto;
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-banda-movil-vistas:has(> button:nth-child(4)) > button {
+  flex: 1 1 auto;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+/* AG3 · LA SEMANA DEL TELÉFONO (versión A, PIEZAS §6, maqueta `ag-semana`).
+   Tira de fechas encima (`TiraSemana`) y la lista por día de `listWeek` con la
+   fila de la maqueta (`FilaLista` con `detalle`): hora apilada, barra de 3 px
+   del estado (`--ag-ev-marca`, la de siempre), nombre 15/600, «duración ·
+   motivo» 13 y el estado en círculo de 26. La hora y el punto del plugin se
+   ocultan: la hora va dentro de la fila. Sólo `listWeek`: el panel del Mes del
+   teléfono sigue con su fila compacta. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-semana {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  margin-top: 8px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--sup);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-dia {
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  cursor: pointer;
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-dia[aria-pressed="true"] { background: var(--fondo); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-dia:focus-visible { outline: 2px solid var(--cal-sel); outline-offset: -2px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-letra { font-size: 12px; line-height: 16px; font-weight: 600; color: var(--tinta2); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-num {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-dia[data-hoy] .ag-tira-num { background: var(--cal-hoy-num); color: var(--sobre-accion); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-dia[data-hoy] .ag-tira-letra { color: var(--enlace); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-puntos { display: flex; gap: 3px; height: 4px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-tira-puntos > i { width: 4px; height: 4px; border-radius: 50%; background: var(--tinta3); }
+
+:root .agenda-raiz[data-agenda-v2="encendida"] .fc-listWeek-view .fc-list-event-time,
+:root .agenda-raiz[data-agenda-v2="encendida"] .fc-listWeek-view .fc-list-event-graphic { display: none; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .fc-listWeek-view .fc-list-event > td {
+  height: auto;
+  padding: 10px 12px 10px 16px;
+  border-color: var(--linea);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .fc-listWeek-view .fc-list-day-cushion {
+  padding: 14px 16px 6px;
+  background: var(--sup);
+  box-shadow: none;
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .fc-listWeek-view .ag-listahead-fecha {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--enlace);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .fc-listWeek-view .ag-listahead-dow { font-size: 13px; font-weight: 400; color: var(--tinta2); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 { gap: 10px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-hora {
+  flex: 0 0 44px;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--tinta2);
+  font-variant-numeric: tabular-nums;
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-hora > b { font-size: 13px; font-weight: 600; color: var(--tinta); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-barra {
+  flex: none;
+  align-self: stretch;
+  width: 3px;
+  min-height: 36px;
+  border-radius: 2px;
+  background: var(--ag-ev-marca);
+}
+/* `contain: inline-size`: el cuerpo no aporta su ancho de contenido a la tabla.
+   Sin esto, la segunda línea (sin salto, con «…») ensanchaba la celda por encima
+   de la tarjeta y en `ext` empujaba el estado bajo el riel. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; contain: inline-size; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre { flex: none; font-size: 15px; line-height: 20px; color: var(--tinta); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre > svg { display: inline; vertical-align: -1px; margin-right: 4px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre--cancelada { color: var(--tinta2); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-linea2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--tinta2);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 > .k-est { flex: none; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-chevron { flex: none; width: 16px; height: 16px; color: var(--tinta3); }
+
+/* AG4 · EL MES DE LA V2 EN `ih`/`iv`/`esc` (PIEZAS-MES §1–§2, maqueta `ag-mes`).
+   Seis semanas que se reparten el alto (`MES_V2_*` de `opcionesCalendario`), fila
+   mínima 104 (`esc`, `iv`) y 78 (`ih`); número 13/600 tabular con hoy en círculo
+   `--cal-hoy-num` y la celda de hoy en `--cal-hoy`; otro mes en `--tinta3` sobre
+   `--fondo` al 55 %; líneas `--cal-linea`. El chip (`.ag-mes`, `MonthChip`) es la
+   hermana de una línea del bloque: 22 de alto, radio 6, todo 12/16 600, barra de
+   3 px como sombra interior (`--ag-mes-tinta`, la tinta del estado o del evento)
+   y la hora tabular; en `iv` (columnas de ~88 px) hora y nombre en dos renglones.
+   «+N» 12/600 `--enlace`, del alto de un chip. El Mes del teléfono (puntos y
+   panel, `.ag-cal-mes-movil`) es aparte, abajo. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-frame { min-height: 104px; }
+:root[data-formato="ih"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-frame { min-height: 78px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day { background: var(--sup); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today { background: var(--cal-hoy); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day.fc-day-other { background: color-mix(in srgb, var(--fondo) 55%, var(--sup)); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view td, :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view th { border-color: var(--cal-linea) !important; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-col-header-cell-cushion { font-size: 12px; font-weight: 600; color: var(--tinta2); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-today .fc-col-header-cell-cushion { color: var(--enlace); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-number {
+  min-width: 22px;
+  height: 22px;
+  margin: 4px 0 0 4px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-number { color: var(--tinta3); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-today .fc-daygrid-day-number { width: 22px; padding: 0; background: var(--cal-hoy-num); color: var(--sobre-accion) !important; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes {
+  height: 22px;
+  gap: 4px;
+  padding: 0 6px 0 7px;
+  border-radius: 6px;
+  box-shadow: inset 3px 0 0 var(--ag-mes-tinta, var(--tinta3));
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--tinta);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes-hora { font-weight: 600; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes-nombre { font-weight: 600; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes-punto { display: none; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes--gcal .ag-mes-punto { display: initial; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes-badge { font-size: 12px; line-height: 16px; border: 0; padding: 0; text-transform: none; letter-spacing: 0; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-more-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--enlace);
+}
+:root[data-formato="iv"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes {
+  height: 34px;
+  flex-wrap: wrap;
+  align-content: center;
+  row-gap: 0;
+}
+:root[data-formato="iv"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes-nombre { flex-basis: 100%; }
+:root[data-formato="ih"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes:has(.ag-mes-hora) .ag-mes-nombre { display: none; }
+
+/* AG4 · EL MES DEL TELÉFONO (`ext`, `tel`) CON LA V2 (PIEZAS-MES §3): se
+   conserva el modo punto + panel del día, redibujado. Número 15/600 en círculo
+   de 28; hoy relleno `--cal-hoy-num` (la celda ya no se rellena entera); el día
+   elegido, `--fondo` con anillo interior de 2 `--cal-sel` (hoy = relleno,
+   elegido = contorno, como hoy); puntos de 5 px con la tinta del estado. El
+   panel de debajo, sobre `--sup`. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day,
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-other { background: var(--sup); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid td, :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid th { border-color: transparent !important; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today { background: var(--sup) !important; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-day-number {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta);
+}
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today .fc-daygrid-day-number { background: var(--cal-hoy-num) !important; color: var(--sobre-accion) !important; font-weight: 600; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-day-today .ag-mes-punto { box-shadow: none; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .ag-mes-dia-sel { background: var(--fondo); border-radius: 12px; box-shadow: inset 0 0 0 2px var(--cal-sel); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-col-header-cell-cushion { font-size: 12px; font-weight: 600; color: var(--tinta2); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .fc-daygrid .fc-daygrid-more-link { font-size: 12px; font-weight: 600; color: var(--tinta2); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .ag-mes { background: transparent !important; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc.ag-cal-mes-movil .ag-mes-punto { background: var(--ag-mes-tinta) !important; }
+
 /* ═══ B13 · AG1 · LAS PIEZAS BASE DE LA AGENDA V2 (rediseño) ═══════════════════
    Especificación: `docs/spec/rediseno/agenda-base/PIEZAS.md` (§1 tokens, §2
    bloque, §3 rejilla, §4 barra, §8 panel del día, §9 avisos). Todo va bajo

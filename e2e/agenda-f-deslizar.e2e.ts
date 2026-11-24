@@ -53,10 +53,18 @@ test('apagado: deslizar no cambia de día', async ({ page }) => {
   await expect(fecha(page)).toHaveText(antes ?? '')
 })
 
-test('encendido: a la izquierda el día siguiente, a la derecha vuelve', async ({ page }) => {
+/* B13 · AG2 · Con la v2, Día del teléfono es REJILLA (CALMA §28) y el gesto vive
+   en las listas (`deslizarActivo`): las dos pruebas del gesto encendido van en la
+   lista de Semana, la única lista que queda con la v2. Apagada, Día sigue en
+   lista y lo prueba la de arriba. */
+async function aSemanaV2(page: Page): Promise<void> {
+  await expect(page.locator('.fc-listWeek-view')).toBeVisible()
+}
+
+test('encendido: a la izquierda el periodo siguiente, a la derecha vuelve', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
-  await aDia(page)
+  await aSemanaV2(page)
   const antes = await fecha(page).textContent()
   await deslizar(page, 300, -200)
   await expect(fecha(page)).not.toHaveText(antes ?? '')
@@ -67,7 +75,7 @@ test('encendido: a la izquierda el día siguiente, a la derecha vuelve', async (
 test('encendido: un deslizamiento corto vuelve a su sitio y uno desde el borde no cuenta', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
-  await aDia(page)
+  await aSemanaV2(page)
   const antes = await fecha(page).textContent()
   await deslizar(page, 300, -30)
   await expect(fecha(page)).toHaveText(antes ?? '')

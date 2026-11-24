@@ -16,7 +16,7 @@ import { regionDeTimezone } from '@/lib/consultorios/zonas-mexico'
 import { MonthChip } from './MonthChip'
 import { BandaChip } from './BandaChip'
 import { GoogleEventCard } from './GoogleEventCard'
-import { FilaLista } from './FilaLista'
+import { FilaLista, type DetalleFilaV2 } from './FilaLista'
 import { FilaListaDetalle } from './FilaListaDetalle'
 import { MemoizedEventContent, FORMATO_HORA_INICIO } from './MemoizedEventContent'
 import { nombreCortoDeTexto, nombreCortoPaciente } from '@/lib/agenda/nombresTarjeta'
@@ -143,6 +143,8 @@ export function renderEventContent(arg: EventContentArg, navegadorTZ: string, in
         tinta={ext?.color ? `var(--ag-evento-${ext.color})`
           : ext?.status ? `var(--ag-status-${ext.status}-dot)` : null}
         cancelada={ext?.status === 'cancelled'}
+        /* B13 · AG3 · Sólo la Semana (no el panel del Mes) y sólo la pinta la v2. */
+        detalle={arg.view.type === 'listWeek' ? detalleDeFila(arg, ext) : undefined}
       />
     )
   }
@@ -267,4 +269,19 @@ function ContenidoBloqueo({ id, rotulo, fondo, inicio, fin }: PropsBloqueo) {
       </span>
     </>
   )
+}
+
+/* B13 · AG3 · Los datos de la fila de la Semana del teléfono con la v2
+   (`FilaLista`): las horas en la del dispositivo, como la celda del plugin que
+   sustituyen, y lo mismo que la fila de Día (duración y motivo). */
+function detalleDeFila(arg: EventContentArg, ext: Appointment | undefined): DetalleFilaV2 {
+  const { start, end, allDay } = arg.event
+  return {
+    inicio: allDay || !start ? null : FORMATO_HORA_INICIO.format(start),
+    fin: allDay || !end ? null : FORMATO_HORA_INICIO.format(end),
+    duracion: allDay ? null : duracionDeLaFila(start, end),
+    motivo: ext?.notes?.trim() || null,
+    status: ext?.status,
+    esEvento: ext ? esEventoGenerico(ext) : false,
+  }
 }

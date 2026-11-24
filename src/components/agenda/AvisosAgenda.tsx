@@ -94,12 +94,14 @@ interface Props {
   onSalirCompacta: () => void
   /** Tanda K (punto 15): «Mostrando el horario de tu ubicación actual (…)», o `null` (`leyendaHusos.ts`). */
   leyendaHusos?: string | null
+  /** B13 · AG3 · La tira de fechas de la Semana del teléfono (v2), la última, pegada a la lista. */
+  tira?: ReactNode
 }
 
 export function AvisosAgenda({
   cargaVisible, errorCitas, onReintentar, citasIncompletas, currentView, onVerPorSemana,
   googleFallo, vacioReal, vacioFiltrado, medicoFiltrado, periodoVacio, mesSinTodos, onVerTodos,
-  onAgendar, avisoRecorte, compactaElMes, onSalirCompacta, leyendaHusos,
+  onAgendar, avisoRecorte, compactaElMes, onSalirCompacta, leyendaHusos, tira,
 }: Props) {
   return (
     <div className="ag-avisos">
@@ -239,6 +241,7 @@ export function AvisosAgenda({
           <p className="m-0 min-w-0">{leyendaHusos}</p>
         </div>
       )}
+      {tira}
     </div>
   )
 }
