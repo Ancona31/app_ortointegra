@@ -201,9 +201,14 @@ export function AvisosAgenda({
                Dos nombres para la misma puerta es peor que apartarse del
                spec en una palabra. Y hace lo mismo que aquel botón, bloqueo
                por suscripción incluido. */
-            <button type="button" className="ag-aviso-accion" onClick={onAgendar}>
-              Agendar
-            </button>
+            <>
+              <button type="button" className="ag-aviso-accion" onClick={onAgendar}>
+                Agendar
+              </button>
+              {/* B13 (CALMA §29.12, vista 0 de `ag-pv`) · El mismo enlace que la lista vacía: oculto salvo
+                  con la raíz v2 (`.agc-vacio-config`), así la agenda apagada no cambia. */}
+              <Link href="/agenda/configuracion" className="ag-aviso-accion agc-vacio-config">Configuración de la agenda</Link>
+            </>
           )}
         </Banda>
       )}</ConSalida>

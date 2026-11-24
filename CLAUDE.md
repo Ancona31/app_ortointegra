@@ -751,12 +751,16 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **El correo es obligatorio en el enlace FIJO** (esquema y `reservar_por_enlace`), que además lo
   verifica con código. **El único lo admite vacío** (tanda I; hoy en `20261201140000`): sin correo no hay
   comprobante ni recordatorio, pero sí el aviso a la clínica. (Sustituye a «obligatorio en los dos».)
-* **La configuración va en pestañas** (`MenuConfiguracion.tsx`, patrón APG): abre en «Primeros pasos» mientras falte
+* **La configuración va en pestañas** (desde B13, `PestanasConfiguracion.tsx`: pestañas de TEXTO en todos los
+  formatos, en `ext`/`tel` en una pista que se desliza; ya no iconos) (`MenuConfiguracion.tsx`, patrón APG): abre en «Primeros pasos» mientras falte
   algo y si no en la primera; todos los paneles montados, sólo uno visible. Un enlace interno a otra sección va con
   `href="#config-…"` y `PESTANA_DE_ANCLA` lo convierte en cambio de pestaña: si añades una sección, añádela ahí. Los
   enlaces de los médicos invitados van plegados (punto 6).
-* **Los botones de la configuración llevan borde y fondo en reposo** (`clasesConfig.ts`, tokens `--ag-control-*`,
-  borde ≥ 3:1 en claro y oscuro). No vuelvas a un botón sin borde ni a un botón con aspecto de enlace.
+* ~~**Los botones de la configuración llevan borde y fondo en reposo** (`clasesConfig.ts`, tokens `--ag-control-*`,
+  borde ≥ 3:1 en claro y oscuro). No vuelvas a un botón sin borde ni a un botón con aspecto de enlace.~~
+  **Sustituido en B13 (AG9, maqueta `ag-config`):** los cuatro niveles de botón del kit (`estilosConfig.ts`); todo
+  botón se LEE (letra ≥ 4,5:1 contra su relleno o su entorno) y los interruptores ≥ 3:1
+  (`agenda-h2-configuracion` 7).
 * **El recordatorio automático tiene su interruptor por clínica, APAGADO de fábrica**
   (`agenda_ajustes.recordatorio_encendido`, `20261201120000`). La tarea lista con `cita_recordatorios_pendientes`
   (`20261201160000`; la de E4 + el interruptor); sin la migración no existe y no se manda nada. No vuelvas a crear
@@ -1107,7 +1111,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **El texto del bloqueo es uno,** `TEXTO_HORARIO_BLOQUEADO`. **No vuelve
   ninguna pregunta «¿… de todos modos?» por un bloqueo**; la del empalme
   («¿Guardar/Reagendar de todos modos?») es otra cosa y se queda.
-* **Un bloqueo se crea sólo con el candado junto a la campana**
+* **Un bloqueo se crea sólo con el candado junto a la campana** (desde B13, fuera de la computadora, con «Bloquear horario» de «Opciones de la agenda»: el MISMO `abrirBloqueoDesdeBarra`)
   (`BotonBloquearHorario`), y **se edita con cualquier clic en la franja**,
   decidido por el instante del gesto (`bloqueoEnInstante`), no por el DOM. El
   candado viaja en el chunk de la barra v2 (`MenuEngraneAgenda` lo reexporta):
@@ -1124,11 +1128,15 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **Lo que pregunta antes de hacerse en la burbuja** es `pideConfirmacion`:
   «Cancelar cita», «Eliminar evento», «No asistió» y «Eliminar cita». Una acción
   destructiva nueva va ahí, con su texto en `textoDeConfirmacion`.
-* **La leyenda tiene dos puertas en computadora:** el botón (i) de la barra y el
-  engrane. Las dos abren `CapaLeyenda`. No dupliques la leyenda.
-* **La letra de la burbuja de la cita y de la configuración va en la escala de
+* ~~**La leyenda tiene dos puertas en computadora:** el botón (i) de la barra y el
+  engrane.~~ **Desde B13 (§28) tiene UNA: «Leyenda de estados» de «Opciones de la
+  agenda»** (`CapaLeyenda`), en todos los formatos; el botón de la barra se retiró. No
+  dupliques la leyenda.
+* ~~**La letra de la burbuja de la cita y de la configuración va en la escala de
   la página de reserva** (`agendaPublica.css`), no en la de las maquetas, y sin
-  tokens nuevos. `configuracionEscala.test.ts` falla si un archivo de
+  tokens nuevos.~~ **Sustituido en B13:** la burbuja va en la escala de la maqueta
+  `ag-burbuja` y la configuración en la del kit, leída de `sistema.css` (12, 13, 14, 15,
+  16, 17, 20, 26, 32); `/reservar` no cambia. Lo que sigue de esta línea es historia: `configuracionEscala.test.ts` falla si un archivo de
   `/agenda/configuracion` usa otro tamaño; `agenda-l2` mide la burbuja (la
   píldora del estado, 600; la ayuda, 13,5 px). Si cambia la escala de la reserva,
   cambian las dos.
@@ -1197,26 +1205,29 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   para al dueño. No le devuelvas el privilegio. Las otras 30 tablas de `public`
   con TRUNCATE siguen igual a propósito (AG-DT-253).
 * **La burbuja de la cita tiene dos tamaños,** según el ancho:
-  - computadora (`.ag-capa.ag-burbuja`, desde `ANCHO_MOVIL` = 1024 px): las
-    medidas de la tarjeta de J. Son 360 de ancho, letra de 16/15/13/12 y
-    acciones de 13 px y 48 de alto, con el icono a la izquierda;
+  - computadora (`.ag-capa.ag-burbuja`, desde `ANCHO_MOVIL` = 1024 px):
+    ~~las medidas de la tarjeta de J. Son 360 de ancho, letra de 16/15/13/12 y
+    acciones de 13 px y 48 de alto~~ desde B13 (AG5), las de la maqueta
+    `ag-burbuja` (nombre 20/700, acciones como filas de menú de 48 · 40 en
+    `ih`/`esc`), con el icono a la izquierda;
   - teléfono y tableta (`.ag-hoja.ag-burbuja`): la escala de L2, con toques de
     44 px.
 
   Toda regla nueva de computadora va acotada a `.ag-capa.ag-burbuja`.
   `agenda-m1-burbuja.e2e.ts` mide la de computadora y `agenda-l2` la del
   teléfono.
-* **Los tres puntos de la burbuja abren el formulario completo
+* **Los tres puntos (desde B13, §29.5, el LÁPIZ; mismo `aria-label`) de la burbuja abren el formulario completo
   (`alAccion('editar')`) y no tienen menú** (M1, punto 4). Lo que quede fuera de
   la burbuja va al formulario: no se crea otro panel. Las observaciones son una
   línea recortada, con el texto en `title`.
 * **«No asistió» de la agendada se hace en el formulario y no pregunta.** El de
   la confirmada es casilla y pregunta (`pideConfirmacion`).
-* **La configuración de la agenda tiene DOS escalas:** teléfono (base) y
+* **La configuración de la agenda tiene DOS escalas** ~~teléfono (base) y
   computadora (`sm:`, desde 640). En computadora: h1 18, títulos de sección 16,
-  texto 13–14, controles 13 px y 40 de alto, rellenos ≥ 14 × 5/6. Todo cambio de
+  texto 13–14, controles 13 px y 40 de alto, rellenos ≥ 14 × 5/6.~~ **por FORMATO
+  desde B13 (AG9):** táctil (`ext`/`tel`/`iv`) 44 y computadora (`ih`/`esc`) 36
+  (campos 40), letra de la escala del kit, sin `sm:`/`md:` en tamaños. Todo cambio de
   tamaño ahí va en las dos y lo vigila `src/lib/tests/configuracionEscala.test.ts`.
-  El teléfono no baja de 44.
 * **El aviso de quien no administra es `SOLO_ADMIN` + `AVISO_SOLO_ADMIN`** de
   `estilosConfig.ts` («Solo el médico administrador puede cambiar estas
   opciones.»): una vez por pestaña, nunca encima de algo que ese rol sí puede
@@ -1273,6 +1284,31 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
     tarea nunca usa `.from()`), y si falla sale «Hola:» sin frenar el envío.
   - El pie va en `--ag-ink-600` #52627a (5,47:1 sobre #eef1f5): no lo bajes a
     `--ag-muted`, que da 3,09:1 (lo vigila `plantillaCita.test.ts`).
+
+**B13 — rediseño de la agenda (2026-11-24; sólo presentación, con la v2 ENCENDIDA; apagada, la agenda de
+siempre).** Registro: `docs/spec/rediseno/IMPLEMENTACION-REGISTRO.md` («B13 · AG0» a «B13 · cierre») y
+`docs/spec/rediseno/b13/`. Lo que un editor futuro no debe romper:
+
+* **Cuatro vistas en todos los formatos** (Mes, Semana, 3 días, Día; `VIEWS_V2`, `vistaDelFormato`): Día y
+  «3 días» son SIEMPRE rejilla, también en el teléfono; sólo la Semana del teléfono (`ext`/`tel`) es lista. El
+  formato sale de la sonda (`leerFormato`), no de `innerWidth`.
+* **La barra por formato (PIEZAS §4):** en computadora, la de M3 (dos ítems de rejilla, reglas de arriba). Fuera
+  de ella `BandaMovil` pinta, con la v2, la barra de la maqueta (`[data-barra-v2]`, sin navy ni «Abrir menú»: el
+  encabezado de la app vuelve en `tel`/`iv`); un solo DOM repartido por `grid-template-areas` según
+  `data-formato` (bloque «B13 · CIERRE · LA BARRA POR FORMATO» de `globals.css`). El periodo es el botón «Ir a
+  una fecha» (`SelectorFechaV2 enBanda`). Médico, candado y, en `ext`/`tel`, la lupa son opciones de «Opciones
+  de la agenda» (`OpcionesDeBanda` de `MenuEngraneAgenda`); la opción de la lupa pulsa el MISMO botón oculto
+  que la tecla `/`. «Huecos disponibles» (`ih`/`iv`, Día, un médico) abre la tarjeta del panel (`CardHuecos`)
+  en su capa. «Agendar»: píldora flotante en `ext`/`tel` (lo que se desplaza lleva 72 px de más abajo para que
+  nada quede bajo ella), primario arriba a la derecha en `ih`/`iv`. No metas otro control en la barra sin
+  pasarlo por la maqueta: lo que no cabe va al menú.
+* **Las capas viven en `body`:** sólo leen tokens del kit (`--sup`, `--tinta*`, `--cal-*`…); los `--ag-*`
+  re-apuntados de la raíz v2 no llegan. Nada por debajo de 12 px.
+* **Toda confirmación de la v2 es la alerta del catálogo con su VERBO** (`ConfirmModal` con `verbo`; §29.3–§29.4):
+  «Cancelar cita»/«Volver», «Eliminar…», «Guardar», «Mover», «Agendar», y en la configuración «Apagar» y «Cambiar»
+  (`alertaDeEnlace`). «Aceptar» queda sólo con la v2 apagada.
+* **Textos unificados (§28):** «Agendada desde Google Calendar», «Reservó por enlace», «Ligar paciente e iniciar
+  consulta», «¿No es una cita?». No reintroduzcas las variantes viejas.
 
 **Pruebas de navegador (2026-11-22, equipo nuevo; AG-DT-256):**
 
