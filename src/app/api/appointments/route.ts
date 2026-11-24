@@ -55,11 +55,47 @@ async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   return data ? { ...data, userId: user.id } : null
 }
 
+/**
+ * VELOCIDAD · El perfil para la LECTURA de citas (sólo el GET), con la sesión
+ * verificada en local (`getClaims()`: la firma del JWT, sin viaje a Auth) en
+ * vez de `getUser()`. Quita un salto en serie de la entrada a la agenda:
+ * antes `getUser` → `profiles` → citas, ahora `profiles` → citas.
+ *
+ * ⚠️ POR QUÉ AQUÍ SÍ VALE, Y SÓLO AQUÍ (CLAUDE.md, «Autoridad de sesión»):
+ *  - es una decisión de «dejar pasar», no un redirect: nadie navega según lo
+ *    que esto conteste;
+ *  - el GET lee con el cliente de SESIÓN y la barrera de datos es la RLS, que
+ *    valida el mismo JWT en `profiles` y en `appointments`; una sesión revocada
+ *    ya podía leer esto mismo por PostgREST directo hasta el `exp` del token;
+ *  - el GET no toca `createAdminClient()`.
+ * ⚠️ NO LO USES EN POST/PUT/DELETE NI EN NINGUNA RUTA CON CLIENTE DE SERVICIO:
+ * ésas siguen con `getProfile` (`getUser()`, con red), que es justo lo que la
+ * RLS no cubre (`src/middleware.ts`, «NO LAS "OPTIMICES"»).
+ * Si el proyecto firmara con HS256, `getClaims()` cae solo a `getUser()`: igual
+ * que antes, ni más rápido ni menos seguro.
+ */
+async function getProfileLectura(supabase: Awaited<ReturnType<typeof createClient>>) {
+  let sub: string | null = null
+  try {
+    const { data } = await supabase.auth.getClaims()
+    sub = typeof data?.claims?.sub === 'string' ? data.claims.sub : null
+  } catch {
+    sub = null
+  }
+  if (!sub) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, clinica_id, role, es_admin_de_clinica')
+    .eq('id', sub)
+    .single()
+  return data ? { ...data, userId: sub } : null
+}
+
 /* ── GET /api/appointments ──────────────────────────────── */
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const profile = await getProfile(supabase)
+    const profile = await getProfileLectura(supabase)
     if (!profile?.clinica_id) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const from = req.nextUrl.searchParams.get('from')
