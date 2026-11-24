@@ -88,7 +88,8 @@ describe('listas, banda y panel del Mes: las marcas con `.ag-marcas-v2` (la hoja
   })
   it('el panel del día del Mes', () => {
     const fila: FilaDelDia = { id: 'c1', orden: 0, hora: '10:00', todoElDia: false, nombre: 'Ana', esDeGoogle: false,
-      origenGoogle: false, deEnlace: true, sinExpediente: false, esEvento: false, cancelada: false, tinta: 'var(--ag-status-scheduled-dot)' }
+      origenGoogle: false, deEnlace: true, sinExpediente: false, esEvento: false, cancelada: false, tinta: 'var(--ag-status-scheduled-dot)',
+      fin: null, duracion: null, motivo: null, status: null }
     const html = renderToStaticMarkup(<FilaDelPanel fila={fila} onAbrir={() => undefined} />)
     expect(html).toContain('ag-marcas-v2')
     expect(html).toContain('aria-label="Agendada por enlace"')

@@ -8,10 +8,11 @@
  */
 
 import type { EventApi } from '@fullcalendar/core'
-import type { Appointment } from './tiposAgenda'
+import type { Appointment, Status } from './tiposAgenda'
 import type { RangoVisible } from '@/lib/agenda/ventanaRejilla'
 import { esEventoGenerico, marcasDeCita, tintasDelChipDeMes } from './tarjetasAgenda'
 import { horaDeReloj } from './horarioAgenda'
+import { duracionDeLaFila } from './fechasAgenda'
 
 /** Una fila del panel, ya resuelta: aquí no se vuelve a mirar el `EventApi`. */
 export type FilaDelDia = {
@@ -30,6 +31,12 @@ export type FilaDelDia = {
   esEvento: boolean
   cancelada: boolean
   tinta: string
+  /** B13 · remate (AG-DT-280) · lo que la fila de la Semana enseña además, para el panel del Mes con la
+   *  v2: fin (en la hora del dispositivo, como `hora`), duración, observaciones y estado. */
+  fin: string | null
+  duracion: string | null
+  motivo: string | null
+  status: Status | null
 }
 
 /**
@@ -79,6 +86,10 @@ export function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia
       esEvento,
       cancelada: ext?.status === 'cancelled',
       tinta: tintasDelChipDeMes(ext, esDeGoogle, esEvento).tinta,
+      fin: ev.allDay || !ev.end ? null : horaDeReloj(ev.end),
+      duracion: ev.allDay ? null : duracionDeLaFila(ev.start, ev.end),
+      motivo: ext?.notes?.trim() || null,
+      status: ext?.status ?? null,
     })
   }
   return filas.sort((a, b) => a.orden - b.orden)
@@ -90,7 +101,7 @@ export function filasDelDia(eventos: readonly EventApi[], dia: Date): FilaDelDia
    cada llamada, o sea que la identidad no vale para nada. Con la firma, un
    `eventsSet` que no cambia nada del día muere en el bail-out de React. */
 export function firmaDeFilas(filas: readonly FilaDelDia[]): string {
-  return filas.map(f => `${f.id}|${f.hora}|${f.nombre}|${f.tinta}|${f.cancelada}|${f.sinExpediente}|${f.deEnlace}`).join('\n')
+  return filas.map(f => `${f.id}|${f.hora}|${f.nombre}|${f.tinta}|${f.cancelada}|${f.sinExpediente}|${f.deEnlace}|${f.fin}|${f.motivo}|${f.status}`).join('\n')
 }
 
 /** El conteo del día, en la MISMA forma que consume `frasearConteo`. */

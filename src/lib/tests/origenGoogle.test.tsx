@@ -58,7 +58,8 @@ describe('la «G» de una fila de Spinus nacida en Google (punto 11)', () => {
   })
   it('el panel del día del Mes', () => {
     const fila: FilaDelDia = { id: 'c1', orden: 0, hora: '10:00', todoElDia: false, nombre: 'Junta', esDeGoogle: false,
-      origenGoogle: true, deEnlace: false, sinExpediente: false, esEvento: false, cancelada: false, tinta: 'var(--ag-status-scheduled-dot)' }
+      origenGoogle: true, deEnlace: false, sinExpediente: false, esEvento: false, cancelada: false, tinta: 'var(--ag-status-scheduled-dot)',
+      fin: null, duracion: null, motivo: null, status: null }
     expect(renderToStaticMarkup(<FilaDelPanel fila={fila} onAbrir={() => undefined} />)).toContain('ag-g-origen')
     expect(renderToStaticMarkup(<FilaDelPanel fila={{ ...fila, origenGoogle: false }} onAbrir={() => undefined} />)).not.toContain('ag-g-origen')
   })

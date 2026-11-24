@@ -6676,6 +6676,20 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 }
 :root[data-formato="iv"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes-nombre { flex-basis: 100%; }
 :root[data-formato="ih"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .ag-mes:has(.ag-mes-hora) .ag-mes-nombre { display: none; }
+/* B13 · remate (AG-DT-280, PIEZAS-MES §2): el número del día arriba a la IZQUIERDA (FullCalendar lo pone a
+   la derecha con `row-reverse`), y el día sin horario (el domingo) en `--cal-fuera`, como la columna sin
+   consulta de la rejilla: la capa `.fc-non-business` de FullCalendar, que la regla de siempre deja
+   transparente en Mes. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-top { flex-direction: row; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-non-business { background: var(--cal-fuera) !important; opacity: 1; }
+/* El panel del día del Mes del teléfono con las filas de la Semana (`FilaDelPanel` v2). */
+/* Con filas de dos renglones, un día cargado ya no aplasta la mini-rejilla: el panel ocupa lo que queda
+   (base 0) y se desplaza por dentro. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel { flex: 1 1 0; min-height: 132px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-fila--v2 { padding: 10px 16px; background: var(--sup); border-bottom-color: var(--linea); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-fila--v2:hover { background: var(--fondo); }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-fila--v2 > .ag-listafila { display: flex; align-items: center; flex: 1; min-width: 0; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-fila--v2 .ag-listafila-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 
 /* AG4 · EL MES DEL TELÉFONO (`ext`, `tel`) CON LA V2 (PIEZAS-MES §3): se
    conserva el modo punto + panel del día, redibujado. Número 15/600 en círculo
@@ -7244,6 +7258,39 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
   border-radius: 20px;
   box-shadow: var(--sombra-capa);
 }
+/* B13 · remate (AG-DT-280, PIEZAS-MES §4) · la capa del «+N más» del Mes (`CapaMasEventos`): en `esc`
+   sobre la celda y sin velo oscuro (`--claro`), 340; en `ih`/`iv` centrada, 380. Filas = las del panel del
+   día del teléfono (`FilaDelPanel` v2); la capa vive en `body`, así que sus reglas van aquí y no en el
+   bloque de VISTAS (que cuelga de `.agenda-raiz`). */
+.ag-capa-velo.ag-capa-velo--claro { background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; } /* en este orden: al revés, el minificador deja sólo el prefijo */
+.ag-capa.ag-capa-mas { gap: 4px; padding: 12px 0 8px; border-radius: 16px; }
+.ag-capa.ag-capa-mas.ag-capa--centro { width: 380px; border-radius: 20px; }
+.ag-capa-mas > .ag-capa-cab { padding: 0 8px 0 16px; }
+.ag-capa-mas-dia {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0; border: 0;
+  font: inherit; color: inherit; text-align: left; background: none; cursor: pointer;
+}
+.ag-capa-mas-dia > svg { flex: none; color: var(--enlace); }
+.ag-capa-mas-dia:hover { text-decoration: underline; }
+.ag-capa-mas-dia:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; border-radius: 6px; }
+.ag-capa-mas-lista { display: flex; flex-direction: column; }
+.ag-capa-mas .ag-mespanel-fila--v2 {
+  display: flex; align-items: center; width: 100%; min-height: 56px; padding: 8px 16px; border: 0; box-shadow: inset 0 1px 0 var(--linea);
+  font: inherit; color: var(--tinta); text-align: left; background: transparent; cursor: pointer;
+}
+.ag-capa-mas .ag-mespanel-fila--v2:hover { background: var(--fondo); }
+.ag-capa-mas .ag-mespanel-fila--v2:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.ag-capa-mas .ag-listafila { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.ag-capa-mas .ag-listafila-hora { flex: 0 0 44px; display: flex; flex-direction: column; font-size: 12px; line-height: 16px; color: var(--tinta2); font-variant-numeric: tabular-nums; }
+.ag-capa-mas .ag-listafila-hora > b { font-size: 13px; font-weight: 600; color: var(--tinta); }
+.ag-capa-mas .ag-listafila-barra { flex: none; align-self: stretch; width: 3px; min-height: 36px; border-radius: 2px; background: var(--ag-ev-marca); }
+.ag-capa-mas .ag-listafila-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ag-capa-mas .ag-listafila-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; line-height: 20px; font-weight: 600; }
+.ag-capa-mas .ag-listafila-nombre > svg { display: inline; vertical-align: -1px; margin-right: 4px; }
+.ag-capa-mas .ag-listafila-nombre--cancelada { color: var(--tinta2); text-decoration: line-through; }
+.ag-capa-mas .ag-listafila-linea2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.ag-capa-mas .ag-listafila-chevron { flex: none; width: 16px; height: 16px; color: var(--tinta3); }
+.ag-capa-mas-vacio { margin: 0; padding: 12px 16px; font-size: 14px; color: var(--tinta2); }
 /* Integración con el rediseño · en `ext` e `ih` el cromo (riel o barra) ocupa
    un lado DENTRO del viewport (`--fijo-der`/`--fijo-izq`, globals.css, regla
    de «nada fijo toca el borde»). Las capas con ancla se miden contra la

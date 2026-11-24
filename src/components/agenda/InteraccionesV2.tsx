@@ -32,6 +32,7 @@ import type { ModalState } from '@/components/agenda/AppointmentModal'
 import BurbujaAlta, { type MasOpcionesBurbuja, type MedicoBurbuja } from '@/components/agenda/BurbujaAlta'
 import TarjetaLectura from '@/components/agenda/TarjetaLectura'
 import AyudaAtajos from '@/components/agenda/AyudaAtajos'
+import CapaMasEventos from '@/components/agenda/CapaMasEventos'
 import ConvertirEnCita, { type EleccionConversion } from '@/components/agenda/ConvertirEnCita'
 import type { PropsConfirmacion } from '@/components/agenda/ConfirmModal'
 import { useAtajosAgenda } from '@/app/(app)/agenda/useAtajosAgenda'
@@ -51,7 +52,8 @@ import type { AltaGuardada, Appointment, DatosGuardado, OpcionesGuardado } from 
 import type { ApiInteraccionesV2, AperturaAltaV2, AperturaEdicionV2, CambiarEstadoCita, GestoAlta, SitioCita } from '@/lib/agenda/contratosV2'
 import type { Caja, Punto } from '@/lib/agenda/posicionCapa'
 import { guardarAltaRapida, horasDelGesto, type DependenciasGuardado } from '@/lib/agenda/altaRapida'
-import { tocaBloqueo } from '@/lib/agenda/bloqueosAgenda'
+import { esBloqueo, tocaBloqueo } from '@/lib/agenda/bloqueosAgenda'
+import { filasDelDia } from '@/lib/agenda/conteoAgenda'
 import type { AvisosHorario } from '@/lib/agenda/horarioRejilla'
 import { empalmesPintados, mensajeEmpalme } from '@/lib/agenda/empalmesCita'
 import { esEventoGenerico, esPorAsignar } from '@/lib/agenda/tarjetasAgenda'
@@ -156,6 +158,8 @@ type Capa =
   | { id: number; tipo: 'convertir'; cita: Appointment }
   /* Tanda J (punto 7) · «Ligar e iniciar consulta» de una por ligar. */
   | { id: number; tipo: 'ligar'; cita: Appointment }
+  /* B13 · remate (AG-DT-280) · el «+N más» del Mes: la celda en `esc`, centrada en `ih`/`iv`. */
+  | { id: number; tipo: 'mas'; fecha: Date; ancla: Caja | null }
 
 type SinId<T> = T extends unknown ? Omit<T, 'id'> : never
 
@@ -628,6 +632,57 @@ function useAlPasarV2(
   return { vigia, fijar }
 }
 
+/** Del `data-date` de la celda («2026-11-19») al día local. */
+function diaDeCelda(td: HTMLElement): Date | null {
+  const [a, m, d] = (td.dataset.date ?? '').split('-').map(Number)
+  return a && m && d ? new Date(a, m - 1, d) : null
+}
+
+/**
+ * B13 · remate (AG-DT-280) · El «+N más» del Mes abre la capa propia y no el popover de FullCalendar.
+ * Se adelanta a su manejador en la fase de CAPTURA (clic, y Enter o espacio, que FullCalendar atiende
+ * por `keydown` sin pasar por `click`). Sólo en la rejilla del Mes (`ih`, `iv`, `esc`): en el Mes del
+ * teléfono el «+N» no es pulsable (el toque elige el día y el panel ya trae la lista).
+ */
+function useMasEventosV2(p: PropsInteraccionesV2, abrir: (c: SinId<Capa>) => void): void {
+  const { raizRef } = p
+  useEffect(() => {
+    const raiz = raizRef.current
+    if (!raiz) return
+    const alPulsar = (e: Event): void => {
+      if (e instanceof KeyboardEvent && e.key !== 'Enter' && e.key !== ' ') return
+      const enlace = e.target instanceof Element ? e.target.closest('.fc-dayGridMonth-view .fc-daygrid-more-link') : null
+      const td = enlace?.closest<HTMLElement>('td[data-date]')
+      const fecha = td ? diaDeCelda(td) : null
+      if (!td || !fecha) return
+      e.preventDefault()
+      e.stopPropagation()
+      const r = td.getBoundingClientRect()
+      const esc = document.documentElement.dataset.formato === 'esc'
+      abrir({ tipo: 'mas', fecha, ancla: esc ? { left: r.left, top: r.top, width: r.width, height: r.height } : null })
+    }
+    raiz.addEventListener('click', alPulsar, true)
+    raiz.addEventListener('keydown', alPulsar, true)
+    return () => { raiz.removeEventListener('click', alPulsar, true); raiz.removeEventListener('keydown', alPulsar, true) }
+  }, [raizRef, abrir])
+}
+
+interface PropsCapaMas { capa: Extract<Capa, { tipo: 'mas' }>; p: PropsInteraccionesV2; cerrar: (id: number) => void }
+
+function CapaMas({ capa, p, cerrar }: PropsCapaMas): ReactElement {
+  const api = p.calendarRef.current?.getApi()
+  const filas = api ? filasDelDia(api.getEvents().filter(e => !esBloqueo(e)), capa.fecha) : []
+  return (
+    <CapaMasEventos fecha={capa.fecha} filas={filas} ancla={capa.ancla} alCerrar={() => cerrar(capa.id)}
+      alIrAlDia={() => { cerrar(capa.id); p.onVista(vistaEnElOtroFormato('timeGridDay', p.isMobile), capa.fecha) }}
+      alAbrir={(id) => {
+        const ev = api?.getEventById(id)
+        cerrar(capa.id)
+        if (ev) p.abrirCita(ev)
+      }} />
+  )
+}
+
 export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement | null {
   const { apiRef, alCambiarListas, alCambiarAtajos, calendarRef, medicos } = p
   const { capa, capaRef, abrir, cerrar: cerrarCapa } = useCapa()
@@ -670,6 +725,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
   /* La tarjeta al pasar dejó de serlo (se fijó, se cerró o la tapó otra capa): el vigía la suelta. */
   useEffect(() => { if (!esAlPasar(capa)) vigia.current?.soltar() }, [capa, vigia])
   useDeslizarV2(p)
+  useMasEventosV2(p, abrir)
 
   useImperativeHandle(apiRef, () => ({
     abrirBurbuja: (gesto) => {
@@ -703,6 +759,7 @@ export default function InteraccionesV2(p: PropsInteraccionesV2): ReactElement |
     )
   }
   if (capa?.tipo === 'convertir') return <CapaConvertir key={capa.id} capa={capa} p={p} cerrar={cerrar} />
+  if (capa?.tipo === 'mas') return <CapaMas key={capa.id} capa={capa} p={p} cerrar={cerrar} />
   if (capa?.tipo === 'ligar') {
     /* «¿No es una cita?» desde la ventana: la marca en el evento pintado, como desde la tarjeta. */
     const marcarEvento = (): void => { p.calendarRef.current?.getApi().getEventById(capa.cita.id)?.setExtendedProp('google_asignacion', 'evento') }

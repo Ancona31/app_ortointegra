@@ -119,4 +119,36 @@ test.describe('computadora', () => {
     expect(Math.max(...lineas)).toBeLessThanOrEqual(3)
     await expect(page.locator('.fc-dayGridMonth-view .fc-daygrid-more-link').first()).toBeVisible()
   })
+
+  /* B13 · remate (AG-DT-280, PIEZAS-MES §4): el «+N» abre la capa propia, no el popover de FullCalendar;
+     trae TODAS las del día (más que las de la celda), abre también con el teclado y el título lleva al Día.
+     MUTACIÓN: quitar `useMasEventosV2` → sale `.fc-popover` y no la capa. */
+  test('Mes: «+N más» abre la capa del día con todas sus citas; el título lleva al Día', async ({ page }) => {
+    interruptorAgenda('A', true)
+    await abrirAgendaV2(page)
+    await pestana(page, 'Mes').click()
+    const mas = page.locator('.fc-dayGridMonth-view .fc-daygrid-more-link').first()
+    await expect(mas).toBeVisible()
+    const celda = mas.locator('xpath=ancestor::td[@data-date][1]')
+    const fecha = await celda.getAttribute('data-date')
+    const enCelda = await celda.locator('.fc-daygrid-event-harness').evaluateAll(hs =>
+      hs.filter(h => getComputedStyle(h).visibility !== 'hidden' && (h as HTMLElement).offsetHeight > 0).length)
+    await mas.click()
+    const capa = page.locator('[data-capa="mas"]')
+    await expect(capa).toBeVisible()
+    await expect(page.locator('.fc-popover')).toHaveCount(0)
+    await expect(capa).toHaveAttribute('role', 'dialog')
+    expect(await capa.locator('.ag-mespanel-fila--v2').count()).toBeGreaterThan(enCelda)
+    // Escape la cierra y la vuelve a abrir el teclado (Enter sobre el «+N»).
+    await page.keyboard.press('Escape')
+    await expect(capa).toHaveCount(0)
+    await mas.focus()
+    await page.keyboard.press('Enter')
+    await expect(capa).toBeVisible()
+    await expect(page.locator('.fc-popover')).toHaveCount(0)
+    await capa.getByRole('button', { name: /^Ir al / }).click()
+    await expect(capa).toHaveCount(0)
+    await expect(page.locator('.fc-timeGridDay-view')).toBeVisible()
+    await expect(page.locator(`.fc-timegrid-col[data-date="${fecha}"]`)).toBeVisible()
+  })
 })
