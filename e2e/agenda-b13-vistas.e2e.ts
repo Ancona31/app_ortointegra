@@ -57,7 +57,12 @@ test.describe('teléfono', () => {
        final del día, fuera de las citas de la semilla. */
     const franja = page.locator('td.fc-timegrid-slot-lane').last()
     await franja.scrollIntoViewIfNeeded()
-    await franja.tap()
+    /* Con el dedo, en la columna del día a la altura de esa franja (la franja
+       queda debajo de la capa de columnas: un `tap()` sobre ella no llega). */
+    const caja = await franja.boundingBox()
+    const col = await columnas(page).first().boundingBox()
+    if (!caja || !col) throw new Error('sin franja o columna a la vista')
+    await page.touchscreen.tap(col.x + col.width / 2, caja.y + caja.height / 2)
     await page.waitForTimeout(600)
     await expect(page.getByRole('dialog')).toHaveCount(0)
     await expect(page.locator('.fc-highlight')).toHaveCount(0)
