@@ -299,3 +299,38 @@ inerte hasta que Angel aplique la migración.
 | P3 | Reserva frenada (7): ¿el aviso dice quién lo intentó? | **No.** Guardar nombre y teléfono de alguien a quien no se le dio cita es dato personal sin necesidad, y cualquiera puede escribir un nombre ajeno |
 | P4 | El «No» de Google, ¿vale hasta el último minuto o, como el enlace, sólo hasta 1 hora antes? | **Cualquier cita futura.** El paciente ya dijo que no va; más vale saberlo aunque sea tarde |
 | P5 | Fuera de la agenda, ¿la campana enseña sólo «Avisos» y «Por confirmar» sigue en la agenda? | **Sí**, por los viajes de red |
+
+---
+
+## 8. Resultados de M1 en local (2026-11-24)
+
+Stack local de Supabase (CLI 2.117.0, Docker) con las 14 migraciones anteriores y la semilla.
+
+- **Ensayo:** ida (rejilla 8/8 OK) → reversa (5/5) → segunda pasada de la reversa (no hace nada) →
+  ida otra vez (8/8) → segunda ida: aborta en el pre-vuelo sin cambiar nada. Con un aviso de la
+  forma nueva ya escrito, la reversa sólo quita escritores y publicación y lo dice (REVISAR).
+- **Pruebas SQL:** `supabase/pruebas-sql/av1_avisos_globales.sql` (15 casos) y la batería entera,
+  49 archivos en verde con M1 aplicada.
+- **Costo del disparador en `appointments`** (`supabase/pruebas-sql/medicion/av1_tiempos.sql`; 300
+  operaciones por caso, tres corridas, ms por operación, sesión de la persona, v2 encendida):
+
+  | Quién | Operación | Antes de M1 | Con M1 |
+  |---|---|---|---|
+  | Médico en su propia agenda (no escribe aviso) | alta | 1,14 – 1,19 | 1,17 – 1,40 |
+  | | mover | 1,30 – 1,74 | 1,32 – 1,51 |
+  | | cancelar | 1,18 – 1,32 | 1,23 – 1,29 |
+  | Secretaria en la agenda de un médico (escribe aviso) | alta | 1,37 – 1,48 | 1,55 – 1,65 |
+  | | mover | 1,65 – 1,79 | 1,88 – 2,05 |
+  | | cancelar | 1,50 – 1,60 | 1,83 – 2,00 |
+
+  Para el médico en su agenda la diferencia queda dentro del ruido; cuando sí se escribe el aviso,
+  +0,2 a +0,4 ms por operación. Es tiempo de base en una máquina local, no de petición completa.
+- **Realtime y RLS** (`scripts/local/avisos-realtime-rls.mjs`, cuatro sesiones suscritas): en 4
+  corridas nadie recibió un aviso que la RLS no le deja leer (ni la otra clínica, ni un aviso
+  dirigido a otro). Dos cosas a saber: (1) en la primera corrida un suscriptor NO recibió un aviso
+  que sí le tocaba (arranque de la suscripción): por eso la relectura cada 2 min se queda como
+  red de seguridad y como alternativa sin migración; (2) los DELETE llegan a todos los suscritos,
+  también de otra clínica, con la llave primaria nada más: en la app nadie borra avisos.
+- **Canal que usa hoy la agenda** (confirmado en `useTiempoRealAgenda.ts:124-131`):
+  `appointments-realtime`, `postgres_changes` de `public.appointments`, todos los eventos, sin
+  filtro; es el único `.channel(` de `src/`.

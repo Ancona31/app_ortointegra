@@ -1,0 +1,368 @@
+-- Avisos globales · M1 (20261202120000_avisos_globales_modelo.sql) — destinatario, actor,
+-- avisos sin cita y los escritores nuevos. Se corre con scripts/pruebas-sql.sh. Crea sus
+-- propios datos y termina en rollback. Falla si M1 no está o se deshace.
+begin;
+
+-- ── Datos ─────────────────────────────────────────────────────────────
+-- c1 (v2 encendida): b1 médico administrador, b2 y b6 médicos invitados, b4 secretaria.
+-- c2 (v2 apagada): b3 administrador, b5 secretaria.
+insert into public.clinicas (id, nombre, es_vip_grant, suscripcion_estado) values
+  ('00000000-0000-4000-8000-0000001a0c01', 'AV1 uno', true, 'free'),
+  ('00000000-0000-4000-8000-0000001a0c02', 'AV1 dos', true, 'free');
+insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at)
+select ('00000000-0000-4000-8000-0000001a0b0' || n)::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+       'av1-b' || n || '@prueba.local', now(), now() from generate_series(1, 6) n;
+update public.profiles set clinica_id = '00000000-0000-4000-8000-0000001a0c01', role = 'medico', es_admin_de_clinica = (id::text like '%b01')
+ where id::text ~ '1a0b0[126]$';
+update public.profiles set clinica_id = '00000000-0000-4000-8000-0000001a0c01', role = 'secretaria', es_admin_de_clinica = false
+ where id = '00000000-0000-4000-8000-0000001a0b04';
+update public.profiles set clinica_id = '00000000-0000-4000-8000-0000001a0c02', role = 'medico', es_admin_de_clinica = true
+ where id = '00000000-0000-4000-8000-0000001a0b03';
+update public.profiles set clinica_id = '00000000-0000-4000-8000-0000001a0c02', role = 'secretaria', es_admin_de_clinica = false
+ where id = '00000000-0000-4000-8000-0000001a0b05';
+-- Los médicos, con el perfil completo (appointments_gates_insert → perfil_completo()): datos y un consultorio activo.
+update public.profiles set nombres = 'Médico', especialidad = 'Ortopedia', cedula_profesional = '1234567' where id::text ~ '1a0b0[1236]$';
+insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion, activo, timezone)
+select ('00000000-0000-4000-8000-0000001a050' || n)::uuid, pr.clinica_id, pr.id, 'Consultorio ' || n, 'C' || n, 'Calle falsa ' || n, true, 'America/Merida'
+  from (values (1), (2), (3), (6)) x(n) join public.profiles pr on pr.id = ('00000000-0000-4000-8000-0000001a0b0' || x.n)::uuid;
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
+  ('00000000-0000-4000-8000-0000001a0c01', true), ('00000000-0000-4000-8000-0000001a0c02', false);
+insert into public.pacientes (id, clinica_id, nombre, apellidos) values
+  ('00000000-0000-4000-8000-0000001a0f01', '00000000-0000-4000-8000-0000001a0c01', 'Paciente', 'Uno'),
+  ('00000000-0000-4000-8000-0000001a0f02', '00000000-0000-4000-8000-0000001a0c02', 'Paciente', 'Dos');
+
+create function pg_temp.esperar(p_caso text, p_obtenido text, p_esperado text) returns void language plpgsql as $$
+begin
+  if p_obtenido is distinct from p_esperado then
+    raise exception 'AV1 %: dio %, esperaba %', p_caso, p_obtenido, p_esperado;
+  end if;
+end $$;
+create function pg_temp.como(p_id uuid) returns void language sql as $$
+  select set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated')::text, true);
+$$;
+create function pg_temp.sin_sesion() returns void language sql as $$
+  select set_config('request.jwt.claims', '', true);
+$$;
+-- Lo que VE una persona con su sesión (RLS): tipos de sus avisos sin revisar, ordenados.
+create function pg_temp.ve(p_id uuid) returns text language plpgsql as $$
+declare v text;
+begin
+  perform pg_temp.como(p_id);
+  set local role authenticated;
+  select coalesce(string_agg(tipo, ',' order by tipo), '') into v from public.avisos_clinica where revisado_en is null;
+  reset role;
+  perform pg_temp.sin_sesion();
+  return v;
+end $$;
+-- Una cita con paciente del médico dado, en c1, dentro de p_dias días; la escribe quien tenga la sesión p_actor.
+create function pg_temp.agenda(p_actor uuid, p_medico uuid, p_dias int) returns uuid language plpgsql as $$
+declare v uuid;
+begin
+  perform pg_temp.como(p_actor);
+  set local role authenticated;
+  insert into public.appointments (clinica_id, paciente_id, medico_id, title, start_time, end_time, status)
+  values ('00000000-0000-4000-8000-0000001a0c01', '00000000-0000-4000-8000-0000001a0f01', p_medico, 'Paciente Uno',
+          date_trunc('day', now()) + make_interval(days => p_dias, hours => 9),
+          date_trunc('day', now()) + make_interval(days => p_dias, hours => 10), 'scheduled')
+  returning id into v;
+  reset role;
+  perform pg_temp.sin_sesion();
+  return v;
+end $$;
+-- Lo que hace Google: una RPC de service_role que marca spinus.via y cambia la cita.
+create function pg_temp.google(p_via text, p_cita uuid, p_que text) returns void language plpgsql as $$
+begin
+  set local role service_role;
+  perform set_config('spinus.via', p_via, true);
+  if p_que = 'mover' then
+    update public.appointments set start_time = start_time + interval '2 hours', end_time = end_time + interval '2 hours' where id = p_cita;
+  else
+    update public.appointments set status = p_que where id = p_cita;
+  end if;
+  perform set_config('spinus.via', '', true);
+  reset role;
+end $$;
+create temp table _c (nombre text primary key, id uuid) on commit drop;
+grant select on _c to anon, authenticated, service_role;
+grant execute on all functions in schema pg_temp to anon, authenticated, service_role;
+
+-- ── Caso 1: la secretaria agenda en la agenda de b2 → aviso SÓLO para b2 ──────
+insert into _c values ('s_en_b2', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b04', '00000000-0000-4000-8000-0000001a0b02', 3));
+select pg_temp.esperar('caso 1 fila', (select tipo || '|' || right(destinatario_id::text, 2) || '|' || right(actor_id::text, 2)
+  from public.avisos_clinica where cita_id = (select id from _c where nombre = 's_en_b2')), 'personal_agendo|02|04');
+select pg_temp.esperar('caso 1 lo ve el médico dueño', pg_temp.ve('00000000-0000-4000-8000-0000001a0b02'), 'personal_agendo');
+select pg_temp.esperar('caso 1 quien lo hizo no lo ve', pg_temp.ve('00000000-0000-4000-8000-0000001a0b04'), '');
+select pg_temp.esperar('caso 1 el administrador no lo ve', pg_temp.ve('00000000-0000-4000-8000-0000001a0b01'), '');
+select pg_temp.esperar('caso 1 otro médico no lo ve', pg_temp.ve('00000000-0000-4000-8000-0000001a0b06'), '');
+
+-- ── Caso 2: el médico en su propia agenda no avisa a nadie ────────────
+insert into _c values ('b2_en_b2', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b02', '00000000-0000-4000-8000-0000001a0b02', 4));
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b02');
+  set local role authenticated;
+  update public.appointments set start_time = start_time + interval '1 hour', end_time = end_time + interval '1 hour'
+   where id = (select id from _c where nombre = 'b2_en_b2');
+  update public.appointments set status = 'cancelled' where id = (select id from _c where nombre = 'b2_en_b2');
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 2', (select count(*)::text from public.avisos_clinica where cita_id = (select id from _c where nombre = 'b2_en_b2')), '0');
+
+-- ── Caso 3: el administrador mueve y cancela una cita de b2 ───────────
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b01');
+  set local role authenticated;
+  update public.appointments set start_time = start_time + interval '1 hour', end_time = end_time + interval '1 hour'
+   where id = (select id from _c where nombre = 's_en_b2');
+  -- un segundo movimiento sin revisar NO crea otro: refresca el mismo.
+  update public.appointments set start_time = start_time + interval '1 hour', end_time = end_time + interval '1 hour'
+   where id = (select id from _c where nombre = 's_en_b2');
+  -- un cambio que no es de hora ni de estado no avisa.
+  update public.appointments set notes = 'nota' where id = (select id from _c where nombre = 's_en_b2');
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 3 mover', (select string_agg(tipo || ':' || right(actor_id::text, 2), ',' order by tipo) from public.avisos_clinica
+  where cita_id = (select id from _c where nombre = 's_en_b2')), 'personal_agendo:04,personal_movio:01');
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b01');
+  set local role authenticated;
+  update public.appointments set status = 'cancelled' where id = (select id from _c where nombre = 's_en_b2');
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 3 cancelar', pg_temp.ve('00000000-0000-4000-8000-0000001a0b02'), 'personal_agendo,personal_cancelo,personal_movio');
+
+-- ── Caso 4: Google «Sí» y «No» (spinus.via = google_rsvp) → avisos de TODA la clínica ──
+insert into _c values ('rsvp_si', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b02', '00000000-0000-4000-8000-0000001a0b02', 5)),
+                      ('rsvp_no', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b02', '00000000-0000-4000-8000-0000001a0b02', 6));
+select pg_temp.google('google_rsvp', (select id from _c where nombre = 'rsvp_si'), 'confirmed');
+select pg_temp.google('google_rsvp', (select id from _c where nombre = 'rsvp_no'), 'cancelled');
+select pg_temp.esperar('caso 4 sí', (select tipo || '|' || coalesce(destinatario_id::text, 'todos') from public.avisos_clinica
+  where cita_id = (select id from _c where nombre = 'rsvp_si')), 'confirmacion_paciente|todos');
+select pg_temp.esperar('caso 4 no', (select tipo from public.avisos_clinica where cita_id = (select id from _c where nombre = 'rsvp_no')), 'cancelacion_paciente');
+-- Los de toda la clínica: los ven el administrador y la secretaria; otro médico invitado, no (no ve la cita).
+select pg_temp.esperar('caso 4 administrador', pg_temp.ve('00000000-0000-4000-8000-0000001a0b01'), 'cancelacion_paciente,confirmacion_paciente');
+select pg_temp.esperar('caso 4 secretaria', pg_temp.ve('00000000-0000-4000-8000-0000001a0b04'), 'cancelacion_paciente,confirmacion_paciente');
+select pg_temp.esperar('caso 4 otro médico', pg_temp.ve('00000000-0000-4000-8000-0000001a0b06'), '');
+-- Sin la marca de Google, un cambio sin sesión no avisa (la confirmación de otra RPC, la semilla…).
+insert into _c values ('sin_via', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b02', '00000000-0000-4000-8000-0000001a0b02', 7));
+select pg_temp.google('', (select id from _c where nombre = 'sin_via'), 'confirmed');
+select pg_temp.google('enlace_paciente', (select id from _c where nombre = 'sin_via'), 'cancelled');
+select pg_temp.esperar('caso 4 sin marca', (select count(*)::text from public.avisos_clinica where cita_id = (select id from _c where nombre = 'sin_via')), '0');
+
+-- ── Caso 5: mover y borrar en Google (spinus.via = google) ────────────
+insert into _c values ('g_mueve', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b01', '00000000-0000-4000-8000-0000001a0b01', 8));
+select pg_temp.google('google', (select id from _c where nombre = 'g_mueve'), 'mover');
+select pg_temp.google('google', (select id from _c where nombre = 'g_mueve'), 'mover');
+select pg_temp.esperar('caso 5 mover (uno, refrescado)', (select string_agg(tipo, ',') from public.avisos_clinica
+  where cita_id = (select id from _c where nombre = 'g_mueve')), 'google_movio_cita');
+select pg_temp.google('google', (select id from _c where nombre = 'g_mueve'), 'cancelled');
+select pg_temp.esperar('caso 5 borrar', (select string_agg(tipo, ',' order by tipo) from public.avisos_clinica
+  where cita_id = (select id from _c where nombre = 'g_mueve')), 'google_cancelo_cita,google_movio_cita');
+-- Un evento SIN paciente movido o borrado en Google no avisa.
+insert into public.appointments (id, clinica_id, medico_id, title, start_time, end_time, status)
+values ('00000000-0000-4000-8000-0000001a0a09', '00000000-0000-4000-8000-0000001a0c01', '00000000-0000-4000-8000-0000001a0b01',
+        'Junta', date_trunc('day', now()) + interval '9 days 9 hours', date_trunc('day', now()) + interval '9 days 10 hours', 'scheduled');
+select pg_temp.google('google', '00000000-0000-4000-8000-0000001a0a09', 'mover');
+select pg_temp.google('google', '00000000-0000-4000-8000-0000001a0a09', 'cancelled');
+select pg_temp.esperar('caso 5 evento sin paciente', (select count(*)::text from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-0000001a0a09'), '0');
+
+-- ── Caso 6: la secretaria pone y quita un bloqueo de b2; b2 en lo suyo, nada ──
+do $$
+declare v uuid;
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b04');
+  set local role authenticated;
+  insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, motivo)
+  values ('00000000-0000-4000-8000-0000001a0c01', '00000000-0000-4000-8000-0000001a0b02',
+          date_trunc('day', now()) + interval '20 days 9 hours', date_trunc('day', now()) + interval '20 days 12 hours', 'motivo que no debe viajar')
+  returning id into v;
+  delete from public.agenda_bloqueos where id = v;
+  reset role;
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b02');
+  set local role authenticated;
+  insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin)
+  values ('00000000-0000-4000-8000-0000001a0c01', '00000000-0000-4000-8000-0000001a0b02',
+          date_trunc('day', now()) + interval '21 days 9 hours', date_trunc('day', now()) + interval '21 days 12 hours');
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 6 filas', (select string_agg(tipo || '|' || right(destinatario_id::text, 2) || '|' || right(actor_id::text, 2)
+  || '|' || (cita_id is null)::text || '|' || (datos ? 'inicio')::text, ',' order by tipo) from public.avisos_clinica where tipo like 'personal\_%bloqueo'),
+  'personal_bloqueo|02|04|true|true,personal_desbloqueo|02|04|true|true');
+select pg_temp.esperar('caso 6 el motivo del bloqueo no viaja', (select count(*)::text from public.avisos_clinica where datos::text like '%motivo%'), '0');
+select pg_temp.esperar('caso 6 sólo los ve b2', (select (pg_temp.ve('00000000-0000-4000-8000-0000001a0b02') like '%personal_bloqueo,%personal_desbloqueo%')::text
+  || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b04') like '%bloqueo%')::text || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b01') like '%bloqueo%')::text), 'truefalsefalse');
+
+-- ── Caso 7: correos. Fallo sin reintento → correo_fallido; recordatorios enviados → UNO agrupado ──
+insert into _c values ('correo1', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b02', '00000000-0000-4000-8000-0000001a0b02', 10)),
+                      ('correo2', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b02', '00000000-0000-4000-8000-0000001a0b02', 11));
+insert into public.cita_correos (id, clinica_id, appointment_id, tipo, inicio_cita, estado, intentos, testigo, tomado_en)
+select ('00000000-0000-4000-8000-0000001a0e0' || x.n)::uuid, '00000000-0000-4000-8000-0000001a0c01', c.id, x.tipo, now() + interval '10 days',
+       'enviando', x.intentos, gen_random_uuid(), now()
+  from (values (1, 'correo1', 'comprobante', 1), (2, 'correo1', 'recordatorio', 1), (3, 'correo1', 'confirmacion', 1),
+               (4, 'correo2', 'recordatorio', 3), (5, 'correo2', 'comprobante', 1)) x(n, cita, tipo, intentos)
+  join _c c on c.nombre = x.cita;
+update public.cita_correos set estado = 'fallido', motivo = 'transporte' where id = '00000000-0000-4000-8000-0000001a0e03'; -- a mano: no avisa
+select pg_temp.esperar('caso 7 el envío a mano no avisa', (select count(*)::text from public.avisos_clinica where tipo = 'correo_fallido'), '0');
+update public.cita_correos set estado = 'fallido', motivo = 'transporte' where id = '00000000-0000-4000-8000-0000001a0e02'; -- se reintentará: no avisa
+select pg_temp.esperar('caso 7 el que se reintenta no avisa', (select count(*)::text from public.avisos_clinica where tipo = 'correo_fallido'), '0');
+update public.cita_correos set estado = 'fallido', motivo = 'sin_destinatario' where id = '00000000-0000-4000-8000-0000001a0e05'; -- no es fallo de envío
+select pg_temp.esperar('caso 7 sin destinatario no avisa', (select count(*)::text from public.avisos_clinica where tipo = 'correo_fallido'), '0');
+update public.cita_correos set estado = 'fallido', motivo = 'transporte' where id = '00000000-0000-4000-8000-0000001a0e01'; -- comprobante
+select pg_temp.esperar('caso 7 comprobante fallido', (select count(*)::text from public.avisos_clinica where tipo = 'correo_fallido'
+  and cita_id = (select id from _c where nombre = 'correo1')), '1');
+update public.cita_correos set estado = 'enviado', enviado_en = now() where id = '00000000-0000-4000-8000-0000001a0e04';
+update public.cita_correos set estado = 'enviando', motivo = null, tomado_en = now() where id = '00000000-0000-4000-8000-0000001a0e02';
+update public.cita_correos set estado = 'enviado', enviado_en = now() where id = '00000000-0000-4000-8000-0000001a0e02';
+select pg_temp.esperar('caso 7 recordatorios agrupados', (select count(*)::text || '|' || max(datos ->> 'enviados') || '|' || max(right(medico_id::text, 2))
+  from public.avisos_clinica where tipo = 'recordatorios_enviados'), '1|2|02');
+
+-- ── Caso 8: Google se desconecta o deja de sincronizar ────────────────
+insert into public.clinica_conexiones_google (id, clinica_id, user_id, rol, estado, calendar_id)
+values ('00000000-0000-4000-8000-0000001a0d01', '00000000-0000-4000-8000-0000001a0c01', '00000000-0000-4000-8000-0000001a0b01', 'clinica', 'activa', 'cal-av1');
+update public.clinica_conexiones_google set estado = 'revocada' where id = '00000000-0000-4000-8000-0000001a0d01';
+update public.clinica_conexiones_google set estado = 'activa' where id = '00000000-0000-4000-8000-0000001a0d01';
+update public.clinica_conexiones_google set estado = 'revocada' where id = '00000000-0000-4000-8000-0000001a0d01';
+select pg_temp.esperar('caso 8 desconectado (uno sin revisar)', (select count(*)::text from public.avisos_clinica where tipo = 'google_desconectado'), '1');
+update public.clinica_conexiones_google set estado = 'activa' where id = '00000000-0000-4000-8000-0000001a0d01';
+insert into public.gcal_sync_estado (clinica_id, conexion_id, calendar_id, errores_seguidos)
+values ('00000000-0000-4000-8000-0000001a0c01', '00000000-0000-4000-8000-0000001a0d01', 'cal-av1', 0);
+update public.gcal_sync_estado set errores_seguidos = 2 where clinica_id = '00000000-0000-4000-8000-0000001a0c01';
+select pg_temp.esperar('caso 8 dos fallos no avisan', (select count(*)::text from public.avisos_clinica where tipo = 'google_sin_sincronizar'), '0');
+update public.gcal_sync_estado set errores_seguidos = 3 where clinica_id = '00000000-0000-4000-8000-0000001a0c01';
+update public.gcal_sync_estado set errores_seguidos = 4 where clinica_id = '00000000-0000-4000-8000-0000001a0c01';
+select pg_temp.esperar('caso 8 al tercero, uno', (select count(*)::text from public.avisos_clinica where tipo = 'google_sin_sincronizar'), '1');
+-- Los de Google sin médico los ve toda la clínica, también el invitado.
+select pg_temp.esperar('caso 8 el invitado los ve', (pg_temp.ve('00000000-0000-4000-8000-0000001a0b06') = 'google_desconectado,google_sin_sincronizar')::text, 'true');
+
+-- ── Caso 9: UN AVISO QUE FALLA NO IMPIDE LA CITA (y deja un WARNING, no silencio) ──
+alter table public.avisos_clinica add constraint av1_forzar_fallo check (tipo <> 'personal_agendo' or creado_en < now() - interval '1 hour') not valid;
+insert into _c values ('aviso_roto', pg_temp.agenda('00000000-0000-4000-8000-0000001a0b04', '00000000-0000-4000-8000-0000001a0b06', 12));
+select pg_temp.esperar('caso 9 la cita se guardó', (select count(*)::text from public.appointments where id = (select id from _c where nombre = 'aviso_roto')), '1');
+select pg_temp.esperar('caso 9 sin aviso', (select count(*)::text from public.avisos_clinica where cita_id = (select id from _c where nombre = 'aviso_roto')), '0');
+alter table public.avisos_clinica drop constraint av1_forzar_fallo;
+
+-- ── Caso 10: la RPC del servidor ──────────────────────────────────────
+do $$
+declare v text;
+begin
+  set local role service_role;
+  v := public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'reserva_frenada', null, '00000000-0000-4000-8000-0000001a0b02', null)::text
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'reserva_frenada', null, '00000000-0000-4000-8000-0000001a0b02', null)::text
+    -- un médico de OTRA clínica y uno que no existe: la misma respuesta.
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'reserva_frenada', null, '00000000-0000-4000-8000-0000001a0b03', null)::text
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'reserva_frenada', null, gen_random_uuid(), null)::text
+    -- con la v2 apagada, nada.
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c02', 'reserva_frenada', null, '00000000-0000-4000-8000-0000001a0b03', null)::text
+    -- «Reagendar» del personal: la cita de b1 movida por la secretaria; por el propio médico, nada; cita de otra clínica, nada.
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'personal_movio', (select id from _c where nombre = 'g_mueve'), null, '00000000-0000-4000-8000-0000001a0b04')::text
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'personal_movio', (select id from _c where nombre = 'g_mueve'), null, '00000000-0000-4000-8000-0000001a0b01')::text
+    || public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c02', 'personal_movio', (select id from _c where nombre = 'g_mueve'), null, '00000000-0000-4000-8000-0000001a0b05')::text;
+  reset role;
+  perform pg_temp.esperar('caso 10 respuestas', v, 'truetruefalsefalsefalsetruefalsefalse');
+end $$;
+select pg_temp.esperar('caso 10 frenada agrupada', (select count(*)::text || '|' || max(datos ->> 'intentos') from public.avisos_clinica where tipo = 'reserva_frenada'), '1|2');
+select pg_temp.esperar('caso 10 reagendar', (select right(destinatario_id::text, 2) || '|' || right(actor_id::text, 2) from public.avisos_clinica
+  where tipo = 'personal_movio' and cita_id = (select id from _c where nombre = 'g_mueve')), '01|04');
+-- La frenada de b2: la ven b2, el administrador y la secretaria; otro médico invitado, no.
+select pg_temp.esperar('caso 10 quién ve la frenada', (select (pg_temp.ve('00000000-0000-4000-8000-0000001a0b02') like '%reserva_frenada%')::text
+  || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b01') like '%reserva_frenada%')::text || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b04') like '%reserva_frenada%')::text
+  || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b06') like '%reserva_frenada%')::text), 'truetruetruefalse');
+do $$
+begin
+  set local role service_role;
+  perform public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'personal_agendo', null, null, null);
+  reset role;
+  raise exception 'AV1 caso 10: aceptó un tipo fuera de la lista blanca';
+exception when invalid_parameter_value then reset role;
+end $$;
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b01');
+  set local role authenticated;
+  perform public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'reserva_frenada', null, '00000000-0000-4000-8000-0000001a0b02', null);
+  reset role;
+  raise exception 'AV1 caso 10: la sesión pudo llamar a la RPC';
+exception when insufficient_privilege then reset role; perform pg_temp.sin_sesion();
+end $$;
+
+-- ── Caso 11: con la v2 APAGADA nada avisa (c2) ────────────────────────
+do $$
+declare v uuid;
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b05');
+  set local role authenticated;
+  insert into public.appointments (clinica_id, paciente_id, medico_id, title, start_time, end_time, status)
+  values ('00000000-0000-4000-8000-0000001a0c02', '00000000-0000-4000-8000-0000001a0f02', '00000000-0000-4000-8000-0000001a0b03', 'Paciente Dos',
+          date_trunc('day', now()) + interval '3 days 9 hours', date_trunc('day', now()) + interval '3 days 10 hours', 'scheduled')
+  returning id into v;
+  update public.appointments set status = 'cancelled' where id = v;
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 11', (select count(*)::text from public.avisos_clinica where clinica_id = '00000000-0000-4000-8000-0000001a0c02'), '0');
+
+-- ── Caso 12: aislamiento entre clínicas ───────────────────────────────
+select pg_temp.esperar('caso 12 c2 no ve nada de c1', pg_temp.ve('00000000-0000-4000-8000-0000001a0b03') || pg_temp.ve('00000000-0000-4000-8000-0000001a0b05'), '');
+
+-- ── Caso 13: revisar. El dueño revisa el suyo; nadie más puede ni verlo ni tocarlo ──
+do $$
+declare v_n integer;
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b04');
+  set local role authenticated;
+  update public.avisos_clinica set revisado_en = now(), revisado_por = '00000000-0000-4000-8000-0000001a0b04' where tipo = 'personal_bloqueo';
+  get diagnostics v_n = row_count;
+  reset role;
+  perform pg_temp.esperar('caso 13 quien lo hizo no lo revisa', v_n::text, '0');
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b02');
+  set local role authenticated;
+  update public.avisos_clinica set revisado_en = now(), revisado_por = '00000000-0000-4000-8000-0000001a0b02' where tipo = 'personal_bloqueo';
+  get diagnostics v_n = row_count;
+  reset role;
+  perform pg_temp.sin_sesion();
+  perform pg_temp.esperar('caso 13 el dueño sí', v_n::text, '1');
+end $$;
+-- La sesión no puede cambiar a quién va dirigido un aviso ni quién lo hizo.
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b02');
+  set local role authenticated;
+  update public.avisos_clinica set destinatario_id = null where tipo = 'personal_desbloqueo';
+  reset role;
+  raise exception 'AV1 caso 13: la sesión cambió destinatario_id';
+exception when insufficient_privilege then reset role; perform pg_temp.sin_sesion();
+end $$;
+
+-- ── Caso 14: los avisos de F4 se ven como antes (columnas nuevas en NULL) ──
+insert into public.avisos_clinica (clinica_id, tipo, cita_id)
+values ('00000000-0000-4000-8000-0000001a0c01', 'reserva_enlace', (select id from _c where nombre = 'correo2'));
+select pg_temp.esperar('caso 14', (select (pg_temp.ve('00000000-0000-4000-8000-0000001a0b01') like '%reserva_enlace%')::text
+  || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b02') like '%reserva_enlace%')::text || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b04') like '%reserva_enlace%')::text
+  || (pg_temp.ve('00000000-0000-4000-8000-0000001a0b06') like '%reserva_enlace%')::text), 'truetruetruefalse');
+
+-- ── Caso 15: la forma. Tipo ↔ cita, y ningún privilegio de más ─────────
+do $$
+begin
+  insert into public.avisos_clinica (clinica_id, tipo) values ('00000000-0000-4000-8000-0000001a0c01', 'reserva_enlace');
+  raise exception 'AV1 caso 15: admitió un aviso de cita sin cita';
+exception when check_violation then null;
+end $$;
+do $$
+begin
+  insert into public.avisos_clinica (clinica_id, tipo, cita_id) values ('00000000-0000-4000-8000-0000001a0c01', 'google_desconectado', gen_random_uuid());
+  raise exception 'AV1 caso 15: admitió un aviso sin cita con cita';
+exception when check_violation then null;
+end $$;
+select pg_temp.esperar('caso 15 privilegios', (select string_agg(r || ':' || p, ',' order by r, p)
+  from unnest(array['anon', 'authenticated', 'service_role']) r cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) p
+  where has_table_privilege(r, 'public.avisos_clinica', p)), 'authenticated:SELECT');
+select pg_temp.esperar('caso 15 publicación', (select count(*)::text from pg_publication_tables
+  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'avisos_clinica'), '1');
+
+rollback;
