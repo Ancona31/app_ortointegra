@@ -710,7 +710,7 @@ test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin m
   await page.getByRole('button', { name: 'Opciones de la agenda' }).first().click()
   await page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem', { name: 'Leyenda de estados' }).click()
   const leyenda = page.getByRole('dialog', { name: 'Leyenda de estados' })
-  await expect(leyenda).toContainText('Se agendó en Google')
+  await expect(leyenda).toContainText('Agendada desde Google Calendar')
   await expect(leyenda).not.toContainText('GCal')
 })
 

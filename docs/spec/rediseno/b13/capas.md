@@ -72,6 +72,8 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
   «¿No es una cita?» con signos (§28; antes «No es una cita» en la burbuja). Eslabón en la burbuja.
 * `VentanaLigarCita`: título y botón «Ligar paciente e iniciar consulta» con eslabón; pie «Cancelar» +
   principal a la derecha; «¿No es una cita?» como acción de texto.
+* `LeyendaEstados`: «Agendada desde Google Calendar» y «Reservó por enlace» (antes «Se agendó en Google» /
+  «Se agendó por enlace»); pruebas `origenGoogle`, `marcasProcedencia`, `agenda-k5-marcas`, `reserva-google`.
 * `BotonNoEsCita`: la explicación se ve bajo el botón y lo describe (`aria-describedby`; §29.7).
 
 ## AG8 · herramientas

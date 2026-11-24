@@ -113,15 +113,15 @@ describe('globals.css: las marcas de listas, banda y panel, sólo con la v2', ()
 describe('LeyendaEstados (punto 20)', () => {
   it('la de la v2: la «G», el eslabón y el expediente tachado, con sus textos', () => {
     const html = renderToStaticMarkup(<LeyendaEstados />)
-    expect(html).toContain('Se agendó en Google')
-    expect(html).toContain('Se agendó por enlace')
+    expect(html).toContain('Agendada desde Google Calendar')
+    expect(html).toContain('Reservó por enlace')
     expect(html).toContain('Sin expediente')
     expect(html).toContain('ag-icono-enlace')
     expect(html).toContain('ag-icono-sin-exp')
   })
   it('la clásica (v2 apagada) no cambia', () => {
     const html = renderToStaticMarkup(<LeyendaEstados clasica />)
-    expect(html).not.toContain('Se agendó por enlace')
+    expect(html).not.toContain('Reservó por enlace')
     expect(html).not.toContain('Sin expediente')
   })
 })

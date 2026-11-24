@@ -85,7 +85,7 @@ describe('globals.css: sin morado y con «G», sólo con la v2', () => {
 describe('LeyendaEstados (punto 11)', () => {
   it('la de la v2: los cinco estados y la «G» explicada, sin morado', () => {
     const html = renderToStaticMarkup(<LeyendaEstados />)
-    expect(html).toContain('Se agendó en Google')
+    expect(html).toContain('Agendada desde Google Calendar')
     expect(html).not.toContain('GCal')
     expect(html).not.toContain('--ag-gcal')
     for (const e of ['Agendada', 'Confirmada', 'Cancelada', 'No asistió', 'Atendida']) expect(html).toContain(e)
@@ -94,6 +94,6 @@ describe('LeyendaEstados (punto 11)', () => {
     const html = renderToStaticMarkup(<LeyendaEstados clasica />)
     expect(html).toContain('GCal')
     expect(html).toContain('--ag-gcal-text')
-    expect(html).not.toContain('Se agendó en Google')
+    expect(html).not.toContain('Agendada desde Google Calendar')
   })
 })
