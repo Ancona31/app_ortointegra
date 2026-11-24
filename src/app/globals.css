@@ -9739,3 +9739,7 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
 :root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie { justify-content: center; }
 :root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie > span:first-child { align-items: center; }
 :root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie > span:first-child > span { text-align: center; }
+
+/* ═══ TAREA 8 (auditoría B13) · «Invitar con Google Calendar» del acuse de la burbuja de alta ═══════════
+   Deshabilitado sin Google conectado: la «G» en gris como la letra (el botón ya va al 55 %, legible ≥ 3:1). */
+.ag-invitar-google:disabled > svg { filter: grayscale(1); }

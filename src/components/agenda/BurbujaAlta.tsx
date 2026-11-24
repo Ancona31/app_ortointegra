@@ -28,7 +28,7 @@
  *   · Puntos 13 y 14: tras agendar, la burbuja NO se cierra: enseña «Cita
  *     agendada» (anunciado por `role="status"`) con una acción principal,
  *     «Listo», y las secundarias alineadas: «Enviar por WhatsApp» (con la
- *     regla del servidor, `motivoSinWhatsApp`) e «Invitar por correo» (la
+ *     regla del servidor, `motivoSinWhatsApp`) e «Invitar con Google Calendar» (la
  *     invitación de Google, si habrá evento y quien agenda puede invitar) a
  *     todo el ancho, y «Más opciones» (el modal de edición de la cita) junto a
  *     «Listo».
@@ -40,15 +40,16 @@
  * del campo. Tras agendar, el foco va a «Listo».
  *
  * Movimiento: entra desde el punto pulsado y sale hacia él (`.ag-capa`, CSS de
- * F3). «Más opciones» e «Invitar por correo» NO animan la salida: lo que abren
+ * F3). «Más opciones» e «Invitar con Google Calendar» NO animan la salida: lo que abren
  * la tapa al instante. Lo nuevo de T1 no añade ninguna animación.
  */
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
-import { Check, Mail, Plus, X } from 'lucide-react'
+import { Check, Plus, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
+import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
@@ -92,7 +93,7 @@ interface Props {
   alMasOpciones: (valores: MasOpcionesBurbuja) => void
   /** T1 · Quien agenda puede invitar (`canVerAgendaCompleta`, la regla de `handleSave`). */
   puedeInvitar: boolean
-  /** T1 · «Invitar por correo» tras agendar: el modal de invitación de la agenda. */
+  /** T1 · «Invitar con Google Calendar» tras agendar: el modal de invitación de la agenda. */
   alInvitar: (cita: Appointment) => void
   /** T1 · «Más opciones» tras agendar: el modal de edición de la cita creada. */
   alEditar: (cita: Appointment) => void
@@ -404,13 +405,34 @@ export function AcuseAgendada({ cita, zonaVisor }: { cita: Appointment; zonaViso
   )
 }
 
+/** Tarea 8 (auditoría B13) · El motivo, visible, de la invitación deshabilitada (§29.7: sin `title`). */
+export const TEXTO_SIN_GOOGLE = 'Conecta Google Calendar para invitar.'
+
+/**
+ * Tarea 8 (auditoría B13) · «Invitar con Google Calendar» (antes «Invitar por correo», que se confundía con
+ * «Por correo», el correo de Spinus de `BotonCorreoCita`). Abre la invitación de Google
+ * (`ModalInvitacionCita`). Sin Google conectado se enseña deshabilitado (`disabled` + `aria-disabled`) y
+ * descrito por la línea de ayuda de debajo (`TEXTO_SIN_GOOGLE`).
+ */
+function BotonInvitarGoogle({ conectado, clase, idAyuda, alPulsar }: {
+  conectado: boolean; clase: string; idAyuda: string; alPulsar: () => void
+}): ReactElement {
+  return (
+    <button type="button" className={`ag-capa-boton ag-invitar-google ${clase}`} onClick={conectado ? alPulsar : undefined}
+      disabled={!conectado} aria-disabled={!conectado || undefined} aria-describedby={conectado ? undefined : idAyuda}>
+      <GoogleGIcon size={15} /> Invitar con Google Calendar
+    </button>
+  )
+}
+
 /**
  * T1 · Lo que enseña la burbuja tras agendar (puntos 13 y 14). G3 (puntos 14,
  * 15 y 17, «Después de agendar» de la maqueta): «Listo» es la acción principal,
  * a todo el ancho, y se lleva el foco; debajo, en dos columnas iguales, «Enviar
  * confirmación» (WhatsApp, en dos líneas) y «Por correo» (el correo de Spinus,
- * con o sin Google); la invitación de Google («Invitar por correo») sólo si
- * habrá evento y quien agenda puede invitar — si queda impar, la última va a
+ * con o sin Google); la invitación de Google («Invitar con Google Calendar»,
+ * tarea 8) si habrá evento y quien agenda puede invitar, y deshabilitada si la
+ * clínica no tiene Google conectado — si queda impar, la última va a
  * todo el ancho. «Más opciones» (el modal de edición) al pie, como enlace.
  */
 function PanelAgendada({ creada, puedeInvitar, zonaVisor, alInvitar, alEditar, alListo }: PropsAgendada): ReactElement {
@@ -419,6 +441,7 @@ function PanelAgendada({ creada, puedeInvitar, zonaVisor, alInvitar, alEditar, a
   /* Un mensaje por aviso: mandar los dos no borra el del primero. */
   const [mensajeWa, setMensajeWa] = useState<Mensaje>(null)
   const [mensajeCorreo, setMensajeCorreo] = useState<Mensaje>(null)
+  const idAyudaGoogle = useId()
   useEffect(() => { listo.current?.focus({ preventScroll: true }) }, [])
   const conWhatsApp = motivoSinWhatsApp(cita, telefonoParaWhatsApp(cita.pacientes?.telefono, cita.reserva_telefono), creada.en) === null
   const conCorreo = motivoSinCorreo(cita, correoParaConfirmacion(cita.pacientes?.email, cita.reserva_correo), creada.en) === null
@@ -426,7 +449,10 @@ function PanelAgendada({ creada, puedeInvitar, zonaVisor, alInvitar, alEditar, a
      (`pending`) y quien agenda puede invitar — la misma regla con la que
      `handleSave` la abría sola. */
   const conInvitacion = puedeInvitar && gcalSync === 'pending'
-  const piezas = [conWhatsApp && 'whatsapp', conCorreo && 'correo', conInvitacion && 'invitar'].filter(Boolean)
+  /* Tarea 8 (auditoría B13) · Sin Google conectado en la clínica (`gcalSync: 'disconnected'`, la
+     respuesta del alta) la invitación se enseña deshabilitada, con su motivo a la vista. */
+  const sinGoogle = puedeInvitar && gcalSync === 'disconnected'
+  const piezas = [conWhatsApp && 'whatsapp', conCorreo && 'correo', (conInvitacion || sinGoogle) && 'invitar'].filter(Boolean)
   const celda = (p: string): string => (piezas.length % 2 === 1 && piezas[piezas.length - 1] === p ? 'ag-lectura-ancho' : '')
   return (
     <>
@@ -440,12 +466,11 @@ function PanelAgendada({ creada, puedeInvitar, zonaVisor, alInvitar, alEditar, a
         {conCorreo && (
           <BotonCorreoCita citaId={cita.id} confirmada={cita.status === 'confirmed'} enCapa claseCelda={celda('correo')} alMensaje={setMensajeCorreo} />
         )}
-        {conInvitacion && (
-          <button type="button" className={`ag-capa-boton ${celda('invitar')}`} onClick={() => alInvitar(cita)}>
-            <Mail size={15} aria-hidden="true" /> Invitar por correo
-          </button>
+        {(conInvitacion || sinGoogle) && (
+          <BotonInvitarGoogle conectado={conInvitacion} clase={celda('invitar')} idAyuda={idAyudaGoogle} alPulsar={() => alInvitar(cita)} />
         )}
       </div>
+      {sinGoogle && <p id={idAyudaGoogle} className="ag-lectura-mensaje">{TEXTO_SIN_GOOGLE}</p>}
       {[mensajeWa, mensajeCorreo].map((m, i) => m && (
         <p key={i} className="ag-lectura-mensaje" role={m.alerta ? 'alert' : undefined}>{m.texto}</p>
       ))}
