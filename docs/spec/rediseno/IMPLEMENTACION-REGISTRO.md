@@ -1264,7 +1264,9 @@ diagnóstico de los dos fallos «conocidos» de la batería. Resultados y captur
   `src/lib/agenda/conteoAgenda.ts` (presentación): `FilaDelDia` + `fin`, `duracion`, `motivo`, `status`.
   El panel del Mes v2 con base 0 (no aplasta la mini-rejilla). No hecho: conteo en la cabecera de la lista
   de Semana; deslizar en rejillas del teléfono (no lo pide nada y choca con la pulsación larga).
-* **80 px por hora (AG-DT-281):** probado y revertido (ver la deuda).
+* **80 px por hora (AG-DT-281):** probado dos veces y revertido (ver la deuda).
+* **Banda de vacío durante la carga (`57db5b98`):** `vacioReal` exige `!cargando`; la banda que salía y se
+  iba al navegar movía la rejilla y era la caída de `agenda-g2-turnos` 169/199 (y :147).
 * **Repaso de capas (punto 5):** capturas de tarjeta al pasar, «Reagendar», «Convertir en cita», ventana de
   ligar, «¿Asistió?», atajos, panel de Día, Mes y «+N», configuración como médico y como secretaria, y la v2
   apagada en oscuro. Arreglado: toques de 28/36 (✕ del formulario, «¿No es una cita?»), nombre del

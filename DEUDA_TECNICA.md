@@ -7728,6 +7728,11 @@ hora (borde de la caja = línea de la franja) y el espejo de un arrastre a mano 
 quedar cerca del borde donde FullCalendar desplaza solo: SUPUESTO, sin comprobar). Ojo: con la franja de
 siempre, `agenda-g2-turnos:169` también falla por tope de 30 s (el ratón cae en la rejilla y abre la burbuja de
 alta en vez de arrastrar): 2 de 2 sueltas el 2026-11-24, y 1 de 2 baterías del cierre.
+**Actualización (mismo día, `57db5b98`):** esa caída con la franja de siempre era la banda de vacío saliendo
+durante la carga de la semana nueva (movía la rejilla ~38 px); arreglada, g2-turnos 3 de 3. Segundo intento de
+los 80 px con ese arreglo (3 corridas, `h80b-*.log`): `:169` ya pasa, pero `agenda-f-tableta:116` (arrastre por
+pulsación larga en `iv`, Semana de siete columnas) sigue sin llegar al PUT 3 de 3 y `:199` cae 30 min corto 2
+de 3. Revertido otra vez; causa de esas dos no establecida.
 **Estado original:** 🟡 abierta, presentación (B13) · **Archivos:** `globals.css`, `AgendaCliente.tsx`
 
 La rejilla sigue en 36/42/48 px por media hora (por alto de ventana). Pasar a 80 por hora exige declarar el
