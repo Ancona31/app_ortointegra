@@ -52,6 +52,11 @@ test('alta de cita con paciente: no duplica el eco propio y persiste en contexto
 
   // GRAVE §4: el toast es optimista (sale en `handleSave` antes del `fetch`,
   // `page.tsx` ~7460 vs ~7505) — lo que hay que esperar es la RESPUESTA real.
+  // El eco sólo puede llegar si el canal ya estaba suscrito al escribir: Realtime no repite lo de
+  // antes. En la batería el `upgrade` del WebSocket llegó a tardar 2,0 s y el alta (a 2,6 s de
+  // abrir la página) se adelantó a la suscripción (B13 · remate, DIAGNOSTICO-FALLOS). No es un tope
+  // más holgado: es la condición previa de lo que se prueba.
+  await esperarEco.suscrito()
   const respuesta = page.waitForResponse(esPeticionAppointments('/api/appointments', 'POST'))
   await page.getByRole('button', { name: 'Guardar' }).click()
   const res = await respuesta

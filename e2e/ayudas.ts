@@ -400,12 +400,20 @@ export async function enContextoNuevo<T>(
  * entrega el objeto `WebSocket` una vez, en el evento `'websocket'` de la
  * conexión que se abre — un listener puesto después de narrar no vería nada.
  */
-export function observarEcosRealtime(page: Page): (clientId: string, timeoutMs?: number) => Promise<void> {
+export function observarEcosRealtime(page: Page): ((clientId: string, timeoutMs?: number) => Promise<void>) & {
+  /** Resuelve con la respuesta `ok` al `phx_join` del canal de citas con `postgres_changes`: desde ahí
+   *  una escritura sí produce eco. Un cambio confirmado ANTES no llega nunca (Realtime no lo repite). */
+  suscrito: (timeoutMs?: number) => Promise<void>
+} {
   const llegados = new Set<string>()
   const esperas = new Map<string, () => void>()
+  let marcarSuscrito: () => void = () => undefined
+  const suscritoYa = new Promise<void>((ok) => { marcarSuscrito = ok })
   page.on('websocket', (ws: WebSocket) => {
     ws.on('framereceived', ({ payload }) => {
       const texto = typeof payload === 'string' ? payload : payload.toString('utf8')
+      if (texto.includes('appointments-realtime') && texto.includes('phx_reply') && texto.includes('"status":"ok"')
+        && texto.includes('postgres_changes')) marcarSuscrito()
       for (const [clientId, resolver] of [...esperas]) {
         if (texto.includes(clientId)) {
           llegados.add(clientId)
@@ -415,7 +423,10 @@ export function observarEcosRealtime(page: Page): (clientId: string, timeoutMs?:
       }
     })
   })
-  return (clientId: string, timeoutMs = 10000) => {
+  const suscrito = (timeoutMs = 15000): Promise<void> => Promise.race([suscritoYa, new Promise<void>((_, mal) => {
+    setTimeout(() => mal(new Error(`observarEcosRealtime: el canal de citas no quedó suscrito en ${timeoutMs} ms`)), timeoutMs)
+  })])
+  return Object.assign((clientId: string, timeoutMs = 10000) => {
     if (llegados.has(clientId)) return Promise.resolve()
     return new Promise<void>((resolve, reject) => {
       const tope = setTimeout(() => {
@@ -424,7 +435,7 @@ export function observarEcosRealtime(page: Page): (clientId: string, timeoutMs?:
       }, timeoutMs)
       esperas.set(clientId, () => { clearTimeout(tope); resolve() })
     })
-  }
+  }, { suscrito })
 }
 
 /** Un rango `{startStr,endStr}` tal como lo pide `rangoQuePedir`. La usan
