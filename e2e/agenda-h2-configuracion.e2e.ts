@@ -199,8 +199,18 @@ async function botonesEnReposo(page: Page): Promise<string[]> {
         if (contraste(cs.backgroundColor, alrededor) < 3 && borde < 3) malos.push(`${nombre}: pista ${contraste(cs.backgroundColor, alrededor).toFixed(2)}:1`)
         continue
       }
-      if (b.hasAttribute('disabled')) continue
       const tras = opaco(cs.backgroundColor) ? cs.backgroundColor : alrededor
+      /* Auditoría B13 · 6 · Un botón DESHABILITADO no se salta: WCAG (1.4.3) lo exime del 4,5:1, pero su nombre
+         tiene que seguir leyéndose atenuado. Se le pide 3:1 con la opacidad que lleve (la suya y la de sus
+         ancestros), mezclada la letra sobre su fondo como la ve el ojo. */
+      if (b.hasAttribute('disabled')) {
+        let op = 1
+        for (let e: Element | null = b; e; e = e.parentElement) op *= Number(getComputedStyle(e).opacity)
+        const [lr = 0, lg = 0, lb = 0] = rgb(cs.color); const [fr = 255, fg = 255, fb = 255] = rgb(tras)
+        const visto = `rgb(${lr * op + fr * (1 - op)}, ${lg * op + fg * (1 - op)}, ${lb * op + fb * (1 - op)})`
+        if (contraste(visto, tras) < 3) malos.push(`${nombre} (deshabilitado): letra ${contraste(visto, tras).toFixed(2)}:1`)
+        continue
+      }
       if (contraste(cs.color, tras) < 4.5) malos.push(`${nombre}: letra ${contraste(cs.color, tras).toFixed(2)}:1`)
     }
     return malos
