@@ -1245,3 +1245,37 @@ izquierda y fechas/horas en píldoras en `ih`/`esc` y «Iniciar consulta»/«Exp
 Paciente; los pendientes de vistas (capa propia de «+N más», conteo en la cabecera de Semana, domingo sin
 horario en `--cal-fuera`, número del día arriba a la izquierda, filas del panel del Mes, deslizar en las
 rejillas del teléfono); 80 px por hora (no se intentó: sigue 36/42/48); título grande en `esc`.
+
+### B13 · remate · notas (2026-11-24)
+
+Un agente sobre `feature/integracion-rediseno-agenda` (desde `5d50a3b8`), para AG-DT-279 a AG-DT-282 y el
+diagnóstico de los dos fallos «conocidos» de la batería. Resultados y capturas: `S/b13/remate/`
+(`RESULTADOS.md`, `DIAGNOSTICO-FALLOS.md`).
+
+* **Formulario (AG-DT-279, cerrada).** `AppointmentModal.tsx`, sólo con la v2: `.ag-form-fechas` (una fila
+  por campo; píldora a la derecha en `ext`/`tel`, columna de 150 en `ih`/`iv`/`esc`), `.ag-form-paciente`
+  (ficha sin caja, avatar tonal) y `.ag-form-filas`/`.ag-form-fila` («Iniciar consulta», «Expediente» y el
+  «Iniciar consulta» de una por ligar, con su segunda línea). Salen de la cabecera y del pie con la v2; con la
+  v2 apagada, como siempre. Cabecera y pie en `--fondo`; `iv` tarjeta de 520 con velo; ✕ de 36 en `ih`/`esc`;
+  el bloque «por asignar» en columna. Mismos nombres, `aria-label`, destinos y condiciones.
+* **Mes (AG-DT-280, parcial).** `CapaMasEventos.tsx` (nuevo) + `useMasEventosV2` en `InteraccionesV2`
+  (captura de clic, Enter y espacio sobre `.fc-daygrid-more-link`; capa `mas`). Número arriba a la izquierda;
+  `.fc-non-business` del Mes en `--cal-fuera`. `FilaDelPanel` v2 = fila de la Semana (sin `data-cita-id`);
+  `src/lib/agenda/conteoAgenda.ts` (presentación): `FilaDelDia` + `fin`, `duracion`, `motivo`, `status`.
+  El panel del Mes v2 con base 0 (no aplasta la mini-rejilla). No hecho: conteo en la cabecera de la lista
+  de Semana; deslizar en rejillas del teléfono (no lo pide nada y choca con la pulsación larga).
+* **80 px por hora (AG-DT-281):** probado y revertido (ver la deuda).
+* **Repaso de capas (punto 5):** capturas de tarjeta al pasar, «Reagendar», «Convertir en cita», ventana de
+  ligar, «¿Asistió?», atajos, panel de Día, Mes y «+N», configuración como médico y como secretaria, y la v2
+  apagada en oscuro. Arreglado: toques de 28/36 (✕ del formulario, «¿No es una cita?»), nombre del
+  consultorio cortado en «(» en la configuración (`PestanaHorario.tsx`, `flex-wrap`), «G»/marcas pegadas al
+  nombre. `ModalInvitacionCita` no se pudo capturar (sin Google conectado en la semilla no se ofrece).
+* **Fallos de la batería:** `reserva-google` 4 — compilación al pedir del `next dev` de :3002 frente a los 6 s
+  de `esperarEvento`; la prueba compila `/api/avisos` y `/api/appointments` en su `beforeAll` (3 de 3). En
+  producción los cinco tipos de aviso y `/agenda?cita=` abren la tarjeta en `esc` y `tel`. Riesgo real que
+  queda: AG-DT-283. `agenda-citas:27` — el alta se adelantaba a la suscripción de Realtime (apretón de manos
+  de 2,0 s); `observarEcosRealtime().suscrito()` y la prueba lo espera (5 de 5).
+
+Pruebas actualizadas: `reserva-google` (compilación previa), `ayudas.ts` + `agenda-citas` (suscrito),
+`agenda-b13-vistas` (nueva: «+N más»), `marcasProcedencia.test.tsx` y `origenGoogle.test.tsx` (campos nuevos
+de `FilaDelDia`). Ninguna saltada ni debilitada.

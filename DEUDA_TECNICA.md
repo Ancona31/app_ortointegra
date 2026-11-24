@@ -7678,7 +7678,13 @@ enlace de salto en el layout; 5–10 líneas, fuera del alcance estético.
 
 ### AG-DT-279 — Formulario de la cita en `ih`/`esc`: rótulo a la izquierda y fechas/horas en píldoras (maqueta `ag-form`)
 
-**Estado:** 🟡 abierta, presentación (B13, cierre, 2026-11-24) · **Archivos:**
+**Estado:** ✅ cerrada en el remate de B13 (2026-11-24, `42b98a18` y `395d61f7`): con la v2, «Fecha y hora» es
+una fila por campo (rótulo a la izquierda, valor en píldora; a la derecha en `ext`/`tel`, en la columna de 150
+en `ih`/`iv`/`esc`), «Iniciar consulta» y «Expediente» son filas del grupo Paciente (también la de una cita por
+ligar, con «Primero se liga a un paciente»), cabecera y pie sobre `--fondo` y `iv` como tarjeta de 520. Lo que
+queda distinto de la maqueta: la píldora es el `<input type="date|time">` nativo (con su icono y el formato de
+fecha del navegador) y en `ext` «Fecha de inicio» parte en dos líneas.
+**Estado original:** 🟡 abierta, presentación (B13, cierre, 2026-11-24) · **Archivos:**
 `src/components/agenda/AppointmentModal.tsx`, `src/app/globals.css` (bloque de capas)
 
 La maqueta aprobada pone en `ih`/`esc` cada rótulo a la izquierda del campo (columna de 150) y fechas y horas
@@ -7690,7 +7696,17 @@ pie. Hacerlo pide rehacer el marcado de cada campo de un archivo de ~2 000 líne
 
 ### AG-DT-280 — Pendientes de vistas del rediseño de la agenda
 
-**Estado:** 🟡 abierta, presentación (B13, cierre) · **Archivos:** `src/app/(app)/agenda/AgendaCliente.tsx`,
+**Estado:** 🟡 abierta, MENOR, tras el remate de B13 (2026-11-24, `e00cd740`). Hecho: capa propia del «+N
+más» (`CapaMasEventos`; en `esc` sobre la celda sin velo oscuro, en `ih`/`iv` centrada; abre con clic, Enter y
+espacio; e2e en `agenda-b13-vistas`), número del día arriba a la izquierda, día sin horario en `--cal-fuera`,
+filas del panel del Mes del teléfono con las de la Semana (y el panel ya no aplasta la mini-rejilla). Queda:
+(1) el conteo «12 cit · 2 ev» en la cabecera de día de la lista de Semana del teléfono — la cabecera la pinta
+FullCalendar (`dayHeaderContent`) y no se vuelve a pintar cuando cambian las citas de un día ya pintado, así que
+el número se quedaría viejo; pide pintarlo desde fuera (como los puntos de `TiraSemana`); (2) el deslizamiento
+lateral en las rejillas de Día y 3 días del teléfono: ni la maqueta ni el plan lo piden y competiría con el
+arrastre por pulsación larga, así que NO se activó (decisión del dueño si lo quiere); (3) la capa del «+N» no
+lista los bloqueos (el panel del teléfono tampoco).
+**Estado original:** 🟡 abierta, presentación (B13, cierre) · **Archivos:** `src/app/(app)/agenda/AgendaCliente.tsx`,
 `opcionesCalendario.ts`, `MonthChip.tsx`, `PanelDelDia.tsx`, `InteraccionesV2.tsx`, `globals.css`
 
 De `docs/spec/rediseno/b13/vistas.md`, sin hacer: capa propia de «+N más» en Mes (sigue el popover de
@@ -7701,7 +7717,18 @@ listas).
 
 ### AG-DT-281 — 80 px por hora (`--cal-h`) sin aplicar
 
-**Estado:** 🟡 abierta, presentación (B13) · **Archivos:** `globals.css`, `AgendaCliente.tsx`
+**Estado:** 🟡 abierta tras un intento revertido (remate de B13, 2026-11-24). Se probó
+`--ag-slot-h: calc(var(--cal-h) / 2)` sobre `.agenda-raiz[data-agenda-v2="encendida"]` (sin la densidad
+compacta) + `updateSize()` en el cuadro siguiente al leer el interruptor. Medido: las citas se pintan en su
+hora (borde de la caja = línea de la franja) y el espejo de un arrastre a mano con el ratón cae bien (40 px =
+30 min). Pero en 5 corridas `agenda-g2-turnos:169` cayó 5 de 5 media hora corto (13:30–14:15 en vez de
+14:15–15:00) y el arrastre con pulsación larga de `agenda-f-tableta:116` no llegó al PUT 5 de 5; `:147` y
+`:199` fallaron 1 de 5. Revertido. Causa exacta del desfase NO establecida (la ayuda
+`arrastrarEventoPorMinutos` reposiciona el scroller antes de agarrar; con la franja más alta la cita puede
+quedar cerca del borde donde FullCalendar desplaza solo: SUPUESTO, sin comprobar). Ojo: con la franja de
+siempre, `agenda-g2-turnos:169` también falla por tope de 30 s (el ratón cae en la rejilla y abre la burbuja de
+alta en vez de arrastrar): 2 de 2 sueltas el 2026-11-24, y 1 de 2 baterías del cierre.
+**Estado original:** 🟡 abierta, presentación (B13) · **Archivos:** `globals.css`, `AgendaCliente.tsx`
 
 La rejilla sigue en 36/42/48 px por media hora (por alto de ventana). Pasar a 80 por hora exige declarar el
 alto antes del primer pintado (o `updateSize()` al encender el atributo de la v2) y que `agenda-arrastre`,
@@ -7717,3 +7744,19 @@ Agendar, y debajo ‹ Hoy › · médico · vistas. La regla M3 de CLAUDE.md (do
 1360, dos limpias de 1024 a 1359, fecha y nombre enteros: `agenda-m3-barra`) se midió con la fecha a 15 px:
 a 32 no cabe en la fila única de 1360 (holgura de 28 px en Semana y 4 en Mes) ni entera a 1024. Hoy `esc`
 conserva el reparto de M3 con la piel nueva. Cambiarlo es rehacer M3 (y su prueba) con la decisión del dueño.
+
+---
+
+### AG-DT-283 — Abrir una cita desde un aviso se rinde a los 6 s desde el clic, no desde que llega el rango
+
+**Estado:** 🟡 abierta, menor (lógica de la agenda v2, NO del rediseño; remate de B13, 2026-11-24) ·
+**Archivos:** `src/components/agenda/InteraccionesV2.tsx` (`esperarEvento`, `ESPERA_CITA_MS = 6000`)
+
+`irACita` (aviso de la campana, buscador, `/agenda?cita=`) cambia al Día de la cita y espera a que el evento
+esté pintado; si en 6 s no llega, enseña «No se pudo mostrar esa cita en la agenda.». El plazo cuenta desde el
+clic, así que si la traída del rango tarda más (arranque en frío de la función, red lenta) la cita aparece
+después sin abrirse. Lo destapó `reserva-google` prueba 4 en el `next dev` de :3002 (compilación al pedir de
+`/api/avisos` y `/api/appointments`, 6,7 y 10,2 s; diagnóstico en el registro del remate). Arreglo propuesto:
+contar el plazo desde el fin de la carga (`loading` de FullCalendar) o reintentar en cada `eventsSet` hasta que
+la carga termine. ~10 líneas; toca código de la v2, va en su rama.
+
