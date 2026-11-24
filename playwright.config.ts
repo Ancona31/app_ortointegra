@@ -104,7 +104,7 @@ export default defineConfig({
     },
     {
       name: 'tableta',
-      testMatch: ['**/agenda-f-tableta.e2e.ts', '**/agenda-t1-capas.e2e.ts'],
+      testMatch: ['**/agenda-f-tableta.e2e.ts', '**/agenda-t1-capas.e2e.ts', '**/agenda-b13-toque-seleccionada.e2e.ts'],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 820, height: 1180 },

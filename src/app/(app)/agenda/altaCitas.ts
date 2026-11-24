@@ -363,7 +363,9 @@ export function crearAltaCitas({
 
   /* `arg.el` es la tarjeta pulsada (o la que tenía el foco, con Enter: FC
      manda el `KeyboardEvent`, sin punto). */
-  function handleEventClick(arg: EventClickArg) {
+  /* La puerta del clic y la del toque sobre la seleccionada (AgendaCliente,
+     `alSoltarArrastre`), que trae `EventApi` y no `EventImpl`. */
+  function handleEventClick(arg: Omit<EventClickArg, 'event'> & { event: EventApi }) {
     /* F3.2 · LA CITA PULSADA SE ENFOCA ANTES DE ABRIR SU TARJETA. Con el ratón
        no recibe el foco sola: FullCalendar cancela el `mousedown` (es lo que le
        deja arrastrar), así que el foco seguía donde estaba —p. ej. en «›»— y
