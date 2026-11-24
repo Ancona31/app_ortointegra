@@ -9728,3 +9728,14 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
    atenuados por el fondo de la celda (`--fondo` al 55 %) y se leen: `--tinta2` sin transparencia. */
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-top { opacity: 1; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-number { color: var(--tinta2); }
+
+/* ═══ AUDITORÍA B13 · 4 · LA VENTANA DE LIGAR EN `ih`/`iv`/`esc` (maqueta `ag-ligado`) ════════════════
+   440 de ancho; «¿No es una cita?» con su explicación en su propia línea (a la izquierda en `ih`/`esc`,
+   centrada en `iv`) y «Cancelar» + el principal en UNA fila debajo. */
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-capa--centro[data-ventana-ligar] { width: 440px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) [data-ventana-ligar] .ag-ligar-pie { gap: 8px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) [data-ventana-ligar] .ag-ligar-pie > span:first-child { flex: 0 0 100%; margin-right: 0; align-items: flex-start; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) [data-ventana-ligar] .ag-ligar-pie > span:first-child > span { text-align: left; }
+:root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie { justify-content: center; }
+:root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie > span:first-child { align-items: center; }
+:root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie > span:first-child > span { text-align: center; }
