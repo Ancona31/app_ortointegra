@@ -23,6 +23,7 @@
 import { useEffect, useId, useState } from 'react'
 import {
   X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX, Ban,
+  Clock, List, CalendarDays, User, Users, MessageCircle,
   type LucideIcon,
 } from 'lucide-react'
 import Link from 'next/link'
@@ -1224,6 +1225,7 @@ export default function AppointmentModal({
               Ocupa el sitio del campo de paciente, no se suma a él: los dos
               tipos comparten pantalla pero nunca los dos campos a la vez, que
               es lo que haría dudar de qué se está creando. */}
+          {agendaV2 && esEvento && <h3 className="ag-form-grupo"><CalendarDays size={14} aria-hidden="true" />Evento</h3>}
           {esEvento && (
             <>
               <div>
@@ -1311,6 +1313,7 @@ export default function AppointmentModal({
           {/* Paciente — campo principal y obligatorio de una CITA.
               En un evento genérico no existe: no es que esté vacío, es que esa
               fila no lleva paciente. */}
+          {agendaV2 && !esEvento && <h3 className="ag-form-grupo"><User size={14} aria-hidden="true" />Paciente</h3>}
           {!esEvento && (
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
@@ -1547,7 +1550,7 @@ export default function AppointmentModal({
               </div>
             ))}
           {/* B13 · AG6 (CALMA §29.9): los rótulos de grupo aprobados, sólo con la v2. */}
-          {agendaV2 && <h3 className="ag-form-grupo">Fecha y hora</h3>}
+          {agendaV2 && <h3 className="ag-form-grupo"><Clock size={14} aria-hidden="true" />Fecha y hora</h3>}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
@@ -1620,34 +1623,6 @@ export default function AppointmentModal({
             <p role="alert" data-aviso-bloqueado className="text-[12.5px] font-semibold text-red-500">{TEXTO_HORARIO_BLOQUEADO}</p>
           )}
 
-          {agendaV2 && <h3 className="ag-form-grupo">Detalles</h3>}
-          {/* B6c · Tipo de cita (P5). Sólo con el interruptor, en una cita con
-              paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
-              siempre está. El color es SÓLO la marca de la lista; la tarjeta
-              sigue con el color del estado y sin el nombre del tipo. */}
-          {conTipos && (paciente || (reserva && !porAsignar)) && opcionesTipo.length > 1 && (
-            <div>
-              <label id={`${tituloId}-tipo`} className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Tipo de cita</label>
-              <div role="radiogroup" aria-labelledby={`${tituloId}-tipo`} className="flex flex-wrap gap-2">
-                {opcionesTipo.map(o => {
-                  const marcado = tipoEfectivo === o.id
-                  return (
-                    <button key={o.id ?? 'sin-tipo'} type="button" role="radio" aria-checked={marcado} onClick={o.elegir}
-                      className={`inline-flex items-center gap-1.5 px-3 py-2 max-md:py-3 rounded-full text-[13px] font-semibold border ag-transicion-color ${marcado ? 'text-white' : ''}`}
-                      style={marcado
-                        ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
-                        : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
-                    >
-                      {o.color && <span aria-hidden className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: `var(--ag-evento-${o.color})` }} />}
-                      {o.nombre}
-                      {o.duracion !== null && <span className="font-normal opacity-80">· {o.duracion} min</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Duración — un ATAJO para escribir el fin, no un dato aparte. En todo
               el día no se pinta: no hay horas que abreviar. */}
           {!todoElDia && !sinBotonesDuracion && (
@@ -1676,6 +1651,34 @@ export default function AppointmentModal({
                   forma de ver el fin cuando el fin no era un campo. Ahora lo
                   enseña el campo de al lado, y repetirlo sería un segundo sitio
                   donde leer el mismo dato —el que se queda viejo—. */}
+            </div>
+          )}
+
+          {agendaV2 && <h3 className="ag-form-grupo"><List size={14} aria-hidden="true" />Detalles</h3>}
+          {/* B6c · Tipo de cita (P5). Sólo con el interruptor, en una cita con
+              paciente y si hay algún tipo que ofrecer. Opcional: «Sin tipo»
+              siempre está. El color es SÓLO la marca de la lista; la tarjeta
+              sigue con el color del estado y sin el nombre del tipo. */}
+          {conTipos && (paciente || (reserva && !porAsignar)) && opcionesTipo.length > 1 && (
+            <div>
+              <label id={`${tituloId}-tipo`} className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>Tipo de cita</label>
+              <div role="radiogroup" aria-labelledby={`${tituloId}-tipo`} className="flex flex-wrap gap-2">
+                {opcionesTipo.map(o => {
+                  const marcado = tipoEfectivo === o.id
+                  return (
+                    <button key={o.id ?? 'sin-tipo'} type="button" role="radio" aria-checked={marcado} onClick={o.elegir}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 max-md:py-3 rounded-full text-[13px] font-semibold border ag-transicion-color ${marcado ? 'text-white' : ''}`}
+                      style={marcado
+                        ? { background: 'var(--ag-brand-primary)', borderColor: 'var(--ag-brand-primary)' }
+                        : { background: 'var(--ag-input-bg)', color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
+                    >
+                      {o.color && <span aria-hidden className="w-2.5 h-2.5 rounded-full flex-none" style={{ background: `var(--ag-evento-${o.color})` }} />}
+                      {o.nombre}
+                      {o.duracion !== null && <span className="font-normal opacity-80">· {o.duracion} min</span>}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
@@ -1786,16 +1789,18 @@ export default function AppointmentModal({
               Va en el cuerpo y no en el pie por sitio: el motivo del botón
               apagado es una frase, y en el pie no cabe sin apretujar «Iniciar
               consulta», «Cancelar» y «Guardar». */}
+          {agendaV2 && isEdit && canInvitar && <h3 className="ag-form-grupo"><Users size={14} aria-hidden="true" />Invitados</h3>}
           {isEdit && canInvitar && (
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+              {/* B13 · AG6: con la v2 el rótulo visible es el del grupo; éste queda para el lector. */}
+              <label className={`block text-[11px] font-bold uppercase tracking-[.06em] mb-2${agendaV2 ? ' sr-only' : ''}`} style={{ color: 'var(--ag-muted2)' }}>
                 Invitados
               </label>
               <button
                 type="button"
                 onClick={onInvitar}
                 disabled={!apt?.google_event_id}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="ag-form-accion w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                 style={{ color: 'var(--ag-text)', borderColor: 'var(--ag-input-border)' }}
               >
                 <Mail size={15} /> Agregar invitados
@@ -1826,17 +1831,28 @@ export default function AppointmentModal({
               correo PROPIO de Spinus, «Enviar confirmación por correo», con o
               sin Google (`motivoSinCorreo`, la regla de la ruta). La invitación
               de Google sigue arriba, en «Invitados», como un extra. */}
+          {isEdit && agendaV2 && apt && !esEvento && (avisoWhatsApp || avisoCorreo) && <h3 className="ag-form-grupo"><MessageCircle size={14} aria-hidden="true" />Avisar al paciente</h3>}
           {isEdit && agendaV2 && apt && !esEvento && (avisoWhatsApp || avisoCorreo) && (
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
-                Avisar al paciente
-              </label>
-              <div className="flex flex-col gap-2">
+              {/* B13 · AG6: el rótulo es el del grupo, arriba (ya no se repite aquí). */}
+              <div className="flex flex-col gap-2 ag-form-avisar">
                 {avisoWhatsApp && <BotonWhatsAppCita citaId={apt.id} tipo="enlace" marcadoEn={apt.whatsapp_sent_at ?? null} confirmada={apt.status === 'confirmed'} />}
                 {avisoCorreo && <BotonCorreoCita citaId={apt.id} confirmada={apt.status === 'confirmed'} />}
               </div>
             </div>
           )}
+          {/* B13 · AG6 (maqueta `ag-form`, patrón de Calendario de iOS) · con la v2, cancelar o eliminar es
+            la última fila del cuerpo, en rojo, y abre su alerta (§29.2). Apagada, el icono del pie de siempre. */}
+          {agendaV2 && ((cancelaEnVezDeBorrar && !yaCancelada) || (isEdit && !cancelaEnVezDeBorrar)) && (
+          <div className="ag-form-peligro-pista">
+            <button type="button" className="ag-form-peligro" disabled={deleting}
+              onClick={() => setConfirmarPie(cancelaEnVezDeBorrar ? 'cancelar' : 'eliminar')}>
+              {deleting ? <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                : cancelaEnVezDeBorrar ? <CalendarX size={18} aria-hidden="true" /> : <Trash2 size={18} aria-hidden="true" />}
+              {cancelaEnVezDeBorrar ? 'Cancelar cita' : esEvento ? 'Eliminar evento' : 'Eliminar cita'}
+            </button>
+          </div>
+        )}
         </div>
 
         {/* Footer
@@ -1862,9 +1878,9 @@ export default function AppointmentModal({
               con etiqueta y merece el nombre exacto de lo que borra. */}
           {/* B3: con el interruptor encendido una cita con paciente se
               CANCELA en vez de borrarse, y una ya cancelada no ofrece botón. */}
-          {cancelaEnVezDeBorrar && !yaCancelada && (
+          {!agendaV2 && cancelaEnVezDeBorrar && !yaCancelada && (
             <button
-              onClick={() => (agendaV2 ? setConfirmarPie('cancelar') : void handleCancelarCita())}
+              onClick={() => void handleCancelarCita()}
               disabled={deleting}
               title={deleting ? 'Cancelando...' : 'Cancelar cita'}
               aria-label={deleting ? 'Cancelando cita' : 'Cancelar cita'}
@@ -1873,9 +1889,9 @@ export default function AppointmentModal({
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <CalendarX size={16} />}
             </button>
           )}
-          {isEdit && !cancelaEnVezDeBorrar && (
+          {!agendaV2 && isEdit && !cancelaEnVezDeBorrar && (
             <button
-              onClick={() => (agendaV2 ? setConfirmarPie('eliminar') : void handleDelete())}
+              onClick={() => void handleDelete()}
               disabled={deleting}
               title={deleting ? 'Eliminando...' : (esEvento ? 'Eliminar evento' : 'Eliminar cita')}
               aria-label={deleting
@@ -1928,7 +1944,7 @@ export default function AppointmentModal({
               derecha con su tamaño de siempre: el `ml-auto` sólo se apaga por
               debajo de `md`. */}
           <div className="flex items-center gap-2 ml-auto max-md:ml-0 max-md:flex-1 max-md:min-w-0">
-            <button onClick={onClose} className="h-10 px-4 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2" style={{ color: 'var(--ag-muted)' }}>
+            <button onClick={onClose} className="ag-form-cancelar h-10 px-4 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2" style={{ color: 'var(--ag-muted)' }}>
               Cancelar
             </button>
             {/* ⚠️ GUARDANDO ES UN GIRADOR Y YA NO «Guardando...», Y NO ES UN
@@ -1944,7 +1960,7 @@ export default function AppointmentModal({
                 `aria-label`. */}
             <button onClick={handleSave} disabled={saving || faltaLoEsencial || faltanPuntas || finAntesDelInicio || enBloqueo || !consultorioId}
               aria-label={saving ? 'Guardando' : undefined}
-              className="flex items-center justify-center h-10 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-50 hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2">
+              className="ag-form-guardar flex items-center justify-center h-10 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-50 hover:brightness-95 shadow-sm bg-[linear-gradient(135deg,var(--ag-brand-primary),var(--ag-brand-secondary))] max-md:flex-1 max-md:min-w-0 max-md:h-11 max-md:px-2">
               {saving ? <Loader2 size={16} className="animate-spin" /> : 'Guardar'}
             </button>
           </div>

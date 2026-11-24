@@ -7482,26 +7482,92 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 .ag-burbuja-pie-ayuda { margin: -6px 0 4px; padding: 0 16px 0 48px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
 :root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-pie-ayuda { padding: 0 20px 0 52px; }
 /* ── B13 · AG6 · EL FORMULARIO DE LA CITA (`AppointmentModal`, sólo con la v2: `[data-form-v2]`) ──
-   Maqueta `S/entrega/ag-form`. La geometría del panel NO cambia (pantalla completa por debajo de
-   `md`, tarjeta de 560 encima, `visualViewport`, áreas seguras: ver el archivo). Sólo la piel del
-   catálogo: superficie `--sup`, radio 20 y la sombra de las capas; rótulos 13/600 en `--tinta2`,
-   sin versalitas (nada < 12); campos rellenos `--sup2` sin borde (44/16 en táctil, 40/15 en `ih`/
-   `esc`) con contorno de 2 px `--enlace` al enfocar; los dos rótulos de grupo (§29.9). Las reglas
-   no tienen capa: ganan a las utilidades de Tailwind sin `!important`, salvo los colores en línea. */
+   Maqueta `S/entrega/ag-form` (vista 1). La lógica no cambia; sólo el dibujo:
+   · Fondo del cuerpo `--fondo` y GRUPOS como tarjetas `--sup` de radio 16: cada rótulo de grupo
+     (`.ag-form-grupo`: 12/700 en versalitas `--enlace` con su icono) abre una tarjeta que forman los
+     bloques que le siguen, separados por una línea; se cierra en el rótulo siguiente o al final.
+   · Rótulos de campo 13 `--tinta2` (antes 11 en versalitas); campos y píldoras `--sup2` sin borde
+     (44/16 en táctil, 40/15 en `ih`/`esc`), contorno de 2 px `--enlace` al enfocar.
+   · Fichas (duración, tipo, estado) `--sup2`; la elegida, tonal con contorno `--enlace`.
+   · La destructiva es la última fila, en rojo (`.ag-form-peligro`); el pie, «Cancelar» (quieto) y
+     «Guardar» (primario), a la derecha (centrados en `iv`; a partes iguales en teléfono).
+   · Capa: tarjeta de 520 centrada en el área (`ih`, `iv`, `esc`) y de 310 en `ext`; pantalla completa
+     en `tel` (la geometría del panel por debajo de `md` es la de siempre: `visualViewport`, áreas).
+   Las reglas no tienen capa: ganan a las utilidades de Tailwind sin `!important`, salvo los colores
+   que el componente pone en línea. */
 .ag-modal-panel[data-form-v2] { color: var(--tinta); background: var(--sup); box-shadow: var(--sombra-capa); }
-@media (min-width: 768px) { .ag-modal-panel[data-form-v2] { border-radius: 20px; } }
+@media (min-width: 768px) { .ag-modal-panel[data-form-v2] { max-width: 520px; border-radius: 20px; } }
 .ag-modal-panel[data-form-v2] h2 { font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta) !important; }
+.ag-modal-panel[data-form-v2] .border-b, .ag-modal-panel[data-form-v2] .border-t { border-color: var(--linea) !important; }
+/* El cuerpo y sus grupos. */
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto { background: var(--fondo); padding: 4px 20px 20px; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > * { margin: 0; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo) {
+  padding: 12px 16px; background: var(--sup); border-radius: 0;
+}
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo) + :not(.ag-form-grupo) { box-shadow: inset 0 1px 0 var(--linea); }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo):first-child,
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-grupo + :not(.ag-form-grupo) { border-top-left-radius: 16px; border-top-right-radius: 16px; margin-top: 12px; box-shadow: none; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo):last-child,
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo):has(+ .ag-form-grupo) { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-grupo + :not(.ag-form-grupo) { margin-top: 0; }
+.ag-form-grupo {
+  display: flex; align-items: center; gap: 6px; margin: 20px 4px 8px;
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--enlace);
+}
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-grupo { margin: 20px 4px 8px; }
+/* Rótulos de campo y campos. */
 .ag-modal-panel[data-form-v2] label.uppercase {
-  font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--tinta2) !important;
+  font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--tinta2) !important;
 }
 .ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea) {
-  font-size: 16px; color: var(--tinta); background-color: var(--sup2); border-color: transparent;
+  font-size: 16px; color: var(--tinta); background-color: var(--sup2); border-color: transparent; border-radius: 12px;
 }
 .ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 44px; }
 :root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 40px; font-size: 15px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] textarea { font-size: 15px; }
 .ag-modal-panel[data-form-v2] :is(input, select, textarea):focus-visible { outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none; }
-.ag-modal-panel[data-form-v2] .border-b, .ag-modal-panel[data-form-v2] .border-t { border-color: var(--linea) !important; }
-.ag-form-grupo { margin: 8px 0 8px; font-size: 15px; line-height: 20px; font-weight: 700; color: var(--tinta); }
+/* Fichas (duración, tipo, estado y el «Qué vas a crear»): 44 en táctil, 36 en `ih`/`esc`. */
+.ag-modal-panel[data-form-v2] :is([role="radio"], .grid > button) { min-height: 44px; font-size: 14px; border-radius: 12px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is([role="radio"], .grid > button) { min-height: 36px; }
+/* El resto de textos pequeños del cuerpo, al mínimo de 12. */
+.ag-modal-panel[data-form-v2] :is(.text-\[11px\], .text-\[10px\], .text-\[10\.5px\]) { font-size: 12px; }
+/* Las acciones del cuerpo como filas de enlace (maqueta: «Agregar invitados», «Enviar confirmación»,
+   «… por correo»): icono y texto `--enlace` a la izquierda, 44 de alto; su mensaje, 13 `--tinta2`. */
+.ag-modal-panel[data-form-v2] :is(.ag-form-accion, .ag-form-avisar [data-whatsapp-cita] > button, .ag-form-avisar [data-correo-cita] > button) {
+  justify-content: flex-start; gap: 12px; min-height: 44px; padding: 0; font-size: 15px; font-weight: 600;
+  color: var(--enlace) !important; background: transparent !important; border: 0 !important; border-radius: 0; box-shadow: none;
+}
+.ag-modal-panel[data-form-v2] .ag-form-avisar [data-whatsapp-cita] + [data-correo-cita] { box-shadow: inset 0 1px 0 var(--linea); }
+.ag-modal-panel[data-form-v2] .ag-form-avisar p { font-size: 13px; color: var(--tinta2) !important; }
+.ag-modal-panel[data-form-v2] .ag-form-avisar p[role="alert"] { color: var(--mal-tinta) !important; font-weight: 600; }
+.ag-modal-panel[data-form-v2] .ag-form-avisar { gap: 0; }
+/* La fila roja del final. */
+.ag-form-peligro-pista { padding: 0 !important; overflow: hidden; }
+.ag-form-peligro {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 16px;
+  font-size: 15px; line-height: 20px; font-weight: 600; text-align: left; color: var(--mal-tinta); background: var(--sup); border: 0;
+}
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-form-peligro { min-height: 44px; font-size: 14px; }
+.ag-form-peligro:is(:hover, :active) { background: var(--mal-fondo); }
+.ag-form-peligro:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.ag-form-peligro:disabled { opacity: .55; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-peligro-pista { margin-top: 20px; border-radius: 16px; box-shadow: none; }
+/* El pie: «Cancelar» quieto y «Guardar» primario, 44 (40 en `ih`/`esc`), mínimo 104 de ancho. */
+.ag-modal-panel[data-form-v2] .ag-form-cancelar,
+.ag-modal-panel[data-form-v2] .ag-form-guardar {
+  min-width: 104px; height: 44px; padding: 0 16px; font-size: 15px; font-weight: 600; border-radius: 12px; box-shadow: none;
+}
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is(.ag-form-cancelar, .ag-form-guardar) { height: 40px; }
+.ag-modal-panel[data-form-v2] .ag-form-cancelar { color: var(--tinta) !important; background: var(--sup2); }
+.ag-modal-panel[data-form-v2] .ag-form-guardar { color: var(--sobre-accion); background: var(--accion); }
+:root[data-formato="iv"] .ag-modal-panel[data-form-v2] .ag-form-cancelar { margin-left: 0; }
+/* Duo cerrado: tarjeta centrada de 310 en el área (no pantalla completa), con el pie fijo. */
+:root[data-formato="ext"] .fixed.inset-0:has(> .ag-modal-panel[data-form-v2]) {
+  padding: var(--capa-arr) calc(var(--capa-der) - var(--fijo-der)) var(--capa-abj) calc(var(--capa-izq) - var(--fijo-izq));
+}
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] { max-width: 310px; height: auto; max-height: 100%; border-radius: 20px; }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.overflow-y-auto { padding: 4px 12px 16px; }
 
 /* B13 · AG7 · la ventana de ligar: el eslabón junto al título, y el pie con el principal a la derecha. */
 .ag-ligar-icono { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--enlace); background: var(--tonal); }

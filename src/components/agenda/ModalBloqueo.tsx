@@ -21,7 +21,6 @@
  */
 import { useId, useState, type ReactElement } from 'react'
 import Portal from '@/components/ui/Portal'
-import ConfirmModal from '@/components/agenda/ConfirmModal'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { addMinutes, componerIso, partirFechaHora } from '@/lib/agenda/fechasAgenda'
 import { renderEnTZ, desplazarFecha } from '@/lib/dates'
@@ -201,9 +200,13 @@ export default function ModalBloqueo(p: Props): ReactElement {
           </div>
           {estado.error && <p role="alert" className="text-[13px] font-semibold text-mal-tinta">{estado.error}</p>}
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            {/* B13 · AG6 (§29.2, §29.4): «Quitar bloqueo» pregunta con la alerta del catálogo y su verbo. */}
-            {editar && <button type="button" className="k-b k-b-capa k-b-texto text-mal-tinta" disabled={estado.ocupado}
-              onClick={() => setConfirmandoQuitar(true)}>Quitar bloqueo</button>}
+            {/* B13 · AG6 (maqueta `ag-form`, vista 2): «Quitar bloqueo» en texto rojo a la izquierda se
+                convierte, en el mismo sitio, en el botón rojo «Sí, quitar» (la confirmación de hoy). */}
+            {editar && (confirmandoQuitar
+              ? <button type="button" className="k-b k-b-capa k-b-mal" disabled={estado.ocupado}
+                  onClick={() => void quitar(editar.id)}>Sí, quitar</button>
+              : <button type="button" className="k-b k-b-capa k-b-texto text-mal-tinta" disabled={estado.ocupado}
+                  onClick={() => setConfirmandoQuitar(true)}>Quitar bloqueo</button>)}
             <span className="flex-1" />
             <button type="button" onClick={p.onClose} className="k-b k-b-capa k-b-quieto">Cancelar</button>
             <button type="button" disabled={estado.ocupado} onClick={() => void guardar(c)} className="k-b k-b-capa k-b-prim">
@@ -212,11 +215,6 @@ export default function ModalBloqueo(p: Props): ReactElement {
           </div>
         </div>
       </div>
-      {editar && confirmandoQuitar && (
-        <ConfirmModal message="¿Quitar el bloqueo de horario? Se vuelve a poder agendar en ese periodo."
-          verbo="Quitar bloqueo" icono="eliminar"
-          onConfirm={() => { setConfirmandoQuitar(false); void quitar(editar.id) }} onCancel={() => setConfirmandoQuitar(false)} />
-      )}
     </Portal>
   )
 }
