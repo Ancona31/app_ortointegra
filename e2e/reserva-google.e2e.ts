@@ -236,6 +236,16 @@ test.beforeAll(async ({}, info) => {
   // Primera compilación de las rutas y primera sincronización (crea el estado y el token).
   const admin = await request.newContext({ baseURL: BASE, storageState: SESION.adminA })
   await admin.post('/api/google/sync', { timeout: 240_000 })
+  /* B13 · remate (diagnóstico de la prueba 4): en `next dev` una ruta se compila la primera vez que se
+     pide, y mientras compila las demás peticiones esperan. Pulsar un aviso de la campana manda el PATCH
+     de `/api/avisos` (darlo por revisado) A LA VEZ que la agenda pide a `/api/appointments` el rango del
+     día de la cita; la primera semana de `/agenda` llega con la página, así que ninguna de las dos rutas
+     se había pedido aún. Medido en el log de :3002: 6,7 s y 10,2 s (6,5 y 10,0 de compilación; la app,
+     0,16–0,2) contra los 6 s de `esperarEvento`, que se rinde con «No se pudo mostrar esa cita en la
+     agenda.». Se compilan aquí, como en el `calentar` de los otros archivos que levantan :3002. En
+     producción no hay compilación al pedir. */
+  await admin.get('/api/avisos', { timeout: 240_000 })
+  await admin.get('/api/appointments?from=2026-01-05T06:00:00.000Z&to=2026-01-12T06:00:00.000Z', { timeout: 240_000 })
   await admin.dispose()
   ultimaBuenaHace(0)
   const { codigo } = emitirEnlace(e, 'unico')
