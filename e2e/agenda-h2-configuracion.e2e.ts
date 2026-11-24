@@ -109,8 +109,9 @@ test('5 · sin nada pendiente: pestañas con su rol, abre en la primera, flechas
   }
 })
 
-/* K3 (punto 13): en el teléfono las pestañas son iconos y CABEN: ya no se desplazan de lado (detalle en agenda-k3-configuracion). */
-test('5 · en el teléfono la fila de pestañas cabe en una sola fila, sin desplazarse ni envolver', async ({ browser }) => {
+/* B13 · AG9 (maqueta `ag-config`; sustituye a los iconos de K3): en el teléfono las pestañas son TEXTO en UNA fila que
+   se desliza de lado (detalle en agenda-k3-configuracion); la página no se desborda. */
+test('5 · en el teléfono las pestañas van en una sola fila que se desliza, sin envolver ni desbordar la página', async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: SESION.adminA, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
     locale: 'es-MX', timezoneId: 'America/Merida' })
   const deshacer = adminSinPendientes()
@@ -124,7 +125,7 @@ test('5 · en el teléfono la fila de pestañas cabe en una sola fila, sin despl
       filas: new Set(Array.from(el.children).map(c => Math.round(c.getBoundingClientRect().top))).size,
       pagina: document.documentElement.scrollWidth <= window.innerWidth + 1,
     }))
-    expect(m).toEqual({ desborda: false, overflow: 'auto', filas: 1, pagina: true })
+    expect(m).toEqual({ desborda: true, overflow: 'auto', filas: 1, pagina: true })
     // Elegir la última la trae a la vista.
     await lista.getByRole('tab', { name: 'Más opciones' }).click()
     await expect(lista.getByRole('tab', { name: 'Más opciones' })).toBeInViewport()
