@@ -112,6 +112,13 @@ interface Props {
  * el `max-height` que no la deja salir.
  */
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
+  /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
+     es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') {
+    for (const k of ['left', 'top', 'maxHeight', 'transformOrigin'] as const) nodo.style[k] = ''
+    return
+  }
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
   /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
   const ventana = ventanaParaCapas()
@@ -526,9 +533,11 @@ export default function BurbujaAlta(props: Props): ReactElement {
   return (
     <>
       <Portal>
+        {/* B13 · AG5 · el velo del catálogo fuera de computadora (en `esc` no se pinta: CSS). */}
+        <div className="ag-capa-velo ag-capa-barra-velo" aria-hidden="true" />
         <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
           onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
-          className="ag-capa ag-capa--tarjeta" data-estado={saliendo ? 'saliendo' : 'abierta'}>
+          className="ag-capa ag-capa--tarjeta ag-capa-barra" data-estado={saliendo ? 'saliendo' : 'abierta'}>
           <div className="ag-capa-cab">
             <h2 id={idTitulo} className="ag-capa-titulo">{etiquetaBurbuja(fecha, horas.inicio, horas.fin)}</h2>
             <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>

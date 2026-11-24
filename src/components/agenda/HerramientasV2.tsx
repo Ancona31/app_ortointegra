@@ -69,6 +69,13 @@ function cajaDe(el: Element): Caja {
    en una se aplica a las tres (CLAUDE.md, protocolo 4: sacarlas a un gancho
    compartido pide el visto bueno de Angel). */
 function colocar(nodo: HTMLElement, ancla: Caja): void {
+  /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
+     es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') {
+    for (const k of ['left', 'top', 'maxHeight', 'transformOrigin'] as const) nodo.style[k] = ''
+    return
+  }
   /* T1: el arreglo de las otras dos copias (alto natural, parte visible de la
      ventana, `max-height`). El desplegable no cambia de alto: no se sigue. */
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
@@ -135,8 +142,10 @@ function Desplegable({ ancla, etiqueta, disparador, enfocar, clase, alCerrar, ch
   useCerrarAlTocarFuera(panel, alCerrar, disparador)
   return (
     <Portal>
+      {/* B13 · AG8 · el velo del catálogo fuera de computadora (en `esc` no se pinta: CSS). */}
+      <div className="ag-capa-velo ag-capa-barra-velo" aria-hidden="true" />
       <div ref={montar} role="dialog" aria-modal="true" aria-label={etiqueta} tabIndex={-1}
-        onKeyDown={alPulsarTecla} className={clase ? `ag-capa ${clase}` : 'ag-capa'} data-estado="abierta">
+        onKeyDown={alPulsarTecla} className={`ag-capa ag-capa-barra${clase ? ` ${clase}` : ''}`} data-estado="abierta">
         {children}
       </div>
     </Portal>

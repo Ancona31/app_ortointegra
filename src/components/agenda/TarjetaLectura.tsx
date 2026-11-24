@@ -66,6 +66,13 @@ interface Props extends PropsBurbuja {
    T1 (punto 3 de Angel): alto NATURAL, parte VISIBLE de la ventana y
    `max-height`, para que la tarjeta no se corte al fondo de la pantalla. */
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
+  /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
+     es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') {
+    for (const k of ['left', 'top', 'maxHeight', 'transformOrigin'] as const) nodo.style[k] = ''
+    return
+  }
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
   /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
   const ventana = ventanaParaCapas()
