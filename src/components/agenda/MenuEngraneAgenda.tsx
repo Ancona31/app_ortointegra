@@ -26,7 +26,7 @@
  * `useDialogoModal`). B13 (§28): es su ÚNICA puerta; el botón de la barra de
  * computadora (tanda L, punto 11) se retiró.
  */
-import { useCallback, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type KeyboardEvent, type ReactElement, type RefObject, type ReactNode } from 'react'
 import { CalendarPlus, ChevronDown, ChevronsDownUp, Info, Keyboard, Lock, MoreHorizontal, MousePointer2, Rows4, Search, Settings, User, X } from 'lucide-react'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { CapaBarra } from '@/components/agenda/CapaBarra'
@@ -98,6 +98,26 @@ function moverFoco(menu: HTMLElement, clave: string): boolean {
   return destino !== null && destino !== undefined
 }
 
+/** El botón que abre el menú: «···» en la banda (PIEZAS §4), el engrane en computadora. Flecha abajo o
+    arriba lo abre con el foco en la primera o la última opción. Auditoría B13 · 7: sale de
+    `MenuEngraneAgenda` para dejarla en el tope de 50 líneas. */
+function BotonOpciones({ boton, enBanda, banda, abierto, abrir, alPulsar }: {
+  boton: RefObject<HTMLButtonElement | null>; enBanda: boolean; banda: boolean; abierto: boolean
+  abrir: (foco: 'primera' | 'ultima') => void; alPulsar: () => void
+}): ReactElement {
+  return (
+    <button type="button" ref={boton} data-engrane-agenda=""
+      className={enBanda ? 'ag-banda-movil-ctrl ag-banda-movil-ctrl--marco' : 'ag-herramienta'}
+      aria-label="Opciones de la agenda" title="Opciones de la agenda" aria-haspopup="menu" aria-expanded={abierto}
+      onClick={alPulsar}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); abrir(e.key === 'ArrowUp' ? 'ultima' : 'primera') }
+      }}>
+      {banda ? <MoreHorizontal size={20} aria-hidden="true" /> : <Settings size={enBanda ? 18 : 16} aria-hidden="true" />}
+    </button>
+  )
+}
+
 export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos, enBanda = false, banda }: Props): ReactElement {
   const [abierto, setAbierto] = useState<{ boton: HTMLElement; foco: 'primera' | 'ultima' } | null>(null)
   const [leyenda, setLeyenda] = useState<HTMLElement | null>(null)
@@ -112,16 +132,8 @@ export function MenuEngraneAgenda({ onConfiguracion, compactar, densidad, atajos
   const ejecutar = (accion: () => void) => (): void => { cerrar(); accion() }
   return (
     <>
-      <button type="button" ref={botonRef} data-engrane-agenda=""
-        className={enBanda ? 'ag-banda-movil-ctrl ag-banda-movil-ctrl--marco' : 'ag-herramienta'}
-        aria-label="Opciones de la agenda" title="Opciones de la agenda" aria-haspopup="menu" aria-expanded={abierto !== null}
-        onClick={() => { setLeyenda(null); setHuecos(null); if (abierto) cerrar(); else abrir('primera') }}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); abrir(e.key === 'ArrowUp' ? 'ultima' : 'primera') }
-        }}>
-        {/* B13 · En la banda, «···» (PIEZAS §4); en computadora, el engrane. */}
-        {banda ? <MoreHorizontal size={20} aria-hidden="true" /> : <Settings size={enBanda ? 18 : 16} aria-hidden="true" />}
-      </button>
+      <BotonOpciones boton={botonRef} enBanda={enBanda} banda={banda !== undefined} abierto={abierto !== null} abrir={abrir}
+        alPulsar={() => { setLeyenda(null); setHuecos(null); if (abierto) cerrar(); else abrir('primera') }} />
       {abierto && (
         <MenuAbierto boton={abierto.boton} foco={abierto.foco} cerrar={cerrar}>
           {banda && <OpcionesDeLaBanda banda={banda} ejecutar={ejecutar} abrirHuecos={() => setHuecos(abierto.boton)} />}

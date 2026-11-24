@@ -526,6 +526,22 @@ function useRegistroEnBurbuja(elegir: (p: PacienteBusqueda) => void, campo: RefF
  * teclas no suben por el árbol de React hasta el `onKeyDown` de la burbuja
  * (que cerraría con Escape y atraparía el Tab).
  */
+/** El título (la fecha y las horas), la ✕ y el anuncio de «Cita agendada». Auditoría B13 · 7: sale de
+    `BurbujaAlta` para dejarla en el tope de 50 líneas. */
+function CabeceraBurbuja({ idTitulo, etiqueta, creada, salir }: {
+  idTitulo: string; etiqueta: string; creada: boolean; salir: () => void
+}): ReactElement {
+  return (
+    <>
+      <div className="ag-capa-cab">
+        <h2 id={idTitulo} className="ag-capa-titulo">{etiqueta}</h2>
+        <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>
+      </div>
+      <p role="status" className="sr-only">{creada ? `Cita agendada: ${etiqueta}` : ''}</p>
+    </>
+  )
+}
+
 export default function BurbujaAlta(props: Props): ReactElement {
   const { fecha, ancla, punto, medicos, filtroMedico, consultorioActivo, alMasOpciones, alCerrar } = props
   const [horas, setHoras] = useState({ inicio: props.horaInicio, fin: props.horaFin })
@@ -550,11 +566,7 @@ export default function BurbujaAlta(props: Props): ReactElement {
         <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
           onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
           className="ag-capa ag-capa--tarjeta ag-capa-barra" data-estado={saliendo ? 'saliendo' : 'abierta'}>
-          <div className="ag-capa-cab">
-            <h2 id={idTitulo} className="ag-capa-titulo">{etiquetaBurbuja(fecha, horas.inicio, horas.fin)}</h2>
-            <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>
-          </div>
-          <p role="status" className="sr-only">{creada ? `Cita agendada: ${etiquetaBurbuja(fecha, horas.inicio, horas.fin)}` : ''}</p>
+          <CabeceraBurbuja idTitulo={idTitulo} etiqueta={etiquetaBurbuja(fecha, horas.inicio, horas.fin)} creada={creada !== null} salir={salir} />
           {creada ? (
             <PanelAgendada creada={creada} puedeInvitar={props.puedeInvitar} alListo={salir}
               zonaVisor={props.zonaVisor ?? Intl.DateTimeFormat().resolvedOptions().timeZone}

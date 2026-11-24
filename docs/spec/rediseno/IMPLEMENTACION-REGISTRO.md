@@ -1281,3 +1281,56 @@ diagnóstico de los dos fallos «conocidos» de la batería. Resultados y captur
 Pruebas actualizadas: `reserva-google` (compilación previa), `ayudas.ts` + `agenda-citas` (suscrito),
 `agenda-b13-vistas` (nueva: «+N más»), `marcasProcedencia.test.tsx` y `origenGoogle.test.tsx` (campos nuevos
 de `FilaDelDia`). Ninguna saltada ni debilitada.
+
+## B13 · auditoría (2026-11-24) — corrección de los hallazgos de `AUDITORIA-B13.md`
+
+Veredicto de la auditoría: «apto con reservas». Un commit por hallazgo; medidas con los scripts del auditor
+(`varios.js toques|contraste|foco`, `sel.js`, `sel2.js`), antes sobre `1d16ad0b` y después sobre el build final.
+
+* **1 · Toque tras la pulsación larga (táctil).** Causa: la pulsación larga SELECCIONA la cita (`SELECT_EVENT`,
+  `@fullcalendar/interaction` 6.1.20, `index.js:1274-1280`) y la deja así; sobre una seleccionada el arrastre
+  empieza sin espera ni distancia (`:1249-1254`), así que el toque es un arrastre de cero píxeles: el clic cae en
+  `.fc-event-mirror` y `EventClicking` lo descarta (`isValidSegDownEl`, `core/internal-common.js:5834`). Arreglo
+  (`AgendaCliente`, sólo con la v2): un «arrastre» que termina antes de 1000 ms (`longPressDelay`), sin moverse
+  ≥ 10 px y sin `eventDrop` (decidido en una microtarea) es el toque y llama al mismo `alPulsarEvento`. La
+  selección se conserva (asas de redimensionar con el dedo). Antes: 0 de 3 toques abrían la burbuja en `tel` e
+  `iv`; después: 1.º toque abre, en los dos; tras un arrastre real también; un segundo arrastre inmediato de la
+  seleccionada sigue moviendo (PUT) sin abrir nada. e2e nueva `agenda-b13-toque-seleccionada` (teléfono y
+  tableta; el proyecto `tableta` la incluye en su `testMatch`).
+* **2 · Áreas de toque** (bloque «AUDITORÍA B13 · 2» de `globals.css`): conmutador de vistas 38→44 (`ext`/`tel`/
+  `iv`) y 30→36 (`ih`/`esc`) con `::after` hasta el borde de su pista; «Qué vas a crear» 31→38 de botón y 44/36 de
+  toque; «Hoy» 37→44 de ancho en `iv`; «Ver día ›» 53×17 → 70×44; «Ir a una fecha» en `esc`, capa de 306 (días
+  30→36). Mes en rejilla: número 22×22 → 37×27 (`esc`/`ih`) y 45×27 (`iv`); «+N» 56×22 → 91×30 (`esc`), 77×30
+  (`ih`), 77×40 (`iv`) (su `overflow: hidden` de FullCalendar recortaba el `::after`). Declarado (AG-DT-285 y
+  `b13/capas.md`): chips del Mes (22/34), alto del número y del «+N», días de «Ir a una fecha» y tira de la
+  Semana en `ext` (~38 de ancho).
+* **3 · Contraste** (bloque «AUDITORÍA B13 · 3»): «Evento»/«Bloqueo» 3,09→≥ 4,5 y ayudas de 12 px del
+  formulario y la campana 3,50→≥ 4,5 (`--ag-muted` y `--ag-segment-text` a `--tinta2` en las capas, que viven en
+  `body`); «DOM» 3,09 y días de otro mes del mini mes 3,09 → `--tinta2`; números de otro mes del Mes 1,32 (1,55 en
+  oscuro) → `--tinta2` sin transparencia (≥ 4,5; siguen atenuados por el fondo de la celda). `varios.js
+  contraste`: «sin fallos» en `esc` y `tel`, claro y oscuro.
+* **4 · Ventana de ligar** en `ih`/`iv`/`esc`: 440 de ancho, «¿No es una cita?» y su explicación en su línea
+  (izquierda; centrada en `iv`), «Cancelar» + principal en UNA fila (antes 360 y el pie en dos filas).
+* **5 · Foco.** Causa (anterior a B13): `focusablesDelPanel` contaba los botones con `tabIndex = -1` del foco
+  itinerante (barra de la burbuja, mini mes), el trapo nunca veía «el último» y el Tab salía; con el foco fuera,
+  Escape no llegaba al panel. Arreglo: filtrar `tabIndex >= 0` (`useDialogoModal` y la copia de
+  `ModalInvitacionCita`; la de `ModalShell`, AG-DT-286) y, en la burbuja abierta por clic, Escape en el documento
+  cuando el foco está fuera (`useEscapeEnDocumento(…, true)`); la tarjeta al pasar no cambia. Antes: Tab×25 fuera
+  = 25 en la burbuja (`esc`, `tel`) y en «Ir a una fecha» (`esc`), Escape no cerraba; después: 0 y cierra. El
+  menú de opciones sigue saliendo con Tab A PROPÓSITO (patrón de menú APG: Tab lo cierra y devuelve el foco al
+  botón). e2e nueva `agenda-b13-foco-capas`.
+* **6 · Pruebas.** `configuracionEscala.test.ts`: `fallosDeControl` cuenta todo alto (también < 40 sin
+  variante) y suma el `before:-inset-y-[…]`. `agenda-reabrir-desplegables`: sin `force` (sólo corre en
+  computadora, sin velo). `agenda-h2` 7: los deshabilitados se miden a ≥ 3:1 con su opacidad; destapó dos
+  defectos reales que se corrigen en `estilosConfig.ts` (`BOTON_TEXTO`/`FILA_ACCION` deshabilitados en
+  `--tinta2`; `BOTON_CHICO` deshabilitado en «quieto» opaco: 2,83 y 2,27 → ≥ 4,5).
+* **7 · Registro.** `b13/capas.md` al día; `BurbujaAlta` (51→48, `CabeceraBurbuja`) y `MenuEngraneAgenda`
+  (51→≤ 48, `BotonOpciones`); CLAUDE.md («La configuración va en pestañas»); AG-DT-284 (`agenda-f-tableta:56`
+  depende de la hora), 285 y 286.
+* **8 (encargo del dueño) · Acuse de la burbuja de alta.** «Por correo» = el correo de Spinus
+  (`BotonCorreoCita`, nombre accesible «Enviar confirmación por correo»), sin cambios. El que decía «Invitar por
+  correo» era la invitación de Google (`alInvitar` → `ModalInvitacionCita`): ahora «Invitar con Google
+  Calendar» con la «G» de `GoogleGIcon`; sin Google conectado (`gcalSync: 'disconnected'`, dato que ya trae el
+  alta) se enseña deshabilitado con «Conecta Google Calendar para invitar.» visible y como descripción. El
+  diálogo que abre conserva su título. La burbuja de alta sólo existe en `esc` (en táctil se agenda con el
+  formulario).
