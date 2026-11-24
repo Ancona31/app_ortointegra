@@ -6598,6 +6598,9 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre { flex: none; font-size: 15px; line-height: 20px; color: var(--tinta); }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre > svg { display: inline; vertical-align: -1px; margin-right: 4px; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre--cancelada { color: var(--tinta2); }
+/* B13 · remate · la «G» de origen y las marcas (eslabón, expediente tachado) no se pegan al nombre. */
+.ag-listafila--v2 .ag-listafila-nombre > .ag-g-origen { display: inline-flex; vertical-align: -1px; margin-right: 4px; }
+.ag-listafila--v2 .ag-listafila-nombre > .ag-marcas { display: inline-flex; vertical-align: -1px; margin-left: 6px; gap: 4px; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-linea2 {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6819,7 +6822,12 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
    rejilla, y su caché de posiciones se queda con el alto de antes. Hacerlo bien
    pide declararlo antes del primer pintado o llamar a `updateSize()` al leer el
    interruptor (AG2). Hasta entonces la franja sigue en 36/42/48 por alto de
-   ventana. */
+   ventana.
+   B13 · remate (AG-DT-281): se probó lo segundo (`--ag-slot-h: calc(var(--cal-h) / 2)` sobre la raíz
+   encendida + `updateSize` al leer el interruptor). Las citas se pintan en su hora y el espejo del
+   arrastre a mano cae bien, pero `agenda-g2-turnos:169` cayó 30 min corto 5 de 5 y el arrastre con
+   pulsación larga de `agenda-f-tableta:116` no llegó al PUT 5 de 5: revertido (detalle en
+   `DEUDA_TECNICA.md`, AG-DT-281). */
 
 /* La tarjeta del calendario deja de envolver la barra: la barra y los avisos
    van sobre el fondo de la página y sólo la rejilla es tarjeta (`--sup`, sin
@@ -7874,6 +7882,15 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 .ag-modal-panel[data-form-v2] > div.border-t:last-child { background: var(--fondo); }
 :root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.border-b:first-child { padding: 16px 12px 8px 16px; gap: 10px; }
 :root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.border-t:last-child { padding: 12px; }
+/* La ✕ de la cabecera: 28 en computadora (`p-1`); con la v2, 36 en `ih`/`esc` (en táctil por debajo de
+   `md` ya mide 44). */
+@media (min-width: 768px) { .ag-modal-panel[data-form-v2] > div.border-b:first-child > button[aria-label="Cerrar"] { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; } }
+/* «Evento nuevo de Google, por asignar»: el texto y, debajo y a la izquierda, «¿No es una cita?» con su
+   explicación (antes centrado entre los dos); 44 en los táctiles. */
+.ag-form-paciente > div.flex-wrap { flex-direction: column; align-items: flex-start; }
+.ag-form-paciente > div.flex-wrap > span.inline-flex { align-items: flex-start; }
+.ag-form-paciente > div.flex-wrap > span.inline-flex > span { text-align: left; }
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="iv"]) .ag-form-paciente > div.flex-wrap button.h-9 { height: 44px; }
 /* `iv` (669, por debajo de `md`): la maqueta lo pinta como tarjeta de 520 centrada con velo, no a pantalla
    completa; mismo envoltorio que `ext` (el alto lo sigue mandando el `visualViewport`). La tarjeta no toca
    ningún borde físico, así que cabecera y pie no suman el área segura. */
@@ -7923,6 +7940,8 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 .ag-ligar-icono { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--enlace); background: var(--tonal); }
 .ag-ligar-pie { justify-content: flex-end; align-items: flex-start; }
 .ag-ligar-pie > :first-child:not(.ag-capa-boton) { margin-right: auto; }
+/* B13 · remate · «¿No es una cita?» (acción de texto del kit, 36) llega a 44 en los táctiles. */
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="iv"]) .ag-ligar-pie .k-b { min-height: 44px; }
 .ag-capa-acuse { display: flex; align-items: center; gap: var(--ag-2-5); }
 .ag-capa-acuse-icono {
   flex: none;

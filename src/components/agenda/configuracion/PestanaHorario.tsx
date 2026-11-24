@@ -79,8 +79,10 @@ function Lineas({ horario }: { horario: Horario }) {
 /** El rótulo de un grupo (icono fuera de la superficie) con sus etiquetas a la derecha. */
 function Rotulo({ icono, titulo, etiquetas }: { icono: ReactNode; titulo: string; etiquetas?: ReactNode }) {
   return (
-    <div className="flex min-h-[24px] items-center justify-between gap-[8px]">
-      <h3 className={`${ROTULO} pr-0`}>{icono}<span className="truncate">{titulo}</span></h3>
+    /* B13 · remate · `flex-wrap`: en `ext` (y la secretaria en `tel`) las etiquetas dejaban el nombre del
+       consultorio en «(»; ahora bajan a su propia línea y el nombre se lee entero. */
+    <div className="flex min-h-[24px] flex-wrap items-center justify-between gap-[8px]">
+      <h3 className={`${ROTULO} max-w-full pr-0`}>{icono}<span className="truncate">{titulo}</span></h3>
       {etiquetas && <span className="flex flex-none gap-[6px] pr-[16px] ih:pr-[20px] iv:pr-[20px] esc:pr-[20px]">{etiquetas}</span>}
     </div>
   )
