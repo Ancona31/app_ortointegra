@@ -84,6 +84,8 @@ export default function EncabezadoFundido(p: Props) {
       <p className="nav-titulo">{p.titulo}</p>
       <Pista entradas={p.entradas} masActivo={p.masActivo} masAbierto={p.masAbierto}
         pendientes={p.pendientes} alAbrirMas={p.alAbrirMas} />
+      {/* La campana de avisos de toda la app (`CampanaGlobal`, por portal). */}
+      <span data-ranura-campana="encabezado" className="contents" />
       <DibujoAvatar avatar={p.avatar} />
     </header>
   )

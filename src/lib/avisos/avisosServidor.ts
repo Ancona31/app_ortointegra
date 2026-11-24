@@ -1,6 +1,9 @@
 /**
  * src/lib/avisos/avisosServidor.ts — leer y marcar revisados los «Avisos» de
- * la clínica (tanda I, punto 19). SÓLO SERVIDOR.
+ * la clínica (tanda I, punto 19). Nació sólo de servidor; desde los avisos
+ * globales (2026-11-24) `leerAvisosClinica` la usa TAMBIÉN el navegador
+ * (`CampanaAvisos`), con su cliente de sesión: por eso no importa nada de
+ * servidor (ni `server-only`, ni cookies, ni `createAdminClient`). Que siga así.
  *
  * ⚠️ CLIENTE DE SESIÓN, NUNCA `createAdminClient()`: la RLS de
  * `avisos_clinica` sólo deja ver los de la clínica de la sesión y de citas que

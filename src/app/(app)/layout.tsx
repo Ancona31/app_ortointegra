@@ -21,6 +21,8 @@ import { AuthProvider } from '@/lib/auth-context'
 import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
 import { MenuMovilProvider } from '@/contexts/MenuMovilContext'
+import CampanaGlobal from '@/components/avisos/CampanaGlobal'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
 
 /**
  * La configuración de la app sembrada en el documento (A1.6): lo mismo que
@@ -117,9 +119,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      vacío como si fuera bueno. */
   /* La semilla de configuración va EN PARALELO con la suscripción: son
      independientes, y encadenadas el layout tardaría la suma. */
-  const [subscriptionState, configSembrada] = await Promise.all([
+  /* Avisos globales (2026-11-24): el interruptor de la agenda v2 decide si se
+     monta la campana de toda la app. Una consulta por PK, en paralelo, sin
+     viaje a Auth; FALLA CERRADO (`agendaV2Encendida`): sin fila, sin tabla o
+     con error, apagada, y la app es la de antes. Sólo corre en carga completa:
+     en navegación suave este layout no se vuelve a renderizar. */
+  const clinicaId = typeof profile?.clinica_id === 'string' ? profile.clinica_id : null
+  const [subscriptionState, configSembrada, avisosGlobales] = await Promise.all([
     getSubscriptionState(supabase, profile ?? undefined),
     sembrarConfig(sesion),
+    clinicaId ? agendaV2Encendida(supabase, clinicaId) : Promise.resolve(false),
   ])
 
   /* `null` = no se siembra y `useProfile` lo pide él, como antes de A1.2. */
@@ -198,6 +207,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
               <CommandPalette />
               <SessionGuard />
+              {/* La campana de avisos de toda la app: sólo con la agenda v2
+                  encendida. Fuera de `<main>`, como el gate: no se desmonta al
+                  navegar. En `/agenda` se calla sola (manda la de la agenda). */}
+              {avisosGlobales && <CampanaGlobal />}
               {/* El gate de perfil (Bloque B5). VA AQUÍ, fuera de `<main>` y de
                   `PageTransition`, con los demás elementos de alcance global:
                   así no se desmonta al navegar y no vuelve a pedir nada. Por

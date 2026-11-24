@@ -68,6 +68,8 @@ export default function RielNavegacion({ entradas, masActivo, masAbierto, pendie
             </Link>
           </li>
         ))}
+        {/* La campana de avisos de toda la app (`CampanaGlobal`, por portal). Vacío, no ocupa. */}
+        <li data-ranura-campana="riel" className="empty:hidden" />
         <li>
           <button type="button" onClick={alAbrirMas} aria-label={nombreBotonMas(pendientes)}
             aria-haspopup="dialog" aria-expanded={masAbierto}

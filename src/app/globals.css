@@ -2331,6 +2331,17 @@ body:has(.ag-banda-movil:not([data-barra-v2])) .nav-encabezado { display: none; 
   box-shadow: 0 0 0 2px var(--navy);
 }
 
+/* La campana de avisos de toda la app (`CampanaAvisos`, por portal a las ranuras
+   de la navegación). El número va en rojo, como el de la campana de la agenda,
+   para no confundirse con el ámbar de «datos pendientes». */
+.nav-campana { position: relative; }
+.nav-ranura-campana { display: contents; }
+:where([data-formato="tel"], [data-formato="iv"], [data-formato="ext"]) .nav-ranura-campana { display: none; }
+[data-plegada="true"] .nav-ranura-campana { display: none; }
+/* El título de la lista, alineado con sus filas (la cabecera de la campana va de borde a borde). */
+.ag-capa--avisos-global .ag-campana-cab { padding-left: 20px; }
+.nav-distintivo--avisos { background: var(--ag-status-cancelled-dot); color: #fff; font-size: 11px; }
+
 /* ── El riel (`ext`) ──────────────────────────────────────────────────────── */
 .nav-riel {
   display: none; position: fixed; top: 0; bottom: 0; right: 0; z-index: 40;

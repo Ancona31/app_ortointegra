@@ -235,6 +235,9 @@ function CabeceraBarra({ plan, planNombre, medico, alCerrar }: { plan?: string; 
         </svg>
         <span className="sb-etiqueta">Spinus</span>
       </span>
+      {/* La campana de avisos de toda la app: `CampanaGlobal` (layout de (app)) pinta aquí su botón por
+          portal. Sólo donde la `<aside>` es barra fija (`esc`, `ih`); en el cajón la esconde CSS. */}
+      <span data-ranura-campana="barra" className="nav-ranura-campana" />
       {plan === 'free' && medico
         ? <Link href="/pricing" prefetch={false} className="nav-plan sb-etiqueta">Actualizar</Link>
         : planNombre && <span className="nav-plan sb-etiqueta">{planNombre}</span>}

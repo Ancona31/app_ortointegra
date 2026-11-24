@@ -10,7 +10,9 @@
  *   · CONTROLADO (`datos` definido): la agenda le pasa los avisos que ya
  *     viajaron en la respuesta de «Por confirmar» y el gancho NO pide nada.
  *   · LIBRE (`datos` undefined): otra página; pide `GET /api/avisos` en tiempo
- *     ocioso al montarse y en cada `recargar()`.
+ *     ocioso al montarse y en cada `recargar()`. Con `pedir`, quien lo monta
+ *     pone su propia lectura (la campana global lee directo con la sesión del
+ *     navegador, bajo RLS: sin pasar por la ruta ni por Auth).
  *
  * Revisar es optimista: el aviso sale de la lista al pulsarlo y el PATCH va
  * detrás; si falla, vuelve en la siguiente recarga (la base es la verdad).
@@ -28,6 +30,8 @@ export interface OpcionesAvisos {
   datos?: RespuestaAvisos | null
   /** Tipos que lanzan aviso emergente al llegar (recientes, una vez por pestaña). */
   emergentes?: readonly TipoAviso[]
+  /** Modo libre: la lectura de quien lo monta, en vez de `GET /api/avisos`. Identidad estable (`useCallback`). */
+  pedir?: () => Promise<RespuestaAvisos | null>
 }
 
 export interface EstadoAvisos {
@@ -66,7 +70,7 @@ function sinRevisados(r: RespuestaAvisos | null, revisados: ReadonlySet<string>)
   return r ? r.avisos.filter(a => !revisados.has(a.id)) : null
 }
 
-export function useAvisosClinica({ datos, emergentes = [] }: OpcionesAvisos = {}): EstadoAvisos {
+export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos }: OpcionesAvisos = {}): EstadoAvisos {
   const controlado = datos !== undefined
   const [propios, setPropios] = useState<RespuestaAvisos | null>(null)
   const [revisados, setRevisados] = useState<ReadonlySet<string>>(() => new Set())
@@ -80,8 +84,8 @@ export function useAvisosClinica({ datos, emergentes = [] }: OpcionesAvisos = {}
 
   const recargar = useCallback((): void => {
     if (controlado) return
-    void pedirAvisos().then(r => { if (r) setPropios(r) })
-  }, [controlado])
+    void pedir().then(r => { if (r) setPropios(r) })
+  }, [controlado, pedir])
 
   useEffect(() => {
     if (controlado) return
