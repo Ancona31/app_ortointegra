@@ -22,7 +22,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import {
-  X, Calendar, Plus, Trash2, ChevronDown, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX, Ban,
+  X, Calendar, Plus, Trash2, ChevronDown, ChevronRight, FileText, Stethoscope, Loader2, Mail, CalendarPlus, CalendarX, Ban,
   Clock, List, CalendarDays, User, Users, MessageCircle,
   type LucideIcon,
 } from 'lucide-react'
@@ -1097,7 +1097,7 @@ export default function AppointmentModal({
               ? (isEdit ? 'Editar evento' : 'Nuevo evento')
               : (isEdit ? 'Editar cita'   : 'Nueva cita')}
           </h2>
-          {canVerExpediente && paciente && (
+          {!agendaV2 && canVerExpediente && paciente && (
             <Link
               href={`/expediente/${paciente.id}`}
               className="ml-auto flex items-center gap-1.5 px-3 py-1.5 max-md:py-3 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
@@ -1114,7 +1114,7 @@ export default function AppointmentModal({
               `flex-none` para que la fila del encabezado no se la coma cuando el
               título envuelve. */}
           <button onClick={onClose} aria-label="Cerrar"
-            className={`${canVerExpediente && paciente ? '' : 'ml-auto'} p-1 transition-opacity hover:opacity-70 max-md:p-3 max-md:flex-none`}
+            className={`${!agendaV2 && canVerExpediente && paciente ? '' : 'ml-auto'} p-1 transition-opacity hover:opacity-70 max-md:p-3 max-md:flex-none`}
             style={{ color: 'var(--ag-muted2)' }}>
             <X size={20} />
           </button>
@@ -1316,8 +1316,8 @@ export default function AppointmentModal({
               fila no lleva paciente. */}
           {agendaV2 && !esEvento && <h3 className="ag-form-grupo"><User size={14} aria-hidden="true" />Paciente</h3>}
           {!esEvento && (
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
+          <div className={agendaV2 ? 'ag-form-paciente' : undefined}>
+            <label className={agendaV2 ? 'sr-only' : 'block text-[11px] font-bold uppercase tracking-[.06em] mb-2'} style={{ color: 'var(--ag-muted2)' }}>
               Paciente <span className="text-red-500">*</span>
             </label>
             {paciente ? (
@@ -1463,6 +1463,34 @@ export default function AppointmentModal({
                 )}
               </div>
             )}
+            {/* B13 · remate (AG-DT-279, maqueta `ag-form`): con la v2, «Iniciar consulta» y «Expediente» son
+                FILAS del grupo Paciente (no van en la cabecera ni en el pie). Mismos nombres, destinos y
+                condiciones que los botones de siempre; con la v2 apagada siguen arriba y abajo. */}
+            {agendaV2 && paciente && canVerExpediente && (
+              <div className="ag-form-filas">
+                {showIniciarConsulta && (
+                  <Link href={`/expediente/${paciente.id}/nueva-nota${apt ? `?cita=${apt.id}` : ''}`}
+                    onClick={() => { cambiarActivo(citaConsultorio!); onClose() }}
+                    aria-label="Iniciar consulta" className="ag-form-fila">
+                    <Stethoscope size={18} aria-hidden="true" /><span className="ag-form-fila-texto">Iniciar consulta</span>
+                    <ChevronRight size={16} aria-hidden="true" className="ag-form-fila-chev" />
+                  </Link>
+                )}
+                <Link href={`/expediente/${paciente.id}`} className="ag-form-fila">
+                  <FileText size={18} aria-hidden="true" /><span className="ag-form-fila-texto">Expediente</span>
+                  <ChevronRight size={16} aria-hidden="true" className="ag-form-fila-chev" />
+                </Link>
+              </div>
+            )}
+            {showLigarYConsultar && !ligar && (
+              <div className="ag-form-filas">
+                <button type="button" onClick={abrirLigar} aria-label="Iniciar consulta" className="ag-form-fila">
+                  <Stethoscope size={18} aria-hidden="true" />
+                  <span className="ag-form-fila-texto">Iniciar consulta<small>Primero se liga a un paciente</small></span>
+                  <ChevronRight size={16} aria-hidden="true" className="ag-form-fila-chev" />
+                </button>
+              </div>
+            )}
           </div>
           )}
 
@@ -1552,7 +1580,9 @@ export default function AppointmentModal({
             ))}
           {/* B13 · AG6 (CALMA §29.9): los rótulos de grupo aprobados, sólo con la v2. */}
           {agendaV2 && <h3 className="ag-form-grupo"><Clock size={14} aria-hidden="true" />Fecha y hora</h3>}
-          <div className="grid grid-cols-2 gap-3">
+          {/* B13 · remate (AG-DT-279): con la v2, cada campo es una FILA con el rótulo a la izquierda y el
+              valor en píldora (`.ag-form-fechas`, `globals.css`); apagada, la rejilla de dos de siempre. */}
+          <div className={agendaV2 ? 'ag-form-fechas' : 'grid grid-cols-2 gap-3'}>
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-[.06em] mb-2" style={{ color: 'var(--ag-muted2)' }}>
                 {todoElDia ? 'Primer día' : 'Fecha de inicio'}
@@ -1906,16 +1936,9 @@ export default function AppointmentModal({
               {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
             </button>
           )}
-          {showLigarYConsultar && !ligar && (
-            <button type="button" onClick={abrirLigar}
-              aria-label="Iniciar consulta" title="Iniciar consulta: primero se liga a un paciente"
-              className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl text-sm font-bold hover:brightness-95 max-md:w-11 max-md:h-11 max-md:px-0 max-md:flex-none"
-              style={{ color: 'var(--ag-brand-legible)', background: 'var(--ag-modal-icon-bg)' }}>
-              <Stethoscope size={15} />
-              <span className="max-md:hidden">Iniciar consulta</span>
-            </button>
-          )}
-          {showIniciarConsulta && (
+          {/* D7 · «Iniciar consulta» de una cita por ligar: sólo existe con la v2 y va como fila del grupo
+              Paciente (B13 · remate, AG-DT-279). */}
+          {showIniciarConsulta && !agendaV2 && (
             <Link
               href={`/expediente/${paciente.id}/nueva-nota${apt ? `?cita=${apt.id}` : ''}`}
               onClick={() => {

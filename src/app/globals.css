@@ -7815,6 +7815,62 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 }
 :root[data-formato="ext"] .ag-modal-panel[data-form-v2] { max-width: 310px; height: auto; max-height: 100%; border-radius: 20px; }
 :root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.overflow-y-auto { padding: 4px 12px 16px; }
+/* B13 · remate (AG-DT-279, maqueta `ag-form` vista 1):
+   · Cabecera y pie sobre `--fondo` como el cuerpo, sin línea arriba; icono tonal de 32.
+   · Grupo Paciente: la ficha sin caja propia (avatar tonal de 36, nombre 15/600) y «Iniciar consulta» /
+     «Expediente» como filas de enlace con chevrón (`.ag-form-filas`), separadas por una línea.
+   · Fecha y hora: una fila por campo (`.ag-form-fechas`), rótulo a la izquierda y valor en píldora
+     `--sup2`; en `ext`/`tel` la píldora va a la derecha, en `ih`/`iv`/`esc` en la columna de 150. */
+.ag-modal-panel[data-form-v2] > div.border-b:first-child { background: var(--fondo); border-bottom-color: transparent !important; padding-bottom: 8px; }
+.ag-modal-panel[data-form-v2] > div.border-b:first-child > div:first-child { width: 32px; height: 32px; border-radius: 10px; background: var(--tonal) !important; }
+.ag-modal-panel[data-form-v2] > div.border-b:first-child > div:first-child svg { width: 18px; height: 18px; color: var(--enlace) !important; }
+.ag-modal-panel[data-form-v2] > div.border-t:last-child { background: var(--fondo); }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.border-b:first-child { padding: 16px 12px 8px 16px; gap: 10px; }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.border-t:last-child { padding: 12px; }
+/* `iv` (669, por debajo de `md`): la maqueta lo pinta como tarjeta de 520 centrada con velo, no a pantalla
+   completa; mismo envoltorio que `ext` (el alto lo sigue mandando el `visualViewport`). La tarjeta no toca
+   ningún borde físico, así que cabecera y pie no suman el área segura. */
+:root[data-formato="iv"] .fixed.inset-0:has(> .ag-modal-panel[data-form-v2]) {
+  padding: var(--capa-arr) calc(var(--capa-der) - var(--fijo-der)) var(--capa-abj) calc(var(--capa-izq) - var(--fijo-izq));
+}
+:root[data-formato="iv"] .ag-modal-panel[data-form-v2] { max-width: 520px; height: auto; max-height: 100%; border-radius: 20px; }
+:root[data-formato="iv"] .ag-modal-panel[data-form-v2] > div.border-b:first-child { padding-top: 18px; }
+:root[data-formato="iv"] .ag-modal-panel[data-form-v2] > div.border-t:last-child { padding-bottom: 14px !important; }
+.ag-form-paciente > div.rounded-xl.border { padding: 0 !important; background: transparent !important; border: 0 !important; border-radius: 0; }
+.ag-form-paciente > div.rounded-xl.border .rounded-full { width: 36px; height: 36px; background: var(--tonal) !important; }
+.ag-form-paciente > div.rounded-xl.border .rounded-full > span { font-size: 13px; color: var(--tonal-tinta) !important; }
+.ag-form-paciente > div.rounded-xl.border p.text-sm { font-size: 15px; line-height: 20px; }
+.ag-form-paciente > div.rounded-xl.border p.text-sm + p { font-size: 13px; color: var(--tinta2) !important; }
+.ag-form-filas { margin: 8px 0 -12px; }
+.ag-form-fila {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 6px 0;
+  font-size: 15px; line-height: 20px; font-weight: 600; text-align: left; color: var(--enlace); background: transparent; border: 0;
+  box-shadow: inset 0 1px 0 var(--linea);
+}
+.ag-form-filas:first-child > .ag-form-fila:first-child { box-shadow: none; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-form-fila { min-height: 44px; font-size: 14px; }
+.ag-form-fila > svg:first-child { flex: none; }
+.ag-form-fila-texto { flex: 1; min-width: 0; }
+.ag-form-fila-texto small { display: block; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--tinta2); }
+.ag-form-fila-chev { flex: none; color: var(--tinta2); }
+.ag-form-fila:hover .ag-form-fila-texto { text-decoration: underline; }
+.ag-form-fila:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; border-radius: 8px; }
+.ag-form-fechas { display: flex; flex-direction: column; }
+.ag-form-fechas > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 4px 0; }
+.ag-form-fechas > div + div { box-shadow: inset 0 1px 0 var(--linea); }
+.ag-modal-panel[data-form-v2] .ag-form-fechas > div > label.uppercase { margin: 0; font-size: 15px; line-height: 20px; color: var(--tinta) !important; }
+.ag-modal-panel[data-form-v2] .ag-form-fechas > div > input {
+  flex: none; justify-self: start; width: auto; min-height: 44px !important; padding: 4px 12px; border-radius: 10px; font-size: 16px; font-variant-numeric: tabular-nums;
+}
+/* `ext` (310): la píldora de fecha mide 151 a 15 px con 8 de relleno; cabe junto al rótulo a 14. */
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-fechas { padding-left: 12px; padding-right: 12px; }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] .ag-form-fechas > div { gap: 8px; }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] .ag-form-fechas > div > label.uppercase { font-size: 14px; }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] .ag-form-fechas > div > input { padding: 4px 8px; font-size: 15px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-form-fechas > div { display: grid; grid-template-columns: 150px auto; justify-content: start; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] .ag-form-fechas > div > label.uppercase { font-size: 14px; color: var(--tinta2) !important; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] .ag-form-fechas > div > input { min-height: 36px !important; font-size: 15px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-form-fechas > div { min-height: 48px; }
 
 /* B13 · AG7 · la ventana de ligar: el eslabón junto al título, y el pie con el principal a la derecha. */
 .ag-ligar-icono { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--enlace); background: var(--tonal); }
