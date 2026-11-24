@@ -55,15 +55,31 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
 * `PanelReagendar`: campos y botones del catálogo. `BurbujaAlta` y `ConvertirEnCita`: por la piel genérica.
 
 ## AG6 · formulario
-* `AppointmentModal` (sólo con la v2, `data-form-v2`): piel del catálogo por CSS (superficie `--sup`,
-  radio 20, rótulos 13/600 sin versalitas —antes 11 px—, campos `--sup2` 44/16), rótulos de grupo
-  «Fecha y hora» y «Detalles» (§29.9). Geometría del panel intacta.
+* `AppointmentModal` (sólo con la v2, `data-form-v2`; sin tocar la lógica):
+  * GRUPOS de la maqueta como tarjetas `--sup` de radio 16 sobre el cuerpo `--fondo`: cada rótulo
+    (`.ag-form-grupo`, 12/700 en versalitas `--enlace` con su icono: Paciente, Evento, Fecha y hora,
+    Detalles, Invitados, Avisar al paciente) abre la tarjeta que forman los bloques que le siguen (por
+    CSS: `.ag-form-grupo + *` y `:has(+ .ag-form-grupo)`), con línea entre bloques. «Fecha y hora» y
+    «Detalles» son los aprobados (§29.9); los otros cuatro son de la maqueta.
+  * La «Duración» se movió (bloque entero, sin cambios) de detrás del «Tipo de cita» a delante: en la
+    maqueta es de «Fecha y hora».
+  * Rótulos 13 `--tinta2` (antes 11 en versalitas); campos y fichas `--sup2` sin borde, 44/16 en táctil y
+    40/15 (fichas 36) en `ih`/`esc`; todo texto de 10–11 px del cuerpo sube a 12.
+  * La destructiva («Cancelar cita» / «Eliminar evento» / «Eliminar cita») baja a una FILA ROJA al final del
+    cuerpo (`.ag-form-peligro`) que abre su alerta; el icono del pie queda sólo con la v2 apagada.
+  * Pie: «Cancelar» quieto y «Guardar» primario, 44 (40 en `ih`/`esc`), mínimo 104.
+  * Capa: tarjeta de 520 en `ih`/`iv`/`esc`, de 310 centrada en `ext` (antes pantalla completa), pantalla
+    completa en `tel` (la de siempre por debajo de `md`).
+  * «Enviar confirmación», «… por correo» (`BotonWhatsAppCita`, `BotonCorreoCita`) y «Agregar invitados»
+    como filas de enlace; el rótulo repetido de dentro se quitó («Avisar al paciente») o quedó sólo para el
+    lector («Invitados»). `BloqueReservaPorLigar` y los recordatorios entran por la piel común (12 mínimo).
 * Cancelar o eliminar desde el pie PIDE CONFIRMACIÓN (§29.2) con «Volver» al cancelar; el texto es el de
   la burbuja (`textoDeConfirmacion`); para una cita sin paciente que se elimina, «¿Eliminar la cita
   «título»? No se puede deshacer.» (texto nuevo: no había alerta). Las alertas de la X del paciente, de
   horario y de empalme llevan su verbo.
-* `ModalBloqueo`: piezas del catálogo y «Quitar bloqueo» con la alerta («¿Quitar el bloqueo de horario?
-  Se vuelve a poder agendar en ese periodo.», texto nuevo; antes «Quitar bloqueo» → «Sí, quitar» en línea).
+* `ModalBloqueo`: tarjeta 440 (310 en `ext`), rótulos y campos del catálogo, pie «Cancelar» · «Guardar»;
+  «Quitar bloqueo» (texto rojo) se convierte en su sitio en el botón rojo «Sí, quitar», como la maqueta y
+  como hoy (en la primera entrega lo había pasado a una alerta con texto nuevo: se deshizo).
 * `ModalInvitacionCita`: «No invitar» / «Invitar» (antes «No invitar a nadie» / «Enviar invitación»).
   Va también con la v2 apagada: el modal no sabe del interruptor y `AgendaCliente` no es de esta línea.
 
@@ -76,8 +92,15 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
   «Se agendó por enlace»); pruebas `origenGoogle`, `marcasProcedencia`, `agenda-k5-marcas`, `reserva-google`.
 * `BotonNoEsCita`: la explicación se ve bajo el botón y lo describe (`aria-describedby`; §29.7).
 
+## AG5 (segunda vuelta) · la burbuja de alta
+* `BurbujaAlta` (y las capas de `HerramientasV2`: buscador, «Ir a una fecha») sólo se anclan en `esc`; en
+  `ext`/`ih`/`iv` van centradas con velo y en `tel` como hoja (`.ag-capa-barra` + `.ag-capa-barra-velo`).
+  La guarda de formato va en las TRES copias de `colocar` (AG-DT-38).
+
 ## AG8 · herramientas
 * `BuscadorCitas`: «Sin coincidencias.» cuando la búsqueda vuelve vacía (§29.8).
+* Engrane: todas las filas con icono (la leyenda, `Info`). La leyenda ya se abre desde el engrane: retirar el
+  botón de la barra no pierde la función.
 * Campana, «Por confirmar», avisos y engrane con los tokens del kit (pestañas de borde a borde, botones
   de 44/40 en `--sup2`, filas del menú de 44; 38 anclado en `esc`).
 
@@ -100,19 +123,22 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
 ## Diferencias con las maquetas (pendientes, sabidas)
 * La cabecera de la burbuja conserva el lápiz (§29.5 y el brief) además de la fila «Editar» (la ficha de
   la maqueta lo quitaba); así no se pierde ningún localizador ni regla de CLAUDE.md.
-* `BurbujaAlta` sigue anclada en `ih`/`iv` (la maqueta: tarjeta centrada con velo). Pendiente.
 * La hoja de la burbuja en `tel` limita su alto al 80 % de lo visible (como antes), no a «pantalla −
   barra de estado − 16».
-* AG6: el formulario no se rehízo pieza a pieza (recordatorios, `BloqueReservaPorLigar`, botones de
-  WhatsApp/correo quedan con su CSS de siempre dentro de la piel nueva); no es pantalla completa en `tel`
-  distinta de la de hoy (ya lo era por debajo de `md`).
-* AG8 NO hecho: la barra por formato de PIEZAS §4 (título grande en `esc`; «···» y píldora flotante en
-  teléfono), «Huecos disponibles» en `ih`/`iv` desde las opciones, iconos en todas las filas del engrane.
-  «Plegar menú» ya existía (B4) y no se tocó.
+* AG6: las filas del formulario siguen con el rótulo ENCIMA del campo en todos los formatos (la maqueta
+  pone en `ih`/`esc` el rótulo a la izquierda en una columna de 150 y fechas/horas como píldoras en línea):
+  hacerlo pide reescribir el marcado de cada campo de un archivo de 2 000 líneas. «Iniciar consulta» y
+  «Expediente» siguen en la cabecera y el pie (la maqueta los pone como filas del grupo Paciente). En `tel`
+  el formulario es pantalla completa (encargo), no la hoja arrastrable de la ficha.
+* AG8: «Huecos disponibles» en `ih`/`iv` NO hecho: la opción del engrane necesita los huecos y el médico
+  elegido, que viven en `AgendaCliente` (línea de vistas); pide una prop nueva a `MenuEngraneAgenda`.
+  La barra por formato de PIEZAS §4, aplazada por el coordinador. «Plegar menú» ya existía (B4).
 
 ## Peticiones a otras líneas
 * **VISTAS (`AgendaCliente.tsx:1822`)**: quitar `leyenda={…BotonLeyendaAgenda…}` de la barra (§28: la
   leyenda sale de la barra y se abre desde las opciones). Al hacerlo, actualizar `ranurasCabecera.test.tsx`
   y las e2e que pulsan el botón «Leyenda de estados» de la barra (`agenda-i5-barra-avisos`, `-k5-marcas`).
+* **VISTAS**: para «Huecos disponibles» en `ih`/`iv` (§28), pasar a `MenuEngraneAgenda` los huecos del día
+  (lo que pinta `CardHuecos`) cuando la vista es Día y hay médico elegido; la capa la pongo yo.
 * **CONFIGURACIÓN (AG9)**: sus `ConfirmModal` no pasan `verbo` y siguen con «Aceptar»; si se quieren con
   la alerta del catálogo, basta pasar `verbo` (y `secundario`/`icono`).

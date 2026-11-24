@@ -68,14 +68,26 @@ function cajaDe(el: Element): Caja {
    desplegable abierto lo cierre y no lo cierre y lo vuelva a abrir. Un arreglo
    en una se aplica a las tres (CLAUDE.md, protocolo 4: sacarlas a un gancho
    compartido pide el visto bueno de Angel). */
+/**
+ * B13 · AG5/AG8 · Fuera de computadora la capa la centra (o la apoya abajo, en `tel`) el CSS; aquí sólo
+ * se la sube a la parte VISIBLE cuando el teclado en pantalla encoge `visualViewport` (T1). Sin
+ * teclado, nada en línea. COPIA DELIBERADA en las tres copias de `colocar` (AG-DT-38).
+ */
+function colocarSinAncla(nodo: HTMLElement, formato: string): void {
+  const vv = window.visualViewport
+  const abajo = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0
+  nodo.style.left = ''
+  nodo.style.transformOrigin = ''
+  nodo.style.top = vv && abajo > 0 && formato !== 'tel' ? `${Math.round(vv.offsetTop) + 8}px` : ''
+  nodo.style.bottom = vv && abajo > 0 ? `${abajo + (formato === 'tel' ? 0 : 8)}px` : ''
+  nodo.style.maxHeight = vv && abajo > 0 ? `${Math.floor(vv.height) - 16}px` : ''
+}
+
 function colocar(nodo: HTMLElement, ancla: Caja): void {
   /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
      es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
   const formato = document.documentElement.dataset.formato
-  if (formato !== undefined && formato !== 'esc') {
-    for (const k of ['left', 'top', 'maxHeight', 'transformOrigin'] as const) nodo.style[k] = ''
-    return
-  }
+  if (formato !== undefined && formato !== 'esc') { colocarSinAncla(nodo, formato); return }
   /* T1: el arreglo de las otras dos copias (alto natural, parte visible de la
      ventana, `max-height`). El desplegable no cambia de alto: no se sigue. */
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
