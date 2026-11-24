@@ -6,7 +6,7 @@ import { canManageClinica } from '@/lib/permissions'
 /**
  * POST /api/admin/paciente/[id]/anonimizar — Derecho de Cancelación (ARCO)
  *
- * LFPDPPP Art. 33: El titular puede solicitar la cancelación de sus datos.
+ * LFPDPPP vigente (DOF 20/03/2025): El titular puede solicitar la cancelación de sus datos.
  * En datos de salud, no se borran físicamente (NOM-004 exige retención
  * de 5 años). En su lugar, se anonimizan: el nombre se reemplaza por un
  * identificador genérico, y se borran email, teléfono y dirección.

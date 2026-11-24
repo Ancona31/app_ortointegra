@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { MENSAJE_ACEPTA_LEGAL } from '@/lib/perfil/schemas'
 import { Loader2, Eye, EyeOff, CheckCircle, RefreshCw } from 'lucide-react'
 
 /**
@@ -87,6 +88,10 @@ export default function RegisterPage() {
     email:    '',
     password: '',
   })
+  /* Privacidad 2026-12: sin esta casilla no se crea la cuenta, ni con correo
+     ni con Google. Nace desmarcada; el servidor la vuelve a exigir
+     (`RegistroSchema.acepta_legal`). */
+  const [aceptaLegal, setAceptaLegal] = useState(false)
 
   function set(field: keyof typeof form) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -103,6 +108,7 @@ export default function RegisterPage() {
      (`window.location.assign`), devolviendo `error: null` siempre. El razonamiento
      completo está junto al handler gemelo de `login/page.tsx`. */
   async function entrarConGoogle() {
+    if (!aceptaLegal) { setError(MENSAJE_ACEPTA_LEGAL); return }
     const supabase = createClient()
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -118,6 +124,7 @@ export default function RegisterPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!aceptaLegal) { setError(MENSAJE_ACEPTA_LEGAL); return }
     enviar(false)
   }
 
@@ -131,7 +138,7 @@ export default function RegisterPage() {
     const res = await fetch('/api/auth/registro', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ...form, aviso_visto: avisoVisto }),
+      body:    JSON.stringify({ ...form, acepta_legal: aceptaLegal, aviso_visto: avisoVisto }),
     })
 
     const data = await res.json()
@@ -308,8 +315,22 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Aceptación del aviso y de los términos (privacidad 2026-12). Los
+                enlaces abren en otra pestaña para no perder lo escrito. */}
+            <label className="flex items-start gap-2.5 text-xs text-slate-600 leading-relaxed cursor-pointer">
+              <input type="checkbox" name="acepta_legal" required checked={aceptaLegal}
+                onChange={e => setAceptaLegal(e.target.checked)}
+                className="mt-0.5 h-4 w-4 flex-none accent-[#1e5fa8]" />
+              <span>
+                Leí y acepto el{' '}
+                <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-medium text-[#1e5fa8] hover:underline">Aviso de privacidad</a>
+                {' '}y los{' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-[#1e5fa8] hover:underline">Términos y Condiciones</a>.
+              </span>
+            </label>
+
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div role="alert" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}

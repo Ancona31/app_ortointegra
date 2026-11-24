@@ -1,5 +1,5 @@
 /**
- * Logger seguro para producción — LFPDPPP Art. 19
+ * Logger seguro para producción — LFPDPPP vigente (DOF 20/03/2025): deber de seguridad
  *
  * En desarrollo: imprime todo para debugging.
  * En producción: solo warnings y errors, sin datos sensibles.

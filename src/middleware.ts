@@ -184,7 +184,15 @@ export async function middleware(request: NextRequest) {
   }
 
   const isLoginPage = pathname === '/login'
-  /* ⚠️ `/privacidad` Y `/privacy` SON LA MISMA PÁGINA Y LAS DOS TIENEN QUE ESTAR.
+  /* ⚠️ ACTUALIZACIÓN (privacidad 2026-12): el aviso ya tiene UNA sola ruta,
+     `/privacidad`; `/privacy` quedó como redirección hacia ella
+     (`app/privacy/page.tsx`). LAS DOS SIGUEN EN LA LISTA Y TIENEN QUE SEGUIR:
+     los enlaces viejos a `/privacy` (pie de la landing, login, ayuda, correos)
+     llegan sin sesión, y sin esta entrada el middleware los mandaría a /login
+     antes de que la página pudiera redirigir. Lo que sigue es la historia de
+     por qué había dos, y sigue valiendo como advertencia.
+
+     ⚠️ `/privacidad` Y `/privacy` SON LA MISMA PÁGINA Y LAS DOS TIENEN QUE ESTAR.
      No es redundancia: existen las dos rutas —`app/privacidad/page.tsx` y
      `app/privacy/page.tsx`, las dos devuelven `<AvisoPrivacidadContent />`— y los
      enlaces del proyecto están repartidos entre ambas. Hacia dentro se usa

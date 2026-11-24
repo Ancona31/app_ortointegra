@@ -1,7 +1,9 @@
 /**
  * Almacenamiento seguro en localStorage con cifrado AES-GCM.
  *
- * FUNDAMENTO LEGAL — LFPDPPP Art. 19:
+ * FUNDAMENTO LEGAL — LFPDPPP vigente (DOF 20/03/2025): el deber de
+ * seguridad. La cita que sigue es la redacción del art. 19 de la ley de 2010
+ * (abrogada), que decía lo mismo; no es el texto literal vigente:
  * "El responsable deberá establecer y mantener medidas de seguridad
  * administrativas, técnicas y físicas que permitan proteger los datos
  * personales contra daño, pérdida, alteración, destrucción o el uso,
