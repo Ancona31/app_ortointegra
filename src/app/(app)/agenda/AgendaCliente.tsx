@@ -1258,8 +1258,12 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
                          otro sitio, y entonces nadie se acordaría de venir aquí.
      `periodoVacio` vacío apaga la banda en Día y en las dos listas; ver
      `periodoDeLaVista`. */
+  /* B13 · remate · `!cargando`: al navegar a una semana que no estaba en la caché, el conteo de la vista
+     nueva es 0 hasta que llegan sus citas, y la banda salía y se iba en cuanto llegaban, moviendo la
+     rejilla ~38 px durante su salida (`agenda-g2-turnos` 169 y 199 agarraban la cita en el sitio de
+     antes y abrían la burbuja de alta). El cero sólo se afirma con la traída de ESE rango terminada. */
   const vacioReal =
-    huboTraida && !errorCitas && !googleFallo && !googlePendiente && !citasIncompletas &&
+    huboTraida && !cargando && !errorCitas && !googleFallo && !googlePendiente && !citasIncompletas &&
     conteo.citas === 0 && conteo.eventos === 0 && conteo.google === 0 &&
     periodoVacio !== ''
 
