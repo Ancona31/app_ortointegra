@@ -16,12 +16,18 @@ import { aprobarAviso, emitirEnlace } from './reservaPublicaAyudas'
  *
  * Tanda M (M2): en computadora la escala es la del punto 2 (h1 18, controles de 40 px; ver
  * `agenda-m2-configuracion`), y la leyenda dice «Solo el médico administrador…» y va donde dice el punto 15.
+ *
+ * B13 · AG9 (rediseño): la escala ya no es la de la reserva sino la DEL KIT (`sistema.css`: 12, 13, 14, 15, 16,
+ * 17, 20, 26 y 32; nada por debajo de 12), el título de la página es el de pantalla del kit (26 en el teléfono,
+ * 32 en computadora) y el toque va por formato: 44 en táctil y 36 en computadora (`--k-toque`).
  */
 
 const RUTA = '/agenda/configuracion'
 const LEYENDA = 'Solo el médico administrador puede cambiar estas opciones.'
 /** Los tamaños de letra de `agendaPublica.css` que usa la configuración (ver `notas_l3.md`, escala). */
-const ESCALA = [11, 13, 13.5, 14, 15, 16, 18, 20]
+const ESCALA = [12, 13, 14, 15, 16, 17, 20, 26, 32]
+/** El h1 de pantalla del kit (`.k-t-pantalla`): 26 en el teléfono, 32 en computadora. */
+const H1 = (proyecto: string): number => (proyecto === 'telefono' ? 26 : 32)
 const PESTANAS_MEDICO = ['Tu enlace', 'Cuándo das consulta', 'Tu consulta', 'Avisos', 'Más opciones']
 const PESTANAS_SECRETARIA = ['Enlaces', 'Cuándo dan consulta', 'Tipos de cita', 'Avisos', 'Más opciones']
 const CL = `(select id from public.clinicas where nombre = 'Clínica Semilla A')`
@@ -42,7 +48,7 @@ interface Medida { fuera: string[]; chicos: string[]; h1: number | null }
  */
 async function medir(page: Page, proyecto: string): Promise<Medida> {
   // Tanda M (punto 2): en computadora los controles miden 40 y el interruptor toca 5 px por encima y por debajo.
-  const [minimo, margen] = proyecto === 'telefono' ? [43.5, 6] : [39.5, 4] as const
+  const [minimo, margen] = proyecto === 'telefono' ? [43.5, 6] : [35.5, 4] as const
   // Que termine la entrada del paso o de la pestaña: a media animación las cajas aún están escaladas.
   await page.evaluate(() => Promise.all(document.getAnimations()
     .filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => undefined))))
@@ -83,8 +89,8 @@ async function medirTodo(page: Page, pestanas: readonly string[], proyecto: stri
     if (await plegado.count()) await plegado.first().click()
     const m = await medir(page, proyecto)
     expect(m.fuera, `${nombre}: letra fuera de la escala`).toEqual([])
-    expect(m.chicos, `${nombre}: áreas de toque de menos de 44 px (40 en computadora)`).toEqual([])
-    expect(m.h1, `${nombre}: el título de la página`).toBe(18)
+    expect(m.chicos, `${nombre}: áreas de toque de menos de 44 px (36 en computadora)`).toEqual([])
+    expect(m.h1, `${nombre}: el título de la página`).toBe(H1(proyecto))
   }
 }
 
@@ -101,7 +107,7 @@ async function funnelEn(page: Page, paso: number): Promise<void> {
 test.describe('el administrador', () => {
   test.use({ storageState: SESION.adminA })
 
-  test('12 · las cinco pestañas en la escala de la reserva, con áreas de 44 px (40 en computadora)', async ({ page }, info) => {
+  test('12 · las cinco pestañas en la escala del kit, con áreas de 44 px (36 en computadora)', async ({ page }, info) => {
     limpiezas.push(sinPendientesAgenda(CORREO.adminA))
     await medirTodo(page, PESTANAS_MEDICO, info.project.name)
   })
@@ -126,13 +132,13 @@ test.describe('el administrador', () => {
 test.describe('la invitada', () => {
   test.use({ storageState: SESION.medicoA })
 
-  test('12 · las pestañas y los pasos del funnel en la escala de la reserva', async ({ page }, info) => {
+  test('12 · las pestañas y los pasos del funnel en la escala del kit', async ({ page }, info) => {
     for (const paso of [1, 2, 3]) {
       await funnelEn(page, paso)
       const m = await medir(page, info.project.name)
       expect(m.fuera, `paso ${paso}`).toEqual([])
       expect(m.chicos, `paso ${paso}`).toEqual([])
-      expect(m.h1, `paso ${paso}`).toBe(18)
+      expect(m.h1, `paso ${paso}`).toBe(H1(info.project.name))
     }
     await page.evaluate(() => window.localStorage.clear())
     limpiezas.push(sinPendientesAgenda(CORREO.medicoA))
@@ -173,7 +179,7 @@ async function leyendaEnPestanas(page: Page, horario: string, enLaTarjeta: boole
 test.describe('la secretaria', () => {
   test.use({ storageState: SESION.secretariaA })
 
-  test('17 · las mismas cinco pestañas, en la escala de la reserva y sin fichas de 32/36 px', async ({ page }, info) => {
+  test('17 · las mismas cinco pestañas, en la escala del kit y sin fichas de menos de 44 px (36 en computadora)', async ({ page }, info) => {
     limpiezas.push(sinPendientesAgenda(CORREO.medicoA))
     await medirTodo(page, PESTANAS_SECRETARIA, info.project.name)
   })

@@ -109,8 +109,9 @@ test('5 · sin nada pendiente: pestañas con su rol, abre en la primera, flechas
   }
 })
 
-/* K3 (punto 13): en el teléfono las pestañas son iconos y CABEN: ya no se desplazan de lado (detalle en agenda-k3-configuracion). */
-test('5 · en el teléfono la fila de pestañas cabe en una sola fila, sin desplazarse ni envolver', async ({ browser }) => {
+/* B13 · AG9 (maqueta `ag-config`; sustituye a los iconos de K3): en el teléfono las pestañas son TEXTO en UNA fila que
+   se desliza de lado (detalle en agenda-k3-configuracion); la página no se desborda. */
+test('5 · en el teléfono las pestañas van en una sola fila que se desliza, sin envolver ni desbordar la página', async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: SESION.adminA, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
     locale: 'es-MX', timezoneId: 'America/Merida' })
   const deshacer = adminSinPendientes()
@@ -124,7 +125,7 @@ test('5 · en el teléfono la fila de pestañas cabe en una sola fila, sin despl
       filas: new Set(Array.from(el.children).map(c => Math.round(c.getBoundingClientRect().top))).size,
       pagina: document.documentElement.scrollWidth <= window.innerWidth + 1,
     }))
-    expect(m).toEqual({ desborda: false, overflow: 'auto', filas: 1, pagina: true })
+    expect(m).toEqual({ desborda: true, overflow: 'auto', filas: 1, pagina: true })
     // Elegir la última la trae a la vista.
     await lista.getByRole('tab', { name: 'Más opciones' }).click()
     await expect(lista.getByRole('tab', { name: 'Más opciones' })).toBeInViewport()
@@ -164,18 +165,15 @@ test('6 · el administrador ve primero el suyo; los de los invitados, plegados h
 
 /* ── Punto 7 · botones en reposo ────────────────────────────────────── */
 
-/* J5 (sección F): la maqueta dibuja como TEXTO azul o rojo algunos botones. Ésos se aceptan sin borde
-   sólo si su nombre está en esta lista y su letra se lee (≥ 4,5:1); cualquier otro botón sin borde
-   sigue siendo un fallo. Las pestañas son subrayadas (maqueta) y los interruptores, una pista rellena o con borde
-   (≥ 3:1 contra el fondo, WCAG 1.4.11). */
-/* Integración L: «Copiar el enlace de …» es el botón de texto de cada enlace de una vez de «Tu enlace» (J5,
-   `PestanaEnlace`, `BOTON_TEXTO`). Faltaba aquí y la prueba caía en cuanto el administrador tenía uno vigente. */
-const BOTONES_DE_TEXTO = /^(Cambiar|Otra duración|Editar .+|Quitar .+|Reactivar .+|Agregar tipo de cita|Apagar el enlace de .+|Copiar el enlace de .+|Desbloquear a .+|Enlaces de los demás médicos \(\d+\)|Personas bloqueadas.*|Empezar de nuevo.*|Cancelar|Guardar)$/
+/* B13 · AG9 (rediseño; sustituye a la regla de la tanda H, «borde y fondo en reposo», y a su lista de botones de
+   texto de J5): los botones son los CUATRO NIVELES DEL KIT (CALMA §2, maqueta `ag-config`) —relleno de acción,
+   tonal, quieto (`--sup2`) y TEXTO en `--enlace`, el nivel por defecto—, ninguno con borde. Lo que se exige ahora
+   a cada botón visible es que su NOMBRE SE LEA: letra ≥ 4,5:1 contra su propio relleno o, si no tiene, contra lo
+   que lo rodea. Los interruptores, una pista rellena o con borde (≥ 3:1 contra el fondo, WCAG 1.4.11). */
 
-/** Cada botón VISIBLE de la pantalla: borde ≥ 1 px con ≥ 3:1 contra el fondo que lo rodea, y fondo propio
-    (o, si es de texto, su nombre y su contraste; ver arriba). */
+/** Cada botón VISIBLE de la pantalla: su letra se lee (≥ 4,5:1); un interruptor, su pista se distingue (≥ 3:1). */
 async function botonesEnReposo(page: Page): Promise<string[]> {
-  const { malos, deTexto } = await page.evaluate(() => {
+  return page.evaluate(() => {
     // `color-mix()` se serializa como `color(srgb r g b)` con canales de 0 a 1, no `rgb()` de 0 a 255.
     const rgb = (c: string) => { const v = (c.match(/[\d.]+/g) ?? []).map(Number); return c.startsWith('color(srgb') ? v.map((x, i) => (i < 3 ? x * 255 : x)) : v }
     const lum = ([r = 0, g = 0, b = 0]: number[]) => {
@@ -189,33 +187,24 @@ async function botonesEnReposo(page: Page): Promise<string[]> {
       return 'rgb(255, 255, 255)'
     }
     const malos: string[] = []
-    const deTexto: string[] = []
     const main = document.querySelector('main') ?? document.body
-    for (const b of Array.from(main.querySelectorAll<HTMLElement>('button, a[class*="h-9"], a[class*="h-8"]'))) {
+    for (const b of Array.from(main.querySelectorAll<HTMLElement>('button, a.k-b'))) {
       if (b.offsetParent === null || b.closest('[role="dialog"], [role="alertdialog"]') || b.getAttribute('role') === 'tab') continue
       const cs = getComputedStyle(b)
       const alrededor = fondo(b.parentElement)
       const nombre = (b.getAttribute('aria-label') ?? b.textContent ?? '').trim().slice(0, 40)
       if (b.getAttribute('role') === 'switch') {
-        // La pista se distingue por su relleno o por su borde (como el resto de botones).
+        // La pista se distingue por su relleno o por su borde.
         const borde = parseFloat(cs.borderTopWidth) >= 1 ? contraste(cs.borderTopColor, alrededor) : 0
         if (contraste(cs.backgroundColor, alrededor) < 3 && borde < 3) malos.push(`${nombre}: pista ${contraste(cs.backgroundColor, alrededor).toFixed(2)}:1`)
         continue
       }
-      if (parseFloat(cs.borderTopWidth) < 1 && !opaco(cs.backgroundColor)) {
-        deTexto.push(nombre)
-        if (contraste(cs.color, alrededor) < 4.5) malos.push(`${nombre}: letra ${contraste(cs.color, alrededor).toFixed(2)}:1`)
-        continue
-      }
-      if (parseFloat(cs.borderTopWidth) < 1) { if (!opaco(cs.backgroundColor) || contraste(cs.backgroundColor, alrededor) < 3) malos.push(`${nombre}: sin borde`) }
-      else if (contraste(cs.borderTopColor, alrededor) < 3 && contraste(cs.backgroundColor, alrededor) < 3) {
-        malos.push(`${nombre}: borde ${contraste(cs.borderTopColor, alrededor).toFixed(2)}:1`)
-      }
-      if (!opaco(cs.backgroundColor)) malos.push(`${nombre}: sin fondo`)
+      if (b.hasAttribute('disabled')) continue
+      const tras = opaco(cs.backgroundColor) ? cs.backgroundColor : alrededor
+      if (contraste(cs.color, tras) < 4.5) malos.push(`${nombre}: letra ${contraste(cs.color, tras).toFixed(2)}:1`)
     }
-    return { malos, deTexto }
+    return malos
   })
-  return [...malos, ...deTexto.filter(n => !BOTONES_DE_TEXTO.test(n)).map(n => `${n}: sin borde (no es de los de texto de la maqueta)`)]
 }
 
 async function revisarTodasLasPestanas(p: Page): Promise<string[]> {
@@ -241,7 +230,7 @@ async function enTema(browser: Browser, oscuro: boolean, sesion: string, fn: (p:
 }
 
 for (const oscuro of [false, true]) {
-  test(`7 · todos los botones se ven como botones en reposo (${oscuro ? 'oscuro' : 'claro'}), administrador e invitada`, async ({ browser }) => {
+  test(`7 · todos los botones (los cuatro niveles del kit) se leen en reposo (${oscuro ? 'oscuro' : 'claro'}), administrador e invitada`, async ({ browser }) => {
     for (const [sesion, correo] of [[SESION.adminA, CORREO.adminA], [SESION.medicoA, CORREO.medicoA]] as const) {
       const deshacer = sinPendientesAgenda(correo)
       try {

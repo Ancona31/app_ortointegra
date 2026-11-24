@@ -13,15 +13,15 @@
  * Pestañas con el patrón de la APG (flechas, Inicio, Fin). Todos los paneles
  * se montan y sólo se ve el elegido: lo escrito no se pierde al cambiar.
  *
- * K3 (punto 13 de Angel): en el teléfono (< `sm`) cada pestaña es un icono de
- * `lucide-react` (la librería de la app) y las cinco reparten el ancho, sin
- * desplazamiento lateral; debajo, el nombre de la elegida como título. En
- * computadora, el texto de siempre. El nombre accesible es SIEMPRE el texto
- * (`aria-label`), así que las pruebas y el lector de pantalla no cambian.
+ * B13 · AG9 (rediseño, maqueta `ag-config`; sustituye a los iconos del teléfono de K3, punto 13): las pestañas
+ * son SIEMPRE texto, las del kit (`.k-tabs`/`.k-tab`: 14, 600 la elegida, subrayado de `--accion`); en el
+ * teléfono van en una pista que se desliza con el borde fundido (`.agc-tabs`, `globals.css`) y la elegida se
+ * trae a la vista. El nombre accesible sigue siendo el texto (`aria-label`). La página es una columna de 680
+ * centrada en computadora (600 en el Duo abierto en vertical), sobre el fondo, sin tarjeta que la envuelva.
  */
 import Link from 'next/link'
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Bell, CalendarClock, ChevronLeft, Ellipsis, Link2, Stethoscope, type LucideIcon } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import AvisoGuardado, { type EstadoAviso } from '@/components/agenda/configuracion/AvisoGuardado'
 import BloquesAvisos from '@/components/agenda/configuracion/BloquesAvisos'
 import PestanaConsulta from '@/components/agenda/configuracion/PestanaConsulta'
@@ -62,12 +62,12 @@ export interface DatosPestanas {
 
 type Clave = 'enlace' | 'horario' | 'consulta' | 'avisos' | 'mas'
 
-const PESTANAS: readonly { clave: Clave; texto: string; textoSinMedico?: string; icono: LucideIcon }[] = [
-  { clave: 'enlace', texto: 'Tu enlace', textoSinMedico: 'Enlaces', icono: Link2 },
-  { clave: 'horario', texto: 'Cuándo das consulta', textoSinMedico: 'Cuándo dan consulta', icono: CalendarClock },
-  { clave: 'consulta', texto: 'Tu consulta', textoSinMedico: 'Tipos de cita', icono: Stethoscope },
-  { clave: 'avisos', texto: 'Avisos', icono: Bell },
-  { clave: 'mas', texto: 'Más opciones', icono: Ellipsis },
+const PESTANAS: readonly { clave: Clave; texto: string; textoSinMedico?: string }[] = [
+  { clave: 'enlace', texto: 'Tu enlace', textoSinMedico: 'Enlaces' },
+  { clave: 'horario', texto: 'Cuándo das consulta', textoSinMedico: 'Cuándo dan consulta' },
+  { clave: 'consulta', texto: 'Tu consulta', textoSinMedico: 'Tipos de cita' },
+  { clave: 'avisos', texto: 'Avisos' },
+  { clave: 'mas', texto: 'Más opciones' },
 ]
 
 const nombreDe = (p: (typeof PESTANAS)[number], esMedico: boolean): string => (esMedico ? p.texto : p.textoSinMedico ?? p.texto)
@@ -88,19 +88,15 @@ function Pestanas({ activa, elegir, esMedico }: { activa: Clave; elegir: (c: Cla
     lista.current?.querySelector<HTMLElement>(`#config-tab-${destino.clave}`)?.focus()
   }
   return (
-    <div ref={lista} role="tablist" aria-label="Secciones de la configuración" onKeyDown={alTeclear}
-      className="-mb-[4px] flex gap-[4px] overflow-x-auto border-b border-[var(--ag-border-card)]">
+    <div ref={lista} role="tablist" aria-label="Secciones de la configuración" onKeyDown={alTeclear} className="k-tabs agc-tabs">
       {PESTANAS.map(p => {
         const sel = p.clave === activa
         const nombre = nombreDe(p, esMedico)
-        const Icono = p.icono
         return (
           <button key={p.clave} type="button" role="tab" id={`config-tab-${p.clave}`} aria-selected={sel} aria-controls={`config-panel-${p.clave}`}
-            aria-label={nombre} tabIndex={sel ? 0 : -1} onClick={() => elegir(p.clave)}
-            className={`flex min-h-[52px] sm:min-h-[40px] min-w-[44px] flex-1 cursor-pointer items-center justify-center whitespace-nowrap border-0 border-b-[3px] bg-transparent px-[8px] text-[15px] sm:text-[13px] sm:flex-none sm:px-[14px] ${sel
-              ? 'border-[var(--ag-brand-secondary)] font-bold text-[var(--ag-brand-legible)]' : 'border-transparent font-semibold text-[var(--ag-ink-600)]'}`}>
-            <Icono size={22} aria-hidden="true" className="sm:hidden" />
-            <span className="hidden sm:inline">{nombre}</span>
+            aria-label={nombre} tabIndex={sel ? 0 : -1} data-t={nombre} className="k-tab"
+            onClick={e => { const b = e.currentTarget; elegir(p.clave); b.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }}>
+            {nombre}
           </button>
         )
       })}
@@ -111,7 +107,7 @@ function Pestanas({ activa, elegir, esMedico }: { activa: Clave; elegir: (c: Cla
 function Panel({ clave, activa, children }: { clave: Clave; activa: Clave; children: ReactNode }) {
   return (
     <section role="tabpanel" id={`config-panel-${clave}`} aria-labelledby={`config-tab-${clave}`} hidden={clave !== activa} tabIndex={0}
-      className="rounded-[16px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--ag-brand-secondary)]">
+      className="rounded-[16px] focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-enlace">
       {children}
     </section>
   )
@@ -121,21 +117,15 @@ export default function PestanasConfiguracion(d: DatosPestanas) {
   const [activa, setActiva] = useState<Clave>('enlace')
   const misConsultorios = (d.consultorios ?? []).filter(c => c.medico_id === d.usuarioId && c.activo !== false)
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-[24px] sm:gap-[20px] pb-[80px] sm:pb-[66px] pt-[8px]">
-      <div className="flex flex-col gap-[6px]">
-        <Link href="/agenda" className="inline-flex min-h-[44px] sm:min-h-[40px] w-fit items-center gap-[6px] text-[14px] sm:text-[13px] text-[var(--ag-ink-600)] no-underline">
-          <ChevronLeft size={18} aria-hidden="true" /> Agenda
+    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-[20px] pb-[56px] pt-[4px] ih:max-w-[601px] ih:gap-[24px] iv:max-w-[600px] iv:gap-[24px] esc:gap-[24px]">
+      <div className="flex flex-col gap-[4px]">
+        <Link href="/agenda" className="relative inline-flex h-[44px] w-fit items-center gap-[2px] -ml-[4px] pr-[4px] text-[13px] font-semibold leading-[18px] text-enlace no-underline ih:h-[36px] esc:h-[36px]">
+          <ChevronLeft size={16} strokeWidth={2.2} aria-hidden="true" /> Agenda
         </Link>
         <h1 className={TITULO_PASO}>Configuración de la agenda</h1>
         <p className={SUB_PASO}>Esto es lo que elegiste al empezar. Cambia lo que quieras: se guarda solo.</p>
       </div>
-      <div className="flex flex-col gap-[16px] sm:gap-[14px]">
-        <Pestanas activa={activa} elegir={setActiva} esMedico={d.esMedico} />
-        {/* El nombre de la elegida, sólo en el teléfono (allí las pestañas son iconos). Lo mismo que ya dice la pestaña: fuera del árbol accesible. */}
-        <p aria-hidden="true" data-titulo-pestana className="m-0 text-[16px] font-bold leading-[1.3] text-[var(--ag-ink)] sm:hidden">
-          {nombreDe(PESTANAS.find(p => p.clave === activa) ?? PESTANAS[0], d.esMedico)}
-        </p>
-      </div>
+      <Pestanas activa={activa} elegir={setActiva} esMedico={d.esMedico} />
       <Panel clave="enlace" activa={activa}>
         <PestanaEnlace lista={d.lista} recargar={d.recargar} medicos={d.medicos} usuarioId={d.usuarioId} esMedico={d.esMedico}
           gestionaTodos={d.gestionaTodos} administradores={d.administradores} puedeAdministrar={d.puedeAdministrar} vigenciaDias={d.vigenciaDias}

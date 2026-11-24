@@ -39,31 +39,32 @@ interface Props {
   conInstruccion?: boolean
 }
 
+/** Un día (maqueta `ag-pv`, editor de días): interruptor · nombre · «Entras» y «Sales», o «Sin consulta». En el
+    teléfono las horas bajan a una segunda línea; en ancho van a la derecha, en la misma fila. */
 function FilaDia({ dia, nombre, horario, alCambiar }: { dia: DiaSemana; nombre: string; horario: Horario; alCambiar: (h: Horario) => void }) {
   const id = useId()
   const d = horario[dia]
   const poner = (cambio: Partial<Horario[DiaSemana]>) => alCambiar({ ...horario, [dia]: { ...d, ...cambio } })
   const alReves = d.activo && d.inicio >= d.fin
   return (
-    <div role="group" aria-label={nombre} className={`flex min-h-[68px] sm:min-h-[56px] flex-wrap items-center gap-x-[16px] sm:gap-x-[14px] gap-y-[12px] rounded-[12px] px-[16px] sm:px-[14px] py-[12px] ${d.activo
-      ? 'bg-[var(--ag-primary-bg-faint)]' : 'bg-[var(--ag-surface-sunken)]'}`}>
-      <div className="flex min-w-[160px] items-center gap-[14px] sm:gap-[12px]">
+    <div role="group" aria-label={nombre} className="flex flex-wrap items-center gap-x-[16px] gap-y-[6px] border-t border-linea py-[10px] first:border-t-0 [p+&]:border-t-0 esc:py-[8px]">
+      <div className="flex min-h-[44px] min-w-[160px] flex-1 items-center gap-[12px] esc:min-h-[36px]">
         <Interruptor encendido={d.activo} etiqueta={nombre} alCambiar={() => alCambiar(d.activo ? { ...horario, [dia]: { ...d, activo: false } } : prenderDia(horario, dia))} />
-        <span className={`text-[15px] sm:text-[14px] font-semibold ${d.activo ? 'text-[var(--ag-ink)]' : 'text-[var(--ag-muted)]'}`}>{nombre}</span>
+        <span className={`text-[15px] leading-[20px] ${d.activo ? 'font-semibold text-tinta' : 'text-tinta2'}`}>{nombre}</span>
       </div>
       {d.activo ? (
-        <div className="flex flex-wrap items-center gap-[10px]">
-          <label htmlFor={`${id}-e`} className="flex items-center gap-[6px] text-[14px] text-[var(--ag-text)]">Entras
-            <input id={`${id}-e`} type="time" className={CAMPO_NUEVO} value={d.inicio} onChange={e => poner({ inicio: e.target.value })} />
+        <div className="flex flex-wrap items-center gap-x-[18px] gap-y-[8px]">
+          <label htmlFor={`${id}-e`} className="flex items-center gap-[8px] text-[14px] leading-[20px] text-tinta2">Entras
+            <input id={`${id}-e`} type="time" className={`${CAMPO_NUEVO} w-auto tabular-nums`} value={d.inicio} onChange={e => poner({ inicio: e.target.value })} />
           </label>
-          <label htmlFor={`${id}-s`} className="flex items-center gap-[6px] text-[14px] text-[var(--ag-text)]">Sales
-            <input id={`${id}-s`} type="time" className={CAMPO_NUEVO} value={d.fin} onChange={e => poner({ fin: e.target.value })} />
+          <label htmlFor={`${id}-s`} className="flex items-center gap-[8px] text-[14px] leading-[20px] text-tinta2">Sales
+            <input id={`${id}-s`} type="time" aria-invalid={alReves || undefined} className={`${CAMPO_NUEVO} w-auto tabular-nums`} value={d.fin} onChange={e => poner({ fin: e.target.value })} />
           </label>
-          {alReves && <p role="alert" className={`${ERROR} basis-full`}>Sales antes de entrar: cambia una de las dos horas.</p>}
         </div>
       ) : (
-        <span className="ml-auto text-[14px] italic text-[var(--ag-muted)]">Sin consulta</span>
+        <span className="ml-auto text-[15px] leading-[20px] text-tinta3">Sin consulta</span>
       )}
+      {alReves && <p role="alert" className={`${ERROR} basis-full`}>Sales antes de entrar: cambia una de las dos horas.</p>}
     </div>
   )
 }
@@ -71,10 +72,10 @@ function FilaDia({ dia, nombre, horario, alCambiar }: { dia: DiaSemana; nombre: 
 export default function EditorDias({ horario, alCambiar, conInstruccion }: Props) {
   const ninguno = !DIAS.some(d => horario[d.key].activo)
   return (
-    <div className="flex flex-col gap-[8px]">
-      {conInstruccion && <p className="mb-[4px] mt-0 text-[14px] text-[var(--ag-text)]">Prende los días que vienes y pon a qué hora entras y sales.</p>}
+    <div className="flex flex-col">
+      {conInstruccion && <p className="m-0 pb-[6px] pt-[4px] text-[15px] leading-[21px] text-tinta">Prende los días que vienes y pon a qué hora entras y sales.</p>}
       {DIAS.map(d => <FilaDia key={d.key} dia={d.key} nombre={d.label} horario={horario} alCambiar={alCambiar} />)}
-      {ninguno && <p role="alert" className={ERROR}>Prende al menos un día.</p>}
+      {ninguno && <p role="alert" className={`${ERROR} pt-[8px]`}>Prende al menos un día.</p>}
     </div>
   )
 }

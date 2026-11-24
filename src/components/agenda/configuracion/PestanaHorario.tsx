@@ -18,12 +18,15 @@
  * horario» en el consultorio cuyo horario nadie ha confirmado.
  */
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { Building2, ChevronRight, Clock, MapPin, User } from 'lucide-react'
 import DialogoHorario from '@/components/agenda/configuracion/DialogoHorario'
 import { nombreHuso } from '@/components/agenda/configuracion/SelectorHuso'
 import { guardarHorarioClinica, guardarHorarioConsultorio, type CambiosConsultorio } from '@/components/agenda/configuracion/accionesConfig'
 import type { Avisar } from '@/components/agenda/configuracion/estadoAvisos'
-import { AVISO_SOLO_ADMIN, AYUDA, BOTON_CHICO, PANEL, SOLO_ADMIN, SOLO_ADMIN_HORARIO, SUB_PANEL, TITULO_PANEL } from '@/components/agenda/configuracion/estilosConfig'
+import {
+  AVISO_EN_LISTA, AVISO_SOLO_ADMIN, AYUDA, BLOQUE, FILA, FILA_ACCION, LISTA, PANEL, PIE, ROTULO, SOLO_ADMIN, SOLO_ADMIN_HORARIO, SUB_PANEL, TITULO_PANEL,
+} from '@/components/agenda/configuracion/estilosConfig'
 import { lineasHorario, textoHorario } from '@/lib/agenda/gruposHorario'
 import { horarioEfectivo } from '@/lib/agenda/disponibilidad'
 import type { ModoHorario } from '@/lib/agenda/primeraVez'
@@ -46,37 +49,76 @@ interface Props {
   alCambiar: () => void
 }
 
-const INSIGNIA = 'rounded-full px-[10px] py-[3px] text-[13px] font-semibold'
-const ENLACE = 'font-semibold text-[var(--ag-brand-legible)] underline underline-offset-2'
+const ENLACE = 'font-semibold text-enlace underline underline-offset-2'
+const CHEV = <ChevronRight size={18} strokeWidth={2} aria-hidden="true" className="ml-auto flex-none text-tinta3" />
+
+/**
+ * Una línea del horario como fila de dos columnas (B13 · AG9, maqueta `ag-config`): días en `--tinta`, horas
+ * tabulares en `--tinta2`. El « · » de `lineasHorario` se queda en el texto para quien lee la fila de corrido
+ * (lector de pantalla, `toContainText` de las pruebas), pero no se ve: lo dice la columna.
+ */
+function LineaHorario({ linea }: { linea: string }) {
+  const i = linea.indexOf(' · ')
+  const dias = i < 0 ? linea : linea.slice(0, i)
+  const horas = i < 0 ? '' : linea.slice(i + 3)
+  return (
+    <div className={FILA}>
+      <span className="text-[15px] leading-[20px] text-tinta">{dias}<span className="sr-only"> · </span></span>
+      <span className="text-right text-[15px] leading-[20px] tabular-nums text-tinta2">{horas}</span>
+    </div>
+  )
+}
+
+/** Las líneas del horario, o «Sin días de consulta». */
+function Lineas({ horario }: { horario: Horario }) {
+  const lineas = lineasHorario(horario)
+  if (!lineas.length) return <p className={`${FILA} m-0 text-[15px] italic text-tinta3`}>Sin días de consulta</p>
+  return <>{lineas.map(l => <LineaHorario key={l} linea={l} />)}</>
+}
+
+/** El rótulo de un grupo (icono fuera de la superficie) con sus etiquetas a la derecha. */
+function Rotulo({ icono, titulo, etiquetas }: { icono: ReactNode; titulo: string; etiquetas?: ReactNode }) {
+  return (
+    <div className="flex min-h-[24px] items-center justify-between gap-[8px]">
+      <h3 className={`${ROTULO} pr-0`}>{icono}<span className="truncate">{titulo}</span></h3>
+      {etiquetas && <span className="flex flex-none gap-[6px] pr-[16px] ih:pr-[20px] iv:pr-[20px] esc:pr-[20px]">{etiquetas}</span>}
+    </div>
+  )
+}
+
+function Etiquetas({ c }: { c: Consultorio }) {
+  const propio = c.horario_propio === true
+  return (
+    <>
+      {c.horario_revisado_en === null && <span className="k-etq k-etq-aviso"><Clock aria-hidden="true" />Por revisar</span>}
+      <span className={`k-etq ${propio ? 'k-etq-tonal' : ''}`}>{propio ? 'Horario propio' : 'Igual que la clínica'}</span>
+    </>
+  )
+}
 
 function Tarjeta({ c, p, alAbrir, alConfirmar }: { c: Consultorio; p: Props; alAbrir: () => void; alConfirmar: () => void }) {
-  const clinica = p.horarioClinica
-  const efectivo = horarioEfectivo(c, clinica)
-  const propio = c.horario_propio === true
   const esDueno = c.medico_id === p.usuarioId
   const medico = esDueno ? null : p.medicos.find(m => m.id === c.medico_id)
-  const lineas = lineasHorario(efectivo)
   return (
-    <div role="group" aria-label={c.nombre} className="flex flex-wrap items-start justify-between gap-[16px] sm:gap-[14px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] sm:px-[16px] py-[18px] sm:py-[16px]">
-      <div className="flex flex-col gap-[6px]">
-        <div className="flex flex-wrap items-center gap-[10px]">
-          <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">{c.nombre}</span>
-          <span className={`${INSIGNIA} ${propio ? 'bg-[var(--ag-primary-bg-faint)] text-[var(--ag-brand-legible)]' : 'bg-[var(--ag-segment-bg)] text-[var(--ag-ink-600)]'}`}>
-            {propio ? 'Horario propio' : 'Igual que la clínica'}
-          </span>
-          {c.horario_revisado_en === null && <span className={`${INSIGNIA} bg-[var(--ag-aviso-bg)] text-[var(--ag-aviso-text)]`}>Por revisar</span>}
-        </div>
-        {medico && <span className="text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">{componerNombreMedicoCompleto(medico)}</span>}
-        {lineas.length ? lineas.map(l => <span key={l} className="text-[14px] text-[var(--ag-text)]">{l}</span>)
-          : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
+    <section role="group" aria-label={c.nombre} className={BLOQUE}>
+      <Rotulo icono={<MapPin size={16} strokeWidth={2} aria-hidden="true" className="flex-none" />} titulo={c.nombre} etiquetas={<Etiquetas c={c} />} />
+      <div className={LISTA}>
+        {medico && (
+          <p className={`${FILA} m-0 justify-start gap-[8px] text-[13px] leading-[18px] text-tinta2`}>
+            <User size={16} aria-hidden="true" className="flex-none text-tinta3" />{componerNombreMedicoCompleto(medico)}
+          </p>
+        )}
+        <Lineas horario={horarioEfectivo(c, p.horarioClinica)} />
+        {esDueno && c.horario_revisado_en === null && (
+          <button type="button" className={FILA_ACCION} onClick={alConfirmar}><span className="flex-1">Confirmar horario</span></button>
+        )}
+        {esDueno && (
+          <button type="button" className={FILA_ACCION} onClick={alAbrir} aria-label={`Cambiar horario de ${c.nombre}`}>
+            <span className="flex-1">Cambiar horario</span>{CHEV}
+          </button>
+        )}
       </div>
-      {esDueno && (
-        <div className="flex flex-wrap gap-[8px]">
-          {c.horario_revisado_en === null && <button type="button" className={BOTON_CHICO} onClick={alConfirmar}>Confirmar horario</button>}
-          <button type="button" className={BOTON_CHICO} onClick={alAbrir} aria-label={`Cambiar horario de ${c.nombre}`}>Cambiar horario</button>
-        </div>
-      )}
-    </div>
+    </section>
   )
 }
 
@@ -95,31 +137,33 @@ function useGuardarConsultorio(p: Props) {
 }
 
 /**
- * K3 (punto 11 de Angel): el horario de la clínica en su tarjeta, al INICIO de la pestaña y antes de
- * los consultorios, con sus días y horas a la vista. «Cambiar horario» sólo para quien administra
- * (`canManageClinica`, el mismo criterio que `PUT /api/me/horario`); los demás lo ven sin botón.
+ * K3 (punto 11 de Angel): el horario de la clínica, al INICIO de la pestaña y antes de los consultorios, con sus
+ * días y horas a la vista. «Cambiar horario» sólo para quien administra (`canManageClinica`, el mismo criterio que
+ * `PUT /api/me/horario`); los demás lo ven sin botón.
  */
 function TarjetaClinica({ p, alAbrir }: { p: Props; alAbrir: () => void }) {
-  const lineas = p.horarioClinica ? lineasHorario(p.horarioClinica) : null
   return (
-    <div role="group" aria-label="Horario de la clínica" data-horario-clinica
-      className="flex flex-wrap items-start justify-between gap-[16px] sm:gap-[14px] rounded-[12px] border border-[var(--ag-border-card)] px-[20px] sm:px-[16px] py-[18px] sm:py-[16px]">
-      <div className="flex flex-col gap-[6px]">
-        <span className="text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]">Horario de la clínica</span>
-        {!lineas ? <span className="text-[14px] text-[var(--ag-ink-600)]">{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</span>
-          : lineas.length ? lineas.map(l => <span key={l} className="text-[14px] text-[var(--ag-text)]">{l}</span>)
-          : <span className="text-[14px] italic text-[var(--ag-muted)]">Sin días de consulta</span>}
-        {p.husoClinica && <span className="text-[14px] text-[var(--ag-text)]">Huso horario: {nombreHuso(p.husoClinica)}</span>}
-        <span className="text-[13.5px] sm:text-[13px] leading-[1.5] text-[var(--ag-ink-600)]">
-          Lo usan los consultorios que dicen «Igual que la clínica».
-        </span>
+    <section role="group" aria-label="Horario de la clínica" data-horario-clinica className={BLOQUE}>
+      <Rotulo icono={<Building2 size={16} strokeWidth={2} aria-hidden="true" className="flex-none" />} titulo="Horario de la clínica" />
+      <div className={LISTA}>
+        {p.horarioClinica ? <Lineas horario={p.horarioClinica} />
+          : <p className={`${FILA} m-0 text-[14px] text-tinta2`}>{p.fallo ? 'No se pudo cargar. Recarga la página.' : '…'}</p>}
+        {p.husoClinica && (
+          <div className={`${FILA} flex-col items-start gap-[2px] ih:flex-row ih:items-center iv:flex-row iv:items-center esc:flex-row esc:items-center`}>
+            <span className="text-[13px] leading-[18px] text-tinta2 ih:text-[15px] iv:text-[15px] esc:text-[15px] ih:text-tinta iv:text-tinta esc:text-tinta">Huso horario<span className="sr-only">: </span></span>
+            <span className="text-[15px] leading-[20px] text-tinta ih:text-right iv:text-right esc:text-right">{nombreHuso(p.husoClinica)}</span>
+          </div>
+        )}
         {/* Tanda M (punto 15): en la tarjeta, sólo el médico invitado (sus consultorios sí los cambia); la secretaria lo lee al inicio. */}
-        {p.esMedico && !p.puedeAdministrar && <span data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN}</span>}
+        {p.esMedico && !p.puedeAdministrar && <span data-solo-admin className={`${AVISO_SOLO_ADMIN} ${AVISO_EN_LISTA} block`}>{SOLO_ADMIN}</span>}
+        {p.puedeAdministrar && p.horarioClinica && (
+          <button type="button" onClick={alAbrir} className={FILA_ACCION} aria-label="Cambiar horario de la clínica">
+            <span className="flex-1">Cambiar horario</span>{CHEV}
+          </button>
+        )}
       </div>
-      {p.puedeAdministrar && p.horarioClinica && (
-        <button type="button" onClick={alAbrir} className={BOTON_CHICO} aria-label="Cambiar horario de la clínica">Cambiar horario</button>
-      )}
-    </div>
+      <p className={PIE}>Lo usan los consultorios que dicen «Igual que la clínica».</p>
+    </section>
   )
 }
 
@@ -155,13 +199,13 @@ export default function PestanaHorario(p: Props) {
       {/* Tanda M (punto 15): la secretaria no cambia nada de esta pestaña (`PUT /api/me/horario` 403; consultorios, 404). */}
       {!p.esMedico && <p data-solo-admin className={AVISO_SOLO_ADMIN}>{SOLO_ADMIN_HORARIO}</p>}
       <TarjetaClinica p={p} alAbrir={() => setAbierto({ tipo: 'clinica' })} />
-      {!p.consultorios || !clinica ? <p className={AYUDA}>{p.fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
-        : p.consultorios.length === 0 ? <p className={AYUDA}>Aún no hay consultorios activos.</p>
+      {!p.consultorios || !clinica ? <p className={`m-0 ${AYUDA}`}>{p.fallo ? 'No se pudieron cargar los consultorios. Recarga la página.' : 'Cargando los consultorios…'}</p>
+        : p.consultorios.length === 0 ? <p className={`m-0 ${AYUDA}`}>Aún no hay consultorios activos.</p>
         : p.consultorios.map(c => (
           <Tarjeta key={c.id} c={c} p={p} alAbrir={() => setAbierto({ tipo: 'consultorio', c })} alConfirmar={() => void guardar(c, { horario_revisado: true })} />
         ))}
       {p.esMedico && (
-        <p className="m-0 text-[13.5px] sm:text-[13px] text-[var(--ag-ink-600)]">Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
+        <p className={`m-0 ${AYUDA}`}>Agrega más consultorios en tu <Link href="/perfil" className={ENLACE}>perfil</Link>.</p>
       )}
       {abierto && clinica && (
         <DialogoHorario

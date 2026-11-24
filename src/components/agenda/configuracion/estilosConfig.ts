@@ -1,111 +1,114 @@
 /**
- * Las clases de la configuración nueva de la agenda (tanda J, J5): el funnel
- * de primera vez y las cinco pestañas, con los COLORES de la app. Ningún
- * hexadecimal de la maqueta: todo sale de `--ag-*`.
+ * Las clases de la configuración de la agenda (`/agenda/configuracion`): el asistente de primera vez y las cinco
+ * pestañas. B13 · AG9/AG10 (rediseño): con los TOKENS Y LAS PRIMITIVAS DEL KIT (`sistema.css`: `--sup`, `--tinta2`,
+ * `--enlace`, `--accion`, `--tonal`, `.k-b`, `.k-campo`, `.k-t-pantalla`…), con su oscuro, y el patrón aprobado de
+ * Mi perfil (maquetas `ag-config` y `ag-pv`): grupos con rótulo de color e icono FUERA de una superficie, datos como
+ * filas de lista, acciones como texto azul. Ningún `--ag-*`: la página vive fuera de `.agenda-raiz`.
  *
- * ⚠️ TRAMPA DE NOMBRES (`CLAUDE.md`): el azul de los botones y de lo elegido es
- * `--ag-brand-secondary` (= `--cs`, #1e5fa8), NO `--ag-brand-primary` (= `--cp`,
- * el navy). Para TEXTO azul, `--ag-brand-legible`, que en oscuro se aclara.
+ * ⚠️ LA LETRA VA EN LA ESCALA DEL KIT (sustituye a la de la página de reserva de la tanda L): los tamaños de
+ * `sistema.css`, papel por papel:
+ *   · título de la página (h1)             26 · 32 en `ih`/`iv`/`esc` · 800   (`.k-t-pantalla`)
+ *   · frase de la pestaña o del paso       15 · 14 en `esc`
+ *   · rótulo de un grupo                   13 · 700 · mayúsculas · `--enlace`
+ *   · título de fila o de bloque           15 · 600                         (`.k-fila-n`)
+ *   · dato secundario, ayuda, pie          13                               (`.k-fila-s`, `.k-campo-ayuda`)
+ *   · etiqueta de un campo                 13 · 600                         (`.k-etiqueta`)
+ *   · insignia                             12 · 600                         (`.k-etq`)
+ *   · campo                                16 · 15 en `ih`/`esc`            (`.k-campo`)
+ *   · botón                                15 · 14 en `ih`/`esc`            (`.k-b`)
  *
- * ⚠️ LA LETRA VA EN LA ESCALA DE LA PÁGINA DE RESERVA (tanda L, punto 12 de Angel,
- * que corrige el «copia los tamaños de las maquetas» de J5): los tamaños y pesos
- * son los de `src/components/agendaPublica/agendaPublica.css`, papel por papel:
- *   · título de la página (h1)        18 px, 20 desde 640 px · 700  (`.rp-titulo`)
- *   · título de un panel o tarjeta    16 px · 700                    (`.rp-medico__nombre`)
- *   · título de bloque, nombre        15 px · 600                    (`.rp-op__txt b`)
- *   · texto                           14 px · 400                    (`.rp-sub`, `.rp-nota`)
- *   · ayuda, línea secundaria         13,5 px                        (`.rp-op__txt span`)
- *   · insignia                        13 px · 600                    (`.rp-op__dur`)
- *   · etiqueta de un campo            13,5 px · 600                  (`.rp-campo`)
- *   · etapas del avance               11 px · 600                    (`.rp-pasos li`)
- *   · campo                           16 px (el teléfono no hace zoom)
- *   · botón principal y secundario    16 px · 700                    (`.rp-btn`)
- *   · botón chico, pestaña, opción    15 px · 600                    (`.rp-hora`)
- *   · botón de texto, enlace          14 px · 600                    (`.rp-enlace`)
- * No hay tokens de tamaño de letra en la app: van en píxeles, como en la reserva.
- *
- * ⚠️ EN COMPUTADORA (desde `sm`, 640 px) LA ESCALA ES OTRA (tanda M, punto 2 de Angel: «títulos de
- * sección 16 px, texto 13–14 px, botones 13 px de letra y 40 px de alto, y los rellenos reducidos en
- * proporción»). Va como variante `sm:` junto a la de teléfono, que no cambia:
- *   · título de la página (h1)        18 px · 700 (el de teléfono; antes 20 desde 640 px)
- *   · título de un panel o tarjeta    16 px · 700 (igual)
- *   · título de bloque, nombre        14 px · 600
- *   · texto                           14 px (igual)
- *   · ayuda, línea secundaria, etiqueta  13 px
- *   · botones (todos), pestaña, opción, enlace «Agenda»   13 px de letra y 40 px de alto
- *   · campo                           40 px de alto, 16 px de letra (un iPad cuenta como computadora y
- *                                     haría zoom con menos de 16)
- *   · rellenos y separaciones de 14 px o más: × 5/6 (48 → 40, la proporción de los botones), al par
- *     más cercano: 28 → 24, 24 → 20, 22 → 18, 20 → 16, 18 → 16, 16 → 14, 14 → 12; los de 12 o menos, igual
- *   · el interruptor, el mismo dibujo con 40 px de toque (46 en el teléfono)
- * `configuracionEscala.test.ts` vigila las dos escalas.
- * `configuracionEscala.test.ts` exige que todo tamaño de letra de la configuración
- * esté en la escala de esa hoja. Las áreas de toque, de 44 px como mínimo.
+ * ⚠️ DOS ESCALAS DE TOQUE, POR FORMATO Y NO POR ANCHO (CALMA §2, `--k-toque`): la TÁCTIL (`ext`, `tel` e `iv`, el
+ * Duo abierto en vertical: 44 px) y la de COMPUTADORA (`ih` y `esc`: 36 px, campos de 40). Antes la de computadora
+ * salía desde 640 px (`sm:`) y en el Duo abierto TODOS los controles medían menos de 44. Va como variantes `ih:` y
+ * `esc:` (siempre las dos) junto a la de teléfono; ningún tamaño con `sm:`/`md:`. `configuracionEscala.test.ts`
+ * vigila las dos escalas.
  *
  * Nombre distinto de `clasesConfig.ts` (la de la pantalla vieja, que no se toca).
  */
 
-/** Tarjeta blanca: la de cada pregunta del funnel (14 px, 24 de relleno). */
-export const TARJETA = 'flex flex-col rounded-[14px] border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-[24px] sm:p-[20px]'
+/** Rellenos laterales de una fila: 16 en el teléfono, 20 en ancho (la sangría de los separadores de `.agc-lista`). */
+const LADOS = 'px-[16px] ih:px-[20px] iv:px-[20px] esc:px-[20px]'
 
-/** El panel de cada pestaña (16 px, 28 de relleno; 20 en el teléfono para que quepa). */
-export const PANEL = 'flex flex-col gap-[18px] sm:gap-[16px] rounded-[16px] border border-[var(--ag-border-card)] bg-[var(--ag-surface)] p-[20px] sm:p-[24px]'
+/** Una superficie suelta: la de cada pregunta del asistente, sin borde ni sombra (CALMA §3). */
+export const TARJETA = 'flex flex-col rounded-[16px] bg-sup p-[16px] ih:rounded-[18px] iv:rounded-[18px] esc:rounded-[20px] ih:p-[20px] iv:p-[20px] esc:p-[20px]'
 
-/** Separador entre bloques de un panel. */
-export const BLOQUE = 'flex flex-col gap-[12px] border-t border-[var(--ag-hairline)] pt-[18px] sm:pt-[16px]'
+/** Una superficie cuyas filas ponen su propio relleno vertical (el editor de días, las opciones del asistente). */
+export const SUPERFICIE = 'flex flex-col rounded-[16px] bg-sup px-[16px] ih:rounded-[18px] iv:rounded-[18px] esc:rounded-[20px] ih:px-[20px] iv:px-[20px] esc:px-[20px]'
 
-/** El h1 de la página y de cada paso del funnel (`.rp-titulo`). */
-export const TITULO_PASO = 'm-0 text-[18px] font-bold leading-[1.3] text-[var(--ag-ink)]'
-export const SUB_PASO = 'm-0 text-[14px] leading-[1.5] text-[var(--ag-ink-600)]'
-export const TITULO_PANEL = 'm-0 text-[16px] font-bold text-[var(--ag-ink)]'
-export const SUB_PANEL = 'm-0 text-[14px] leading-[1.5] text-[var(--ag-ink-600)]'
-export const TITULO_BLOQUE = 'text-[15px] sm:text-[14px] font-semibold text-[var(--ag-ink)]'
-export const AYUDA = 'text-[13.5px] sm:text-[13px] leading-[1.5] text-[var(--ag-ink-600)]'
-export const ETIQUETA = 'flex flex-wrap items-center gap-[10px] text-[14px] text-[var(--ag-text)]'
-export const ERROR = 'm-0 text-[14px] font-semibold text-[var(--ag-status-cancelled-text)]'
+/** La cabecera de un paso del asistente o de la página: h1 y su frase. */
+export const CABECERA_PASO = 'flex flex-col gap-[6px] pt-[6px]'
 
-/** Botón azul lleno (48 px de alto; 16 px · 700, `.rp-btn`). El borde `--ag-brand-legible` no se ve en claro (es el mismo azul) y
-    en oscuro es lo que lo separa de la superficie: el relleno crudo queda a 2,24:1 de `--ag-surface`. */
-export const BOTON_AZUL =
-  'inline-flex min-h-[48px] sm:min-h-[40px] cursor-pointer items-center justify-center gap-[8px] rounded-[10px] border border-[var(--ag-brand-legible)] bg-[var(--ag-brand-secondary)] px-[22px] sm:px-[18px] text-[16px] sm:text-[13px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-60'
+/** Un paso del asistente: cabecera y grupos. */
+export const SECCION_PASO = 'flex flex-col gap-[24px] ih:gap-[28px] iv:gap-[28px] esc:gap-[28px]'
 
-/* Los botones con borde usan `--ag-control-border` y no el gris claro de la maqueta: es el token de la
-   app para un botón en REPOSO (tanda H, punto 7: borde ≥ 3:1). Sección F: colores con los tokens de la app. */
+/** Una superficie que es una LISTA: filas con separador con sangría (`.agc-lista`, `globals.css`). */
+export const LISTA = 'agc-lista'
 
-/** Botón blanco con borde (48 px). */
-export const BOTON_BLANCO =
-  'inline-flex min-h-[48px] sm:min-h-[40px] cursor-pointer items-center justify-center gap-[8px] rounded-[10px] border border-[var(--ag-control-border)] bg-[var(--ag-surface)] px-[22px] sm:px-[18px] text-[16px] sm:text-[13px] font-bold text-[var(--ag-ink)] hover:bg-[var(--ag-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-60'
+/** La pestaña: sus grupos, uno bajo otro. */
+export const PANEL = 'flex flex-col gap-[24px] ih:gap-[28px] iv:gap-[28px] esc:gap-[28px]'
 
-/** Botón blanco pequeño (44 px, 15 px de letra): «Cambiar», «Crear uno», «Cambiar horario». */
-export const BOTON_CHICO =
-  'inline-flex min-h-[44px] sm:min-h-[40px] flex-none cursor-pointer items-center justify-center rounded-[10px] border border-[var(--ag-control-border)] bg-[var(--ag-surface)] px-[18px] sm:px-[16px] text-[15px] sm:text-[13px] font-semibold text-[var(--ag-ink)] hover:bg-[var(--ag-control-bg-hover)] disabled:cursor-not-allowed disabled:opacity-60'
+/** Un grupo: rótulo, superficie y pie. */
+export const BLOQUE = 'flex min-w-0 flex-col gap-[8px]'
 
-/** Botón de texto azul («Cambiar» del resumen, «Copiar», «Agregar tipo de cita»). */
-export const BOTON_TEXTO =
-  'inline-flex min-h-[44px] sm:min-h-[40px] cursor-pointer items-center gap-[6px] border-0 bg-transparent px-[8px] text-[14px] sm:text-[13px] font-semibold text-[var(--ag-brand-legible)] disabled:cursor-not-allowed disabled:opacity-60'
+/** El rótulo de un grupo, FUERA de la superficie: icono de 16 y texto 13/700 en mayúsculas, `--enlace`. */
+export const ROTULO = `m-0 flex min-h-[24px] min-w-0 items-center gap-[6px] ${LADOS} text-[13px] font-bold uppercase leading-[18px] tracking-[.4px] text-enlace`
 
-/** Botón de texto rojo («Apagar», «Quitar»). */
-export const BOTON_TEXTO_ROJO =
-  'inline-flex min-h-[44px] sm:min-h-[40px] cursor-pointer items-center border-0 bg-transparent px-[8px] text-[14px] sm:text-[13px] font-semibold text-[var(--ag-status-cancelled-text)] disabled:cursor-not-allowed disabled:opacity-60'
+/** La línea de ayuda bajo una superficie. */
+export const PIE = `m-0 ${LADOS} text-[13px] leading-[18px] text-tinta2`
 
-/** Campo de texto, número, hora o selector (44 px, 16 px · 400 de letra: el teléfono no hace zoom; `font-normal` porque
-    hereda el peso de su etiqueta, que es seminegrita como `.rp-campo`). */
-export const CAMPO_NUEVO =
-  'min-h-[44px] sm:min-h-[40px] rounded-[8px] border border-[var(--ag-input-border)] bg-[var(--ag-input-bg)] px-[10px] py-[8px] sm:py-[6px] text-[16px] font-normal text-[var(--ag-ink)] focus:border-[var(--ag-input-focus-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ag-input-focus-ring)] disabled:opacity-60'
+/** Una fila de dato o de control dentro de la lista. */
+export const FILA = `flex min-h-[48px] items-center justify-between gap-[12px] ${LADOS} py-[12px]`
 
-/** La dirección del enlace, en letra de máquina. */
-export const DIRECCION =
-  'break-all rounded-[10px] border border-[var(--ag-border-card)] bg-[var(--ag-surface-sunken)] px-[16px] sm:px-[14px] py-[14px] sm:py-[12px] font-mono text-[15px] sm:text-[14px] text-[var(--ag-ink)]'
+/** Una fila de lista con acciones de texto a la derecha (tipos de cita, enlaces de una vez, contactos). */
+export const FILA_GRIS = 'flex min-h-[60px] flex-wrap items-center justify-between gap-x-[8px] gap-y-[2px] py-[8px] pl-[16px] pr-[8px] ih:pl-[20px] iv:pl-[20px] esc:pl-[20px] ih:pr-[12px] iv:pr-[12px] esc:pr-[12px]'
 
-/** Fila gris de una lista dentro de un panel (enlaces de una vez, tipos de cita). */
-export const FILA_GRIS =
-  'flex flex-wrap items-center justify-between gap-[12px] rounded-[10px] bg-[var(--ag-surface-sunken)] px-[16px] sm:px-[14px] py-[12px]'
+/** Una fila entera que es la acción («Cambiar horario», «Crear uno»): texto azul y, si navega, «›». */
+export const FILA_ACCION = `flex min-h-[48px] w-full cursor-pointer items-center gap-[10px] border-0 bg-transparent ${LADOS} text-left text-[15px] font-semibold leading-[20px] text-enlace disabled:cursor-default disabled:text-tinta3 ih:min-h-[44px] esc:min-h-[44px] ih:text-[14px] esc:text-[14px]`
 
-/** Una opción elegible (rejilla de duraciones): elegida, azul claro con borde azul. */
+/** El h1 de la página y de cada paso del asistente (`.k-t-pantalla`: 26/800, 32 en ancho). */
+export const TITULO_PASO = 'm-0 k-t-pantalla'
+export const SUB_PASO = 'm-0 text-[15px] leading-[22px] text-tinta2 esc:text-[14px] esc:leading-[20px]'
+/** El h2 de cada pestaña: lo dice ya la pestaña elegida; queda para el lector de pantalla y la estructura. */
+export const TITULO_PANEL = 'sr-only'
+/** La frase de cada pestaña, arriba y sin superficie. */
+export const SUB_PANEL = 'm-0 text-[15px] leading-[21px] text-tinta2 esc:text-[14px] esc:leading-[20px]'
+export const TITULO_BLOQUE = 'text-[15px] font-semibold leading-[20px] text-tinta'
+export const AYUDA = 'text-[13px] leading-[18px] text-tinta2'
+export const ETIQUETA = 'flex flex-wrap items-center gap-[8px] text-[15px] leading-[20px] text-tinta esc:text-[14px]'
+export const ERROR = 'm-0 text-[14px] font-semibold leading-[20px] text-mal-tinta'
+
+/** El ÚNICO botón relleno de la pantalla (`.k-b-prim`): 44 en táctil, 36 en `ih`/`esc`. */
+export const BOTON_AZUL = 'k-b k-b-prim h-[44px] ih:h-[36px] esc:h-[36px] disabled:opacity-45'
+
+/** El secundario, quieto (`--sup2`): «Cancelar», «Atrás». */
+export const BOTON_BLANCO = 'k-b k-b-quieto h-[44px] ih:h-[36px] esc:h-[36px]'
+
+/** El tonal («Mandar por WhatsApp», «Emitir enlace de un solo uso»). */
+export const BOTON_CHICO = 'k-b k-b-tonal h-[44px] ih:h-[36px] esc:h-[36px]'
+
+/** Botón de texto azul («Copiar», «Editar», «Guardar» de una fila). */
+export const BOTON_TEXTO = 'k-b k-b-texto h-[44px] px-[8px] ih:h-[36px] esc:h-[36px] disabled:text-tinta3'
+
+/** Botón de texto rojo («Apagar», «Quitar», «Revocar»). */
+export const BOTON_TEXTO_ROJO = `${BOTON_TEXTO} text-mal-tinta`
+
+/** Campo de texto, número u hora (`.k-campo`: relleno `--sup2`, sin borde; 16 de letra en táctil, sin zoom). */
+export const CAMPO_NUEVO = 'k-campo'
+
+/** Un selector: el campo con su flecha. */
+export const SELECTOR = 'k-campo agc-select'
+
+/** La dirección del enlace, en letra de máquina y sin caja dentro de la caja. */
+export const DIRECCION = 'm-0 break-all font-mono text-[15px] leading-[22px] text-tinta esc:text-[14px] esc:leading-[20px]'
+
+/** La caja ámbar de los avisos de página («Ningún enlace abre todavía…»). */
+export const CAJA_AVISO = 'm-0 flex items-start gap-[8px] rounded-[12px] bg-aviso-fondo p-[12px] text-[13px] leading-[18px] text-aviso-tinta'
+
+/** Una opción elegible (rejilla de duraciones): elegida, tonal con anillo de `--accion`. */
 export function opcion(elegida: boolean): string {
-  return `min-h-[56px] sm:min-h-[40px] cursor-pointer rounded-[12px] border-2 text-[15px] sm:text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${elegida
-    ? 'border-[var(--ag-brand-secondary)] bg-[var(--ag-primary-bg-faint)] text-[var(--ag-brand-legible)]'
-    : 'border-[var(--ag-control-border)] bg-[var(--ag-surface)] text-[var(--ag-ink)]'}`
+  return `relative flex h-[44px] cursor-pointer items-center justify-center rounded-[12px] border-0 text-[15px] font-semibold tabular-nums ih:h-[40px] esc:h-[36px] esc:text-[14px] disabled:cursor-not-allowed disabled:opacity-45 ${elegida
+    ? 'bg-tonal text-tonal-tinta shadow-[inset_0_0_0_2px_var(--accion)]'
+    : 'bg-sup2 text-tinta'}`
 }
 
 /**
@@ -124,6 +127,7 @@ export const SOLO_ADMIN = 'Solo el médico administrador puede cambiar estas opc
 export const SOLO_ADMIN_HORARIO = 'Cada médico cambia el horario de sus consultorios.'
 export const SOLO_ADMIN_TIPOS = 'Cada médico cambia sus tipos de cita.'
 
-/** El aviso de `SOLO_ADMIN`: una caja azul claro con la letra en seminegrita, para que se vea (punto 15). */
-export const AVISO_SOLO_ADMIN =
-  'm-0 rounded-[10px] bg-[var(--ag-primary-bg-faint)] px-[14px] sm:px-[12px] py-[10px] text-[14px] sm:text-[13px] font-semibold leading-[1.5] text-[var(--ag-ink)]'
+/** El aviso de `SOLO_ADMIN`: nota informativa TONAL con la letra en seminegrita, para que se vea (punto 15; maqueta
+    `ag-config` `.ac-nota`). Dentro de una lista lleva además su margen (`AVISO_EN_LISTA`). */
+export const AVISO_SOLO_ADMIN = 'm-0 rounded-[12px] bg-tonal px-[12px] py-[10px] text-[13px] font-semibold leading-[18px] text-tonal-tinta'
+export const AVISO_EN_LISTA = 'agc-sin-linea mx-[16px] my-[12px] ih:mx-[20px] iv:mx-[20px] esc:mx-[20px]'

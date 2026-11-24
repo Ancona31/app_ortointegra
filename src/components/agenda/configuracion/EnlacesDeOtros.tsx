@@ -92,15 +92,16 @@ export default function EnlacesDeOtros(p: Props) {
   )
   if (vistas.length + plegadas.length === 0) return null
   return (
-    <div className="flex flex-col gap-[12px]">
+    <div className="flex flex-col gap-[24px] ih:gap-[28px] iv:gap-[28px] esc:gap-[28px]">
       {vistas.map(bloque)}
       {plegadas.length > 0 && (
         <>
-          <button type="button" aria-expanded={abierto} aria-controls={id} onClick={() => setAbierto(a => !a)} className={`${BOTON_TEXTO} self-start px-0`}>
-            <ChevronRight size={16} aria-hidden="true" className={`transition-transform duration-[var(--ag-dur-micro)] motion-reduce:transition-none ${abierto ? 'rotate-90' : ''}`} />
+          <button type="button" aria-expanded={abierto} aria-controls={id} onClick={() => setAbierto(a => !a)}
+            className={`${BOTON_TEXTO} self-start px-[16px] ih:px-[20px] iv:px-[20px] esc:px-[20px]`}>
+            <ChevronRight size={16} strokeWidth={2.2} aria-hidden="true" className={`transition-transform duration-[var(--dur-toque)] motion-reduce:transition-none ${abierto ? 'rotate-90' : ''}`} />
             Enlaces de los demás médicos ({plegadas.length})
           </button>
-          <div id={id} hidden={!abierto} className="flex flex-col gap-[12px]">{plegadas.map(bloque)}</div>
+          <div id={id} hidden={!abierto} className="flex flex-col gap-[24px] ih:gap-[28px] iv:gap-[28px] esc:gap-[28px]">{plegadas.map(bloque)}</div>
         </>
       )}
       {g.pregunta && (

@@ -158,6 +158,66 @@ test('G2 · 7 y 8 · el funnel abre en el primer paso que falta (la duración); 
   await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toHaveCount(0)
 })
 
+/* B13 · AG10 · el cierre no puede decir «falta la duración» con una respuesta ATRASADA de la lista de enlaces.
+   Cada paso pide otra vez `GET /api/agenda/enlaces`; aquí la que sale al continuar el paso del horario (aún sin
+   duración, `sin_tipos`) se retrasa 6 s, de modo que llega DESPUÉS de las que salen ya con la duración guardada.
+   Antes de B13 esa respuesta vieja pisaba a la nueva y el cierre enseñaba «No abrirá: falta la duración…».
+   MUTACIÓN: quitar el «sólo la última petición» de `useListaEnlaces` (ConfiguracionAgenda.tsx) → rojo. */
+test('B13 · AG10 · una respuesta atrasada de la lista de enlaces no deja «falta la duración» en el cierre', async ({ page }) => {
+  const id = idDe(CORREO.adminA)
+  await page.goto(RUTA)
+  await page.evaluate(([k, v]) => { window.localStorage.setItem(k, v) }, [`spinus-agenda-primera-vez:${id}`, '1'])
+  let gets = 0
+  let atrasada: Promise<void> | null = null
+  await page.route('**/api/agenda/enlaces', async r => {
+    if (r.request().method() !== 'GET') return r.continue()
+    gets += 1
+    if (gets !== 2) return r.continue()
+    const respuesta = await r.fetch()
+    atrasada = new Promise(res => setTimeout(res, 6000)).then(() => r.fulfill({ response: respuesta }))
+    return atrasada
+  })
+  await page.goto(RUTA)
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(page.getByRole('heading', { name: '¿Cuánto dura tu consulta?' })).toBeVisible()
+  await page.getByRole('button', { name: '45 min' }).click()
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(page.getByRole('heading', { name: '¿Mandamos avisos por correo?' })).toBeVisible()
+  await page.getByRole('button', { name: 'Terminar', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Tu agenda ya está lista' })).toBeVisible()
+  expect(atrasada, 'la segunda lectura de la lista quedó retenida').not.toBeNull()
+  await atrasada
+  await page.waitForTimeout(500)
+  expect(gets).toBeGreaterThanOrEqual(3)
+  await expect(page.locator('[data-primera-vez="4"]')).not.toContainText('falta la duración')
+  await page.evaluate(k => window.localStorage.removeItem(k), `spinus-agenda-primera-vez:${id}`)
+})
+
+/* B13 · AG10 · al cambiar de paso la página vuelve ARRIBA: `window.scrollTo` no movía `<main>`, que es quien se
+   desplaza, y el paso nuevo se abría a media altura. MUTACIÓN: volver a `window.scrollTo` en `irA` → rojo. */
+test('B13 · AG10 · al continuar, el paso nuevo empieza arriba (se desplaza el contenedor real)', async ({ page }) => {
+  const id = idDe(CORREO.adminA)
+  await page.setViewportSize({ width: 1280, height: 600 })
+  await page.goto(RUTA)
+  await page.evaluate(([k, v]) => { window.localStorage.setItem(k, v) }, [`spinus-agenda-primera-vez:${id}`, '0'])
+  await page.goto(RUTA)
+  await expect(page.getByRole('heading', { name: 'Horario de la clínica' })).toBeVisible()
+  const continuar = page.getByRole('button', { name: 'Continuar' })
+  await continuar.scrollIntoViewIfNeeded()
+  const desplazado = await page.evaluate(() => {
+    const raiz = document.querySelector('[data-primera-vez]')
+    return (raiz?.getBoundingClientRect().top ?? 0) < -50
+  })
+  expect(desplazado, 'el paso de la clínica tiene que desplazarse para llegar a «Continuar»').toBe(true)
+  await continuar.click()
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => Math.round(document.querySelector('[data-primera-vez]')?.getBoundingClientRect().top ?? -999)))
+    .toBeGreaterThanOrEqual(0)
+  await expect(page.getByRole('heading', { name: '¿Cuándo das consulta?' })).toBeInViewport()
+  await page.evaluate(k => window.localStorage.removeItem(k), `spinus-agenda-primera-vez:${id}`)
+})
+
 test('G2 · 9 · la médica invitada contesta SU duración (sólo suya), la cambia y quita sus tipos', async ({ browser }) => {
   await enContextoNuevo(browser, SESION.medicoA, async (p) => {
     await p.goto(RUTA)

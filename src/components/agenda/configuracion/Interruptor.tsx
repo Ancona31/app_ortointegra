@@ -14,7 +14,12 @@
  * Tanda L (punto 12): el dibujo mide 30 de alto, pero el área de toque llega a 46 con un `::before`
  * invisible 8 px por encima y por debajo (el clic en él es clic en el botón). Sin cambio a la vista.
  * (El `inset` cuenta desde dentro del borde de 1 px: `-inset-y-[9px]` sale 8 fuera.)
- * Tanda M (punto 2): en computadora (`sm`), `-inset-y-[6px]`, 5 fuera: 40 de alto, el de los botones.
+ * Tanda M (punto 2): en computadora, `-inset-y-[6px]`, 5 fuera: 40 de alto, el de los botones.
+ *
+ * B13 · AG9 (rediseño, maquetas `ag-config`/`ag-pv`): colores del kit. Encendido, `--accion`; apagado, la pista
+ * del kit (`--tinta3` al 38 % sobre `--sup2`) con un borde `--tinta3` que la deja a ≥ 3:1 del fondo (WCAG
+ * 1.4.11, como antes). La escala de computadora va por FORMATO (`ih`/`esc`), no desde 640 px: en el Duo
+ * abierto en vertical (`iv`) el área vuelve a ser de 46.
  */
 interface Props {
   encendido: boolean
@@ -28,9 +33,9 @@ export default function Interruptor({ encendido, alCambiar, etiquetadoPor, etiqu
   return (
     <button type="button" role="switch" aria-checked={encendido} aria-labelledby={etiquetadoPor} aria-label={etiquetadoPor ? undefined : etiqueta}
       onClick={alCambiar} disabled={deshabilitado}
-      className={`relative flex h-[30px] w-[52px] flex-none cursor-pointer rounded-full border p-[2px] before:absolute before:inset-x-0 before:-inset-y-[9px] before:content-[''] sm:before:-inset-y-[6px] transition-colors duration-[var(--ag-dur-micro)] disabled:cursor-not-allowed disabled:opacity-50 ${encendido
-        ? 'justify-end border-[var(--ag-control-primario-border)] bg-[var(--ag-brand-secondary)]' : 'justify-start border-[var(--ag-control-border)] bg-[var(--ag-control-border)]'}`}>
-      <span aria-hidden="true" className="h-[24px] w-[24px] rounded-full bg-white shadow-[0_1px_2px_rgba(15,23,42,0.25)]" />
+      className={`relative flex h-[30px] w-[52px] flex-none cursor-pointer rounded-full border p-[2px] before:absolute before:inset-x-0 before:-inset-y-[9px] before:content-[''] ih:before:-inset-y-[6px] esc:before:-inset-y-[6px] transition-colors duration-[var(--dur-toque)] disabled:cursor-not-allowed disabled:opacity-45 ${encendido
+        ? 'justify-end border-accion bg-accion' : 'justify-start border-tinta3 bg-[color-mix(in_srgb,var(--tinta3)_38%,var(--sup2))]'}`}>
+      <span aria-hidden="true" className="h-[24px] w-[24px] rounded-full bg-white shadow-[0_1px_3px_rgba(10,18,32,0.28)]" />
     </button>
   )
 }

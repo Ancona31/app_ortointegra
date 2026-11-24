@@ -8607,6 +8607,67 @@ html[data-lp-teclado] [data-lp-espera] [data-lp-reveal] {
 }
 
 
+/* ═══ B13 · AG9/AG10 · CONFIGURACIÓN DE LA AGENDA Y PRIMERA VEZ (ag-config, ag-pv) ═══
+   `/agenda/configuracion` (pestañas y asistente de primera vez). Lo demás va
+   en utilidades del kit en cada `.tsx` (`estilosConfig.ts`); aquí sólo lo que
+   una utilidad no dice bien: la LISTA de una superficie con separadores con
+   sangría (patrón de Mi perfil, maqueta `ag-config` `.ac-tar`), la pista de
+   pestañas que se desliza en el teléfono con el borde fundido, y la flecha
+   del selector. Tokens del kit (`--sup`, `--linea`, `--tinta2`), con su oscuro.
+   Nada de `--ag-*`: esta página vive fuera de `.agenda-raiz`. */
+.agc-lista { position: relative; display: flex; flex-direction: column; min-width: 0; background: var(--sup); color: var(--tinta); border-radius: var(--r-tarjeta); }
+:root[data-formato="ih"] .agc-lista, :root[data-formato="iv"] .agc-lista { border-radius: 18px; }
+:root[data-formato="esc"] .agc-lista { border-radius: var(--r-tarjeta-ancha); }
+.agc-lista > * { position: relative; }
+.agc-lista > * + *::before {
+  content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 1px;
+  background: var(--linea); pointer-events: none;
+}
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .agc-lista > * + *::before { left: 20px; right: 20px; }
+.agc-lista > [hidden]:first-child + *::before, .agc-lista > .agc-sin-linea::before { display: none; }
+/* Una fila-acción pulsable dentro de la lista: responde al toque con el fondo, no con escala. */
+.agc-lista > :is(button, a):active { background: var(--fondo); }
+.agc-lista > :first-child { border-top-left-radius: inherit; border-top-right-radius: inherit; }
+.agc-lista > :last-child { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
+
+/* Pestañas en el teléfono: TEXTO en una pista que se desliza (antes, sólo iconos), con el borde fundido
+   para decir «hay más». La pista sale a todo el ancho (anula el margen de la página). */
+:root:is([data-formato="ext"], [data-formato="tel"]) .agc-tabs {
+  justify-content: flex-start; gap: 22px; margin-inline: -16px; padding-inline: 16px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 40px), transparent);
+}
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .agc-tabs { gap: 28px; }
+:root[data-formato="ih"] .agc-tabs { gap: 24px; }
+
+/* El selector con su flecha (`.k-campo` quita la del sistema). */
+select.agc-select {
+  padding-right: 40px; text-overflow: ellipsis;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237b8799' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 16px 16px;
+}
+/* El campo de número de una frase («Pueden ver horarios de los próximos [60] días»): sin flechas. */
+.agc-num { text-align: center; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+.agc-num::-webkit-inner-spin-button, .agc-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* La lista vacía de la agenda (`renderSinEventos`, CALMA §29.12): el enlace a «Configuración de la agenda» sólo con
+   la v2 (la página no existe sin ella). Texto `--enlace` 600, 44 de toque en táctil y 36 en `ih`/`esc`. */
+.agc-vacio-config { display: none; }
+.agenda-raiz[data-agenda-v2="encendida"] .agc-vacio-config {
+  display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 4px;
+  color: var(--enlace); font-weight: 600; text-decoration: none;
+}
+:root:is([data-formato="ih"], [data-formato="esc"]) .agenda-raiz[data-agenda-v2="encendida"] .agc-vacio-config { min-height: 36px; }
+
+/* «Guardado»: entra desde arriba y sale por el mismo camino (sólo `translate` y `opacity`); con movimiento
+   reducido, sólo fundido. Mismo dibujo que el aviso breve del catálogo (`ui/Toast.tsx`). */
+.agc-aviso { transition: translate var(--dur-entra) var(--resorte-entra), opacity var(--dur-entra) var(--resorte-entra); }
+@starting-style { .agc-aviso { translate: 0 -60%; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .agc-aviso { transition-duration: var(--dur-sale); }
+  @starting-style { .agc-aviso { translate: 0 0; opacity: 0; } }
+}
+
 /* ════════════════════════════════════════════════════════════════════════════
    AMPLIACIÓN DE LA HOJA DE TRADUCCIÓN DE MODO OSCURO
    ----------------------------------------------------------------------------
