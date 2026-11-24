@@ -65,6 +65,9 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
     maqueta es de «Fecha y hora».
   * Rótulos 13 `--tinta2` (antes 11 en versalitas); campos y fichas `--sup2` sin borde, 44/16 en táctil y
     40/15 (fichas 36) en `ih`/`esc`; todo texto de 10–11 px del cuerpo sube a 12.
+  * Fichas del kit (duración, tipo: `--sup2`; la elegida tonal con contorno `--enlace`); el ESTADO lleva su
+    icono en círculo (`IconoEstadoCita`, decorativo: el nombre del botón sigue siendo el texto) y el elegido
+    el contorno; en `ext` los pares fecha | hora van en una columna (en 310 no caben dos fechas).
   * La destructiva («Cancelar cita» / «Eliminar evento» / «Eliminar cita») baja a una FILA ROJA al final del
     cuerpo (`.ag-form-peligro`) que abre su alerta; el icono del pie queda sólo con la v2 apagada.
   * Pie: «Cancelar» quieto y «Guardar» primario, 44 (40 en `ih`/`esc`), mínimo 104.
@@ -133,6 +136,17 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
 * AG8: «Huecos disponibles» en `ih`/`iv` NO hecho: la opción del engrane necesita los huecos y el médico
   elegido, que viven en `AgendaCliente` (línea de vistas); pide una prop nueva a `MenuEngraneAgenda`.
   La barra por formato de PIEZAS §4, aplazada por el coordinador. «Plegar menú» ya existía (B4).
+
+## Rojos comprobados contra la base (`cbaaa1c1`, worktree aparte, mismo puerto y misma base de datos)
+* `reserva-google:275` («GET de turnos…»): FALLA IGUAL en la base → preexistente, no es de esta línea.
+* `agenda-google-dos-sentidos:458`: en la base FALLA y la guarda de asistencia la marca igual → preexistente.
+* `agenda-convertir-google:90`: pasa en la base y en esta rama, y corrida SOLA no deja nada a la guarda en
+  ninguna de las dos; la marca que salió en una tanda larga depende del orden de la corrida (siembra
+  citas el jueves de la semana visible, `DIA_LABORABLE_LIBRE`).
+* `agenda-f-movimiento:187` (y el mismo patrón en `agenda-cache-rangos`, `-candado-gesto`, `-tiempo-real`,
+  `-reflejo-enlace`, `confirmacion-enlace`, `confirmacion-k2-al-cargar`, `recordatorios`,
+  `reserva-k2-codigo`): `localhost:3001` escrito a mano; ahora usan la base URL de la corrida
+  (`test.info().project.use.baseURL` o `E2E_BASE_URL`). Defecto de las pruebas, corregido.
 
 ## Peticiones a otras líneas
 * **VISTAS (`AgendaCliente.tsx:1822`)**: quitar `leyenda={…BotonLeyendaAgenda…}` de la barra (§28: la
