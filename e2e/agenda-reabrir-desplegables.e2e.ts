@@ -39,8 +39,10 @@ async function abrirCerrarAbrir(page: Page, boton: string, dialogo: string): Pro
   await disparador.click()
   await expect(page.getByRole('dialog', { name: dialogo })).toBeVisible()
   await expect(page.getByText('Algo salió mal')).toHaveCount(0)
-  // Y el botón sigue alternando: un tercer clic lo cierra.
-  await disparador.click()
+  // Y el botón sigue alternando: un tercer clic lo cierra. B13 · AG8: fuera de computadora la capa lleva el
+  // velo del catálogo encima del botón; el toque en ese sitio cae en el velo y cierra igual (`force`: el clic
+  // va al punto del botón aunque lo tape el velo, que es lo que hace un dedo).
+  await disparador.click({ force: true })
   await expect(page.getByRole('dialog', { name: dialogo })).toHaveCount(0)
   await expect(page.getByText('Algo salió mal')).toHaveCount(0)
 }
