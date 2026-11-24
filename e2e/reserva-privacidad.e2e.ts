@@ -89,7 +89,7 @@ test('el aviso integral: público, relleno con el consultorio, sin marcadores y 
     await expect(aviso.getByRole('heading', { level: 2 })).toHaveCount(15)
     await expect(aviso).toContainText('Versión consultorio-2026-12-v1 · Última actualización: 24 de noviembre de 2026')
     await expect(aviso).toContainText(`con domicilio en ${c.direccion} (${c.nombre}), es responsable del tratamiento`)
-    await expect(aviso).toContainText(`Medios. Por escrito en ${c.direccion}, para orientación, al teléfono ${c.telefono}.`)
+    await expect(aviso).toContainText(`Medios. Por escrito en ${c.direccion} o, para orientación, al teléfono ${c.telefono}.`)
     await expect(aviso).toContainText('Secretaría Anticorrupción y Buen Gobierno (www.gob.mx/buengobierno)')
     await expect(aviso).not.toContainText(/\{[A-Z_]+\}|CORREO_PRIVACIDAD|\[FECHA|\*\*|\\|®/)
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(238, 241, 245)')

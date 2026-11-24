@@ -17,14 +17,14 @@ describe('aviso integral del consultorio', () => {
   it('es el documento aprobado, salvo la fecha y el correo de privacidad que aún no existe', () => {
     const esperado = DOCUMENTO
       .replace('[FECHA DE PUBLICACIÓN]', '{FECHA}')
-      .replace(' al correo {CORREO_PRIVACIDAD} o,', '')
+      .replace(', al correo {CORREO_PRIVACIDAD} o,', ' o,')
     expect(esperado).not.toBe(DOCUMENTO)
     expect(AVISO_INTEGRAL_PLANTILLA).toBe(esperado)
     expect(AVISO_INTEGRAL_PLANTILLA).toContain(`Versión ${AVISO_INTEGRAL_VERSION} · Última actualización: {FECHA}`)
   })
   it('no promete un correo que no hay, ni nombra al INAI, ni cita artículos', () => {
     expect(AVISO_INTEGRAL_PLANTILLA).not.toContain('CORREO_PRIVACIDAD')
-    expect(AVISO_INTEGRAL_PLANTILLA).toContain('**Medios.** Por escrito en {DIRECCION}, para orientación, al teléfono {TELEFONO}.')
+    expect(AVISO_INTEGRAL_PLANTILLA).toContain('**Medios.** Por escrito en {DIRECCION} o, para orientación, al teléfono {TELEFONO}.')
     expect(AVISO_INTEGRAL_PLANTILLA).toContain('Secretaría Anticorrupción y Buen Gobierno')
     expect(AVISO_INTEGRAL_PLANTILLA).not.toMatch(/INAI/)
     expect(AVISO_INTEGRAL_PLANTILLA).not.toMatch(/art[íi]culo\s+\d|art\.\s*\d/i)

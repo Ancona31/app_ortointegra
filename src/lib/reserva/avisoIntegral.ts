@@ -7,9 +7,12 @@
  * ⚠️ TEXTO LEGAL APROBADO PARA LA BETA: copia LITERAL del documento, en
  * Markdown, con DOS cambios y ninguno más (`avisoIntegral.test.ts` lo exige):
  *   1. «[FECHA DE PUBLICACIÓN]» es el marcador `{FECHA}` (`AVISO_INTEGRAL_FECHA`);
- *   2. en la sección 10 se quitaron las palabras «al correo {CORREO_PRIVACIDAD}
- *      o,», como manda `PENDIENTES-TECNICOS.md`: el campo de correo de
- *      privacidad por consultorio no existe todavía.
+ *   2. en la sección 10, «Por escrito en {DIRECCION}, al correo
+ *      {CORREO_PRIVACIDAD} o, para orientación, al teléfono…» queda «Por
+ *      escrito en {DIRECCION} o, para orientación, al teléfono…»: el campo de
+ *      correo de privacidad por consultorio no existe todavía
+ *      (`PENDIENTES-TECNICOS.md`), y se conserva la conjunción para que la
+ *      frase no quede rota. PENDIENTE DE QUE EL ABOGADO LO CONFIRME.
  * No se redacta ni se «mejora» aquí.
  *
  * Los marcadores `{MEDICO}`, `{CONSULTORIO}`, `{DIRECCION}` y `{TELEFONO}` los
@@ -127,7 +130,7 @@ Mientras reservas, tu navegador guarda de forma temporal lo que escribiste, por 
 
 Puedes acceder a tus datos, rectificarlos, cancelarlos u oponerte a su tratamiento.
 
-**Medios.** Por escrito en {DIRECCION}, para orientación, al teléfono {TELEFONO}.
+**Medios.** Por escrito en {DIRECCION} o, para orientación, al teléfono {TELEFONO}.
 
 **Quién atiende.** {MEDICO}.
 
