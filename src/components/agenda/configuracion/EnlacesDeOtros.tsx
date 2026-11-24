@@ -18,7 +18,7 @@
  */
 import { useId, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
-import ConfirmModal from '@/components/agenda/ConfirmModal'
+import ConfirmModal, { type IconoConfirmacion } from '@/components/agenda/ConfirmModal'
 import BloqueEnlacesMedico from '@/components/agenda/configuracion/BloqueEnlacesMedico'
 import { fichas } from '@/components/agenda/configuracion/SeccionEnlacesReserva'
 import { emitirEnlace, leerCodigo, revocarEnlace, urlReserva, type Resultado } from '@/components/agenda/configuracion/accionesConfig'
@@ -29,6 +29,12 @@ import type { MedicoConfig } from '@/lib/configApp'
 
 export const MSJ_REVOCAR = 'El enlace dejará de funcionar para siempre, también para quien ya lo tenga. Las citas que ya se reservaron con él no cambian. ¿Apagarlo?'
 export const MSJ_REGENERAR = 'Se crea un enlace nuevo y el anterior deja de funcionar: quien lo tenga guardado ya no podrá apartar con él. ¿Cambiarlo?'
+
+/** B13 (CALMA §29.3–§29.4) · La alerta del catálogo con su verbo en vez de «Aceptar»: apagar es
+    destructivo (rojo); cambiar el enlace, un aviso (ámbar). */
+export function alertaDeEnlace(mensaje: string): { verbo: string; icono: IconoConfirmacion } {
+  return mensaje === MSJ_REVOCAR ? { verbo: 'Apagar', icono: 'eliminar' } : { verbo: 'Cambiar', icono: 'aviso' }
+}
 
 interface Props {
   lista: ListaEnlaces
@@ -105,7 +111,7 @@ export default function EnlacesDeOtros(p: Props) {
         </>
       )}
       {g.pregunta && (
-        <ConfirmModal message={g.pregunta.mensaje}
+        <ConfirmModal message={g.pregunta.mensaje} {...alertaDeEnlace(g.pregunta.mensaje)}
           onConfirm={() => { const q = g.pregunta; g.setPregunta(null); q?.seguir() }}
           onCancel={() => g.setPregunta(null)} />
       )}

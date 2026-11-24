@@ -93,7 +93,8 @@ test('el administrador crea, muestra, regenera y revoca el enlace fijo de un mé
 
   /* Regenerar: «Cambiar por uno nuevo», con confirmación. */
   await panel.getByRole('button', { name: 'Cambiar por uno nuevo' }).click()
-  await page.getByRole('button', { name: 'Aceptar' }).click()
+  // B13 (§29.3–§29.4): la alerta del catálogo lleva el verbo, no «Aceptar».
+  await page.getByRole('dialog').getByRole('button', { name: 'Cambiar', exact: true }).click()
   await expect(direccion).toHaveText(/\/reservar\/[A-Za-z0-9_-]{22}$/)
   await expect(direccion).not.toHaveText(primera ?? '')
   const todos = [...enlacesDe(idDe(CORREO.medicoA)), ...enlacesDe(idDe(CORREO.adminA))]

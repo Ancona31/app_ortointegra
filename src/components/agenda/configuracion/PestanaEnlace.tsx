@@ -27,7 +27,7 @@ import { AlertTriangle, Copy, Link2, MessageCircle, Plus, Ticket } from 'lucide-
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import CrearEnlaceUnaVez from '@/components/agenda/configuracion/CrearEnlaceUnaVez'
-import EnlacesDeOtros, { MSJ_REGENERAR, MSJ_REVOCAR } from '@/components/agenda/configuracion/EnlacesDeOtros'
+import EnlacesDeOtros, { MSJ_REGENERAR, MSJ_REVOCAR, alertaDeEnlace } from '@/components/agenda/configuracion/EnlacesDeOtros'
 import Interruptor from '@/components/agenda/configuracion/Interruptor'
 import { emitirEnlace, leerCodigo, pausarEnlace, revocarEnlace, urlReserva, urlWhatsApp, type Resultado } from '@/components/agenda/configuracion/accionesConfig'
 import type { EstadoLista, ListaEnlaces } from '@/components/agenda/configuracion/listaEnlaces'
@@ -197,7 +197,7 @@ function Propio({ p, lista }: { p: Props; lista: ListaEnlaces }) {
         </div>
       )}
       {pregunta && (
-        <ConfirmModal message={pregunta.mensaje} onCancel={() => setPregunta(null)}
+        <ConfirmModal message={pregunta.mensaje} {...alertaDeEnlace(pregunta.mensaje)} onCancel={() => setPregunta(null)}
           onConfirm={() => { const q = pregunta; setPregunta(null); q.seguir() }} />
       )}
     </>

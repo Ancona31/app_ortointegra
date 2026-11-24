@@ -300,7 +300,8 @@ test('14 y 17 · Tu enlace: apagarlo lo pausa sin preguntar; prenderlo lo devuel
   const fila = page.getByRole('group', { name: 'Paciente de prueba J5' })
   await expect(fila).toContainText('Sin usar · deja de servir el')
   await fila.getByRole('button', { name: 'Apagar el enlace de Paciente de prueba J5' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aceptar' }).click()
+  // B13 (§29.3–§29.4): la alerta del catálogo lleva el verbo, no «Aceptar».
+  await page.getByRole('dialog').getByRole('button', { name: 'Apagar', exact: true }).click()
   await expect(fila).toHaveCount(0)
 })
 

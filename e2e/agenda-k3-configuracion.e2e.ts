@@ -241,7 +241,8 @@ test('14 · apagar «Tu enlace» lo pausa sin preguntar: fuera responde como un 
   await ctx.dispose()
 
   await panel.getByRole('button', { name: 'Cambiar por uno nuevo' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Aceptar' }).click()
+  // B13 (§29.3–§29.4): la alerta del catálogo lleva el verbo, no «Aceptar».
+  await page.getByRole('dialog').getByRole('button', { name: 'Cambiar', exact: true }).click()
   await expect(panel.locator('[data-enlace-fijo]')).not.toHaveText(new RegExp(`/reservar/${codigo}$`))
   expect(fila()).toBe('false|true')
 })
