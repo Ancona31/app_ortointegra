@@ -682,8 +682,8 @@ test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin m
   // `?cita=` lleva a su día (vista Día) y abre su tarjeta de lectura: con la «G».
   await page.goto(`/agenda?cita=${importada}`)
   const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) })
-  /* Tanda K, punto 21: en la burbuja la «G» va en la línea «Llegó de Google Calendar», a color. */
-  const linea = tarjeta.locator('.ag-burbuja-origen', { hasText: 'Llegó de Google Calendar' })
+  /* Tanda K, punto 21: en la burbuja la «G» va en la línea «Agendada desde Google Calendar» (CALMA §28; antes «Llegó de Google Calendar»), a color. */
+  const linea = tarjeta.locator('.ag-burbuja-origen', { hasText: 'Agendada desde Google Calendar' })
   await expect(linea).toBeVisible({ timeout: 120_000 })
   await expect(linea.locator('path[fill="#4285F4"]')).toHaveCount(1)
   await page.keyboard.press('Escape')
@@ -710,7 +710,7 @@ test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin m
   await page.getByRole('button', { name: 'Opciones de la agenda' }).first().click()
   await page.getByRole('menu', { name: 'Opciones de la agenda' }).getByRole('menuitem', { name: 'Leyenda de estados' }).click()
   const leyenda = page.getByRole('dialog', { name: 'Leyenda de estados' })
-  await expect(leyenda).toContainText('Se agendó en Google')
+  await expect(leyenda).toContainText('Agendada desde Google Calendar')
   await expect(leyenda).not.toContainText('GCal')
 })
 

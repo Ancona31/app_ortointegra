@@ -53,7 +53,7 @@ import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 import type { AltaGuardada, Appointment, DatosGuardado } from '@/lib/agenda/tiposAgenda'
-import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
+import { posicionCapa, ventanaParaCapas, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 import { idDeOpcion, indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import { buscarPacientes, limpiarTextoBusqueda } from '@/lib/agenda/buscarCitasPaciente'
@@ -106,14 +106,34 @@ interface Props {
    tres (CLAUDE.md, protocolo 4: sacarlas a un módulo compartido pide el visto
    bueno de Angel). */
 /**
+ * B13 · AG5/AG8 · Fuera de computadora la capa la centra (o la apoya abajo, en `tel`) el CSS; aquí sólo
+ * se la sube a la parte VISIBLE cuando el teclado en pantalla encoge `visualViewport` (T1). Sin
+ * teclado, nada en línea. COPIA DELIBERADA en las tres copias de `colocar` (AG-DT-38).
+ */
+function colocarSinAncla(nodo: HTMLElement, formato: string): void {
+  const vv = window.visualViewport
+  const abajo = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0
+  nodo.style.left = ''
+  nodo.style.transformOrigin = ''
+  nodo.style.top = vv && abajo > 0 && formato !== 'tel' ? `${Math.round(vv.offsetTop) + 8}px` : ''
+  nodo.style.bottom = vv && abajo > 0 ? `${abajo + (formato === 'tel' ? 0 : 8)}px` : ''
+  nodo.style.maxHeight = vv && abajo > 0 ? `${Math.floor(vv.height) - 16}px` : ''
+}
+
+/**
  * Coloca el panel junto al ancla, en el mismo commit en que se monta (sin un
  * fotograma fuera de sitio). T1: con el alto NATURAL (con `max-height` puesto,
  * `offsetHeight` ya llega recortado), en la parte VISIBLE de la ventana, y con
  * el `max-height` que no la deja salir.
  */
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
+  /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
+     es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') { colocarSinAncla(nodo, formato); return }
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
-  const ventana = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
+  const ventana = ventanaParaCapas()
   const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana, punto)
   nodo.style.left = `${p.left}px`
   nodo.style.top = `${p.top}px`
@@ -525,9 +545,11 @@ export default function BurbujaAlta(props: Props): ReactElement {
   return (
     <>
       <Portal>
+        {/* B13 · AG5 · el velo del catálogo fuera de computadora (en `esc` no se pinta: CSS). */}
+        <div className="ag-capa-velo ag-capa-barra-velo" aria-hidden="true" />
         <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
           onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
-          className="ag-capa ag-capa--tarjeta" data-estado={saliendo ? 'saliendo' : 'abierta'}>
+          className="ag-capa ag-capa--tarjeta ag-capa-barra" data-estado={saliendo ? 'saliendo' : 'abierta'}>
           <div className="ag-capa-cab">
             <h2 id={idTitulo} className="ag-capa-titulo">{etiquetaBurbuja(fecha, horas.inicio, horas.fin)}</h2>
             <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={salir}><X size={16} aria-hidden="true" /></button>

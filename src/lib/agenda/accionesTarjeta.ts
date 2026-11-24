@@ -62,8 +62,10 @@ export const ETIQUETA_ACCION: Record<AccionTarjeta, string> = {
   editar: 'Editar',
   convertir: 'Convertir en cita',
   eliminar: 'Eliminar evento',
-  'no-es-cita': 'No es una cita',
-  ligar: 'Ligar expediente e iniciar',
+  /* B13 · AG7 (CALMA §28, textos unificados): «¿No es una cita?» con signos en todas partes, y el
+     ligado como en el dashboard. Antes, «No es una cita» y «Ligar expediente e iniciar». */
+  'no-es-cita': '¿No es una cita?',
+  ligar: 'Ligar paciente e iniciar consulta',
   'no-asistio': 'No asistió',
   /* Tanda L, punto 9 · la de una CANCELADA: la quita de la agenda sin borrarla (queda cerrada). */
   'eliminar-cita': 'Eliminar cita',
@@ -204,8 +206,12 @@ function ayudaDeBurbuja(cita: CitaTarjeta, principal: AccionTarjeta | null): str
 function rejillaDeBurbuja(cita: CitaTarjeta, d: DisposicionTarjeta, o: OpcionesBurbuja, hayConfirmar: boolean): CeldaBurbuja[] {
   const tiene = (p: PiezaTarjeta): boolean => d.secundarias.includes(p)
   if (esEventoGenerico(cita)) return d.secundarias.filter((p): p is AccionTarjeta => p !== 'whatsapp')
-  if (cita.status === 'cancelled') return tiene('reasignar') ? ['reasignar'] : []
-  if (!VIVAS.includes(cita.status)) return []
+  /* B13 · AG5 (maqueta `ag-burbuja`, decisión del dueño) · TODAS las burbujas llevan la fila
+     «Editar» —la misma puerta que el lápiz de la cabecera (`alAccion('editar')`)—, también la
+     cancelada, la atendida y la no asistida, donde antes sólo se llegaba por la cabecera. No es
+     una acción nueva para el servidor: abre el formulario de siempre. */
+  if (cita.status === 'cancelled') return [...(tiene('reasignar') ? ['reasignar' as const] : []), 'editar']
+  if (!VIVAS.includes(cita.status)) return ['editar']
   /* J4 · la principal desplazada por `destacar` va primero, como antes. */
   const subida = d.secundarias.filter((p): p is AccionTarjeta => p === 'iniciar-consulta' || p === 'ligar')
   const reagendar: CeldaBurbuja[] = tiene('reagendar') ? ['reagendar'] : []

@@ -52,7 +52,7 @@ test.describe.configure({ mode: 'serial' })
 soloEscritorio()
 
 const ASUNTO = 'Tu código para reservar'
-const BASE = 'http://localhost:3001'
+const BASE = process.env.E2E_BASE_URL ?? 'http://localhost:3001'
 let e: Escenario
 let desde = ''
 let fijo = ''

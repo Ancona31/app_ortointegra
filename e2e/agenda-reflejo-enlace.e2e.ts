@@ -43,7 +43,7 @@ soloEscritorio()
 test.use({ storageState: SESION.adminA })
 
 const TZ = 'America/Merida'
-const BASE_URL = 'http://localhost:3001'
+const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3001'
 const ENLACE_CONF = /\/confirmar\/([A-Za-z0-9_-]{22})(?=[\s"<]|$)/
 const TITULO = 'Cita I1 reflejo'
 

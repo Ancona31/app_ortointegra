@@ -39,7 +39,7 @@ test('con admin.a abierto, una cita que crea la secretaria por API aparece sola,
   // firmas pendientes, `aplicarCambioRealtime` lo trataría como un eco propio
   // y lo descartaría en vez de pintarlo — el caso que esta prueba existe
   // para cubrir es justo el contrario.
-  const comoSecretaria = await request.newContext({ baseURL: 'http://localhost:3001', storageState: SESION.secretariaA })
+  const comoSecretaria = await request.newContext({ baseURL: test.info().project.use.baseURL, storageState: SESION.secretariaA })
   const inicio = new Date(`${DIA_LABORABLE_LIBRE}T16:00:00`)
   const fin = new Date(`${DIA_LABORABLE_LIBRE}T16:20:00`)
   const res = await comoSecretaria.post('/api/appointments', {

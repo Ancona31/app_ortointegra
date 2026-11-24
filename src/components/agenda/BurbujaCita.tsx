@@ -25,10 +25,12 @@
  * «Confirmar» despliega (`aria-expanded`); Escape cierra lo desplegado antes que la burbuja; el
  * expediente tachado es un botón con nombre y aviso.
  */
-import { useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode, type RefObject } from 'react'
-import { ArrowRightLeft, UserPlus } from 'lucide-react'
+import { Fragment, useId, useRef, useState, type KeyboardEvent, type PointerEvent as EventoPuntero, type ReactElement, type ReactNode, type RefObject } from 'react'
+import { ArrowRightLeft, CalendarX, ChevronDown, Link2, Trash2, UserPlus, X as Tache } from 'lucide-react'
+import { AYUDA_NO_ES_CITA } from '@/components/agenda/BotonNoEsCita'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
-import { STATUS_CONFIG, marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
+import { marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
+import IconoEstadoCita from '@/components/ui/IconoEstadoCita'
 import { indiceTrasTecla } from '@/lib/agenda/opcionesLista'
 import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
 import { IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
@@ -70,30 +72,35 @@ function Trazo({ size = 20, color = 'currentColor', children }: { size?: number;
       strokeLinejoin="round" aria-hidden="true" focusable="false" className="flex-none">{children}</svg>
   )
 }
-const IconoPuntos = () => <Trazo><circle cx="12" cy="5" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="12" cy="19" r="1.2" /></Trazo>
 const IconoCerrar = () => <Trazo><path d="M6 6l12 12M18 6L6 18" /></Trazo>
-const IconoReloj = () => <Trazo color="var(--ag-brand-legible)"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Trazo>
+const IconoReloj = () => <Trazo color="var(--tinta2)"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Trazo>
 const IconoPlay = () => <Trazo><path d="M7 4v16l13-8z" /></Trazo>
 const IconoDoc = () => <Trazo><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h4" /></Trazo>
 const IconoCal = ({ color }: { color?: string }) => (
   <Trazo color={color}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18M10 15h6M14 13l2 2-2 2" /></Trazo>
 )
-const IconoCheck = () => <Trazo color="var(--ag-brand-legible)"><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 10" /></Trazo>
-const IconoLapiz = () => <Trazo color="var(--ag-ink-600)"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" /></Trazo>
+const IconoCheck = () => <Trazo><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.7 2.7L16 10" /></Trazo>
+const IconoLapiz = () => <Trazo><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" /></Trazo>
 const IconoNoAsistio = () => (
-  <Trazo color="var(--ag-muted)"><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 9l5 5M21 9l-5 5" /></Trazo>
+  <Trazo><circle cx="9" cy="8" r="3.5" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 9l5 5M21 9l-5 5" /></Trazo>
 )
 
 /** El icono de cada botón de la rejilla (y del ancho, si «Reagendar» sube a principal). */
 function IconoDeAccion({ a }: { a: CeldaBurbuja }): ReactElement | null {
   switch (a) {
     case 'menu-confirmar': return <IconoCheck />
-    case 'reagendar': return <IconoCal color="var(--ag-brand-legible)" />
+    case 'reagendar': return <IconoCal />
     case 'editar': return <IconoLapiz />
     case 'no-asistio': return <IconoNoAsistio />
-    case 'reasignar': return <ArrowRightLeft size={20} aria-hidden="true" color="var(--ag-brand-legible)" />
-    case 'convertir': return <UserPlus size={20} aria-hidden="true" color="var(--ag-brand-legible)" />
-    case 'iniciar-consulta': case 'ligar': return <IconoPlay />
+    case 'reasignar': return <ArrowRightLeft size={20} aria-hidden="true" />
+    case 'convertir': return <UserPlus size={20} aria-hidden="true" />
+    /* B13 · AG5: las del pie, con su icono (la destructiva en rojo, por CSS). */
+    case 'cancelar': return <Tache size={20} aria-hidden="true" />
+    case 'eliminar': case 'eliminar-cita': return <Trash2 size={20} aria-hidden="true" />
+    case 'no-es-cita': return <CalendarX size={20} aria-hidden="true" />
+    case 'iniciar-consulta': return <IconoPlay />
+    /* B13 · AG7 (CALMA §29.6): ligar lleva el ESLABÓN, como en el dashboard. */
+    case 'ligar': return <Link2 size={20} aria-hidden="true" />
     default: return null
   }
 }
@@ -115,8 +122,10 @@ function SinExpediente(): ReactElement {
   )
 }
 
-/** Las líneas de procedencia: «Llegó de Google Calendar» y el eslabón (permanente). */
-function Procedencia({ cita, enlacePropio, historial }: { cita: Appointment; enlacePropio: boolean; historial: string | null }): ReactElement | null {
+/** Las líneas de procedencia y el eslabón (permanente). B13 · AG5 (CALMA §28, textos unificados):
+    «Agendada desde Google Calendar» y «Reservó por enlace» (antes «Llegó de Google Calendar» y
+    «La apartó con tu enlace» / «… con el enlace de reserva»). */
+function Procedencia({ cita, historial }: { cita: Appointment; historial: string | null }): ReactElement | null {
   const google = cita.origen === 'google'
   const enlace = Boolean(cita.reserva_canal)
   if (!google && !enlace) return null
@@ -124,13 +133,13 @@ function Procedencia({ cita, enlacePropio, historial }: { cita: Appointment; enl
     <>
       {google && (
         <p className="ag-burbuja-origen">
-          <span className="ag-burbuja-origen-icono ag-burbuja-origen-icono--g"><GoogleGIcon size={12} /></span>Llegó de Google Calendar
+          <span className="ag-burbuja-origen-icono ag-burbuja-origen-icono--g"><GoogleGIcon size={14} /></span>Agendada desde Google Calendar
         </p>
       )}
       {enlace && (
         <p className="ag-burbuja-origen" data-burbuja-enlace="">
-          <span className="ag-burbuja-origen-icono ag-burbuja-origen-icono--enlace"><IconoEnlace size={13} /></span>
-          {enlacePropio ? 'La apartó con tu enlace' : 'La apartó con el enlace de reserva'}
+          <span className="ag-burbuja-origen-icono ag-burbuja-origen-icono--enlace"><IconoEnlace size={14} /></span>
+          Reservó por enlace
         </p>
       )}
       {historial && <p className="ag-burbuja-origen ag-burbuja-historial">{historial}</p>}
@@ -139,23 +148,24 @@ function Procedencia({ cita, enlacePropio, historial }: { cita: Appointment; enl
 }
 
 interface PropsCabecera {
-  cita: Appointment; idTitulo: string; salir: () => void; enlacePropio: boolean
-  /** Tanda M, punto 4 · el ⋮ abre el formulario completo (`alAccion('editar')`), sin menú. */
+  cita: Appointment; idTitulo: string; salir: () => void
+  /** Tanda M, punto 4 · el botón abre el formulario completo (`alAccion('editar')`), sin menú. */
   alEditar: () => void
 }
 
-function Cabecera({ cita, idTitulo, salir, enlacePropio, alEditar }: PropsCabecera): ReactElement {
+/* B13 · AG5 · el estado es el icono en círculo del dashboard (`IconoEstadoCita`, sus colores del kit)
+   con su texto 12/600; el botón del formulario completo lleva LÁPIZ (CALMA §29.5) y el nombre de
+   siempre, «Más opciones de la cita». */
+function Cabecera({ cita, idTitulo, salir, alEditar }: PropsCabecera): ReactElement {
   const s = cita.status
   const marcas = marcasDeCita(cita)
   return (
     <div className="ag-burbuja-cab">
       <div className="ag-burbuja-fila">
-        <span className="ag-burbuja-estado" style={{ background: `var(--ag-status-${s}-bg)`, color: `var(--ag-status-${s}-text)` }}>
-          <span className="ag-burbuja-punto" style={{ background: `var(--ag-status-${s}-dot)` }} />{STATUS_CONFIG[s].label}
-        </span>
+        <span className="ag-burbuja-estado"><IconoEstadoCita estado={s} texto="siempre" compacto /></span>
         <div className="ag-burbuja-botones">
           <button type="button" className="ag-burbuja-icono" aria-label="Más opciones de la cita" aria-haspopup="dialog"
-            onClick={alEditar}><IconoPuntos /></button>
+            onClick={alEditar}><IconoLapiz /></button>
           <button type="button" className="ag-burbuja-icono" aria-label="Cerrar" onClick={salir}><IconoCerrar /></button>
         </div>
       </div>
@@ -165,12 +175,13 @@ function Cabecera({ cita, idTitulo, salir, enlacePropio, alEditar }: PropsCabece
         </h2>
         {marcas.sinExpediente && <SinExpediente />}
       </div>
-      <Procedencia cita={cita} enlacePropio={enlacePropio} historial={marcas.historial} />
+      <Procedencia cita={cita} historial={marcas.historial} />
     </div>
   )
 }
 
 /* ── El bloque de la hora y el médico ─────────────────────────────────── */
+/* B13 · AG5 · el bloque de detalles entre dos líneas: la hora, el médico y, al final, las observaciones. */
 function Info({ cita, zonaVisor, nombreMedico }: { cita: Appointment; zonaVisor: string; nombreMedico?: string | null }): ReactElement {
   const { duracion } = cuandoDeTarjeta(cita, zonaVisor)
   const { tramo, enConsultorio } = horarioDeTarjeta(cita, zonaVisor)
@@ -193,6 +204,7 @@ function Info({ cita, zonaVisor, nombreMedico }: { cita: Appointment; zonaVisor:
           <span>{nombreMedico}</span>
         </div>
       )}
+      <Observaciones notas={cita.notes} />
     </div>
   )
 }
@@ -219,9 +231,9 @@ function useFocoBarra(orden: string[]): {
   const actual = activa !== null && orden.includes(activa) ? activa : orden[0]
   const foco = (clave: string) => ({ tabIndex: clave === actual ? 0 : -1, onFocus: () => setActiva(clave) })
   function alTeclear(e: KeyboardEvent): void {
-    /* Lo que abre «Confirmar» es una columna: ahí arriba y abajo también recorren. */
-    const enColumna = actual.startsWith('c:')
-    const tecla = enColumna && e.key === 'ArrowDown' ? 'ArrowRight' : enColumna && e.key === 'ArrowUp' ? 'ArrowLeft' : e.key
+    /* B13 · AG5: la barra es una COLUMNA de filas (`aria-orientation="vertical"`): arriba y abajo
+       recorren, y las flechas de los lados siguen haciéndolo, como antes. */
+    const tecla = e.key === 'ArrowDown' ? 'ArrowRight' : e.key === 'ArrowUp' ? 'ArrowLeft' : e.key
     const i = indiceTrasTecla(orden.indexOf(actual), orden.length, tecla, 'horizontal')
     if (i === null) return
     e.preventDefault()
@@ -249,7 +261,8 @@ function Principal({ a, ayuda, alAccion, foco, autoFoco }: {
   a: AccionTarjeta; ayuda: string | null; alAccion: (a: AccionTarjeta) => void
   foco: { tabIndex: number; onFocus: () => void }; autoFoco: boolean
 }): ReactElement {
-  const icono = a === 'ver-expediente' ? <IconoDoc /> : a === 'reagendar' || a === 'reagendar-cita' ? <IconoCal /> : <IconoPlay />
+  const icono = a === 'ver-expediente' ? <IconoDoc /> : a === 'reagendar' || a === 'reagendar-cita' ? <IconoCal />
+    : a === 'ligar' ? <Link2 size={18} aria-hidden="true" /> : <IconoPlay />
   return (
     <div className="ag-burbuja-principal">
       <button type="button" data-clave="principal" autoFocus={autoFoco} {...foco} onClick={() => alAccion(a)}
@@ -289,9 +302,14 @@ interface PropsAcciones {
   mensaje: MensajeAccion | null; alMensaje: (m: MensajeAccion | null) => void
 }
 
+/* B13 · AG5 (CALMA §28) · Las acciones son FILAS DE MENÚ: icono de color y texto, a todo el ancho;
+   lo que abre «Confirmar» cuelga de su fila; el pie va tras una línea, con la destructiva en rojo al
+   final. Las clases y el orden del foco son los de antes (`.ag-burbuja-rejilla` = la lista,
+   `.ag-burbuja-celda` = una fila, `.ag-burbuja-pie` = lo de tras la línea). */
 function Acciones({ d, props, autoFoco, confirmar, mensaje, alMensaje }: PropsAcciones): ReactElement {
   const orden = ordenDeBarra(d, confirmar.abierto)
   const { barra, foco, alTeclear } = useFocoBarra(orden)
+  const idAyudaNoEsCita = useId()
   if (orden.length === 0) return <div className="ag-burbuja-fin" />
   const celda = (a: CeldaBurbuja): ReactElement => (
     <button key={a} type="button" className="ag-burbuja-celda" data-clave={`r:${a}`} autoFocus={autoFoco && orden[0] === `r:${a}`}
@@ -299,25 +317,34 @@ function Acciones({ d, props, autoFoco, confirmar, mensaje, alMensaje }: PropsAc
         ? { 'aria-expanded': confirmar.abierto, 'aria-controls': confirmar.abierto ? confirmar.id : undefined, 'data-abre-submenu': '', onClick: confirmar.alternar }
         : { onClick: () => props.alAccion(a) })}>
       <IconoDeAccion a={a} />{a === 'menu-confirmar' ? 'Confirmar' : ETIQUETA_ACCION[a]}
+      {a === 'menu-confirmar' && <ChevronDown size={16} aria-hidden="true" className="ag-burbuja-chev" />}
     </button>
   )
+  const opciones = confirmar.abierto ? <OpcionesConfirmar d={d} props={props} id={confirmar.id} foco={foco} alMensaje={alMensaje} /> : null
   return (
-    <div ref={barra} role="toolbar" aria-label="Acciones de la cita" className="ag-burbuja-acciones" onKeyDown={alTeclear}>
+    <div ref={barra} role="toolbar" aria-label="Acciones de la cita" aria-orientation="vertical" className="ag-burbuja-acciones" onKeyDown={alTeclear}>
       <div className="ag-burbuja-cuerpo">
         {d.principal && <Principal a={d.principal} ayuda={d.ayuda} alAccion={props.alAccion} foco={foco('principal')} autoFoco={autoFoco} />}
         {!d.principal && d.ayuda && <span className="ag-burbuja-ayuda">{d.ayuda}</span>}
-        {d.rejilla.length > 0 && (
-          <div className="ag-burbuja-rejilla" style={{ gridTemplateColumns: `repeat(${d.rejilla.length}, minmax(0, 1fr))` }}>{d.rejilla.map(celda)}</div>
-        )}
-        {confirmar.abierto && <OpcionesConfirmar d={d} props={props} id={confirmar.id} foco={foco} alMensaje={alMensaje} />}
-        {mensaje && <p className="ag-lectura-mensaje" role={mensaje.alerta ? 'alert' : undefined}>{mensaje.texto}</p>}
       </div>
+      {d.rejilla.length > 0 && (
+        <div className="ag-burbuja-rejilla">
+          {d.rejilla.map(a => (a === 'menu-confirmar' ? <Fragment key={a}>{celda(a)}{opciones}</Fragment> : celda(a)))}
+        </div>
+      )}
+      {d.rejilla.length === 0 && opciones}
+      {mensaje && <p className="ag-lectura-mensaje" role={mensaje.alerta ? 'alert' : undefined}>{mensaje.texto}</p>}
       {d.pie.length > 0 ? (
-        <div className="ag-burbuja-pie" style={{ gridTemplateColumns: `repeat(${d.pie.length}, minmax(0, 1fr))` }}>
+        <div className="ag-burbuja-pie">
           {d.pie.map(a => (
-            <button key={a} type="button" data-clave={`p:${a}`} {...foco(`p:${a}`)} autoFocus={autoFoco && orden[0] === `p:${a}`}
-              className={a === 'no-es-cita' ? 'ag-burbuja-pie-boton' : 'ag-burbuja-pie-boton ag-burbuja-pie-boton--peligro'}
-              onClick={() => props.alAccion(a)}>{ETIQUETA_ACCION[a]}</button>
+            <Fragment key={a}>
+              <button type="button" data-clave={`p:${a}`} {...foco(`p:${a}`)} autoFocus={autoFoco && orden[0] === `p:${a}`}
+                className={a === 'no-es-cita' ? 'ag-burbuja-pie-boton' : 'ag-burbuja-pie-boton ag-burbuja-pie-boton--peligro'}
+                aria-describedby={a === 'no-es-cita' ? idAyudaNoEsCita : undefined}
+                onClick={() => props.alAccion(a)}><IconoDeAccion a={a} />{ETIQUETA_ACCION[a]}</button>
+              {/* B13 · AG7 (CALMA §29.7): la explicación de «¿No es una cita?», a la vista. */}
+              {a === 'no-es-cita' && <p id={idAyudaNoEsCita} className="ag-burbuja-pie-ayuda">{AYUDA_NO_ES_CITA}</p>}
+            </Fragment>
           ))}
         </div>
       ) : <div className="ag-burbuja-fin" />}
@@ -358,9 +385,9 @@ export default function BurbujaCita({ props, idTitulo, salir, autoFoco }: {
   return (
     <div className="ag-burbuja-raiz" onKeyDown={desplegado.alTeclear} onPointerDown={desplegado.alPulsar}>
       <div className="ag-burbuja-franja" aria-hidden="true" style={{ background: `var(--ag-status-${cita.status}-dot)` }} />
-      <Cabecera cita={cita} idTitulo={idTitulo} salir={salir} enlacePropio={props.enlacePropio === true} alEditar={() => props.alAccion('editar')} />
+      <span className="ag-burbuja-asa" aria-hidden="true" />
+      <Cabecera cita={cita} idTitulo={idTitulo} salir={salir} alEditar={() => props.alAccion('editar')} />
       <Info cita={cita} zonaVisor={zonaVisor} nombreMedico={nombreMedico} />
-      <Observaciones notas={cita.notes} />
       <Acciones d={d} props={props} autoFoco={autoFoco} mensaje={mensaje} alMensaje={setMensaje}
         confirmar={{ abierto: desplegado.abierto, alternar: desplegado.alternar, id: idConfirmar }} />
     </div>

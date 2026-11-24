@@ -181,7 +181,7 @@ test('encendido: B7 el empalme se pregunta ANTES del POST; Cancelar deja la burb
 
   await b.getByRole('button', { name: 'Guardar', exact: true }).click()
   const post = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith('/api/appointments'))
-  await page.getByRole('dialog', { name: /«Paciente Prueba 13»/ }).getByRole('button', { name: 'Aceptar' }).click()
+  await page.getByRole('dialog', { name: /«Paciente Prueba 13»/ }).getByRole('button', { name: 'Guardar' }).click()
   expect(((await post).postDataJSON() as { empalmes_aceptados?: string[] }).empalmes_aceptados).toContain(appointment.id)
 })
 
@@ -207,6 +207,6 @@ test('encendido: fuera de horario, primero el aviso; aceptarlo abre la burbuja',
   const aviso = page.getByRole('dialog', { name: /13:30/ })
   await expect(aviso).toBeVisible()
   await expect(burbuja(page)).toHaveCount(0)
-  await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  await aviso.getByRole('button', { name: 'Agendar' }).click()
   await expect(burbuja(page)).toBeVisible()
 })

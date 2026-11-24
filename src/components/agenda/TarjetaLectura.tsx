@@ -37,7 +37,8 @@ import { useCallback, useEffect, useId, useRef, useState, type PointerEvent as E
 import Portal from '@/components/ui/Portal'
 import BurbujaCita, { type PropsBurbuja } from '@/components/agenda/BurbujaCita'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
-import { posicionCapa, ventanaVisible, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
+import { useArrastreHoja } from '@/components/ui/ModalShell'
+import { posicionCapa, ventanaParaCapas, type Caja, type Punto } from '@/lib/agenda/posicionCapa'
 import { duracionToken, prefiereMenosMovimiento } from '@/lib/agenda/movimientoAgenda'
 
 /** Tanda K, punto 21 · Lo de la burbuja (`BurbujaCita`) más el sitio, la variante y el cierre. */
@@ -64,9 +65,29 @@ interface Props extends PropsBurbuja {
    compartido (CLAUDE.md, protocolo 4). Un arreglo en una se aplica a las dos.
    T1 (punto 3 de Angel): alto NATURAL, parte VISIBLE de la ventana y
    `max-height`, para que la tarjeta no se corte al fondo de la pantalla. */
+/**
+ * B13 · AG5/AG8 · Fuera de computadora la capa la centra (o la apoya abajo, en `tel`) el CSS; aquí sólo
+ * se la sube a la parte VISIBLE cuando el teclado en pantalla encoge `visualViewport` (T1). Sin
+ * teclado, nada en línea. COPIA DELIBERADA en las tres copias de `colocar` (AG-DT-38).
+ */
+function colocarSinAncla(nodo: HTMLElement, formato: string): void {
+  const vv = window.visualViewport
+  const abajo = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0
+  nodo.style.left = ''
+  nodo.style.transformOrigin = ''
+  nodo.style.top = vv && abajo > 0 && formato !== 'tel' ? `${Math.round(vv.offsetTop) + 8}px` : ''
+  nodo.style.bottom = vv && abajo > 0 ? `${abajo + (formato === 'tel' ? 0 : 8)}px` : ''
+  nodo.style.maxHeight = vv && abajo > 0 ? `${Math.floor(vv.height) - 16}px` : ''
+}
+
 function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
+  /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
+     es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') { colocarSinAncla(nodo, formato); return }
   const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
-  const ventana = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
+  const ventana = ventanaParaCapas()
   const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana, punto)
   nodo.style.left = `${p.left}px`
   nodo.style.top = `${p.top}px`
@@ -80,10 +101,20 @@ function colocar(nodo: HTMLElement, ancla: Caja, punto?: Punto): void {
  * ella; el CSS (`.ag-hoja`) da lo mismo sin `visualViewport`.
  */
 function colocarHoja(nodo: HTMLElement): void {
+  /* B13 · AG5 · Sólo el teléfono lleva hoja; en Duo (`ext`, `ih`, `iv`) la burbuja es una tarjeta
+     centrada por CSS (`globals.css`, «LA BURBUJA DE LA CITA»): aquí no se coloca, y se quita lo que
+     se hubiera puesto antes de cambiar de formato (abrir o cerrar el Duo). */
+  if (!esTelefono()) { nodo.style.bottom = ''; nodo.style.maxHeight = ''; return }
   const vv = window.visualViewport
   if (!vv) return
   nodo.style.bottom = `${Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height)))}px`
   nodo.style.maxHeight = `${Math.floor(vv.height * 0.8)}px`
+}
+
+/** B13 · AG5 · ¿Hoja de teléfono? Lo dice la sonda de formato (`data-formato`); sin ella, como antes. */
+function esTelefono(): boolean {
+  const f = document.documentElement.dataset.formato
+  return f === undefined || f === 'tel'
 }
 
 /** T1 · Recoloca al cambiar de alto o la parte visible de la ventana (ver `BurbujaAlta.tsx`). */
@@ -180,13 +211,20 @@ function usePanelTarjeta(ancla: Caja | null, punto: Punto | undefined, comoHoja:
   const { montarPanel, alPulsarTecla } = useDialogoModal(salir)
   const colocarSeguido = useColocacionSeguida(ancla, punto, comoHoja)
   const panel = useRef<HTMLDivElement | null>(null)
+  /* B13 · AG5 · la hoja del teléfono se arrastra hacia abajo para cerrar (la del catálogo,
+     `useArrastreHoja`), sólo desde el asa o la cabecera. */
+  const velo = useRef<HTMLDivElement | null>(null)
+  const arrastrar = useArrastreHoja(panel, velo, () => comoHoja && esTelefono(), salir)
+  const alPulsarPuntero = useCallback((e: EventoPuntero<HTMLDivElement>) => {
+    if (e.target instanceof Element && e.target.closest('.ag-burbuja-asa, .ag-burbuja-fila') && !e.target.closest('button')) arrastrar(e)
+  }, [arrastrar])
   const montar = useCallback((nodo: HTMLDivElement | null) => {
     montarPanel(nodo)
     panel.current = nodo
     colocarSeguido(nodo)
   }, [montarPanel, colocarSeguido])
   useCerrarAlTocarFuera(panel, salir)
-  return { saliendo, salir, alTerminar, alPulsarTecla, montar }
+  return { saliendo, salir, alTerminar, alPulsarTecla, montar, velo, alPulsarPuntero }
 }
 
 /** Lo de dentro, igual en las dos variantes: la burbuja de la maqueta (tanda K, punto 21). */
@@ -241,7 +279,7 @@ function TarjetaAlPasar(props: Props): ReactElement {
 /** La de siempre (clic, Enter, buscador): diálogo modal con foco atrapado. */
 function TarjetaModal(props: Props): ReactElement {
   const { ancla, punto, comoHoja, alCerrar, sinEntrada = false } = props
-  const { saliendo, salir, alTerminar, alPulsarTecla, montar } = usePanelTarjeta(ancla, punto, comoHoja, alCerrar)
+  const { saliendo, salir, alTerminar, alPulsarTecla, montar, velo, alPulsarPuntero } = usePanelTarjeta(ancla, punto, comoHoja, alCerrar)
   const idTitulo = useId()
   /* Sin ancla en escritorio (se abrió desde el buscador): centrada, como la ayuda. */
   const clase = (comoHoja ? 'ag-hoja' : ancla ? 'ag-capa ag-capa--tarjeta' : 'ag-capa ag-capa--centro') + ' ag-burbuja' + (sinEntrada ? ' ag-capa--sin-entrada' : '')
@@ -251,9 +289,9 @@ function TarjetaModal(props: Props): ReactElement {
       {/* Velo con la hoja y con la capa centrada (sin ancla), como la ayuda:
           atenúa el fondo y se queda el toque de cerrar, que así no cae además
           sobre la rejilla de detrás. */}
-      {(comoHoja || !ancla) && <div className="ag-capa-velo" aria-hidden="true" />}
+      {(comoHoja || !ancla) && <div ref={velo} className="ag-capa-velo" aria-hidden="true" />}
       <div ref={montar} role="dialog" aria-modal="true" aria-labelledby={idTitulo} tabIndex={-1}
-        onKeyDown={alPulsarTecla} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
+        onKeyDown={alPulsarTecla} onPointerDown={alPulsarPuntero} onAnimationEnd={e => { if (e.target === e.currentTarget) alTerminar() }}
         className={clase} data-estado={saliendo ? 'saliendo' : 'abierta'}>
         <Contenido props={props} idTitulo={idTitulo} salir={salir} autoFoco />
       </div>

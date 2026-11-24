@@ -544,7 +544,7 @@ export default function ModalInvitacionCita({
           className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
           style={{ color: 'var(--ag-muted)' }}
         >
-          {paso === 'esperando' ? 'No invitar a nadie' : 'Cerrar'}
+          {paso === 'esperando' ? 'No invitar' : 'Cerrar'}
         </button>
       )
     }
@@ -589,7 +589,9 @@ export default function ModalInvitacionCita({
           className="px-4 py-2 rounded-xl text-sm font-bold transition-colors hover:bg-[var(--ag-btn-ghost-hover)]"
           style={{ color: 'var(--ag-muted)' }}
         >
-          No invitar a nadie
+          {/* B13 · AG6 (textos aprobados, «botones-desbordados»): «No invitar» / «Invitar»; los de
+              antes («No invitar a nadie» / «Enviar invitación») no cabían lado a lado en Duo cerrado. */}
+          No invitar
         </button>
         <button
           onClick={() => {
@@ -604,7 +606,7 @@ export default function ModalInvitacionCita({
         >
           {paso === 'enviando'
             ? <><Loader2 size={15} className="animate-spin" /> Enviando…</>
-            : <><Send size={15} /> Enviar invitación</>}
+            : <><Send size={15} /> Invitar</>}
         </button>
       </>
     )

@@ -19,15 +19,25 @@
  */
 import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactElement, type ReactNode } from 'react'
 import Portal from '@/components/ui/Portal'
-import { ALTO_MINIMO_CAPA, MARGEN_VENTANA, SEPARACION_CAPA } from '@/lib/agenda/posicionCapa'
+import { ALTO_MINIMO_CAPA, MARGEN_VENTANA, SEPARACION_CAPA, ventanaParaCapas } from '@/lib/agenda/posicionCapa'
 
 /** Debajo del botón, con su borde derecho; dentro de la ventana visible. */
 function colocarBajo(nodo: HTMLElement, boton: Element): void {
+  /* B13 · AG8 (CALMA §25–§28, maqueta `ag-herr`): sólo en computadora cuelga del botón, sin velo; en
+     Duo y teléfono es tarjeta centrada u hoja con velo, por CSS («.ag-capa-barra»). Aquí no se coloca y
+     se quita lo que se hubiera puesto antes de cambiar de formato. */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') {
+    for (const k of ['left', 'top', 'maxHeight', 'transformOrigin'] as const) nodo.style[k] = ''
+    return
+  }
   const r = boton.getBoundingClientRect()
-  const ancho = window.innerWidth
+  /* B13 · AG8: dentro del área de contenido, sin el cromo (riel en `ext`, barra en `ih`). */
+  const v = ventanaParaCapas()
+  const desde = v.left ?? 0
   const alto = window.visualViewport?.height ?? window.innerHeight
   const w = nodo.offsetWidth
-  const left = Math.max(MARGEN_VENTANA, Math.min(r.right - w, ancho - w - MARGEN_VENTANA))
+  const left = Math.max(desde + MARGEN_VENTANA, Math.min(r.right - w, desde + v.width - w - MARGEN_VENTANA))
   const top = r.bottom + SEPARACION_CAPA
   nodo.style.left = `${left}px`
   nodo.style.top = `${top}px`
@@ -76,8 +86,10 @@ export function CapaBarra({ boton, rol, etiqueta, clase, alCerrar, alMontar, alP
   }, [boton, alCerrar])
   return (
     <Portal>
+      {/* B13 · AG8 · el velo del catálogo fuera de computadora (en `esc` no se pinta: CSS). */}
+      <div className="ag-capa-velo ag-capa-barra-velo" aria-hidden="true" />
       <div ref={montar} role={rol} aria-label={etiqueta} aria-modal={rol === 'dialog' ? true : undefined} tabIndex={-1}
-        onKeyDown={alPulsarTecla} className={clase ? `ag-capa ${clase}` : 'ag-capa'} data-estado="abierta" {...datos}>
+        onKeyDown={alPulsarTecla} className={`ag-capa ag-capa-barra${clase ? ` ${clase}` : ''}`} data-estado="abierta" {...datos}>
         {children}
       </div>
     </Portal>

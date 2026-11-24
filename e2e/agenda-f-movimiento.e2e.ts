@@ -198,7 +198,7 @@ test('un INSERT ajeno por tiempo real entra con .ag-ev-remoto (el anillo)', asyn
   await vaciar(page)
 
   const titulo = tituloUnico('Evento F remoto')
-  const comoSecretaria = await request.newContext({ baseURL: 'http://localhost:3001', storageState: SESION.secretariaA })
+  const comoSecretaria = await request.newContext({ baseURL: test.info().project.use.baseURL, storageState: SESION.secretariaA })
   const res = await comoSecretaria.post('/api/appointments', {
     data: {
       title: titulo,

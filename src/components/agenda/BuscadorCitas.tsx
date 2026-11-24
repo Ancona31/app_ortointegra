@@ -55,8 +55,9 @@ function textoOpcion(o: Opcion): { principal: string; meta: string } {
   return { principal: `${o.paciente.nombre} ${o.paciente.apellidos}`, meta: o.paciente.telefono ?? 'Ver sus citas' }
 }
 
-/** La búsqueda del primer paso, con espera de 300 ms como el modal. */
-function useResultados(texto: string, agendaV2: boolean, activo: boolean): Opcion[] {
+/** La búsqueda del primer paso, con espera de 300 ms como el modal. `null` mientras no hay
+    respuesta para lo escrito (B13 · AG8: así «Sin coincidencias.» sólo sale con la respuesta vacía). */
+function useResultados(texto: string, agendaV2: boolean, activo: boolean): Opcion[] | null {
   const [opciones, setOpciones] = useState<{ para: string; lista: Opcion[] }>({ para: '', lista: [] })
   const q = limpiarTextoBusqueda(texto)
   useEffect(() => {
@@ -72,7 +73,7 @@ function useResultados(texto: string, agendaV2: boolean, activo: boolean): Opcio
     }, 300)
     return () => { vigente = false; clearTimeout(t) }
   }, [q, agendaV2, activo])
-  return q && opciones.para === q ? opciones.lista : []
+  return q && opciones.para === q ? opciones.lista : null
 }
 
 /**
@@ -104,7 +105,7 @@ export default function BuscadorCitas({ agendaV2, alElegirCita, alCerrar }: Prop
   const { paciente, citas, elegirPaciente, volver: volverPaso } = usePacienteElegido()
   const idLista = useId()
   const resultados = useResultados(texto, agendaV2, paciente === null)
-  const opciones: Opcion[] = paciente ? (citas ?? []).map(c => ({ tipo: 'cita', cita: c })) : resultados
+  const opciones: Opcion[] = paciente ? (citas ?? []).map(c => ({ tipo: 'cita', cita: c })) : (resultados ?? [])
   const abierta = opciones.length > 0 || (paciente !== null && citas !== null)
 
   async function elegir(o: Opcion): Promise<void> {
@@ -141,7 +142,9 @@ export default function BuscadorCitas({ agendaV2, alElegirCita, alCerrar }: Prop
         />
       </label>
       <ListaOpciones id={idLista} opciones={opciones} activa={activa} alElegir={o => void elegir(o)}
-        vacio={paciente && citas?.length === 0 ? 'Sin citas entre hace 30 días y dentro de un año.' : null} />
+        vacio={paciente && citas?.length === 0 ? 'Sin citas entre hace 30 días y dentro de un año.'
+          /* B13 · AG8 (CALMA §29.8): sin resultados, se dice. */
+          : !paciente && resultados?.length === 0 ? 'Sin coincidencias.' : null} />
     </div>
   )
 }

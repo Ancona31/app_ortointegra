@@ -117,7 +117,7 @@ test('una cita ajena en otra semana vacía la caché por tiempo real: al ir a es
   const titulo = tituloUnico('Evento ajeno caché de rangos E2E')
   const dia = diaDeLaSemana(1, 3)
   const clientId = randomUUID()
-  const comoSecretaria = await request.newContext({ baseURL: 'http://localhost:3001', storageState: SESION.secretariaA })
+  const comoSecretaria = await request.newContext({ baseURL: test.info().project.use.baseURL, storageState: SESION.secretariaA })
   const res = await comoSecretaria.post('/api/appointments', {
     data: {
       title: titulo,
@@ -264,7 +264,7 @@ test('precarga en vuelo durante un vaciado: no debe entregar datos de antes del 
   const titulo = tituloUnico('Evento precarga en vuelo E2E')
   const dia = diaDeLaSemana(2, 2)
   const clientId = randomUUID()
-  const comoSecretaria = await request.newContext({ baseURL: 'http://localhost:3001', storageState: SESION.secretariaA })
+  const comoSecretaria = await request.newContext({ baseURL: test.info().project.use.baseURL, storageState: SESION.secretariaA })
   const res = await comoSecretaria.post('/api/appointments', {
     data: {
       title: titulo,
@@ -313,7 +313,7 @@ test('una cita ajena por tiempo real no dispara una segunda precarga', async ({ 
   const titulo = tituloUnico('Evento tiempo real precarga E2E')
   const dia = diaDeLaSemana(1, 2)
   const clientId = randomUUID()
-  const comoSecretaria = await request.newContext({ baseURL: 'http://localhost:3001', storageState: SESION.secretariaA })
+  const comoSecretaria = await request.newContext({ baseURL: test.info().project.use.baseURL, storageState: SESION.secretariaA })
   const res = await comoSecretaria.post('/api/appointments', {
     data: {
       title: titulo,

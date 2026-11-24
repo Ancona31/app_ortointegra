@@ -85,10 +85,10 @@ export function LeyendaEstados({ clasica = false }: { clasica?: boolean }) {
 /** K1 · El bloqueo de horario en la leyenda. */
 export const ETIQUETA_LEYENDA_BLOQUEO = 'Bloqueo'
 
-/** Tanda J, punto 11 · Lo que la «G» quiere decir en la v2 (lo de Google lleva los colores de estado). */
-export const ETIQUETA_LEYENDA_GOOGLE = 'Se agendó en Google'
-/** Tanda K, punto 20 · Lo que quiere decir el eslabón. */
-export const ETIQUETA_LEYENDA_ENLACE = 'Se agendó por enlace'
+/** Tanda J, punto 11 · Lo que la «G» quiere decir en la v2. B13 · AG7 (CALMA §28): el texto unificado (antes «Se agendó en Google»). */
+export const ETIQUETA_LEYENDA_GOOGLE = 'Agendada desde Google Calendar'
+/** Tanda K, punto 20 · Lo que quiere decir el eslabón. B13 · AG7 (CALMA §28): antes «Se agendó por enlace». */
+export const ETIQUETA_LEYENDA_ENLACE = 'Reservó por enlace'
 
 /** La marca de siempre (v2 apagada): «GCal» en el morado de Google. */
 function MarcaGCal() {

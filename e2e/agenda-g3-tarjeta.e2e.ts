@@ -121,23 +121,28 @@ test('agendada: orden, rejilla pareja (mismos anchos y altos), márgenes iguales
   await expect(t.locator('.ag-burbuja-hora')).toHaveText('09:00 – 10:00 · 60 min')
   await expect(t.locator('.ag-burbuja-dia')).toHaveText(/^(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo) \d{1,2} de \w+$/)
   await expect(t.locator('.ag-burbuja-medico')).toContainText('Dr.')
-  // Rejilla pareja.
+  /* B13 · AG5 (maqueta `ag-burbuja`, CALMA §28): las acciones son FILAS DE MENÚ, una debajo de otra, del mismo
+     ancho y alto, de borde a borde de la burbuja; el principal centrado con márgenes iguales; la destructiva al final.
+     (Antes, una rejilla pareja de casillas en una fila.) */
   const b = (n: string): Locator => t.getByRole('button', { name: n, exact: true })
   const [ini, con, rea, edi, can, dlg] = await Promise.all([caja(b('Iniciar consulta')), caja(b('Confirmar')), caja(b('Reagendar')),
     caja(b('Editar')), caja(b('Cancelar cita')), caja(t)])
+  let previa = con
   for (const x of [rea, edi]) {
-    expect(Math.abs(x.y - con.y)).toBeLessThan(1)
+    expect(Math.abs(x.y - (previa.y + previa.height))).toBeLessThan(1)
+    expect(Math.abs(x.x - con.x)).toBeLessThan(1)
     expect(Math.abs(x.width - con.width)).toBeLessThan(1)
     expect(Math.abs(x.height - con.height)).toBeLessThan(1)
+    previa = x
   }
-  // Tanda M, punto 1: en computadora, 48 px (las medidas exactas, en `agenda-m1-burbuja`).
-  expect(con.height).toBeGreaterThanOrEqual(48)
-  expect(ini.height).toBeGreaterThanOrEqual(48)
-  expect(Math.abs(ini.width - (edi.x + edi.width - con.x))).toBeLessThan(1)
+  // En computadora, filas y principal de 40 px (las medidas exactas, en `agenda-m1-burbuja`).
+  expect(con.height).toBeGreaterThanOrEqual(40)
+  expect(ini.height).toBeGreaterThanOrEqual(40)
+  expect(Math.abs(con.width - dlg.width)).toBeLessThan(1)
   expect(Math.abs((ini.x - dlg.x) - (dlg.x + dlg.width - (ini.x + ini.width)))).toBeLessThan(1.5)
-  // Cancelar en el pie: debajo de la rejilla, a todo el ancho de la burbuja.
-  expect(can.y).toBeGreaterThan(con.y + con.height)
-  expect(Math.abs(can.width - (dlg.width - 2))).toBeLessThan(2)
+  // Cancelar al final: debajo de las filas, a todo el ancho de la burbuja.
+  expect(can.y).toBeGreaterThan(edi.y + edi.height)
+  expect(Math.abs(can.width - dlg.width)).toBeLessThan(1)
   // «Confirmar» abre sus tres opciones, en su orden; el WhatsApp con el logo de la app, tal cual.
   await b('Confirmar').click()
   await expect(b('Confirmar')).toHaveAttribute('aria-expanded', 'true')
@@ -185,16 +190,17 @@ test('confirmada: Reagendar | Editar | No asistió, y «No asistió» pregunta y
   const put = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
   await t2.getByRole('toolbar').getByRole('button', { name: 'No asistió', exact: true }).click()
   aviso = page.getByRole('dialog', { name: /no asistió\?/ })
-  await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  await aviso.getByRole('button', { name: 'No asistió' }).click()
   expect((await put).request().postDataJSON()).toMatchObject({ status: 'no_show' })
   await expect.poll(() => sqlLocal(`select status from public.appointments where id = :'id'`, { id })).toBe('no_show')
 })
 
-test('atendida: ÚNICAMENTE «Ver la consulta», que lleva al expediente', async ({ page }) => {
+/* B13 · AG5: además la fila «Editar» (maqueta `ag-burbuja`: todas las burbujas la llevan; la misma puerta que el lápiz). */
+test('atendida: «Ver la consulta», que lleva al expediente, y «Editar»', async ({ page }) => {
   test.skip(test.info().project.name !== 'escritorio', 'escritorio')
   const { paciente } = cita(MARTES, '13:00', 'Prueba 23', 'attended')
   const t = await abrirTarjeta(page, 'Prueba 23')
-  expect(await acciones(t)).toEqual(['Ver la consulta'])
+  expect(await acciones(t)).toEqual(['Ver la consulta', 'Editar'])
   await t.getByRole('button', { name: 'Ver la consulta' }).click()
   await page.waitForURL(`**/expediente/${paciente}`)
 })
@@ -212,7 +218,7 @@ test('cancelada y no asistió: «Darle otra cita» (y «Reasignar el horario» l
   const original = (x: string): string => sqlLocal(`select status || '|' || start_time || '|' || updated_at from public.appointments where id = :'x'`, { x })
   const [antesCancelada, antesFalta] = [original(id), original(falta)]
   let t = await abrirTarjeta(page, 'Prueba 25')
-  expect(await acciones(t)).toEqual(['Darle otra cita'])
+  expect(await acciones(t)).toEqual(['Darle otra cita', 'Editar'])
   await expect(t).toContainText('El paciente no llegó a esta cita.')
   await page.keyboard.press('Escape')
   t = tarjetaLectura(page)
@@ -220,7 +226,7 @@ test('cancelada y no asistió: «Darle otra cita» (y «Reasignar el horario» l
   await page.locator('.fc-timegrid-event', { hasText: 'Prueba 24' }).first().click({ position: { x: 8, y: 8 } })
   await expect(t).toHaveAccessibleName('Paciente Prueba 24')
   // Tanda L, punto 9: la cancelada suma «Eliminar cita» en el pie.
-  await expect.poll(() => acciones(t)).toEqual(['Darle otra cita', 'Reasignar el horario', 'Eliminar cita'])
+  await expect.poll(() => acciones(t)).toEqual(['Darle otra cita', 'Reasignar el horario', 'Editar', 'Eliminar cita'])
   await expect(t).toContainText('Esta cita se canceló. Su horario quedó libre.')
   await t.getByRole('button', { name: 'Darle otra cita' }).click()
   const modal = modalCita(page, 'Nueva cita')
@@ -234,7 +240,7 @@ test('cancelada y no asistió: «Darle otra cita» (y «Reasignar el horario» l
   /* Si sale un aviso (empalme u horario), se acepta: aquí no se prueba. */
   const aviso = page.getByRole('dialog', { name: /Se empalma|fuera de/i })
   const res = await Promise.race([post, aviso.waitFor({ timeout: 4000 }).then(async () => {
-    await aviso.getByRole('button', { name: 'Aceptar' }).click()
+    await aviso.getByRole('button', { name: 'Guardar' }).click()
     return post
   }).catch(() => post)])
   const enviado = res.request().postDataJSON() as Record<string, unknown>

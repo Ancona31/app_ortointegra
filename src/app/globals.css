@@ -7209,13 +7209,16 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: var(--ag-3);
-  padding: var(--ag-4);
-  background: var(--ag-surface);
-  color: var(--ag-text);
-  border: 1px solid var(--ag-border-card);
-  border-radius: var(--ag-r-card);
-  box-shadow: var(--ag-shadow-pop);
+  gap: 12px;
+  padding: 20px;
+  /* B13 · AG5 · la piel del catálogo (CALMA §25): superficie `--sup`, sin borde, contorno fino y la
+     sombra de las capas; radio 18 anclada (`esc`), 20 centrada. Tokens del KIT: la capa vive en
+     `body`, donde los `--ag-*` re-apuntados de la raíz v2 no llegan (AG1). */
+  background: var(--sup);
+  color: var(--tinta);
+  border: 0;
+  border-radius: 18px;
+  box-shadow: var(--sombra-capa), 0 0 0 1px var(--linea);
   animation: ag-capa-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 .ag-capa:focus { outline: none; }
@@ -7236,14 +7239,15 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
   top: 50%;
   translate: -50% -50%;
   width: 360px;
+  border-radius: 20px;
+  box-shadow: var(--sombra-capa);
 }
 /* Integración con el rediseño · en `ext` e `ih` el cromo (riel o barra) ocupa
    un lado DENTRO del viewport (`--fijo-der`/`--fijo-izq`, globals.css, regla
    de «nada fijo toca el borde»). Las capas con ancla se miden contra la
-   ventana entera (`posicionCapa`, `CapaBarra`): sin esto, la campana o el
-   buscador de 320 px se metían bajo el riel. Se acota el ANCHO al área de
-   contenido y la colocación del JS, que lee `offsetWidth`, la deja dentro; la
-   centrada se centra en esa área. Fuera de `ext`/`ih` los `--fijo-*` valen 0. */
+   ventana menos el cromo (B13 · AG8: `ventanaSinCromo`, en `posicionCapa`); se
+   acota además el ANCHO al área de contenido y la centrada se centra en esa
+   área. Fuera de `ext`/`ih` los `--fijo-*` valen 0. */
 :root:is([data-formato="ext"], [data-formato="ih"]):has(#barra-lateral) .ag-capa {
   max-width: calc(100vw - var(--fijo-izq) - var(--fijo-der) - 2 * var(--ag-2));
 }
@@ -7260,13 +7264,13 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--ag-3);
-  padding: var(--ag-4) var(--ag-4) calc(var(--ag-4) + env(safe-area-inset-bottom));
-  background: var(--ag-surface);
-  color: var(--ag-text);
-  border-top: 1px solid var(--ag-border-card);
-  border-radius: var(--ag-r-card) var(--ag-r-card) 0 0;
-  box-shadow: var(--ag-shadow-pop);
+  gap: 12px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--sup);
+  color: var(--tinta);
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  box-shadow: var(--sombra-capa);
   animation: ag-hoja-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 .ag-hoja:focus { outline: none; }
@@ -7286,122 +7290,141 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
   animation: ag-velo-entra var(--ag-dur-base) var(--ag-ease-out) backwards;
 }
 
-/* Cabecera común: título a la izquierda, ✕ a la derecha, centrados en una línea. */
+/* Cabecera común: título a la izquierda, ✕ a la derecha, centrados en una línea.
+   B13 · AG5: título 17/700 (el de las capas del catálogo), ✕ de 44 (36 en `ih`/`esc`). */
 .ag-capa-cab {
   display: flex;
   align-items: center;
-  gap: var(--ag-2);
+  gap: 8px;
   min-width: 0;
+  margin: -6px -8px 0 0;
 }
 .ag-capa-titulo {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
-  line-height: 1.3;
-  color: var(--ag-ink);
+  line-height: 22px;
+  color: var(--tinta);
   overflow-wrap: anywhere;
 }
 .ag-capa-cerrar {
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--ag-r-btn);
-  color: var(--ag-muted);
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: var(--tinta2);
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-capa-cerrar:hover { background: var(--ag-btn-ghost-hover); }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-capa-cerrar { width: 36px; height: 36px; }
+.ag-capa-cerrar:is(:hover, :active) { background: var(--sup2); }
 
+/* Campos: rótulo 13/600 `--tinta2` encima; campo relleno `--sup2`, sin borde, 44 de alto con
+   letra de 16 en táctil (40/15 en computadora), contorno de 2 px `--enlace` al enfocar. */
 .ag-capa-campo {
   display: flex;
   flex-direction: column;
-  gap: var(--ag-1);
+  gap: 6px;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 600;
-  color: var(--ag-muted);
+  color: var(--tinta2);
 }
 .ag-capa-campo input,
 .ag-capa-campo select {
-  height: 36px;
-  padding: 0 var(--ag-2-5);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--ag-ink);
-  background: var(--ag-surface);
-  border: 1px solid var(--ag-input-border);
-  border-radius: var(--ag-r-btn);
+  height: 44px;
+  padding: 0 12px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--tinta);
+  background: var(--sup2);
+  border: 0;
+  border-radius: 12px;
 }
+:root[data-formato="esc"] :is(.ag-capa-campo input, .ag-capa-campo select) { height: 40px; font-size: 15px; }
+.ag-capa-campo :is(input, select, textarea):focus-visible { outline: 2px solid var(--enlace); outline-offset: 0; }
 .ag-capa-fila {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--ag-2);
+  gap: 12px;
 }
 .ag-capa-error {
   margin: 0;
-  font-size: 12.5px;
-  color: var(--ag-status-cancelled-text);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--mal-tinta);
 }
 
-/* Las listas de opciones (`role="listbox"`) de la burbuja y del buscador. */
+/* Las listas de opciones (`role="listbox"`) de la burbuja y del buscador: un recuadro hundido
+   (`--fondo`) con filas de 15/600 y su dato en 13 tabular. */
 .ag-opciones {
   margin: 0;
-  padding: var(--ag-1);
+  padding: 4px;
   list-style: none;
   max-height: 240px;
   overflow-y: auto;
-  border: 1px solid var(--ag-border-card);
-  border-radius: var(--ag-r-btn);
+  background: var(--fondo);
+  border: 0;
+  border-radius: 12px;
 }
 .ag-opcion {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--ag-1-5) var(--ag-2);
-  border-radius: var(--ag-r-btn-sm);
-  font-size: 14px;
-  color: var(--ag-ink);
+  gap: 0;
+  min-height: 44px;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--tinta);
   cursor: pointer;
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-opcion-meta { font-size: 12px; color: var(--ag-muted); }
+.ag-opcion-meta { font-size: 13px; line-height: 18px; font-weight: 400; color: var(--tinta2); font-variant-numeric: tabular-nums; }
 .ag-opcion:hover,
-.ag-opcion[aria-selected="true"] { background: var(--ag-primary-bg-faint); }
-.ag-opciones-vacio { margin: 0; padding: var(--ag-2); font-size: 12.5px; color: var(--ag-muted); }
+.ag-opcion[aria-selected="true"] { background: var(--sup); }
+.ag-opciones-vacio { margin: 0; padding: 10px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
 
-/* Los botones del pie y de la barra de acciones: todos a 36 px, en una fila. */
+/* Los botones del pie y de la barra de acciones: los del catálogo (`.k-b-capa`), 44 de alto en
+   táctil y 40 en `ih`/`esc`; «quieto» (`--sup2`) por omisión y principal en `--accion`. */
 .ag-capa-acciones {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--ag-2);
+  gap: 10px;
 }
 .ag-capa-boton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--ag-1-5);
-  height: 36px;
-  padding: 0 var(--ag-3);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ag-text);
-  background: var(--ag-surface);
-  border: 1px solid var(--ag-input-border);
-  border-radius: var(--ag-r-btn);
-  transition: background-color var(--ag-dur-micro) var(--ag-ease),
-              border-color var(--ag-dur-micro) var(--ag-ease);
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--tinta);
+  background: var(--sup2);
+  border: 0;
+  border-radius: var(--r-control, 12px);
+  transition: background-color var(--ag-dur-micro) var(--ag-ease), transform var(--dur-toque) ease-out;
 }
-.ag-capa-boton:hover { background: var(--ag-btn-ghost-hover); }
-.ag-capa-boton:disabled { cursor: default; opacity: .55; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-capa-boton { height: 40px; }
+.ag-capa-boton:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); }
+.ag-capa-boton:active { transform: scale(.97); }
+.ag-capa-boton:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.ag-capa-boton:disabled { cursor: default; opacity: .55; transform: none; }
 .ag-capa-boton--principal {
-  color: #fff;
-  background: var(--ag-brand-secondary);
-  border-color: var(--ag-brand-secondary);
+  color: var(--sobre-accion);
+  background: var(--accion);
 }
-.ag-capa-boton--principal:hover { background: var(--ag-brand-secondary); }
+.ag-capa-boton--principal:hover { background: var(--accion); }
 .ag-hoja .ag-capa-boton { height: 44px; }   /* el mínimo táctil de la agenda, como `.ag-hueco` */
 
 /* T1 · La burbuja tras agendar (puntos 13 y 14): el acuse; las dos de enviar
@@ -7411,64 +7434,61 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 .ag-capa-hecho {
   display: flex;
   align-items: center;
-  gap: var(--ag-2);
+  gap: 8px;
   margin: 0;
-  padding: var(--ag-2) var(--ag-3);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ag-success-text);
-  background: var(--ag-success-bg);
-  border: 1px solid var(--ag-success-border);
-  border-radius: var(--ag-r-btn);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ok-tinta);
+  background: var(--ok-fondo);
+  border: 0;
+  border-radius: 12px;
 }
 .ag-capa-rejilla {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--ag-2);
+  gap: 10px;
 }
 .ag-capa-rejilla > * { min-width: 0; }
-.ag-capa-pila { display: flex; flex-direction: column; gap: var(--ag-2); }
-.ag-opcion--registrar { margin-top: var(--ag-1); border-top: 1px solid var(--ag-hairline); border-radius: 0 0 var(--ag-r-btn-sm) var(--ag-r-btn-sm); }
+.ag-capa-pila { display: flex; flex-direction: column; gap: 8px; }
+.ag-opcion--registrar { margin-top: 4px; border-top: 1px solid var(--linea); border-radius: 0 0 10px 10px; }
 /* H3 (punto 11) · «Registrar «…»» en VERDE, como el «Registrar "…"» del
-   formulario completo y el resto de la app (esmeralda). Aquí con el verde de la
-   agenda, `--ag-success-*`, que ya pasa AA en las dos paletas (la e2e
-   `agenda-h3-burbuja` mide el contraste con el fondo pintado). La línea de
-   debajo, en el mismo verde (no en gris). */
+   formulario completo y el resto de la app. B13 · AG5: el verde del kit
+   (`--ok-tinta` sobre `--fondo`, AA en las dos paletas; la e2e
+   `agenda-h3-burbuja` mide el contraste con el fondo pintado). */
 .ag-opcion--registrar,
-.ag-opcion--registrar .ag-opcion-meta { color: var(--ag-success-text); }
+.ag-opcion--registrar .ag-opcion-meta { color: var(--ok-tinta); }
 .ag-opcion--registrar:hover,
-.ag-opcion--registrar[aria-selected="true"] { background: var(--ag-success-bg); }
+.ag-opcion--registrar[aria-selected="true"] { background: var(--ok-fondo); }
 
-/* La tarjeta de lectura. */
+/* La tarjeta de lectura (lo que queda: la burbuja de alta y el acuse usan sus piezas). */
 .ag-lectura-pildora {
   display: inline-flex;
   align-items: center;
   min-height: 20px;
-  padding: 0 var(--ag-2);
-  font-size: 10.5px;
+  padding: 0 8px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
   border: 1px solid;
-  border-radius: var(--ag-r-pill);
+  border-radius: 999px;
 }
 .ag-lectura-hora {
   margin: 0;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--ag-ink);
+  color: var(--tinta);
 }
-.ag-lectura-hora small { display: block; font-size: 12px; font-weight: 600; color: var(--ag-muted); }
+.ag-lectura-hora small { display: block; font-size: 13px; font-weight: 400; color: var(--tinta2); }
 .ag-lectura-datos {
   margin: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--ag-1) var(--ag-3);
-  font-size: 13px;
+  gap: 4px 12px;
+  font-size: 14px;
 }
-.ag-lectura-datos dt { color: var(--ag-muted); font-weight: 600; }
-.ag-lectura-datos dd { margin: 0; color: var(--ag-text); overflow-wrap: anywhere; }
+.ag-lectura-datos dt { color: var(--tinta2); font-weight: 600; }
+.ag-lectura-datos dd { margin: 0; color: var(--tinta); overflow-wrap: anywhere; }
 .ag-lectura-nota {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -7476,215 +7496,328 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
   overflow: hidden;
 }
 
-/* ── G3 (puntos 15, 17 y 19 de la tanda de diseño) · tarjeta de la cita y
-   burbuja tras agendar, con la maqueta «Burbuja y tarjeta» como referencia:
-   cabecera con la píldora en la línea del nombre y el engrane y la ✕ arriba;
-   la fecha y la hora juntas como dato principal; y las acciones en una
-   REJILLA PAREJA: la principal a todo el ancho, las demás en dos columnas
-   iguales (si quedan impares, la última a todo el ancho: nada suelto), todas
-   del MISMO alto, y la de peligro aparte, al final. Sin animaciones nuevas.
-   Sólo tokens con contraparte oscura. */
-.ag-capa--tarjeta { width: 360px; }   /* el ancho de la maqueta */
-.ag-lectura-cab { align-items: flex-start; gap: var(--ag-1-5); }
-/* Como la maqueta: el nombre en una línea, con puntos suspensivos si no cabe
-   (el nombre entero sigue siendo el nombre accesible del diálogo). */
+/* ── G3 · tarjeta de la cita y burbuja tras agendar. B13 · AG5: la capa anclada de computadora
+   mide 360 (la de la burbuja); las acciones en REJILLA PAREJA de dos columnas (la principal a
+   todo el ancho) con los botones del catálogo. */
+.ag-capa--tarjeta { width: 360px; }
+.ag-lectura-cab { align-items: flex-start; gap: 6px; }
 .ag-lectura-cab .ag-capa-titulo {
-  padding-top: 6px;
-  font-size: 16px;
+  padding-top: 11px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   overflow-wrap: normal;
 }
-.ag-lectura-cab .ag-capa-cerrar { width: 32px; height: 32px; }
-.ag-hoja .ag-lectura-cab .ag-capa-cerrar { width: 44px; height: 44px; }
 .ag-lectura-pildoras {
   flex: none;
   display: inline-flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: var(--ag-1);
+  gap: 4px;
   max-width: 45%;
-  padding-top: 7px;
+  padding-top: 12px;
 }
 .ag-lectura-cuando {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
   font-variant-numeric: tabular-nums;
-  color: var(--ag-ink);
+  color: var(--tinta);
 }
-.ag-lectura-cuando small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 500; color: var(--ag-muted); }
-.ag-lectura-cuando .ag-lectura-huso { font-weight: 600; }
+.ag-lectura-cuando small { display: block; margin-top: 2px; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--tinta2); }
+.ag-lectura-cuando .ag-lectura-huso { font-weight: 400; }
 .ag-lectura-acciones {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--ag-2);
+  gap: 10px;
 }
 .ag-lectura-acciones > * { min-width: 0; }
 .ag-lectura-acciones .ag-capa-boton {
   width: 100%;
   height: auto;
-  min-height: 48px;
-  padding: var(--ag-1) var(--ag-2-5);
+  min-height: 44px;
+  padding: 4px 10px;
   line-height: 1.2;
 }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-lectura-acciones .ag-capa-boton { min-height: 40px; }
 .ag-lectura-ancho { grid-column: 1 / -1; }
 .ag-lectura-celda { display: flex; }
 .ag-capa-dos-lineas { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
-.ag-lectura-sep { grid-column: 1 / -1; height: 1px; margin: var(--ag-1) 0 0; background: var(--ag-hairline); }
+.ag-lectura-sep { grid-column: 1 / -1; height: 1px; margin: 4px 0 0; background: var(--linea); }
 .ag-lectura-peligro {
   grid-column: 1 / -1;
   justify-self: center;
-  min-height: 36px;
-  padding: 0 var(--ag-3);
-  font-size: 13.5px;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--ag-status-cancelled-text);
+  color: var(--mal-tinta);
   background: transparent;
   border: 0;
-  border-radius: var(--ag-r-btn);
+  border-radius: 12px;
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-lectura-peligro:hover { background: var(--ag-btn-ghost-hover); }
-.ag-hoja .ag-lectura-peligro { min-height: 44px; }
-.ag-lectura-mensaje { margin: 0; font-size: 12px; line-height: 1.4; color: var(--ag-muted); }
+.ag-lectura-peligro:hover { background: var(--mal-fondo); }
+.ag-lectura-mensaje { margin: 0; font-size: 13px; line-height: 18px; color: var(--tinta2); }
 
-/* ── Tanda K, sección E, punto 21 · LA BURBUJA DE LA CITA (`BurbujaCita.tsx`), como
-   `docs/spec/Burbuja.dc.html`: estructura y tamaños de la maqueta; colores y letra, con los
-   tokens de la agenda (sus colores de estado, la tinta, la superficie, el azul de marca y el
-   rojo de error). La capa y la hoja de siempre ponen el sitio, la entrada y la salida; aquí
-   sólo cambian su caja: sin relleno ni hueco (cada parte lleva el suyo, como la maqueta). */
-.ag-capa.ag-burbuja { border-radius: 18px; }   /* el ancho, en el bloque de la tanda M (computadora) */
-.ag-capa.ag-burbuja, .ag-hoja.ag-burbuja { padding: 0; gap: 0; }
-.ag-hoja.ag-burbuja { padding-bottom: env(safe-area-inset-bottom); }
-.ag-burbuja-raiz { position: relative; display: flex; flex-direction: column; }
-.ag-burbuja-franja { height: 4px; flex: none; }
-.ag-burbuja-cab { display: flex; flex-direction: column; gap: 8px; padding: 12px 10px 0 20px; }
-.ag-burbuja-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ag-burbuja-estado {
-  display: inline-flex; align-items: center; gap: 7px;
-  padding: 4px 10px; font-size: 13px; font-weight: 600; border-radius: var(--ag-r-pill);
+/* ── B13 · AG5 · LA BURBUJA DE LA CITA (`BurbujaCita.tsx`), capa del catálogo ─────────────────────
+   Maqueta `S/entrega/ag-burbuja` (vista 1, «Especificación · la burbuja de la cita»), CALMA §25–§28.
+   SUSTITUYE a las medidas de la tanda K (punto 21) y de la tanda M (punto 1): lo que vigilaban
+   `agenda-m1-burbuja` (computadora) y `agenda-l2` (teléfono) se midió de nuevo con estas.
+   Dónde va (sólo CSS; el JS no decide la forma por formato, salvo colocar o no la hoja):
+     esc       la capa (`.ag-capa`), 360, ANCLADA al bloque (`posicionCapa`), sin velo;
+     tel       la hoja (`.ag-hoja`) desde abajo, con asa y arrastre (`TarjetaLectura`);
+     ext       la «hoja» de la agenda pasa a TARJETA CENTRADA de 310 en el área de contenido, con velo;
+     ih / iv   la misma tarjeta centrada, de 400 (CALMA §26).
+   La capa vive en `body`: COLOR SÓLO CON TOKENS DEL KIT (`--sup`, `--tinta*`, `--linea`, `--enlace`,
+   `--accion`, `--tonal*`, `--mal-*`), que valen igual en `body` y tienen su oscuro; los `--ag-*`
+   re-apuntados en la raíz v2 NO llegan aquí (AG1).
+   Letra: nombre 20/700; detalles 15/20 con lo secundario a 13/18; filas 15/20 (14 en `esc`); estado
+   12/600 con el icono en círculo de 24; nada por debajo de 12. Toques: 44/48 (40 y 36 en `esc`/`ih`). */
+.ag-capa.ag-burbuja, .ag-hoja.ag-burbuja {
+  padding: 0; gap: 0; color: var(--tinta); background: var(--sup); border: 0;
+  box-shadow: var(--sombra-capa);
 }
-.ag-burbuja-punto { width: 8px; height: 8px; border-radius: var(--ag-r-pill); }
-.ag-burbuja-botones { display: flex; align-items: center; }
+.ag-capa.ag-burbuja { width: 360px; border-radius: 18px; box-shadow: var(--sombra-capa), 0 0 0 1px var(--linea); }
+.ag-hoja.ag-burbuja { border-radius: 22px 22px 0 0; padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
+/* Duo cerrado, Duo abierto (h / v): tarjeta centrada en el área de contenido, con el velo de siempre.
+   `left`/`right` (y en `ext`/`ih` los de la regla del cromo, que les ganan) dejan el área; el margen
+   automático la centra; el JS no la coloca (`colocarHoja` sólo actúa en `tel`). */
+:root:is([data-formato="ext"], [data-formato="ih"], [data-formato="iv"]) .ag-hoja.ag-burbuja {
+  inset: var(--capa-arr) var(--capa-der) var(--capa-abj) var(--capa-izq);
+  width: 400px; height: fit-content; margin: auto;
+  max-width: calc(100vw - var(--fijo-izq) - var(--fijo-der) - 16px);
+  max-height: calc(100dvh - var(--capa-arr) - var(--capa-abj));
+  padding-bottom: 0; border-radius: 20px;
+  animation-name: ag-capa-entra;
+}
+:root[data-formato="ext"] .ag-hoja.ag-burbuja { width: 310px; }
+:root:is([data-formato="ext"], [data-formato="ih"], [data-formato="iv"]) .ag-hoja.ag-burbuja[data-estado="saliendo"] { animation-name: ag-capa-sale; }
+
+.ag-burbuja-raiz { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 6px 16px 16px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-raiz { padding: 6px 20px 20px; }
+.ag-burbuja-franja { display: none; }
+.ag-burbuja-asa { display: none; flex: none; width: 36px; height: 5px; margin: 2px auto -6px; border-radius: 999px; background: var(--borde); }
+:root[data-formato="tel"] .ag-hoja.ag-burbuja .ag-burbuja-asa,
+:root:not([data-formato]) .ag-hoja.ag-burbuja .ag-burbuja-asa { display: block; }
+/* El arrastre de la hoja se toma del asa y de la cabecera; el resto conserva su desplazamiento. */
+:root[data-formato="tel"] .ag-hoja.ag-burbuja :is(.ag-burbuja-asa, .ag-burbuja-fila) { touch-action: none; }
+
+.ag-burbuja-cab { display: flex; flex-direction: column; gap: 12px; }
+.ag-burbuja-fila { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 44px; margin-right: -8px; }
+.ag-burbuja-estado { display: inline-flex; align-items: center; font-size: 12px; line-height: 16px; font-weight: 600; }
+.ag-burbuja-botones { display: flex; align-items: center; gap: 4px; }
 .ag-burbuja-icono {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: var(--ag-r-btn); color: var(--ag-ink-600);
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 44px; height: 44px; border-radius: 999px; color: var(--tinta2); background: transparent;
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-burbuja-icono:hover { background: var(--ag-btn-ghost-hover); }
-.ag-burbuja-nombre { display: flex; align-items: flex-start; gap: 10px; padding-right: 10px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-burbuja-icono { width: 36px; height: 36px; }
+.ag-burbuja-icono:is(:hover, :active) { background: var(--sup2); }
+.ag-burbuja-icono:focus-visible { outline: 3px solid var(--enlace); outline-offset: 0; }
+.ag-burbuja-nombre { display: flex; align-items: flex-start; gap: 10px; margin-top: -6px; }
 .ag-burbuja-titulo {
   flex: 1; min-width: 0; margin: 0;
-  /* Tanda L, punto 12 · la escala de la página de reserva (`agendaPublica.css`): título = `.rp-titulo`. */
-  font-size: 18px; line-height: 1.3; font-weight: 700; color: var(--ag-ink); overflow-wrap: anywhere;
+  font-size: 20px; line-height: 25px; font-weight: 700; letter-spacing: -.3px; color: var(--tinta); overflow-wrap: anywhere;
 }
-.ag-burbuja-titulo--cancelada { color: var(--ag-muted); }
+.ag-burbuja-titulo--cancelada { color: var(--tinta2); text-decoration: line-through; }
 .ag-burbuja-sinexp { position: relative; flex: none; }
 .ag-burbuja-sinexp-boton {
   display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0;
-  background: var(--ag-status-cancelled-bg); border: 1px solid var(--ag-status-cancelled-border); border-radius: var(--ag-r-btn); cursor: help;
+  color: var(--mal-tinta); background: var(--mal-fondo); border: 0; border-radius: 10px; cursor: help;
 }
 .ag-burbuja-aviso {
   position: absolute; top: 42px; right: 0; z-index: 2; white-space: nowrap;
-  padding: 6px 10px; font-size: 13px; font-weight: 600; color: var(--ag-surface); background: var(--ag-ink);
-  border-radius: 8px; box-shadow: var(--ag-shadow-pop);
+  padding: 6px 10px; font-size: 13px; font-weight: 600; color: var(--sup); background: var(--tinta);
+  border-radius: 8px; box-shadow: var(--sombra-capa);
 }
-.ag-burbuja-origen { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13px; color: var(--ag-ink-600); }
-.ag-burbuja-historial { padding-left: 28px; }
-.ag-burbuja-origen-icono {
-  flex: none; display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border-radius: var(--ag-r-pill);
-}
-.ag-burbuja-origen-icono--g { background: var(--ag-surface); border: 1px solid var(--ag-input-border); }
-.ag-burbuja-origen-icono--enlace { background: var(--ag-status-confirmed-bg); }
+.ag-burbuja-origen { display: inline-flex; align-items: center; gap: 6px; margin: -6px 0 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--tinta2); }
+.ag-burbuja-origen + .ag-burbuja-origen { margin-top: -8px; }
+.ag-burbuja-historial { padding-left: 20px; font-weight: 400; }
+.ag-burbuja-origen-icono { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; }
+.ag-burbuja-origen-icono--enlace { color: var(--enlace); }
+
+/* Los detalles, entre dos líneas. */
 .ag-burbuja-info {
-  display: flex; flex-direction: column; gap: 12px; margin: 14px 20px 0; padding: 14px 16px;
-  background: var(--ag-surface-sunken); border-radius: var(--ag-r-card);
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 0;
+  border-top: 1px solid var(--linea); border-bottom: 1px solid var(--linea);
 }
 .ag-burbuja-cuando { display: flex; align-items: flex-start; gap: 12px; }
-.ag-burbuja-reloj { flex: none; margin-top: 2px; display: inline-flex; }
-.ag-burbuja-cuando-texto { display: flex; flex-direction: column; gap: 2px; }
-/* Tanda L, punto 12 · hora = texto destacado de la reserva (`.rp-hora`, 15/600); duración, día y médico = texto (14). */
-.ag-burbuja-hora { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--ag-ink); font-variant-numeric: tabular-nums; }
-.ag-burbuja-hora--cancelada { text-decoration: line-through; color: var(--ag-muted); }
-.ag-burbuja-duracion { font-size: 14px; font-weight: 400; color: var(--ag-ink-600); }
-.ag-burbuja-dia { font-size: 14px; color: var(--ag-text); }
-.ag-burbuja-cuando-texto .ag-lectura-huso { font-size: 13px; color: var(--ag-ink-600); }
-.ag-burbuja-medico { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ag-text); }
+.ag-burbuja-reloj { flex: none; display: inline-flex; }
+.ag-burbuja-cuando-texto { display: flex; flex-direction: column; min-width: 0; }
+.ag-burbuja-hora { font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.ag-burbuja-hora--cancelada { text-decoration: line-through; color: var(--tinta2); }
+.ag-burbuja-duracion { font-weight: 400; color: var(--tinta); }
+.ag-burbuja-dia, .ag-burbuja-cuando-texto .ag-lectura-huso { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.ag-burbuja-cuando-texto .ag-lectura-huso { font-variant-numeric: tabular-nums; }
+.ag-burbuja-medico { display: flex; align-items: center; gap: 12px; font-size: 15px; line-height: 20px; color: var(--tinta); }
 .ag-burbuja-iniciales {
-  flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: -2px;
-  font-size: 11px; font-weight: 700; color: var(--ag-brand-legible); background: var(--ag-status-confirmed-bg); border-radius: var(--ag-r-pill);
+  flex: none; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+  font-size: 12px; line-height: 20px; font-weight: 700; color: var(--tonal-tinta); background: var(--tonal); border-radius: 999px;
 }
-.ag-burbuja-acciones { display: flex; flex-direction: column; }
-.ag-burbuja-cuerpo { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 0; }
+/* Tanda M, punto 4 · las observaciones en UNA línea, recortada con «…» (el texto entero va en el DOM
+   y en `title`). Sin observaciones no se pinta. */
+.ag-burbuja-obs { margin: 0; font-size: 13px; line-height: 18px; color: var(--tinta2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-burbuja-obs-rotulo { font-weight: 600; color: var(--tinta); }
+
+/* El botón principal y su ayuda. */
+.ag-burbuja-acciones { display: flex; flex-direction: column; gap: 12px; }
+.ag-burbuja-cuerpo { display: flex; flex-direction: column; }
+.ag-burbuja-cuerpo:empty { display: none; }
 .ag-burbuja-principal { display: flex; flex-direction: column; gap: 6px; }
 .ag-burbuja-cta {
-  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 52px;
-  font-size: 16px; font-weight: 700; color: #fff; background: var(--ag-brand-secondary);
-  border: 2px solid var(--ag-brand-secondary); border-radius: var(--ag-r-card);
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 44px;
+  font-size: 15px; line-height: 20px; font-weight: 600; color: var(--sobre-accion); background: var(--accion);
+  border: 0; border-radius: 12px; transition: transform var(--dur-toque) ease-out;
 }
-.ag-burbuja-cta--contorno { color: var(--ag-brand-legible); background: var(--ag-surface); }
-/* Integración L (choque de escalas L2/L3): la píldora es `.rp-op__dur` (13 · 600) y la ayuda bajo el botón,
-   `.rp-pie small` (13,5), como en la reserva y en la configuración. */
-.ag-burbuja-ayuda { font-size: 13.5px; color: var(--ag-ink-600); text-align: center; }
-.ag-burbuja-rejilla { display: grid; gap: 8px; }
-.ag-burbuja-celda {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 68px;
-  padding: 6px 4px; font-size: 14px; font-weight: 600; line-height: 1.2; text-align: center; color: var(--ag-ink);
-  background: var(--ag-surface); border: 1px solid var(--ag-border-card); border-radius: var(--ag-r-card);
-  transition: background-color var(--ag-dur-micro) var(--ag-ease);
-}
-.ag-burbuja-celda:hover, .ag-burbuja-celda[aria-expanded="true"] { background: var(--ag-btn-ghost-hover); }
-.ag-burbuja-submenu { display: flex; flex-direction: column; gap: 8px; }
-.ag-burbuja-submenu .ag-capa-boton { width: 100%; height: 44px; justify-content: flex-start; gap: 10px; font-size: 14px; }
-.ag-burbuja-pie {
-  display: grid; margin-top: 16px; border-top: 1px solid var(--ag-hairline);
-}
-.ag-burbuja-pie-boton {
-  min-height: 52px; font-size: 14px; font-weight: 600; color: var(--ag-ink-600); background: none;
-  transition: background-color var(--ag-dur-micro) var(--ag-ease);
-}
-.ag-burbuja-pie-boton + .ag-burbuja-pie-boton { border-left: 1px solid var(--ag-hairline); }
-.ag-burbuja-pie-boton:hover { background: var(--ag-btn-ghost-hover); }
-.ag-burbuja-pie-boton--peligro { color: var(--ag-status-cancelled-text); }
-.ag-burbuja-fin { height: 20px; flex: none; }
-/* Tanda M, punto 4 · las observaciones en UNA línea, recortada con «…» (el texto entero va en el DOM
-   y en `title`). Sin observaciones no se pinta. Teléfono: 14 px, el texto de la escala de L2. */
-.ag-burbuja-obs {
-  margin: 12px 20px 0; font-size: 14px; color: var(--ag-text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ag-burbuja-obs-rotulo { font-weight: 600; color: var(--ag-ink-600); }
+.ag-burbuja-cta svg { width: 18px; height: 18px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-burbuja-cta { height: 40px; }
+.ag-burbuja-cta:active { transform: scale(.97); }
+.ag-burbuja-cta:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.ag-burbuja-cta--contorno { color: var(--tonal-tinta); background: var(--tonal); }
+.ag-burbuja-ayuda { font-size: 13px; line-height: 18px; color: var(--tinta2); text-align: center; }
 
-/* ── Tanda M, punto 1 de Angel · LA BURBUJA EN COMPUTADORA, con las medidas de la tarjeta de la
-   tanda J (`.ag-capa--tarjeta` y `.ag-lectura-*`, en `0cce313`) y el diseño de K5. Computadora es
-   la capa (`.ag-capa`, desde `ANCHO_MOVIL` = 1024 px); el teléfono y la tableta llevan la hoja
-   (`.ag-hoja`) y NO cambian (toques de 44 px, escala de L2). Lo vigila `agenda-m1-burbuja.e2e.ts`:
-     ancho 360 · nombre 16 · hora 15 · día, duración, médico, procedencia y observaciones 13 ·
-     píldora 12 · botón ancho, casillas y pie 13 px de letra y 48 de alto, casillas con el icono A
-     LA IZQUIERDA · ✕ y ⋮ de 32 · relleno 16 · 12 entre bloques · el recuadro de la hora, 10. */
-.ag-capa.ag-burbuja { width: 360px; }
-.ag-capa.ag-burbuja .ag-burbuja-cab { padding: 16px 16px 0; }
-.ag-capa.ag-burbuja .ag-burbuja-nombre { padding-right: 0; }
-.ag-capa.ag-burbuja .ag-burbuja-icono { width: 32px; height: 32px; }
-.ag-capa.ag-burbuja .ag-burbuja-estado { font-size: 12px; }
-.ag-capa.ag-burbuja .ag-burbuja-titulo { font-size: 16px; }
-.ag-capa.ag-burbuja .ag-burbuja-info { margin: 12px 16px 0; padding: 10px; }
-.ag-capa.ag-burbuja .ag-burbuja-duracion,
-.ag-capa.ag-burbuja .ag-burbuja-dia,
-.ag-capa.ag-burbuja .ag-burbuja-medico,
-.ag-capa.ag-burbuja .ag-burbuja-obs { font-size: 13px; }
-.ag-capa.ag-burbuja .ag-burbuja-obs { margin: 12px 16px 0; }
-.ag-capa.ag-burbuja .ag-burbuja-cuerpo { padding: 12px 16px 0; }
-.ag-capa.ag-burbuja .ag-burbuja-cta { min-height: 48px; font-size: 13px; }
-.ag-capa.ag-burbuja .ag-burbuja-celda { flex-direction: row; min-height: 48px; font-size: 13px; }
-.ag-capa.ag-burbuja .ag-burbuja-submenu .ag-capa-boton { height: 48px; font-size: 13px; }
-.ag-capa.ag-burbuja .ag-burbuja-pie { margin-top: 12px; }
-.ag-capa.ag-burbuja .ag-burbuja-pie-boton { min-height: 48px; font-size: 13px; }
-.ag-capa.ag-burbuja .ag-burbuja-fin { height: 16px; }
+/* Las filas de menú: a todo el ancho de la burbuja (sangran el relleno), icono de color a la izquierda. */
+.ag-burbuja-rejilla, .ag-burbuja-pie { display: flex; flex-direction: column; margin: 0 -16px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) :is(.ag-burbuja-rejilla, .ag-burbuja-pie) { margin: 0 -20px; }
+.ag-burbuja-celda, .ag-burbuja-pie-boton, .ag-burbuja-submenu .ag-capa-boton {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; min-height: 48px; padding: 0 16px;
+  font-size: 15px; line-height: 20px; font-weight: 400; text-align: left; color: var(--tinta);
+  background: transparent; border: 0; border-radius: 0;
+  transition: background-color var(--ag-dur-micro) var(--ag-ease);
+}
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) :is(.ag-burbuja-celda, .ag-burbuja-pie-boton) { padding: 0 20px; }
+:root[data-formato="esc"] :is(.ag-burbuja-celda, .ag-burbuja-pie-boton) { min-height: 40px; font-size: 14px; }
+:root[data-formato="ih"] :is(.ag-burbuja-celda, .ag-burbuja-pie-boton) { min-height: 40px; }
+.ag-burbuja-celda > svg, .ag-burbuja-pie-boton > svg, .ag-burbuja-submenu .ag-capa-boton > svg { flex: none; width: 20px; height: 20px; color: var(--enlace); }
+.ag-burbuja-celda:is(:hover, :active, [aria-expanded="true"]),
+.ag-burbuja-pie-boton:is(:hover, :active),
+.ag-burbuja-submenu .ag-capa-boton:is(:hover, :active) { background: var(--fondo); }
+.ag-burbuja-celda:focus-visible, .ag-burbuja-pie-boton:focus-visible, .ag-burbuja-submenu .ag-capa-boton:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.ag-burbuja-celda > .ag-burbuja-chev { width: 16px; height: 16px; margin-left: auto; color: var(--tinta3); transition: transform var(--ag-dur-micro) var(--ag-ease); }
+.ag-burbuja-celda[aria-expanded="true"] > .ag-burbuja-chev { transform: rotate(180deg); }
+/* Lo que despliega «Confirmar»: colgado de su fila, sangrado bajo el texto. */
+.ag-burbuja-submenu { display: flex; flex-direction: column; padding: 0 0 4px 48px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-submenu { padding-left: 52px; }
+.ag-burbuja-submenu .ag-capa-boton { min-height: 44px; height: auto; padding-left: 0; justify-content: flex-start; }
+:root[data-formato="esc"] .ag-burbuja-submenu .ag-capa-boton { min-height: 36px; font-size: 14px; }
+.ag-burbuja-submenu .ag-capa-boton > svg { width: 18px; height: 18px; }
+/* El resultado de una acción (WhatsApp, correo), bajo lo desplegado. */
+.ag-burbuja-acciones > .ag-lectura-mensaje { margin: -10px 0 0 32px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.ag-burbuja-acciones > .ag-lectura-mensaje[role="alert"] { color: var(--mal-tinta); font-weight: 600; }
+/* El pie: tras una línea; la destructiva en rojo, al final. */
+.ag-burbuja-pie::before { content: ""; display: block; height: 1px; margin: 0 16px 4px; background: var(--linea); }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-pie::before { margin: 0 20px 4px; }
+.ag-burbuja-pie-boton--peligro, .ag-burbuja-pie-boton--peligro > svg { color: var(--mal-tinta); }
+.ag-burbuja-fin { display: none; }
+/* B13 · AG7 (CALMA §29.7): la explicación de «¿No es una cita?», bajo su fila y alineada con el texto. */
+.ag-burbuja-pie-ayuda { margin: -6px 0 4px; padding: 0 16px 0 48px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-burbuja-pie-ayuda { padding: 0 20px 0 52px; }
+/* ── B13 · AG6 · EL FORMULARIO DE LA CITA (`AppointmentModal`, sólo con la v2: `[data-form-v2]`) ──
+   Maqueta `S/entrega/ag-form` (vista 1). La lógica no cambia; sólo el dibujo:
+   · Fondo del cuerpo `--fondo` y GRUPOS como tarjetas `--sup` de radio 16: cada rótulo de grupo
+     (`.ag-form-grupo`: 12/700 en versalitas `--enlace` con su icono) abre una tarjeta que forman los
+     bloques que le siguen, separados por una línea; se cierra en el rótulo siguiente o al final.
+   · Rótulos de campo 13 `--tinta2` (antes 11 en versalitas); campos y píldoras `--sup2` sin borde
+     (44/16 en táctil, 40/15 en `ih`/`esc`), contorno de 2 px `--enlace` al enfocar.
+   · Fichas (duración, tipo, estado) `--sup2`; la elegida, tonal con contorno `--enlace`.
+   · La destructiva es la última fila, en rojo (`.ag-form-peligro`); el pie, «Cancelar» (quieto) y
+     «Guardar» (primario), a la derecha (centrados en `iv`; a partes iguales en teléfono).
+   · Capa: tarjeta de 520 centrada en el área (`ih`, `iv`, `esc`) y de 310 en `ext`; pantalla completa
+     en `tel` (la geometría del panel por debajo de `md` es la de siempre: `visualViewport`, áreas).
+   Las reglas no tienen capa: ganan a las utilidades de Tailwind sin `!important`, salvo los colores
+   que el componente pone en línea. */
+.ag-modal-panel[data-form-v2] { color: var(--tinta); background: var(--sup); box-shadow: var(--sombra-capa); }
+@media (min-width: 768px) { .ag-modal-panel[data-form-v2] { max-width: 520px; border-radius: 20px; } }
+.ag-modal-panel[data-form-v2] h2 { font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta) !important; }
+.ag-modal-panel[data-form-v2] .border-b, .ag-modal-panel[data-form-v2] .border-t { border-color: var(--linea) !important; }
+/* El cuerpo y sus grupos. */
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto { background: var(--fondo); padding: 4px 20px 20px; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > * { margin: 0; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo) {
+  padding: 12px 16px; background: var(--sup); border-radius: 0;
+}
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo) + :not(.ag-form-grupo) { box-shadow: inset 0 1px 0 var(--linea); }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo):first-child,
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-grupo + :not(.ag-form-grupo) { border-top-left-radius: 16px; border-top-right-radius: 16px; margin-top: 12px; box-shadow: none; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo):last-child,
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > :not(.ag-form-grupo):has(+ .ag-form-grupo) { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-grupo + :not(.ag-form-grupo) { margin-top: 0; }
+.ag-form-grupo {
+  display: flex; align-items: center; gap: 6px; margin: 20px 4px 8px;
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--enlace);
+}
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-grupo { margin: 20px 4px 8px; }
+/* Rótulos de campo y campos. */
+.ag-modal-panel[data-form-v2] label.uppercase {
+  font-size: 13px; line-height: 18px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--tinta2) !important;
+}
+.ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select, textarea) {
+  font-size: 16px; color: var(--tinta); background-color: var(--sup2); border-color: transparent; border-radius: 12px;
+}
+.ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 44px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]), select) { min-height: 40px; font-size: 15px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] textarea { font-size: 15px; }
+.ag-modal-panel[data-form-v2] :is(input, select, textarea):focus-visible { outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none; }
+/* Fichas (duración, tipo, estado y el «Qué vas a crear»): 44 en táctil, 36 en `ih`/`esc`. */
+.ag-modal-panel[data-form-v2] :is([role="radio"], .grid > button) { min-height: 44px; font-size: 14px; border-radius: 12px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is([role="radio"], .grid > button) { min-height: 36px; }
+/* Las fichas, del kit: `--sup2` sin borde; la elegida tonal con contorno `--enlace` (los colores van en
+   línea en el componente: `!important`). El estado elegido conserva su icono de color y lleva el contorno. */
+.ag-modal-panel[data-form-v2] :is(.grid > button, [role="radio"]) {
+  background: var(--sup2) !important; color: var(--tinta) !important; border: 0 !important; box-shadow: none;
+}
+.ag-modal-panel[data-form-v2] :is(.grid > button.text-white, [role="radio"].text-white) {
+  background: var(--tonal) !important; color: var(--tonal-tinta) !important; box-shadow: inset 0 0 0 2px var(--enlace);
+}
+.ag-modal-panel[data-form-v2] .grid > button[style*="--ag-status-"] { background: var(--sup) !important; box-shadow: inset 0 0 0 2px var(--enlace); }
+.ag-modal-panel[data-form-v2] .grid-cols-5 > button { font-size: 12px; font-weight: 600; }
+/* Duo cerrado: los pares de campos (fecha | hora) en una columna; en 310 no caben dos fechas. */
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] .grid-cols-2:has(input) { grid-template-columns: minmax(0, 1fr); }
+/* El resto de textos pequeños del cuerpo, al mínimo de 12. */
+.ag-modal-panel[data-form-v2] :is(.text-\[11px\], .text-\[10px\], .text-\[10\.5px\]) { font-size: 12px; }
+/* Las acciones del cuerpo como filas de enlace (maqueta: «Agregar invitados», «Enviar confirmación»,
+   «… por correo»): icono y texto `--enlace` a la izquierda, 44 de alto; su mensaje, 13 `--tinta2`. */
+.ag-modal-panel[data-form-v2] :is(.ag-form-accion, .ag-form-avisar [data-whatsapp-cita] > button, .ag-form-avisar [data-correo-cita] > button) {
+  justify-content: flex-start; gap: 12px; min-height: 44px; padding: 0; font-size: 15px; font-weight: 600;
+  color: var(--enlace) !important; background: transparent !important; border: 0 !important; border-radius: 0; box-shadow: none;
+}
+.ag-modal-panel[data-form-v2] .ag-form-avisar [data-whatsapp-cita] + [data-correo-cita] { box-shadow: inset 0 1px 0 var(--linea); }
+.ag-modal-panel[data-form-v2] .ag-form-avisar p { font-size: 13px; color: var(--tinta2) !important; }
+.ag-modal-panel[data-form-v2] .ag-form-avisar p[role="alert"] { color: var(--mal-tinta) !important; font-weight: 600; }
+.ag-modal-panel[data-form-v2] .ag-form-avisar { gap: 0; }
+/* La fila roja del final. */
+.ag-form-peligro-pista { padding: 0 !important; overflow: hidden; }
+.ag-form-peligro {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 0 16px;
+  font-size: 15px; line-height: 20px; font-weight: 600; text-align: left; color: var(--mal-tinta); background: var(--sup); border: 0;
+}
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-form-peligro { min-height: 44px; font-size: 14px; }
+.ag-form-peligro:is(:hover, :active) { background: var(--mal-fondo); }
+.ag-form-peligro:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.ag-form-peligro:disabled { opacity: .55; }
+.ag-modal-panel[data-form-v2] > div.overflow-y-auto > .ag-form-peligro-pista { margin-top: 20px; border-radius: 16px; box-shadow: none; }
+/* El pie: «Cancelar» quieto y «Guardar» primario, 44 (40 en `ih`/`esc`), mínimo 104 de ancho. */
+.ag-modal-panel[data-form-v2] .ag-form-cancelar,
+.ag-modal-panel[data-form-v2] .ag-form-guardar {
+  min-width: 104px; height: 44px; padding: 0 16px; font-size: 15px; font-weight: 600; border-radius: 12px; box-shadow: none;
+}
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] :is(.ag-form-cancelar, .ag-form-guardar) { height: 40px; }
+.ag-modal-panel[data-form-v2] .ag-form-cancelar { color: var(--tinta) !important; background: var(--sup2); }
+.ag-modal-panel[data-form-v2] .ag-form-guardar { color: var(--sobre-accion); background: var(--accion); }
+:root[data-formato="iv"] .ag-modal-panel[data-form-v2] .ag-form-cancelar { margin-left: 0; }
+/* Duo cerrado: tarjeta centrada de 310 en el área (no pantalla completa), con el pie fijo. */
+:root[data-formato="ext"] .fixed.inset-0:has(> .ag-modal-panel[data-form-v2]) {
+  padding: var(--capa-arr) calc(var(--capa-der) - var(--fijo-der)) var(--capa-abj) calc(var(--capa-izq) - var(--fijo-izq));
+}
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] { max-width: 310px; height: auto; max-height: 100%; border-radius: 20px; }
+:root[data-formato="ext"] .ag-modal-panel[data-form-v2] > div.overflow-y-auto { padding: 4px 12px 16px; }
+
+/* B13 · AG7 · la ventana de ligar: el eslabón junto al título, y el pie con el principal a la derecha. */
+.ag-ligar-icono { flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--enlace); background: var(--tonal); }
+.ag-ligar-pie { justify-content: flex-end; align-items: flex-start; }
+.ag-ligar-pie > :first-child:not(.ag-capa-boton) { margin-right: auto; }
 .ag-capa-acuse { display: flex; align-items: center; gap: var(--ag-2-5); }
 .ag-capa-acuse-icono {
   flex: none;
@@ -8014,107 +8147,140 @@ td[aria-selected="true"] > .ag-minimes-dia { background: var(--ag-primary-bg-fai
 }
 html.dark .ag-campana-punto { background: color-mix(in srgb, var(--ag-status-cancelled-dot) 82%, #000); }
 .ag-banda-movil-ctrl .ag-campana-punto { top: -4px; right: -4px; border-color: var(--ag-navy); }
-.ag-capa--campana { width: 400px; gap: var(--ag-3); padding-top: 0; }
+.ag-capa--campana { width: 400px; gap: 12px; padding-top: 0; }
+/* B13 · AG8 · las pestañas de la campana de borde a borde (el relleno de la capa es 20) y con los
+   tokens del kit: el subrayado y el texto elegido en `--enlace`. */
 .ag-campana-cab {
   display: flex;
   align-items: center;
-  gap: var(--ag-1);
-  margin: 0 calc(-1 * var(--ag-4));
-  padding: 0 var(--ag-2) 0 0;
-  border-bottom: 1px solid var(--ag-hairline);
+  gap: 4px;
+  margin: 0 -20px;
+  padding: 0 8px 0 0;
+  border-bottom: 1px solid var(--linea);
 }
 .ag-campana-pestanas { flex: 1 1 0; display: grid; grid-template-columns: 1fr 1fr; }
 .ag-campana-pestana {
-  padding: var(--ag-3) 0;
-  font-size: 13.5px;
+  min-height: 48px;
+  padding: 12px 0;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--ag-muted);
+  color: var(--tinta2);
   background: transparent;
   border: 0;
   transition: color var(--ag-dur-micro) var(--ag-ease), box-shadow var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-campana-pestana[aria-selected="true"] { color: var(--ag-brand-legible); box-shadow: inset 0 -2px 0 var(--ag-brand-legible); }
+.ag-campana-pestana[aria-selected="true"] { color: var(--enlace); box-shadow: inset 0 -2px 0 var(--enlace); }
 
 /* · «Por confirmar» (punto 17): cada fila es una rejilla de columnas FIJAS
      —datos, WhatsApp, correo—, así los dos botones quedan en el mismo sitio y
      del mismo tamaño en todas las filas (la celda existe aunque falte el
-     botón), y el estado de los dos va en UNA línea debajo de la fila. */
+     botón), y el estado de los dos va en UNA línea debajo de la fila.
+     B13 · AG8: los botones de 44 (40 en `ih`/`esc`) en `--sup2`, sin borde. */
 .ag-pc-fila {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 38px 38px;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
   grid-template-areas: "datos whatsapp correo" "estado estado estado" "sin sin sin";
-  column-gap: var(--ag-2);
+  column-gap: 8px;
   align-items: center;
-  padding: var(--ag-2-5) 0;
+  padding: 10px 0;
 }
-.ag-pc-fila + .ag-pc-fila { border-top: 1px solid var(--ag-hairline); }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-pc-fila { grid-template-columns: minmax(0, 1fr) 40px 40px; }
+.ag-pc-fila + .ag-pc-fila { border-top: 1px solid var(--linea); }
 .ag-pc-datos { grid-area: datos; }
 .ag-pc-celda--whatsapp { grid-area: whatsapp; }
 .ag-pc-celda--correo { grid-area: correo; }
 .ag-pc-estado {
   grid-area: estado;
-  margin: var(--ag-1) 0 0;
-  color: var(--ag-muted);
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--tinta2);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ag-pc-estado--alerta { color: var(--ag-status-cancelled-text); white-space: normal; }
-.ag-pc-sin-medios { grid-area: sin; display: flex; flex-wrap: wrap; align-items: center; gap: var(--ag-2); margin-top: var(--ag-1); }
+.ag-pc-estado--alerta { color: var(--mal-tinta); font-weight: 600; white-space: normal; }
+.ag-pc-sin-medios { grid-area: sin; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .ag-boton-icono {
   display: inline-grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  color: var(--ag-text);
-  background: var(--ag-surface);
-  border: 1px solid var(--ag-input-border);
-  border-radius: var(--ag-r-btn);
+  width: 44px;
+  height: 44px;
+  color: var(--enlace);
+  background: var(--sup2);
+  border: 0;
+  border-radius: 12px;
   transition: background-color var(--ag-dur-micro) var(--ag-ease);
 }
-.ag-boton-icono:hover { background: var(--ag-btn-ghost-hover); }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-boton-icono { width: 40px; height: 40px; }
+.ag-boton-icono:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); }
 .ag-boton-icono:disabled { opacity: .6; }
 
 /* · «Avisos» (punto 19): una fila por aviso, con el punto de la marca. */
 .ag-aviso-fila {
   display: flex;
-  gap: var(--ag-2-5);
+  gap: 10px;
   width: 100%;
-  padding: var(--ag-2-5) var(--ag-1);
+  padding: 10px 4px;
   text-align: left;
   color: inherit;
   background: transparent;
   border: 0;
-  border-radius: var(--ag-r-btn-sm);
+  border-radius: 10px;
   text-decoration: none;
 }
-.ag-aviso-fila:hover { background: var(--ag-btn-ghost-hover); }
-li + li > .ag-aviso-fila { border-top: 1px solid var(--ag-hairline); border-radius: 0; }
-.ag-aviso-punto { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--ag-brand-secondary); }
+.ag-aviso-fila:hover { background: var(--fondo); }
+li + li > .ag-aviso-fila { border-top: 1px solid var(--linea); border-radius: 0; }
+.ag-aviso-punto { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--enlace); }
 
-/* · El MENÚ DEL ENGRANE (punto 15) y la capa de la leyenda. */
-.ag-capa--menu { width: 300px; gap: 0; padding: var(--ag-2); }
+/* · El MENÚ DEL ENGRANE (punto 15) y la capa de la leyenda. B13 · AG8: el menú del catálogo
+     (`.k-menu-op` de `sistema.css`): filas de 44 (38 anclado en `esc`), icono en `--enlace`, texto 15
+     (14 en `esc`), separador `--linea`. */
+.ag-capa--menu { width: 288px; gap: 0; padding: 8px; border-radius: 14px; }
 .ag-menu-opcion {
   display: flex;
   align-items: center;
-  gap: var(--ag-2-5);
+  gap: 12px;
   width: 100%;
-  min-height: 40px;
-  padding: 0 var(--ag-2-5);
-  font-size: 14px;
-  font-weight: 500;
+  min-height: 44px;
+  padding: 6px 12px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 400;
   text-align: left;
-  color: var(--ag-text);
+  color: var(--tinta);
   background: transparent;
   border: 0;
-  border-radius: var(--ag-r-btn-sm);
+  border-radius: 10px;
 }
-.ag-menu-opcion:is(:hover, :focus-visible) { background: var(--ag-btn-ghost-hover); }
+:root[data-formato="esc"] .ag-menu-opcion { min-height: 38px; gap: 10px; padding: 4px 10px; font-size: 14px; }
+.ag-menu-opcion:is(:hover, :focus-visible) { background: var(--fondo); }
+.ag-menu-opcion:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
 .ag-menu-opcion[aria-disabled="true"] { opacity: .6; cursor: default; }
-.ag-menu-icono { display: inline-grid; place-items: center; color: var(--ag-muted); }
-.ag-menu-sep { margin: var(--ag-1-5) var(--ag-1); border: 0; border-top: 1px solid var(--ag-hairline); }
-.ag-capa--leyenda { width: 260px; }
-.ag-capa--leyenda .ag-leyenda { display: flex; flex-direction: column; gap: var(--ag-2); }
+.ag-menu-icono { display: inline-grid; place-items: center; color: var(--enlace); }
+.ag-menu-sep { margin: 6px 12px; border: 0; border-top: 1px solid var(--linea); }
+/* B13 · AG8 (CALMA §25–§28; maqueta `ag-herr`) · las capas de la barra (campana, engrane, leyenda):
+   en computadora cuelgan de su botón, sin velo (`colocarBajo`); en Duo (`ext`, `ih`, `iv`) son TARJETA
+   CENTRADA en el área de contenido, con velo (310 en `ext`, 400 en `ih`/`iv`); en el teléfono, HOJA
+   desde abajo. El JS no las coloca fuera de `esc`. */
+.ag-capa-barra-velo { display: none; }
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="ih"], [data-formato="iv"]) .ag-capa-barra-velo { display: block; }
+:root:is([data-formato="ext"], [data-formato="ih"], [data-formato="iv"]) .ag-capa.ag-capa-barra {
+  inset: var(--capa-arr) var(--capa-der) var(--capa-abj) var(--capa-izq);
+  width: 400px; height: fit-content; margin: auto;
+  max-width: calc(100vw - var(--fijo-izq) - var(--fijo-der) - 16px);
+  max-height: calc(100dvh - var(--capa-arr) - var(--capa-abj));
+  border-radius: 20px; box-shadow: var(--sombra-capa);
+}
+:root[data-formato="ext"] .ag-capa.ag-capa-barra { width: 310px; }
+:root[data-formato="tel"] .ag-capa.ag-capa-barra {
+  inset: auto 0 0 0; width: auto; max-width: none; max-height: calc(100dvh - var(--it, 0px) - 16px);
+  padding-bottom: calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; box-shadow: var(--sombra-capa);
+  animation-name: ag-hoja-entra;
+}
+:root[data-formato="tel"] .ag-capa.ag-capa--menu.ag-capa-barra { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="ih"], [data-formato="iv"]) .ag-capa--menu .ag-menu-opcion { min-height: 48px; }
+.ag-capa--leyenda { width: 280px; }
+.ag-capa--leyenda .ag-leyenda { display: flex; flex-direction: column; gap: 8px; }
 .ag-capa--leyenda .ag-leyenda > [aria-hidden] { display: none; }
 
 /* ════════════════════════════════════════════════════════════════

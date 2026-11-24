@@ -101,7 +101,7 @@ async function abrirDashboard(page: Page): Promise<void> {
   await expect(proximas(page).locator('.skeleton')).toHaveCount(0, { timeout: 30_000 })
 }
 function ventana(page: Page): Locator {
-  return page.getByRole('dialog', { name: 'Ligar e iniciar consulta' })
+  return page.getByRole('dialog', { name: 'Ligar paciente e iniciar consulta' })
 }
 function registro(page: Page): Locator {
   return page.locator('div.fixed', { has: page.getByRole('heading', { name: 'Registrar paciente' }) }).last()
@@ -121,7 +121,7 @@ test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta�
   await expect(v.getByText('5512345678')).toBeVisible()
   await expect(v.getByText('persona.e2e@ejemplo.test')).toBeVisible()
   await expect(v.getByText(/Duración|Tipo de cita|Notas|Observaciones/)).toHaveCount(0)
-  await v.getByRole('button', { name: 'Ligar e iniciar consulta' }).click()
+  await v.getByRole('button', { name: 'Ligar paciente e iniciar consulta' }).click()
   // Paso 2: el buscador ya relleno con el nombre.
   const buscador = v.getByRole('textbox', { name: 'Buscar paciente existente' })
   await expect(buscador).toHaveValue(nombre)
@@ -166,11 +166,11 @@ test('punto 7 · tarjeta: abre la ventana; «Registrar paciente nuevo» con los 
   await abrirAgendaV2(page)
   await pasarASemanaSiguiente(page) // AG-DT-256: semana siguiente
   await eventoConTexto(page, nombre).click({ position: { x: 8, y: 8 } })
-  await tarjetaLectura(page).getByRole('button', { name: 'Ligar expediente e iniciar', exact: true }).click()
+  await tarjetaLectura(page).getByRole('button', { name: 'Ligar paciente e iniciar consulta', exact: true }).click()
   const v = ventana(page)
   await expect(v).toBeVisible()
   await expect(modalCita(page, 'Editar cita')).toHaveCount(0)
-  await v.getByRole('button', { name: 'Ligar e iniciar consulta' }).click()
+  await v.getByRole('button', { name: 'Ligar paciente e iniciar consulta' }).click()
   await v.getByRole('button', { name: 'Registrar paciente nuevo' }).click()
   const alta = registro(page)
   await expect(alta.locator('label:text-is("Nombre") + input')).toHaveValue('Zoila')
@@ -244,7 +244,7 @@ test('punto 7 · escudo: el segundo clic de un doble clic no cae en el buscador 
   /* Rediseño B5: si otra cita ocupa la pieza principal («en curso»), ésta es una fila de «Después» y sus acciones van en la hoja. */
   await (await accionesDe(page, nombre)).getByRole('button', { name: /Ligar/ }).click()
   const v = ventana(page)
-  const seguir = v.getByRole('button', { name: 'Ligar e iniciar consulta' })
+  const seguir = v.getByRole('button', { name: 'Ligar paciente e iniciar consulta' })
   expect(await clicsTrasDobleClic(page, seguir, () => expect(v.getByRole('textbox', { name: 'Buscar paciente existente' })).toBeVisible())).toBe(1)
   await v.getByRole('button', { name: 'Registrar paciente nuevo' }).click()
   const cancelar = registro(page).getByRole('button', { name: 'Cancelar' })

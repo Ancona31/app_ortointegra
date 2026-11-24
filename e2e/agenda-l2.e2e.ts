@@ -93,7 +93,7 @@ test('Eliminar cita: pregunta, «Cancelar» no hace nada; «Aceptar» la quita d
     await t.getByRole('button', { name: 'Eliminar cita', exact: true }).click()
     aviso = page.getByRole('dialog', { name: texto })
     const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${id}/quitar`) && r.request().method() === 'POST')
-    await aviso.getByRole('button', { name: 'Aceptar' }).click()
+    await aviso.getByRole('button', { name: 'Eliminar cita' }).click()
     expect((await post).status()).toBe(200)
     await expect(cajaDe(page, 'Prueba 07')).toHaveCount(0)
     await expect(cajaDe(vecina, 'Prueba 07')).toHaveCount(0)
@@ -141,7 +141,9 @@ test('con la v2 apagada no hay botón de la leyenda', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Leyenda de estados', exact: true })).toHaveCount(0)
 })
 
-test('la burbuja con la escala de la reserva: título 18, hora 15, texto 14; toques de 44 px o más', async ({ page }) => {
+/* B13 · AG5 · la escala de la burbuja pasa a la de la maqueta aprobada `ag-burbuja` (capa del catálogo): nombre
+   20, hora y médico 15, día 13, estado 12/600, ayuda 13; los toques siguen en 44 o más. */
+test('la burbuja con la escala del catálogo: nombre 20, hora 15, día 13; toques de 44 px o más', async ({ page }) => {
   test.skip(test.info().project.name !== 'telefono', 'tanda M, punto 1: en computadora, las medidas de la tanda J (agenda-m1-burbuja)')
   cita('12:00', 'Prueba 08', 'scheduled')
   cita('14:00', 'Prueba 09', 'cancelled')
@@ -150,19 +152,19 @@ test('la burbuja con la escala de la reserva: título 18, hora 15, texto 14; toq
   // La burbuja entra con `scale(.97)`: se mide quieta.
   await t.evaluate(el => Promise.all(el.getAnimations({ subtree: true }).map(a => a.finished)))
   const px = (sel: string): Promise<string> => t.locator(sel).first().evaluate(el => getComputedStyle(el).fontSize)
-  expect(await px('.ag-burbuja-titulo')).toBe('18px')
+  expect(await px('.ag-burbuja-titulo')).toBe('20px')
   expect(await px('.ag-burbuja-hora')).toBe('15px')
-  expect(await px('.ag-burbuja-dia')).toBe('14px')
-  expect(await px('.ag-burbuja-medico')).toBe('14px')
+  expect(await px('.ag-burbuja-dia')).toBe('13px')
+  expect(await px('.ag-burbuja-medico')).toBe('15px')
   // Integración L: la píldora, con la tabla de L3 (`.rp-op__dur`: 13 · 600).
   expect(await t.locator('.ag-burbuja-estado').first().evaluate(el => getComputedStyle(el).fontWeight)).toBe('600')
   const altos = await t.locator('button').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null)
     .map(e => Math.round(Math.min(e.getBoundingClientRect().height, e.getBoundingClientRect().width))))
   expect(Math.min(...altos)).toBeGreaterThanOrEqual(44)
-  // Integración L: la ayuda bajo el botón ancho (la de una cancelada) es `.rp-pie small`, 13,5 px.
+  // La ayuda bajo el botón ancho (la de una cancelada): 13 px (B13 · AG5; antes 13,5, `.rp-pie small`).
   await page.keyboard.press('Escape')
   await expect(t).toHaveCount(0)
   const c = await abrir(page, 'Prueba 09')
   await expect(c.locator('.ag-burbuja-ayuda')).toHaveText('Esta cita se canceló. Su horario quedó libre.')
-  expect(await c.locator('.ag-burbuja-ayuda').evaluate(el => getComputedStyle(el).fontSize)).toBe('13.5px')
+  expect(await c.locator('.ag-burbuja-ayuda').evaluate(el => getComputedStyle(el).fontSize)).toBe('13px')
 })

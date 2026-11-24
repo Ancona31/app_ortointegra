@@ -129,3 +129,30 @@ export function ventanaVisible(
   if (!vv) return { left: 0, top: 0, width: layout.width, height: layout.height }
   return { left: vv.offsetLeft, top: vv.offsetTop, width: vv.width, height: vv.height }
 }
+
+/**
+ * B13 · AG8 · La ventana MENOS EL CROMO (riel en `ext`, barra en `ih`): lo que las capas con ancla
+ * tienen para colocarse. Pura: el componente le pasa lo que miden `--fijo-izq` y `--fijo-der`
+ * (`globals.css`, «nada fijo toca el borde»; 0 fuera de `ext`/`ih`). Sin esto el buscador de
+ * citas tapaba 45 px del riel en `ext`.
+ */
+export function sinCromo(ventana: Ventana, izq: number, der: number): Ventana {
+  const i = Math.max(0, izq)
+  return { ...ventana, left: (ventana.left ?? 0) + i, width: Math.max(0, ventana.width - i - Math.max(0, der)) }
+}
+
+/** Mide una longitud CSS (una variable que puede ser `calc()`) en px, con una sonda que se quita al momento. */
+function medirLongitud(valor: string): number {
+  const sonda = document.createElement('div')
+  sonda.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;height:0;width:${valor}`
+  document.body.appendChild(sonda)
+  const px = sonda.getBoundingClientRect().width
+  sonda.remove()
+  return Number.isFinite(px) ? px : 0
+}
+
+/** B13 · AG8 · La parte visible de la ventana sin el cromo: la usan las tres copias de `colocar` y `colocarBajo`. */
+export function ventanaParaCapas(): Ventana {
+  const v = ventanaVisible(window.visualViewport, { width: window.innerWidth, height: window.innerHeight })
+  return sinCromo(v, medirLongitud('var(--fijo-izq, 0px)'), medirLongitud('var(--fijo-der, 0px)'))
+}

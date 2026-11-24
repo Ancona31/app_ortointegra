@@ -57,7 +57,8 @@ type CalRef = RefObject<InstanceType<typeof FullCalendar> | null>
    propósito y no importadas de un tipo compartido, igual que `CalRef` en los
    demás módulos de este paso: son estructuralmente la misma cosa para el
    compilador y no hace falta una abstracción nueva para que coincidan. */
-type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => void } | null
+/* B13 · AG5: `verbo` (y su icono) sólo con la v2: la alerta del catálogo con verbo (§29.4). */
+type ConfirmState = { message: string; onConfirm: () => void; onCancel: () => void; verbo?: string; icono?: 'aviso' } | null
 type InvitacionState = {
   citaId: string
   paciente: { id: string; nombre: string; correoFicha: string | null } | null
@@ -104,6 +105,8 @@ export function crearGuardadoCitas({
   calendarRef, avisosHorario, profile, toast, setConfirm, setCitaCreada, setInvitacion, closeModal,
   refetch, firmarEscritura, aplicarAppointmentAlEvento, agendaV2, ajustarTurno,
 }: Params) {
+  /** B13 · AG5 (§29.4): con la v2, el principal de la alerta lleva su verbo; apagada, «Aceptar» como siempre. */
+  const verboV2 = (verbo: string): { verbo?: string; icono?: 'aviso' } => (agendaV2 ? { verbo, icono: 'aviso' } : {})
   /** El consultorio y el médico del evento: el aviso se compara contra el horario de SU consultorio. */
   const dondeDe = (ev: EventApi): DondeCita => {
     const ext: Partial<Appointment> = ev.extendedProps
@@ -331,6 +334,7 @@ export function crearGuardadoCitas({
     if (aviso) {
       setConfirm({
         message: aviso,
+        ...verboV2('Mover'),
         onConfirm: () => { setConfirm(null); seguir() },
         onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
       })
@@ -401,6 +405,7 @@ export function crearGuardadoCitas({
   function preguntarEmpalme(lista: readonly Empalme[], aceptar: () => void, cancelar: () => void): void {
     setConfirm({
       message:   mensajeEmpalme(lista),
+      ...verboV2('Guardar'),
       onConfirm: () => { setConfirm(null); aceptar() },
       onCancel:  () => { setConfirm(null); cancelar() },
     })
@@ -533,6 +538,7 @@ export function crearGuardadoCitas({
     if (aviso) {
       setConfirm({
         message: aviso,
+        ...verboV2('Guardar'),
         onConfirm: () => { setConfirm(null); seguir() },
         onCancel:  () => { setConfirm(null); restaurarPosicion(arg) },
       })

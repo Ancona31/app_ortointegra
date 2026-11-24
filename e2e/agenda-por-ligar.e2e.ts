@@ -145,6 +145,7 @@ test('encendido: una cita por ligar que gastó un enlace único se cancela; el D
   await expect(modalCita(page, 'Editar cita')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Eliminar cita', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Cancelar cita', exact: true }).click()
+  /* B13 · AG6 (CALMA §29.2): con la v2, cancelar desde el formulario pregunta; «Cancelar cita» confirma. */ await page.getByRole('dialog', { name: /¿Cancelar la cita de/ }).getByRole('button', { name: 'Cancelar cita' }).click()
   await expect(toastConTexto(page, 'Se canceló la cita')).toBeVisible()
   await expect.poll(() => estado(c.citaId)).toBe('cancelled')
   expect(sqlLocal(`select count(*) from public.reserva_incidencias where appointment_id = :'id' and tipo = 'cancelacion'`, { id: c.citaId })).toBe('1')

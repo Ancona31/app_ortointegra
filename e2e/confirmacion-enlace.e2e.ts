@@ -30,7 +30,7 @@ soloEscritorio()
 // La página sale con una IP inventada por corrida: los límites por IP sobreviven a la siembra.
 test.use({ extraHTTPHeaders: { 'x-forwarded-for': ipAlAzar() } })
 
-const BASE_URL = 'http://localhost:3001'
+const BASE_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3001'
 const ENLACE_CONF = /\/confirmar\/([A-Za-z0-9_-]{22})(?=[\s"<]|$)/
 
 let e: Escenario

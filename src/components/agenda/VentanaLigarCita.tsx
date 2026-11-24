@@ -29,7 +29,7 @@
  */
 import { Fragment, useEffect, useId, useState, type ReactElement } from 'react'
 import { useRouter } from 'next/navigation'
-import { X } from 'lucide-react'
+import { Link2, X } from 'lucide-react'
 import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import PanelLigarCita from '@/components/agenda/PanelLigarCita'
@@ -44,7 +44,10 @@ import { logger } from '@/lib/logger'
 import { buscarPacientes } from '@/lib/agenda/buscarCitasPaciente'
 import { ligarCitaAPaciente, type PacienteParaLigar } from '@/lib/agenda/ligarCita'
 import { esPorAsignar, esPorLigar } from '@/lib/agenda/tarjetasAgenda'
-import { cuandoDeTarjeta } from '@/lib/agenda/accionesTarjeta'
+import { cuandoDeTarjeta, ETIQUETA_ACCION } from '@/lib/agenda/accionesTarjeta'
+
+/** B13 · AG7 (CALMA §28): «Ligar paciente e iniciar consulta», el mismo texto en la burbuja, la ventana y el dashboard. */
+const TEXTO_LIGAR = ETIQUETA_ACCION.ligar
 import type { Consultorio } from '@/types'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
 
@@ -187,10 +190,14 @@ function PasoDatos({ cita, consultorios, consultorioId, alConsultorio, alSeguir,
           </select>
         </label>
       )}
-      <div className="ag-capa-acciones">
-        <button type="button" className="ag-capa-boton ag-capa-boton--principal" onClick={alSeguir}>Ligar e iniciar consulta</button>
-        {porAsignar && <BotonNoEsCita citaId={cita.id} alHecho={alNoEsCita} className="ag-capa-boton" />}
+      {/* B13 · AG7 (CALMA §28, §29.6): el texto unificado con su eslabón; «Cancelar» a la izquierda
+          del principal y «¿No es una cita?» como acción de texto, con su explicación a la vista. */}
+      <div className="ag-capa-acciones ag-ligar-pie">
+        {porAsignar && <BotonNoEsCita citaId={cita.id} alHecho={alNoEsCita} className="k-b k-b-texto" />}
         <button type="button" className="ag-capa-boton" onClick={alCerrar}>Cancelar</button>
+        <button type="button" className="ag-capa-boton ag-capa-boton--principal" onClick={alSeguir}>
+          <Link2 size={18} aria-hidden="true" />{TEXTO_LIGAR}
+        </button>
       </div>
     </>
   )
@@ -265,8 +272,9 @@ function EstadoVentana({ lectura, motivo, alVerCita }: { lectura: Lectura; motiv
 function CabVentana({ idTitulo, alCerrar }: { idTitulo: string; alCerrar: () => void }): ReactElement {
   return (
     <div className="ag-capa-cab">
-      <h2 id={idTitulo} className="ag-capa-titulo">Ligar e iniciar consulta</h2>
-      <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={alCerrar}><X size={16} aria-hidden="true" /></button>
+      <span className="ag-ligar-icono" aria-hidden="true"><Link2 size={20} /></span>
+      <h2 id={idTitulo} className="ag-capa-titulo">{TEXTO_LIGAR}</h2>
+      <button type="button" className="ag-capa-cerrar" aria-label="Cerrar" onClick={alCerrar}><X size={20} aria-hidden="true" /></button>
     </div>
   )
 }

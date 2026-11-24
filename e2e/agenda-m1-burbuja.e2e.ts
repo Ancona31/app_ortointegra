@@ -18,7 +18,9 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *     «…», con el texto entero en `title`; sin ellas, no hay línea.
  *
  * MUTACIONES (comprobadas en rojo, una por prueba):
- *   · `.ag-capa.ag-burbuja { width: 400px }` → «las medidas de la tanda J»;
+ *   B13 · AG5: las medidas de la tanda J/M se sustituyeron por las de la maqueta aprobada `ag-burbuja`
+ *   (ver las pruebas). Mutaciones de entonces que siguen valiendo:
+ *   · `.ag-capa.ag-burbuja { width: 400px }` → «las medidas de la maqueta»;
  *   · `.ag-burbuja-celda` sin `flex-direction: row` en computadora (el icono encima) → la misma;
  *   · `.ag-capa.ag-burbuja .ag-burbuja-info` con `padding: 14px 16px` → la misma;
  *   · el ⋮ de vuelta a desplegar (`alEditar` → nada) → «los tres puntos»;
@@ -92,8 +94,6 @@ async function medidas(t: Locator) {
     }
     const fs = (s: string): string => getComputedStyle(d.querySelector(s) as Element).fontSize
     const caja = d.getBoundingClientRect()
-    const borde = parseFloat(getComputedStyle(d).borderLeftWidth)
-    const dentro = { left: caja.left + borde, right: caja.right - borde, top: caja.top + borde, bottom: caja.bottom - borde }
     const celdas = [...d.querySelectorAll('.ag-burbuja-celda')].map(b => {
       const svg = (b.querySelector('svg') as Element).getBoundingClientRect()
       const rango = document.createRange()
@@ -102,7 +102,7 @@ async function medidas(t: Locator) {
       const txt = rango.getBoundingClientRect()
       const bb = b.getBoundingClientRect()
       return {
-        alto: bb.height, letra: getComputedStyle(b).fontSize,
+        alto: bb.height, letra: getComputedStyle(b).fontSize, ancho: bb.width,
         iconoALaIzquierda: svg.right <= txt.left + 0.5 && Math.abs((svg.top + svg.bottom) / 2 - (txt.top + txt.bottom) / 2) < 3,
       }
     })
@@ -111,29 +111,30 @@ async function medidas(t: Locator) {
     return {
       ancho: caja.width,
       letra: {
-        nombre: fs('.ag-burbuja-titulo'), hora: fs('.ag-burbuja-hora'), dia: fs('.ag-burbuja-dia'), duracion: fs('.ag-burbuja-duracion'),
+        nombre: fs('.ag-burbuja-titulo'), hora: fs('.ag-burbuja-hora'), dia: fs('.ag-burbuja-dia'),
         medico: fs('.ag-burbuja-medico'), procedencia: d.querySelector('.ag-burbuja-origen') ? fs('.ag-burbuja-origen') : '13px',
         obs: fs('.ag-burbuja-obs'), estado: fs('.ag-burbuja-estado'), cta: fs('.ag-burbuja-cta'), pie: fs('.ag-burbuja-pie-boton'),
       },
       ctaAlto: cta.height, celdas, iconos, pieAlto: r('.ag-burbuja-pie-boton').height,
       relleno: {
-        arriba: r('.ag-burbuja-fila').top - r('.ag-burbuja-franja').bottom,
-        izquierda: r('.ag-burbuja-estado').left - dentro.left,
-        derecha: dentro.right - r('.ag-burbuja-botones').right,
-        ctaIzq: cta.left - dentro.left, ctaDer: dentro.right - cta.right,
-        pieAbajo: dentro.bottom - r('.ag-burbuja-pie').bottom,
+        arriba: r('.ag-burbuja-fila').top - caja.top,
+        izquierda: r('.ag-burbuja-estado').left - caja.left,
+        ctaIzq: cta.left - caja.left, ctaDer: caja.right - cta.right,
+        /* Las filas van de borde a borde (sangran el relleno). */
+        filaIzq: r('.ag-burbuja-celda').left - caja.left,
+        pieAbajo: caja.bottom - r('.ag-burbuja-pie').bottom,
       },
       entre: {
         cabInfo: r('.ag-burbuja-info').top - r('.ag-burbuja-cab').bottom,
-        infoObs: r('.ag-burbuja-obs').top - r('.ag-burbuja-info').bottom,
-        obsCta: r('.ag-burbuja-principal').top - r('.ag-burbuja-obs').bottom,
+        infoCta: r('.ag-burbuja-principal').top - r('.ag-burbuja-info').bottom,
         ctaRejilla: r('.ag-burbuja-rejilla').top - r('.ag-burbuja-principal').bottom,
         rejillaPie: r('.ag-burbuja-pie').top - r('.ag-burbuja-rejilla').bottom,
       },
+      /* Los detalles, entre dos líneas de 1 px, con 12 de relleno arriba y abajo; las observaciones dentro. */
       info: {
-        izq: r('.ag-burbuja-cuando').left - r('.ag-burbuja-info').left,
         arriba: r('.ag-burbuja-cuando').top - r('.ag-burbuja-info').top,
-        abajo: r('.ag-burbuja-info').bottom - r('.ag-burbuja-medico').bottom,
+        abajo: r('.ag-burbuja-info').bottom - r('.ag-burbuja-obs').bottom,
+        lineas: getComputedStyle(d.querySelector('.ag-burbuja-info') as Element).borderTopWidth,
       },
     }
   })
@@ -143,26 +144,36 @@ async function medidas(t: Locator) {
 const cerca = (v: number, esperado: number, nombre: string): void => { expect.soft(Math.abs(v - esperado), `${nombre}: ${v}`).toBeLessThan(0.6) }
 
 for (const [ancho, alto] of [[1920, 1080], [1366, 768]] as const) {
-  test(`computadora ${ancho}×${alto}: la burbuja con las medidas de la tanda J y el diseño de K5`, async ({ page }) => {
+  /* B13 · AG5 · SUSTITUYE a las medidas de la tanda J/M: las de la maqueta aprobada `ag-burbuja` (capa del
+     catálogo anclada, 360; filas de menú de 40 y 14 px con el icono a la izquierda, de borde a borde; botón
+     principal de 40 y 15 px; ✕ y lápiz de 36; nombre 20; detalles 15 con lo secundario a 13; relleno 6/20/20;
+     12 entre bloques; los detalles entre dos líneas de 1 px con 12 de relleno). */
+  test(`computadora ${ancho}×${alto}: la burbuja con las medidas de la maqueta (capa del catálogo)`, async ({ page }) => {
     test.skip(test.info().project.name !== 'escritorio', 'computadora')
     await page.setViewportSize({ width: ancho, height: alto })
     cita(MARTES, '10:00', 'Prueba 14')
     await aLaSemana(page)
     const m = await medidas(await abrir(page, 'Prueba 14'))
     cerca(m.ancho, 360, 'ancho')
-    expect.soft(m.letra).toEqual({ nombre: '16px', hora: '15px', dia: '13px', duracion: '13px', medico: '13px', procedencia: '13px', obs: '13px',
-      estado: '12px', cta: '13px', pie: '13px' })
-    cerca(m.ctaAlto, 48, 'alto del botón ancho')
-    cerca(m.pieAlto, 48, 'alto del pie')
-    expect.soft(m.celdas.map(c => [Math.round(c.alto), c.letra, c.iconoALaIzquierda])).toEqual([[48, '13px', true], [48, '13px', true], [48, '13px', true]])
-    expect.soft(m.iconos).toEqual([[32, 32], [32, 32]])
-    for (const [k, v] of Object.entries(m.relleno)) cerca(v, k === 'pieAbajo' ? 0 : 16, `relleno ${k}`)
+    expect.soft(m.letra).toEqual({ nombre: '20px', hora: '15px', dia: '13px', medico: '15px', procedencia: '13px', obs: '13px',
+      estado: '12px', cta: '15px', pie: '14px' })
+    cerca(m.ctaAlto, 40, 'alto del botón ancho')
+    cerca(m.pieAlto, 40, 'alto del pie')
+    expect.soft(m.celdas.map(c => [Math.round(c.alto), c.letra, c.iconoALaIzquierda, Math.round(c.ancho)]))
+      .toEqual([[40, '14px', true, 360], [40, '14px', true, 360], [40, '14px', true, 360]])
+    expect.soft(m.iconos).toEqual([[36, 36], [36, 36]])
+    const relleno: Record<string, number> = { arriba: 6, izquierda: 20, ctaIzq: 20, ctaDer: 20, filaIzq: 0, pieAbajo: 20 }
+    for (const [k, v] of Object.entries(m.relleno)) cerca(v, relleno[k], `relleno ${k}`)
     for (const [k, v] of Object.entries(m.entre)) cerca(v, 12, `entre ${k}`)
-    for (const [k, v] of Object.entries(m.info)) cerca(v, 10, `recuadro ${k}`)
+    cerca(m.info.arriba, 13, 'detalles: línea y relleno de arriba')
+    cerca(m.info.abajo, 13, 'detalles: relleno y línea de abajo')
+    expect.soft(m.info.lineas).toBe('1px')
   })
 }
 
-test('teléfono: la hoja como estaba (escala de L2) y toques de 44 px o más', async ({ page }) => {
+/* B13 · AG5 · el teléfono es la HOJA del catálogo (maqueta `ag-burbuja`): nombre 20, detalles 15/13,
+   estado 12, botón y filas 15; filas de menú con el icono a la izquierda; toques de 44 o más. */
+test('teléfono: la hoja del catálogo y toques de 44 px o más', async ({ page }) => {
   test.skip(test.info().project.name !== 'telefono', 'teléfono')
   cita(MARTES, '12:00', 'Prueba 15')
   await aLaSemana(page)
@@ -170,12 +181,12 @@ test('teléfono: la hoja como estaba (escala de L2) y toques de 44 px o más', a
   await expect(t).toHaveClass(/ag-hoja/)
   const px = (sel: string): Promise<string> => t.locator(sel).first().evaluate(el => getComputedStyle(el).fontSize)
   expect([await px('.ag-burbuja-titulo'), await px('.ag-burbuja-hora'), await px('.ag-burbuja-dia'), await px('.ag-burbuja-medico'),
-    await px('.ag-burbuja-estado'), await px('.ag-burbuja-cta'), await px('.ag-burbuja-celda')]).toEqual(['18px', '15px', '14px', '14px', '13px', '16px', '14px'])
+    await px('.ag-burbuja-estado'), await px('.ag-burbuja-cta'), await px('.ag-burbuja-celda')]).toEqual(['20px', '15px', '13px', '15px', '12px', '15px', '15px'])
   const altos = await t.locator('button').evaluateAll(els => els.filter(e => (e as HTMLElement).offsetParent !== null)
     .map(e => Math.round(Math.min(e.getBoundingClientRect().height, e.getBoundingClientRect().width))))
   expect(Math.min(...altos)).toBeGreaterThanOrEqual(44)
-  // El icono sigue ENCIMA del texto en las casillas del teléfono.
-  expect(await t.locator('.ag-burbuja-celda').first().evaluate(el => getComputedStyle(el).flexDirection)).toBe('column')
+  // Filas de menú: el icono a la IZQUIERDA del texto (antes, encima).
+  expect(await t.locator('.ag-burbuja-celda').first().evaluate(el => getComputedStyle(el).flexDirection)).toBe('row')
 })
 
 /** ¿Cabe en la parte visible de la ventana? Devuelve lo que sobra por cada lado (≥ 0 = dentro). */

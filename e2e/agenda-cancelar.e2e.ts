@@ -96,6 +96,7 @@ test('encendido: la papelera de una cita con paciente la CANCELA; sigue pintada 
 
   const resp = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
   await page.getByRole('button', { name: 'Cancelar cita', exact: true }).click()
+  /* B13 · AG6 (CALMA §29.2): con la v2, cancelar desde el formulario pregunta; «Cancelar cita» confirma. */ await page.getByRole('dialog', { name: /¿Cancelar la cita de/ }).getByRole('button', { name: 'Cancelar cita' }).click()
   const res = await resp
   expect(res.ok()).toBeTruthy()
   expect(res.request().postDataJSON()).toMatchObject({ status: 'cancelled' })
@@ -132,7 +133,7 @@ test('encendido: la X del paciente también cancela, con su propio aviso', async
   await expect(aviso).toBeVisible()
 
   const resp = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'PUT')
-  await aviso.getByRole('button', { name: 'Aceptar' }).click()
+  await aviso.getByRole('button', { name: 'Cancelar cita' }).click()
   expect((await resp).ok()).toBeTruthy()
   await expect(tarjetaDe(page, '15:40')).toHaveClass(/ag-ev-status--cancelled/)
   expect(estadoEnBase(id)).toBe('cancelled')
@@ -150,6 +151,7 @@ test('encendido: un evento sin paciente se sigue borrando y deja cita_eliminada'
   await expect(modalCita(page, 'Editar evento')).toBeVisible()
   const resp = page.waitForResponse(r => r.url().includes(`/api/appointments/${id}`) && r.request().method() === 'DELETE')
   await page.getByRole('button', { name: 'Eliminar evento', exact: true }).click()
+  /* B13 · AG6 (CALMA §29.2): con la v2, eliminar desde el formulario pregunta; «Eliminar evento» confirma. */ await page.getByRole('dialog', { name: /¿Eliminar el evento/ }).getByRole('button', { name: 'Eliminar evento' }).click()
   expect((await resp).ok()).toBeTruthy()
   await expect(page.locator('.fc-event', { hasText: titulo })).toHaveCount(0)
   expect(estadoEnBase(id)).toBe('BORRADA')
