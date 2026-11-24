@@ -6589,7 +6589,10 @@ html.dark .nav-fila-icono { color: var(--enlace); }
   border-radius: 2px;
   background: var(--ag-ev-marca);
 }
-:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* `contain: inline-size`: el cuerpo no aporta su ancho de contenido a la tabla.
+   Sin esto, la segunda línea (sin salto, con «…») ensanchaba la celda por encima
+   de la tarjeta y en `ext` empujaba el estado bajo el riel. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; contain: inline-size; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre { flex: none; font-size: 15px; line-height: 20px; color: var(--tinta); }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre > svg { display: inline; vertical-align: -1px; margin-right: 4px; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .ag-listafila--v2 .ag-listafila-nombre--cancelada { color: var(--tinta2); }
