@@ -60,6 +60,7 @@ import { reglasDe, turnoValido } from '@/lib/reserva/turnosReserva'
 import { crearEventoReserva } from '@/lib/reserva/googleReserva'
 import { enviarComprobante } from '@/lib/reserva/comprobanteReserva'
 import { avisarReservaAClinica } from '@/lib/reserva/correoClinicaReserva'
+import { registrarAvisoDelServidor } from '@/lib/avisos/avisoDelServidor'
 import type { ContextoReserva, ResultadoReservaRpc } from '@/lib/reserva/servidorReserva'
 
 export const dynamic = 'force-dynamic'
@@ -124,6 +125,11 @@ export async function POST(req: NextRequest, rctx: RouteContext<'/api/reservar/[
   if (!r.ok) return responder(respuestaErrorRpc(r.ausente, r.codigo))
   // D8, sólo con una reserva NUEVA (una `repetida` ya los programó la primera vez).
   if (r.data.r_resultado === 'ok') programarDespues(ctx, consultorio, { nombre: b.nombre, correo, unico: ctx.clase === 'unico' }, r.data, !!b.origen)
+  /* Avisos globales: lo frenó el candado o un contacto bloqueado. La cita no nace, así que el aviso a
+     la clínica lo deja el servidor, después de responder. La respuesta al público no cambia. */
+  if (r.data.r_resultado === 'bloqueado' || r.data.r_resultado === 'ya_tiene_cita') {
+    after(() => registrarAvisoDelServidor({ tipo: 'reserva_frenada', clinicaId: ctx.clinica_id, medicoId: ctx.medico_id, nombre: b.nombre }))
+  }
   return responder(respuestaReserva(r.data.r_resultado, telefonoDeContacto(ctx, consultorio.id)))
 }
 

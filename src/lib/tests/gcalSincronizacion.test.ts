@@ -180,6 +180,8 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       db.aplicadas.push(a)
       return db.aplicarDevuelve
     },
+    /* El «No» (avisos globales): aquí la base no tiene M2 → no hace nada. Lo suyo se prueba en `gcalRsvpRechazo.test.ts`. */
+    rechazarPorRsvp: async () => null,
     confirmarPorRsvp: async (_c: string, _cal: string, citaId: string, eventId: string, aceptaron: string[]) => {
       db.rsvps.push({ citaId, eventId, aceptaron })
       if (db.rsvpDevuelve === 'lanza') throw new Error('la base falló')

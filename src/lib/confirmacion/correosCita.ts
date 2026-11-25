@@ -179,3 +179,36 @@ export function correoCambio(d: DatosRecordatorio, nombre: string | null = null)
     vista: cuando => `Tu cita cambió: ahora es el ${cuando}.`,
   }, saludoDe(nombre))
 }
+
+/** Lo que necesita el correo de «tu cita fue cancelada» (el «No» a la invitación de Google). */
+export type DatosCancelacion = Pick<DatosRecordatorio, 'inicio' | 'zona' | 'medico' | 'consultorio'>
+
+/**
+ * Avisos globales (decisión de Angel, 2026-11-24) · El paciente respondió «No» a la invitación de
+ * Google con más de una hora de anticipación y la cita se canceló: se le dice POR QUÉ y qué hacer si
+ * fue un error. Sin botones: una cancelada no se reabre (regla de G); si quiere otra, agenda de nuevo
+ * o llama. Determinista y sin nada clínico, como los demás. Lanza sólo si `inicio` no es una fecha.
+ */
+export function correoCancelacionPorRsvp(d: DatosCancelacion, nombre: string | null = null): CorreoRecordatorio {
+  if (Number.isNaN(new Date(d.inicio).getTime())) throw new Error('correoCancelacionPorRsvp: inicio inválido')
+  const zona = zonaValida(d.zona)
+  const f = fechaDeCorreo(d.inicio, zona)
+  const medico = d.medico.trim()
+  const armado: CorreoArmado = {
+    marca: { medico, consultorio: d.consultorio.nombre },
+    preencabezado: `Tu cita del ${f.completa} a las ${f.hora}${medico ? ` con ${medico}` : ''} fue cancelada.`,
+    titulo: 'Tu cita fue cancelada',
+    bloques: [
+      { tipo: 'entrada', pildora: { texto: 'Cita cancelada' }, encabezado: saludoDe(nombre) ?? 'Hola:',
+        parrafos: ['Tu cita fue cancelada porque indicaste que no asistirás.'] },
+      { tipo: 'fecha', fecha: f },
+      { tipo: 'recuadro', fuerte: '¿Fue un error?', texto: 'Agenda de nuevo cuando quieras.',
+        llamada: { frase: 'O llámanos al', telefono: d.consultorio.telefono } },
+      { tipo: 'datos', arriba: 28, raya: true, filas: [
+        { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
+        { etiqueta: 'Teléfono', valor: d.consultorio.telefono, telefono: true },
+      ] },
+    ],
+  }
+  return { asunto: `Tu cita del ${fechaYHora(d.inicio, zona).fecha} fue cancelada`, texto: textoCorreoCita(armado), html: htmlCorreoCita(armado), remitente: medico }
+}

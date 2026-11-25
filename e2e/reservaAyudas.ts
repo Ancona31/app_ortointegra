@@ -166,6 +166,9 @@ export function limpiarReservasE2e(desde: string): void {
           delete from public.avisos_vistos where aviso_id in (select id from public.avisos_clinica where cita_id in (select id from _citas));
         end if;
         delete from public.avisos_clinica where cita_id in (select id from _citas);
+        -- Avisos globales: la reserva frenada no tiene cita; se quitan las de esta corrida (por su hora).
+        delete from public.avisos_clinica where clinica_id in (select id from _cl) and tipo = 'reserva_frenada'
+           and creado_en >= current_setting('e2e.desde')::timestamptz;
       end if;
       if to_regclass('public.cita_confirmaciones') is not null then
         delete from public.cita_confirmaciones where clinica_id in (select id from _cl)

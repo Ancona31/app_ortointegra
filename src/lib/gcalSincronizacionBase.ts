@@ -303,3 +303,37 @@ export async function confirmarPorRsvp(
   }))
   return r === 'confirmada'
 }
+
+const NombreMedicoSchema = z.object({
+  titulo: z.string().nullable(), nombres: z.string().nullable(),
+  apellido_paterno: z.string().nullable(), apellido_materno: z.string().nullable(),
+})
+const RechazoRsvpSchema = z.object({
+  r_resultado: z.enum(['cancelada', 'no_asistira', 'sin_cambio']),
+  r_para: z.string().nullable(), r_nombre: z.string().nullable(),
+  r_inicio: z.string().nullable(), r_zona: z.string().nullable(),
+  r_medico: NombreMedicoSchema.nullable(),
+  r_consultorio: z.object({ nombre: z.string().nullable(), direccion: z.string().nullable(), telefono: z.string().nullable() }).nullable(),
+  r_gcal_etag: z.string().nullable(),
+})
+export type RechazoRsvp = z.infer<typeof RechazoRsvpSchema>
+
+/**
+ * `declined` del paciente (`20261202130000_avisos_globales_rsvp_rechazo.sql`): con más de 1 hora
+ * cancela la cita (`cancelada`, con lo que hace falta para escribirle); en la última hora no la
+ * cancela y deja el aviso (`no_asistira`); si no aplica, `sin_cambio`. `null` = la base no tiene la
+ * función (M2 sin aplicar): no se hace nada, como antes.
+ */
+export async function rechazarPorRsvp(
+  clinicaId: string, calendarId: string, citaId: string, eventId: string, rechazaron: string[],
+): Promise<RechazoRsvp | null> {
+  try {
+    const filas = z.array(RechazoRsvpSchema).parse(await llamar('cita_rsvp_google_rechazo', clinicaId, {
+      p_cita_id: citaId, p_calendar_id: calendarId, p_google_event_id: eventId, p_rechazaron: rechazaron,
+    }))
+    return filas[0] ?? null
+  } catch (err) {
+    if (err instanceof SincronizacionNoDisponible) return null
+    throw err
+  }
+}

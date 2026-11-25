@@ -32,6 +32,7 @@ import { reagendarCita, type ResultadoReagendar } from '@/lib/agenda/eleccionSer
 import { correoParaConfirmacion } from '@/lib/agenda/whatsappCita'
 import { enviarConfirmacionCita } from '@/lib/confirmacion/confirmacionCita'
 import { reflejarEnGoogle } from '@/lib/confirmacion/googleConfirmacion'
+import { registrarAvisoDelServidor } from '@/lib/avisos/avisoDelServidor'
 import { logAudit } from '@/lib/audit'
 import { logger } from '@/lib/logger'
 
@@ -142,6 +143,11 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/appointment
     if (r.resultado !== 'ok') return json({ error: r.resultado, message: MENSAJES[r.resultado].message }, MENSAJES[r.resultado].status)
     const eventId = cita.google_event_id
     if (eventId) after(() => reflejarEnGoogle({ clinicaId: e.clinicaId, citaId: id, eventId, etag: cita.gcal_etag }, e.perfil.id))
+    /* Avisos globales: el personal movió la cita de OTRO médico. La RPC escribe con `service_role`, sin
+       `auth.uid()`, y el disparador no sabe quién fue: lo dice el servidor. Dirigido sólo a ese médico. */
+    if (cita.medico_id && cita.medico_id !== e.perfil.id) {
+      after(() => registrarAvisoDelServidor({ tipo: 'personal_movio', clinicaId: e.clinicaId, citaId: id, actorId: e.perfil.id }))
+    }
     return json({ updated_at: r.updatedAt, correo: await avisarAlPaciente(e.clinicaId, cita, e.perfil.id) })
   } catch (err: unknown) {
     logger.error('agenda', `POST reagendar: ${err instanceof Error ? err.name : 'error'}`)

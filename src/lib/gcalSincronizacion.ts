@@ -48,6 +48,7 @@ import {
 } from '@/lib/gcalSincronizacionBase'
 import { restablecerEnGoogle, RestablecimientoPendiente, type PorRestablecer } from '@/lib/gcalSincronizacionRestablecer'
 import { aceptaronDe, rsvpGoogleEncendido } from '@/lib/gcalRsvp'
+import { rechazarPorRsvps } from '@/lib/gcalRsvpRechazo'
 
 /** C-b: la primera sincronización completa empieza hace 30 días, sin límite hacia adelante. */
 export const DIAS_VENTANA_COMPLETA = 30
@@ -328,7 +329,13 @@ async function procesarPagina(
   const restablecido = await restablecerEnGoogle(conexion.clinicaId, calendar, pagina.calendarId, pendientes, pasada.op.senal)
   pasada.r.errores += restablecido.errores
   await avisarEmpalmes(pasada)
-  if (rsvpGoogleEncendido()) await confirmarPorRsvps(pasada, pagina.calendarId, tareas)
+  if (rsvpGoogleEncendido()) {
+    await confirmarPorRsvps(pasada, pagina.calendarId, tareas)
+    // Avisos globales: el «No» del paciente (cancela con más de 1 h; en la última hora sólo avisa).
+    const no = await rechazarPorRsvps(conexion.clinicaId, pagina.calendarId, tareas)
+    pasada.r.cambios += no.cambios
+    pasada.r.errores += no.errores
+  }
   // Tanda J, punto 9: si Google no respondió al restablecer, la página NO
   // avanza (la siguiente pasada la repite y vuelve a restablecer). Al final, y
   // no antes: lo importado y lo movido ya registró sus empalmes, que repetir
