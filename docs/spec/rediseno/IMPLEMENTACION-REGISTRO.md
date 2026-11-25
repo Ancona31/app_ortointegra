@@ -1334,3 +1334,9 @@ Veredicto de la auditoría: «apto con reservas». Un commit por hallazgo; medid
   alta) se enseña deshabilitado con «Conecta Google Calendar para invitar.» visible y como descripción. El
   diálogo que abre conserva su título. La burbuja de alta sólo existe en `esc` (en táctil se agenda con el
   formulario).
+* **Verificación final.** `tsc` 0; eslint 87 errores / 61 avisos (el tope); Vitest 2602/2602 sin TZ, `UTC` y
+  `America/Hermosillo`; `npm run build` 0. Batería completa (reporters del config): **679 pasan, 0 fallan, 526
+  saltadas**; guarda de asistencia roja por las dos de siempre (`agenda-convertir-google:90`,
+  `agenda-google-dos-sentidos:458`, citas del jueves de la semana visible; anteriores a B13). Las tres
+  intermitentes de la referencia pasaron. Aparte: `agenda-b13-vistas` «+N más» fallaba 2 de 8 corridas sueltas
+  por la PRUEBA (`.first()` se resolvía otra vez y podía ser el «+N» de otro día); se fija a su celda (4 de 4).
