@@ -50,7 +50,9 @@ test.afterAll(() => { interruptorAgenda('A', false) })
 test('fuera de la agenda: la campana cuenta los avisos, la lista los nombra y revisar los quita', async ({ page }) => {
   const a = sembrarAviso('cancelacion_paciente', 0)
   await page.goto('/dashboard')
-  await expect(campana(page)).toHaveAttribute('aria-label', /^Avisos \(\d+ sin revisar\)$/)
+  /* En la batería completa la clínica A llega aquí con 50 avisos o más de las pruebas anteriores y la campana
+     dice «50 o más» (su tope): las dos formas son la cuenta. Lo que se prueba es el aviso sembrado, abajo. */
+  await expect(campana(page)).toHaveAttribute('aria-label', /^Avisos \(\d+( o más)? sin revisar\)$/)
   await campana(page).click()
   const fila = page.locator(`[data-panel-avisos-global] [data-aviso="${a.id}"]`)
   await expect(fila).toContainText(`${a.nombre} canceló su cita`)
