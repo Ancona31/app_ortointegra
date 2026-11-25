@@ -402,8 +402,11 @@ test('4 · un evento de Google que se empalma con una reserva por enlace: un avi
   // evento importado, por asignar. Uno por par, aunque se resincronizó.
   const importada = sqlLocal(`select id from public.appointments where google_event_id = :'ev'`, { ev })
   const filas = (tipo: string, cita: string): string =>
-    sqlLocal(`select count(*) || '|' || count(*) filter (where revisado_en is null) from public.avisos_clinica
-               where tipo = :'t' and cita_id = :'c'`, { t: tipo, c: cita })
+    /* Avisos globales (M1): «revisado» es POR USUARIO. Pendiente = sin cerrar para todos y sin una fila de
+       `avisos_vistos` posterior al último cambio del aviso (la misma regla de `agenda-i5-barra-avisos`). */
+    sqlLocal(`select count(*) || '|' || count(*) filter (where a.revisado_en is null and not exists (
+                 select 1 from public.avisos_vistos v where v.aviso_id = a.id and v.visto_en >= a.creado_en))
+                from public.avisos_clinica a where a.tipo = :'t' and a.cita_id = :'c'`, { t: tipo, c: cita })
   expect(filas('empalme_google', reserva)).toBe('1|1')
   expect(filas('google_por_asignar', importada)).toBe('1|1')
   await page.goto('/agenda')
@@ -508,8 +511,11 @@ test('J10 · reserva movida en Google: un aviso por intento; pulsarlo abre la ta
   const evento = (): string => sqlLocal(`select coalesce(google_event_id, '') from public.appointments where id = :'r'`, { r: reserva })
   await expect.poll(evento, { timeout: 60_000 }).not.toBe('')
   const ev = evento()
-  const avisos = (): string => sqlLocal(`select count(*) || '|' || count(*) filter (where revisado_en is null) from public.avisos_clinica
-                                          where tipo = 'google_movimiento_rechazado' and cita_id = :'r'`, { r: reserva })
+  /* Avisos globales (M1): pendiente = sin cerrar para todos y sin verlo nadie después de su último cambio. */
+  const avisos = (): string => sqlLocal(`select count(*) || '|' || count(*) filter (where a.revisado_en is null and not exists (
+                                            select 1 from public.avisos_vistos v where v.aviso_id = a.id and v.visto_en >= a.creado_en))
+                                           from public.avisos_clinica a
+                                          where a.tipo = 'google_movimiento_rechazado' and a.cita_id = :'r'`, { r: reserva })
   const intentos = (): string => sqlLocal(`select count(*) from public.gcal_movimientos_rechazados where cita_id = :'r'`, { r: reserva })
   const creado = (): string => sqlLocal(`select creado_en from public.avisos_clinica where tipo = 'google_movimiento_rechazado' and cita_id = :'r'
                                           and revisado_en is null`, { r: reserva })

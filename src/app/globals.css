@@ -2340,6 +2340,14 @@ body:has(.ag-banda-movil:not([data-barra-v2])) .nav-encabezado { display: none; 
 [data-plegada="true"] .nav-ranura-campana { display: none; }
 /* El título de la lista, alineado con sus filas (la cabecera de la campana va de borde a borde). */
 .ag-capa--avisos-global .ag-campana-cab { padding-left: 20px; }
+/* En computadora la campana vive DENTRO de la barra lateral: `CapaBarra` alinea la lista con el borde derecho
+   del botón y, al no caber, la pegaba al borde izquierdo, tapando la barra entera. Se abre a la derecha de la
+   barra, sobre el contenido. `!important` porque la posición la pone `colocarBajo` en línea (compartido con la
+   agenda: no se toca). */
+:root[data-formato="esc"] .ag-capa--avisos-global { left: calc(var(--cromo-izq) + 8px) !important; transform-origin: top left !important; }
+/* Duo abierto (barra de 216): marca + campana + «Actualizar» no caben y la píldora salía cortada por el borde.
+   Sólo en ese caso (plan gratuito, la píldora es enlace) la marca se queda en el glifo. */
+[data-formato="ih"] .nav-barra-cabeza:has(a.nav-plan) .nav-marca .sb-etiqueta { display: none; }
 .nav-distintivo--avisos { background: var(--ag-status-cancelled-dot); color: #fff; font-size: 11px; }
 
 /* ── El riel (`ext`) ──────────────────────────────────────────────────────── */
