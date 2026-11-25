@@ -8,14 +8,54 @@ Migraciones: **M1** `20261202120000_avisos_globales_modelo.sql` y **M2**
 > auditor independiente empiece por ahí. Todo lo marcado «local» se comprobó en el stack local de
 > Supabase (CLI 2.117.0), no en el clon de la foto de producción.
 
+> **Versión corregida (2026-11-25)** tras las decisiones de Angel (PLAN §10): «revisado» por
+> usuario (`avisos_vistos`, `avisos_pendientes`, `trg_avisos_clinica_reabrir`), sin
+> `recordatorios_enviados`, nombre en `reserva_frenada`, `paciente_no_asistira`, y la publicación de
+> Realtime como paso separable. La tabla de abajo se escribió para la primera versión; lo que
+> cambia va en «Añadido con la versión corregida».
+
+## Añadido con la versión corregida
+
+- **`avisos_vistos` (dimensiones 10, 20 y 30).** Sin FK a `avisos_clinica` ni a `profiles`; FK
+  RESTRICT a `clinicas` (la semilla ya la borra antes). La sesión inserta sólo `(aviso_id,
+  usuario_id, clinica_id)` y actualiza sólo `visto_en`; la hora la pone un disparador. El alta
+  exige `usuario_id = auth.uid()`, su clínica, y que el aviso sea uno que ESA sesión ve (EXISTS bajo
+  la RLS de `avisos_clinica`): el error es el mismo exista o no el aviso (caso 16, cinco intentos).
+  Sin DELETE ni TRUNCATE para nadie; lleva `prohibir_truncate()`. **No lleva disparador de
+  auditoría, a propósito:** marcar un aviso como visto no es un cambio de datos sensibles y
+  «marcar todos» escribiría decenas de filas en `audit_log`. Si el auditor lo quiere, es una línea.
+- **Ciclo de RLS (dimensión 19).** `avisos_vistos_insert` lee `avisos_clinica`; ninguna policy de
+  `avisos_clinica` lee `avisos_vistos` (el post-vuelo lo comprueba). Si alguien metiera «no visto
+  por mí» en la policy de `avisos_clinica`, habría ciclo: por eso el filtro vive en
+  `avisos_pendientes`, no en la policy.
+- **`trg_avisos_clinica_reabrir` cambia el comportamiento de los seis escritores de F4 sin
+  tocarlos** (dimensión 22, en espíritu): su `ON CONFLICT DO NOTHING` deja de evaluarse cuando ya hay
+  un aviso sin cerrar, porque el BEFORE INSERT refresca y devuelve NULL. Efecto buscado (reabrir);
+  efecto lateral: `aviso_clinica_de_movimiento_google` ya refrescaba `creado_en` con `now()` y ahora
+  lo hace el disparador con `clock_timestamp()`. Las pruebas i5, j4 y l5 siguen en verde.
+- **`creado_en` deja de ser «cuándo nació»** y pasa a ser «último hecho» (dimensión 16). Ya lo era
+  para `google_movimiento_rechazado`. Lo lee `haceCuanto` en la lista: correcto para un aviso reabierto.
+- **Un nombre en claro en `datos`** (dimensión 16): sólo en `reserva_frenada`, impuesto por
+  `avisos_clinica_datos_check` (tipo, cadena, 1 a 120). Lo ve quien ve el aviso: el médico del
+  enlace, el administrador y la secretaria. Vive indefinidamente (no hay purga). El aviso de
+  privacidad de la reserva sigue pendiente de revisión legal y habla de historial seudonimizado.
+- **Contador `datos.intentos` (dimensión 27):** se sube en la misma sentencia; nada después lanza.
+  Lo provoca un anónimo: una línea por nombre, así que quien varíe el nombre crea una línea por
+  intento. Lo acota el límite de intentos de la ruta pública, no la base.
+- **Realtime separable (dimensiones 11 y 28):** el pre-vuelo ya no mira la publicación; el paso se
+  salta solo y la rejilla lo dice. **DELETE por Realtime:** llega a todo suscrito con el id; no se
+  puede excluir por tabla; mitigación: nadie tiene DELETE.
+- **M2, última hora:** `cita_rsvp_google_rechazo` (INVOKER, `service_role`) llama a
+  `aviso_clinica_registrar` (DEFINER). El umbral es una copia textual del de
+  `cita_confirmacion_responder`; lo vigila el caso 8 de av2.
+
 ## Lo que el auditor debe mirar primero
 
 1. **El clon de producción.** Nada se ensayó sobre la foto. En producción 32 funciones tienen el
    cuerpo con `\r\n` (`supabase/produccion/DERIVA.md`); M1 y M2 no comparan ninguna huella md5, pero
    sus pre-vuelos sí miran policies, CHECK y la publicación, y eso sólo se vio en local.
-2. **El dueño de la publicación `supabase_realtime`** (dimensiones 11 y 26). En local es `postgres`;
-   el pre-vuelo aborta si quien aplica no es su dueño. Si en producción es `supabase_admin`, M1
-   aborta limpia en el pre-vuelo: habría que sacar el `ALTER PUBLICATION` a un paso aparte.
+2. **El dueño de la publicación `supabase_realtime`** (dimensiones 11 y 26). En local es `postgres`.
+   Si en producción no lo es, M1 se aplica igual, salta ese paso y lo deja PENDIENTE en la fila 9.
 3. **`auth.uid()` en el `WHEN` de los disparadores.** Postgres admite funciones en `WHEN` (no
    subconsultas) y en local funciona; `auth.uid()` es de Supabase (esquema `auth`, dueño
    `supabase_auth_admin`). Si Supabase cambiara su firma, los cuatro disparadores que la nombran
@@ -55,7 +95,7 @@ Migraciones: **M1** `20261202120000_avisos_globales_modelo.sql` y **M2**
 | 20 Permisos de fábrica | Columnas nuevas: `authenticated` las lee (SELECT de tabla) y no las actualiza (post-vuelo y caso 13). Funciones: `REVOKE … FROM PUBLIC`; la RPC, sólo `service_role` | Sólo `service_role` |
 | 21 Rendimiento | Medido en local (tabla del PLAN §8): sin cambio apreciable para el médico en su agenda; +0,2 a +0,4 ms cuando se escribe aviso. La policy añade comparaciones de columna; para avisos sin cita llama a `soy_admin_de_clinica()` y `get_my_role()` por fila (tabla pequeña, tope de 50 en la lectura) | — |
 | 22 Conjunto | No reescribe ninguna función existente. Va después de las 14 | No reescribe `cita_rsvp_google`. Exige M1 |
-| 23 Prueba | `av1_avisos_globales.sql`, 15 casos | `av2_rsvp_rechazo.sql`, 7 casos |
+| 23 Prueba | `av1_avisos_globales.sql`, 16 casos | `av2_rsvp_rechazo.sql`, 8 casos |
 | 24 DEFINER | Las 6 nuevas fijan `search_path = ''` y no son de PUBLIC (post-vuelo) | INVOKER |
 | 26 Otorgante | No revoca privilegios de tabla | — |
 | 27 Contadores | `datos.intentos` y `datos.enviados` se suben en la misma sentencia (`ON CONFLICT DO UPDATE`); nada después puede lanzar | — |

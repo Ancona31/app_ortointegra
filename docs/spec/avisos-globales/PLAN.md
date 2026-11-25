@@ -346,3 +346,102 @@ Stack local de Supabase (CLI 2.117.0, Docker) con las 14 migraciones anteriores 
   le escribe. Batería SQL entera: 50 archivos en verde.
 - El repaso del autor contra las 31 dimensiones, con lo que NO se pudo comprobar, está en
   `docs/spec/avisos-globales/AUDITORIA-PREVIA-M1-M2.md`. No sustituye a la auditoría independiente.
+
+---
+
+## 10. Decisiones de Angel del 2026-11-24 y lo que cambiaron (MANDA SOBRE LO DE ARRIBA)
+
+Las secciones 1 a 9 se escribieron con las recomendaciones del autor. Angel decidió distinto en
+cuatro puntos y añadió uno. M1 y M2 se corrigieron EN SU PROPIO ARCHIVO (no estaban aplicadas en
+ningún sitio). Donde esta sección contradiga a las anteriores, vale ésta.
+
+| # | Decisión de Angel | Qué cambió |
+|---|---|---|
+| P1 | «Revisado» es **por usuario**: que uno marque un aviso no se lo quita a nadie | Tabla nueva `avisos_vistos (aviso_id, usuario_id, clinica_id, visto_en)` con RLS propia (cada quien sólo lo suyo). Un aviso está pendiente para mí si no lo he visto o si `visto_en < creado_en`. Lo lee `avisos_pendientes(tipos, límite)`, INVOKER, bajo RLS, en un solo viaje |
+| P2 | El recordatorio ENVIADO (16) sale del alcance: ni aviso ni burbuja. El fallido (15) se queda. «Por confirmar» (8) sigue como lista | Fuera el tipo `recordatorios_enviados` y su rama del disparador de correos |
+| P3 | La reserva frenada (7) **sí** lleva el nombre tecleado: «Fulano intentó reservar y no pudo» | `aviso_clinica_registrar` recibe `p_nombre`; se guarda en `datos.nombre`, recortado, sin caracteres de control y de 120 como mucho (lo impone un CHECK, y sólo en ese tipo). Una línea por nombre (sin distinguir mayúsculas), con contador |
+| P4 | «No» de Google con más de 1 hora → cancela, avisa y manda correo. En la última hora → **no cancela**: aviso «Fulano indicó que no asistirá» y decide el personal | Tipo nuevo `paciente_no_asistira`; `cita_rsvp_google_rechazo` devuelve `cancelada`, `no_asistira` o `sin_cambio` |
+| P5 | Fuera de la agenda sólo «Avisos» | Ya era así (paso 2) |
+| Nuevo | El médico administrador alterna «Solo mis avisos» / «Toda la clínica» en la campana | Sin migración: preferencia por navegador (ver abajo) |
+
+Siguen siendo 19 tipos (sale uno, entra otro) y 2 migraciones.
+
+### Qué pasa con `revisado_en` / `revisado_por`
+
+Se quedan, sin convertir ni borrar nada, y pasan a significar «cerrado para todos». El código de
+antes los sigue escribiendo mientras dure el despliegue (y entonces el aviso desaparece para todos,
+como hoy); el código nuevo ya no los escribe. El índice único de F4 `(tipo, cita_id) WHERE
+revisado_en IS NULL` sigue deduplicando: como ya nadie cierra para todos, hay UN aviso por tipo y
+cita, que se va refrescando.
+
+### Cómo se reabre un aviso
+
+Disparador `trg_avisos_clinica_reabrir` (BEFORE INSERT en `avisos_clinica`, sólo avisos con cita).
+Un BEFORE INSERT corre antes de que `ON CONFLICT` mire el índice: si ya hay un aviso sin cerrar del
+mismo tipo y cita, le pone `creado_en` = la hora real y se salta el alta. Quien ya lo había visto
+lo vuelve a tener pendiente (`visto_en < creado_en`), y Realtime lo entrega como un cambio. Así los
+**seis escritores de F4 reabren sin tocarlos**. Las horas son `clock_timestamp()` (no `now()`), para
+que «visto» y «reabierto» se ordenen bien aunque caigan en transacciones largas.
+
+Excepción a propósito: `paciente_no_asistira` avisa UNA vez por cita y no se reabre (cada pasada de
+la sincronización volvería a verlo).
+
+### La reserva frenada con nombre (P3), contestado punto por punto
+
+- **Cuándo se conoce el nombre:** antes del freno. La persona ya envió el formulario (nombre,
+  teléfono, casilla del aviso marcada) y la ruta se lo pasa a `reservar_por_enlace`
+  (`src/app/api/reservar/[codigo]/route.ts:116-126`); la RPC comprueba el aviso de privacidad
+  (f3:1131) y, en el enlace fijo, el correo verificado (f3:1187-1195) ANTES de devolver `bloqueado`
+  (f3:1214) o `ya_tiene_cita` (f3:1221).
+- **Dónde se guarda:** `avisos_clinica.datos ->> 'nombre'`, sólo en `reserva_frenada`. Ni teléfono
+  ni correo.
+- **Cuánto vive:** lo mismo que cualquier aviso: indefinidamente. Hoy no hay purga de avisos (ni de
+  `reserva_incidencias`, como ya anota el propio aviso de privacidad). Si Angel quiere un plazo,
+  hace falta una tarea de purga, que no existe: queda como pendiente.
+- **¿Lo cubre el aviso de privacidad de la reserva?** A medias, y el aviso sigue PENDIENTE DE
+  REVISIÓN LEGAL. Lista «tu nombre» entre los datos y tiene las finalidades «aplicar las reglas de
+  reserva» y «proteger el servicio contra abusos» (`src/lib/reserva/avisoReserva.ts:40-46`), pero
+  dice que el historial se guarda **seudonimizado**, y este nombre va en claro y de alguien a quien
+  no se le dio cita. **ASUMIENDO** que haga falta una frase propia: va a la revisión legal junto con
+  el resto. No toqué el aviso.
+
+### El «No» de Google y el umbral (P4)
+
+El umbral es el del enlace de confirmación, con su misma expresión
+(`start_time - interval '1 hour' <= ahora`: hasta 1 hora antes; a T-1h exacto ya no). No pude
+«leerlo del código» sin duplicarlo: está escrito como literal dentro de `cita_confirmacion_responder`
+(F4, ya en producción) y compartirlo exigiría reescribir esa función. Lo que hice: la misma
+expresión en `cita_rsvp_google_rechazo` y una prueba (av2, caso 8) que **falla si las dos funciones
+dejan de decir lo mismo**. `PLAZO_CANCELAR` de los correos es la tercera copia, ya anotada (AG-DT-249).
+
+### El interruptor «Solo mis avisos» / «Toda la clínica»
+
+- Sólo para el médico administrador. El invitado ya ve sólo lo suyo por RLS; la secretaria, siempre
+  toda la clínica.
+- «Mis avisos» = los de citas cuyo médico es él + los dirigidos a él + los de toda la clínica sin
+  médico (Google desconectado o sin sincronizar, que le tocan como administrador).
+- **Dónde se guarda:** en el navegador (`localStorage`, clave `spinus.avisos.solo-mios`), como
+  «Pop-up de eventos» (`spinus.agenda.tarjeta-al-pasar`). Sin migración y sin datos de nadie. Es por
+  dispositivo: en otro equipo empieza en «Toda la clínica». Si Angel lo quiere igual en todos sus
+  equipos, hace falta una columna (p. ej. en `profiles`) y se diría entonces.
+- Filtra lista, número y burbujas, en el cliente, sobre lo que la RLS ya le deja leer.
+
+### Realtime, separable
+
+Si quien aplica M1 no es dueño de la publicación `supabase_realtime`, ese paso se salta, el resto
+queda aplicado y la fila 9 de la rejilla dice `PENDIENTE: …` con la sentencia que falta. La campana
+sigue con su relectura cada 2 minutos. Sobre el DELETE que llega a otras clínicas con el id: una
+publicación no deja excluir DELETE por tabla (la opción `publish` es de toda la publicación, y la
+de Supabase la comparte `appointments`); la mitigación es que nadie puede borrar avisos salvo
+`postgres` a mano, y lo que viaja es un uuid sin más.
+
+### Resultados de la versión corregida (local, 2026-11-24/25)
+
+- M1: ida 9/9 OK (+1 informativa) → reversa → segunda pasada → ida; segunda ida aborta. Con una
+  marca en `avisos_vistos`, la reversa conserva la tabla y lo dice; con un aviso de la forma nueva,
+  conserva la forma. M2: ida 3/3 → reversa → ida.
+- Pruebas: `av1` (16 casos) y `av2` (8 casos); batería SQL entera, 50 archivos en verde.
+- Tiempos con la versión corregida (ms por operación, 3 corridas): médico en su agenda, alta
+  1,13–1,43, mover 1,22–1,24, cancelar 1,16–1,18 (igual que antes de M1); secretaria en agenda ajena,
+  alta 1,55–1,77, mover 1,91–1,94, cancelar 1,87–1,92 (+0,2 a +0,4 ms sobre la línea base).
+- Realtime y RLS: otra corrida con cuatro sesiones, sin fugas.

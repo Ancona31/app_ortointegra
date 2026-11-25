@@ -3,7 +3,7 @@
 -- Rama: feature/avisos-globales · Escrita: 2026-11-24
 -- Plan: docs/spec/avisos-globales/PLAN.md (§4)
 -- ───────────────────────────────────────────────────────────────────────
--- ESTADO · LOCAL: 2026-11-24, stack local de Supabase (CLI 2.117.0) con las 14
+-- ESTADO · LOCAL: 2026-11-25 (versión corregida tras las decisiones de Angel), stack local de Supabase (CLI 2.117.0) con las 14
 --   migraciones anteriores y M1: aplicada, deshecha con su reversa y vuelta a
 --   aplicar; prueba av2_rsvp_rechazo.sql en verde.
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. PENDIENTE DE ENSAYO SOBRE EL CLON
@@ -13,16 +13,27 @@
 --   tablas, ni columnas, ni disparadores, ni policies. NO reemplaza
 --   cita_rsvp_google (el «Sí»), que queda intacta.
 --   Decisión de Angel (2026-11-24): cuando el paciente responde «No» a la
---   invitación de Google, la cita se CANCELA, se avisa a la clínica y se le
---   manda un correo. La función hace lo primero y devuelve lo que el servidor
---   necesita para el correo; el aviso lo deja el disparador de M1
---   (aviso_clinica_de_cambio_cita, por spinus.via = 'google_rsvp').
+--   invitación de Google:
+--     · con MÁS de 1 hora de anticipación, la cita se CANCELA, se avisa a la
+--       clínica y se le manda un correo. La función cancela y devuelve lo que
+--       el servidor necesita para el correo ('cancelada'); el aviso lo deja el
+--       disparador de M1 (aviso_clinica_de_cambio_cita, spinus.via = 'google_rsvp');
+--     · en la ÚLTIMA HORA, NO se cancela: deja el aviso «indicó que no
+--       asistirá» (paciente_no_asistira, por aviso_clinica_registrar, una sola
+--       vez por cita) y devuelve 'no_asistira'. El personal decide.
+--   ⚠️ EL UMBRAL ES EL DEL ENLACE DE CONFIRMACIÓN, con su misma expresión:
+--     start_time - interval '1 hour' <= ahora  (cita_confirmacion_responder, F4:
+--     «Hasta 1 hora antes. A T-1h exacto ya no»). SQL no deja compartir el
+--     literal sin reescribir aquella función; la prueba av2 (caso 8) falla si
+--     las dos dejan de decir lo mismo. Si cambia una, cambia la otra (y
+--     PLAZO_CANCELAR de src/lib/correo/plantillaCita.ts).
 --   Condiciones, calcadas de cita_rsvp_google: v2 encendida; el evento y el
 --   calendario son los de ESA cita y de la conexión activa de la clínica; la
 --   cita tiene paciente o está por ligar, tiene hora y es FUTURA (hora real
 --   tras el candado); está agendada o confirmada (una atendida, una cancelada
 --   o una inasistencia no cambian); y un correo que rechazó es pacientes.email
 --   o reserva_correo de ESA cita. Si algo no se cumple: 'sin_cambio', sin más.
+--   Sólo la cancelación cuenta para el candado, audita y manda correo.
 --   · Cuenta para el candado de reservas igual que la cancelación por enlace,
 --     sin tocar nada: trg_appointments_reserva_incidencia (F3) registra la
 --     incidencia en cualquier paso a cancelada de una cita reservada por enlace.
@@ -65,7 +76,8 @@ BEGIN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: log_cita_change() no tiene google_rsvp en su lista de vías.';
   END IF;
   -- Sin M1 la cita se cancelaría SIN avisar a la clínica.
-  IF to_regprocedure('public.aviso_clinica_de_cambio_cita()') IS NULL
+  IF to_regprocedure('public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)') IS NULL
+     OR to_regprocedure('public.aviso_clinica_de_cambio_cita()') IS NULL
      OR NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.appointments'::regclass
                        AND tgname = 'trg_appointments_aviso_cambio' AND tgenabled = 'O') THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta M1 (20261202120000_avisos_globales_modelo): sin ella el «No» cancelaría sin avisar a la clínica.';
@@ -125,13 +137,21 @@ BEGIN
   IF NOT FOUND THEN
     RETURN NEXT; RETURN;
   END IF;
+  r_nombre := v_a.nombre;
+  -- Hasta 1 hora antes. A T-1h exacto ya no: la MISMA expresión que cita_confirmacion_responder.
+  IF r_inicio - interval '1 hour' <= v_ahora THEN
+    -- Última hora: no se cancela. Aviso «indicó que no asistirá», una vez por cita; decide el personal.
+    IF public.aviso_clinica_registrar(p_clinica_id, 'paciente_no_asistira', v_a.id, NULL, NULL, NULL) THEN
+      r_resultado := 'no_asistira';
+    END IF;
+    RETURN NEXT; RETURN;
+  END IF;
   PERFORM set_config('spinus.via', 'google_rsvp', true);
   UPDATE public.appointments
      SET status = 'cancelled', updated_at = greatest(coalesce(v_a.updated_at, v_ahora), v_ahora)
    WHERE id = v_a.id AND clinica_id = p_clinica_id AND status IN ('scheduled', 'confirmed');
   r_resultado := 'cancelada';
   r_para := v_a.para;
-  r_nombre := v_a.nombre;
   r_fin := v_a.end_time;
   r_zona := v_a.consultorio_timezone;
   r_gcal_etag := v_a.gcal_etag;
@@ -146,7 +166,7 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[]) FROM PUBLIC, anon, authenticated;
 GRANT  EXECUTE ON FUNCTION public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[]) TO service_role;
 COMMENT ON FUNCTION public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[]) IS
-  'Avisos globales: RSVP «declined» de Google. Cancela la cita (scheduled o confirmed → cancelled) si es futura, con hora, con paciente o por ligar, ligada a ese evento y calendario de la conexión activa de la clínica, y sólo si un correo que rechazó es pacientes.email o reserva_correo de ESA cita. Audita via google_rsvp; el aviso cancelacion_paciente lo deja aviso_clinica_de_cambio_cita; la incidencia del candado, trg_appointments_reserva_incidencia. Devuelve cancelada con lo que el servidor necesita para el correo al paciente (nada clínico), o sin_cambio. No reabre nada: el «Sí» posterior no cambia una cancelada. Sólo service_role; el código la llama sólo con AGENDA_RSVP_GOOGLE=encendido.';
+  'Avisos globales: RSVP «declined» de Google. Con más de 1 hora de anticipación (el umbral del enlace de confirmación) cancela la cita (scheduled o confirmed → cancelled); en la última hora NO cancela: deja el aviso paciente_no_asistira (una vez por cita) y devuelve no_asistira. En los dos casos, sólo si la cita es futura, con hora, con paciente o por ligar, ligada a ese evento y calendario de la conexión activa de la clínica, y sólo si un correo que rechazó es pacientes.email o reserva_correo de ESA cita. Audita via google_rsvp; el aviso cancelacion_paciente lo deja aviso_clinica_de_cambio_cita; la incidencia del candado, trg_appointments_reserva_incidencia. Devuelve cancelada con lo que el servidor necesita para el correo al paciente (nada clínico), no_asistira, o sin_cambio. No reabre nada: el «Sí» posterior no cambia una cancelada. Sólo service_role; el código la llama sólo con AGENDA_RSVP_GOOGLE=encendido.';
 
 DO $$
 BEGIN

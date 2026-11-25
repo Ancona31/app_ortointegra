@@ -166,6 +166,30 @@ update public.pacientes set activo = false where id = '00000000-0000-4000-8000-0
 select pg_temp.esperar('caso 6', pg_temp.no('00000000-0000-4000-8000-000000a2c001',
   '00000000-0000-4000-8000-000000a2a005', 'cal-av2-1', 'ev-av2-5', array['paciente.uno@prueba.local']), 'cancelada|-|Paciente');
 
+-- ── Caso 8: el «No» en la ÚLTIMA HORA no cancela: avisa «indicó que no asistirá», una vez ──
+update public.pacientes set activo = true where id = '00000000-0000-4000-8000-000000a2f001';
+update public.appointments set start_time = now() + interval '40 min', end_time = now() + interval '70 min' where id = '00000000-0000-4000-8000-000000a2a008';
+update public.appointments set gcal_calendar_id = 'cal-av2-1' where id = '00000000-0000-4000-8000-000000a2a008';
+select pg_temp.esperar('caso 8 última hora', pg_temp.no('00000000-0000-4000-8000-000000a2c001',
+  '00000000-0000-4000-8000-000000a2a008', 'cal-av2-1', 'ev-av2-8', array['paciente.uno@prueba.local']), 'no_asistira|-|Paciente');
+select pg_temp.esperar('caso 8 no se cancela', pg_temp.estado('00000000-0000-4000-8000-000000a2a008'), 'scheduled');
+select pg_temp.esperar('caso 8 aviso', (select string_agg(tipo, ',') from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-000000a2a008'), 'paciente_no_asistira');
+select pg_temp.esperar('caso 8 no cuenta para el candado ni audita cancelación', (select count(*)::text from public.audit_log
+  where tabla = 'appointments' and registro_id = '00000000-0000-4000-8000-000000a2a008' and accion = 'cita_cancelada'), '0');
+-- La pasada siguiente no repite el aviso.
+select pg_temp.esperar('caso 8 repetido', pg_temp.no('00000000-0000-4000-8000-000000a2c001',
+  '00000000-0000-4000-8000-000000a2a008', 'cal-av2-1', 'ev-av2-8', array['paciente.uno@prueba.local']), 'sin_cambio|-|Paciente');
+select pg_temp.esperar('caso 8 un solo aviso', (select count(*)::text from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-000000a2a008'), '1');
+-- Justo por encima de la hora, sí cancela (el borde es el del enlace: a T-1h exacto ya no).
+update public.appointments set start_time = now() + interval '61 min', end_time = now() + interval '91 min', status = 'scheduled',
+       google_event_id = 'ev-av2-6b', gcal_calendar_id = 'cal-av2-1', paciente_id = '00000000-0000-4000-8000-000000a2f001'
+ where id = '00000000-0000-4000-8000-000000a2a006';
+select pg_temp.esperar('caso 8 con 61 minutos', split_part(pg_temp.no('00000000-0000-4000-8000-000000a2c001',
+  '00000000-0000-4000-8000-000000a2a006', 'cal-av2-1', 'ev-av2-6b', array['paciente.uno@prueba.local']), '|', 1), 'cancelada');
+-- El umbral es el MISMO que el del enlace de confirmación: las dos funciones usan la misma expresión.
+select pg_temp.esperar('caso 8 mismo umbral que el enlace', (select string_agg((position('- interval ''1 hour'' <= v_ahora' in prosrc) > 0)::text, ',' order by proname)
+  from pg_proc where pronamespace = 'public'::regnamespace and proname in ('cita_confirmacion_responder', 'cita_rsvp_google_rechazo')), 'true,true');
+
 -- ── Caso 7: argumentos imposibles → 22023; y sólo service_role la ejecuta ──
 do $$
 begin

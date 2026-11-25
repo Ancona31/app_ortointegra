@@ -5,9 +5,12 @@
 -- ═══════════════════════════════════════════════════════════════════════
 -- QUÉ HACE, en dos partes:
 --   A · SIEMPRE: quita lo que ESCRIBE avisos nuevos y lo que los publica: los 7
---       disparadores de M1, sus 5 funciones, la RPC aviso_clinica_registrar y
---       avisos_clinica de la publicación supabase_realtime. Desde ese momento
---       no nace ningún aviso de los 12 tipos nuevos; los 7 de F4 siguen igual.
+--       disparadores de M1, sus 5 funciones, la RPC aviso_clinica_registrar,
+--       el disparador de reabrir, la lectura avisos_pendientes y avisos_clinica
+--       de la publicación supabase_realtime. Desde ese momento no nace ningún
+--       aviso de los 12 tipos nuevos; los 7 de F4 siguen igual. La tabla
+--       avisos_vistos (quién vio qué) se borra SÓLO si está vacía; con filas se
+--       queda, inerte, y la rejilla lo dice: nunca se borra lo que alguien marcó.
 --   B · SÓLO SI NINGUNA FILA USA LA FORMA NUEVA (ver la guarda): devuelve la
 --       tabla a la forma de F4: las dos policies de F4, cita_id NOT NULL, el
 --       CHECK de 7 tipos, y fuera el índice, los dos CHECK y las 4 columnas.
@@ -27,6 +30,7 @@
 -- GUARDA DE DATOS, SIN CORRER LA REVERSA (dimensión 31): consulta de SÓLO
 --   LECTURA con la misma condición que decide la parte B. 0 filas = la parte B
 --   se hará; con filas, sólo la parte A.
+--     SELECT 'M1: marcas de visto (avisos_vistos se quedaría)' AS motivo, count(*) AS n FROM public.avisos_vistos HAVING count(*) > 0;
 --     SELECT 'M1: avisos con la forma nueva' AS motivo, count(*) AS n FROM public.avisos_clinica
 --      WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL OR medico_id IS NOT NULL
 --         OR datos IS NOT NULL
@@ -75,7 +79,21 @@ BEGIN
   DROP FUNCTION IF EXISTS public.aviso_clinica_de_correo();
   DROP FUNCTION IF EXISTS public.aviso_clinica_de_conexion_google();
   DROP FUNCTION IF EXISTS public.aviso_clinica_de_sync_google();
-  DROP FUNCTION IF EXISTS public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid);
+  DROP FUNCTION IF EXISTS public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text);
+  DROP FUNCTION IF EXISTS public.avisos_pendientes(text[], integer);
+  IF to_regclass('public.avisos_clinica') IS NOT NULL THEN
+    DROP TRIGGER IF EXISTS trg_avisos_clinica_reabrir ON public.avisos_clinica;
+  END IF;
+  DROP FUNCTION IF EXISTS public.aviso_clinica_reabrir();
+  -- avisos_vistos: sólo si está vacía. Con filas se queda (inerte: ya nadie la lee).
+  IF to_regclass('public.avisos_vistos') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.avisos_vistos' INTO v_n;
+    IF v_n = 0 THEN
+      DROP TABLE public.avisos_vistos;
+      DROP FUNCTION IF EXISTS public.aviso_visto_sellar();
+    END IF;
+    v_n := 0;
+  END IF;
 
   IF to_regclass('public.avisos_clinica') IS NULL THEN
     INSERT INTO pg_temp._reversa_m1 VALUES ('no aplica: avisos_clinica no existe');
@@ -148,7 +166,8 @@ FROM (
   SELECT 2, 'funciones de M1 que quedan',
          (SELECT count(*)::text FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
              AND p.proname IN ('aviso_clinica_de_cambio_cita', 'aviso_clinica_de_bloqueo', 'aviso_clinica_de_correo',
-                               'aviso_clinica_de_conexion_google', 'aviso_clinica_de_sync_google', 'aviso_clinica_registrar')),
+                               'aviso_clinica_de_conexion_google', 'aviso_clinica_de_sync_google', 'aviso_clinica_registrar',
+                               'aviso_clinica_reabrir', 'avisos_pendientes')),
          '0'
   UNION ALL
   SELECT 3, 'escritores de F4, intactos (6 DEFINER + aviso_clinica_revisar)',
@@ -161,7 +180,10 @@ FROM (
          '0'
   UNION ALL
   -- «hecha», «ya estaba…» o «no aplica…» son buenas; «NO HECHA: …» sale como REVISAR.
-  SELECT 5, 'parte B (la forma de F4)', (SELECT parte_b FROM pg_temp._reversa_m1 LIMIT 1),
+  SELECT 5, 'avisos_vistos (se borra sólo vacía; con filas se queda, inerte)',
+         CASE WHEN to_regclass('public.avisos_vistos') IS NULL THEN 'borrada' ELSE 'SE QUEDA: tiene filas' END, 'borrada'
+  UNION ALL
+  SELECT 6, 'parte B (la forma de F4)', (SELECT parte_b FROM pg_temp._reversa_m1 LIMIT 1),
          (SELECT CASE WHEN parte_b LIKE 'NO HECHA%' THEN 'hecha' ELSE parte_b END FROM pg_temp._reversa_m1 LIMIT 1)
 ) t
 ORDER BY t.n;

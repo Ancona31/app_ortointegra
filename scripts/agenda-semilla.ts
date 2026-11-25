@@ -195,6 +195,10 @@ function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
     if to_regclass('public.reserva_empalmes_google') is not null then
       delete from public.reserva_empalmes_google where clinica_id = any (v_c);
     end if;
+    -- Avisos globales (M1): quién vio qué aviso (FK RESTRICT a la clínica).
+    if to_regclass('public.avisos_vistos') is not null then
+      delete from public.avisos_vistos where clinica_id = any (v_c);
+    end if;
     -- I5: los avisos de la clínica (FK RESTRICT a la clínica; sin DELETE para nadie más que postgres).
     if to_regclass('public.avisos_clinica') is not null then
       delete from public.avisos_clinica where clinica_id = any (v_c);

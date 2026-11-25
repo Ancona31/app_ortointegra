@@ -3,7 +3,7 @@
 -- Rama: feature/avisos-globales · Escrita: 2026-11-24
 -- Plan: docs/spec/avisos-globales/PLAN.md (§1 y §2)
 -- ───────────────────────────────────────────────────────────────────────
--- ESTADO · LOCAL: 2026-11-24, stack local de Supabase (CLI 2.117.0) con las 14
+-- ESTADO · LOCAL: 2026-11-25 (versión corregida tras las decisiones de Angel), stack local de Supabase (CLI 2.117.0) con las 14
 --   migraciones anteriores: aplicada, deshecha con su reversa y vuelta a
 --   aplicar; prueba av1_avisos_globales.sql en verde; medición antes/después en
 --   supabase/pruebas-sql/medicion/ (resultados en el PLAN, §8).
@@ -18,19 +18,36 @@
 --        actor_id         quién lo hizo (atribución, sin FK, como revisado_por);
 --                         quien lo hizo NUNCA ve su propio aviso (policy).
 --        medico_id        el dueño de la agenda en los avisos SIN cita.
---        datos            jsonb con contadores y horas. NUNCA datos de personas.
+--        datos            jsonb con contadores y horas; y, SÓLO en reserva_frenada,
+--                         el nombre que tecleó quien intentó reservar.
 --   2. cita_id admite NULL (avisos sin cita) y un CHECK liga tipo ↔ cita.
 --   3. avisos_clinica_tipo_check pasa de 7 a 19 tipos.
 --   4. Un índice único para agrupar los avisos sin cita que se repiten.
 --   5. Las dos policies se recrean. Con las columnas nuevas en NULL son
 --      EXACTAMENTE las de F4: el código de antes ve lo mismo.
---   6. Cinco funciones de disparador (DEFINER de postgres, search_path vacío) y
+--   6. «REVISADO» POR USUARIO (decisión de Angel, 2026-11-24): tabla nueva
+--      avisos_vistos (aviso_id, usuario_id, visto_en), con su RLS (cada quien
+--      sólo lo suyo). Un aviso está PENDIENTE PARA MÍ si no lo he visto o si
+--      cambió después de que lo vi (visto_en < creado_en). Lo lee
+--      avisos_pendientes(tipos, límite), con la sesión y bajo RLS.
+--      revisado_en/revisado_por SE QUEDAN y significan «cerrado para todos»:
+--      el código de antes los sigue escribiendo durante el despliegue; el
+--      nuevo ya no. Nada se borra ni se convierte.
+--   7. Reabrir: trg_avisos_clinica_reabrir (BEFORE INSERT). Si ya hay un aviso
+--      sin cerrar del mismo tipo y cita, le pone creado_en = la hora real (vuelve a
+--      estar pendiente para quien ya lo había visto) y se salta el alta. Así
+--      los SEIS escritores de F4 reabren sin tocarlos: su ON CONFLICT DO
+--      NOTHING ya no llega a evaluarse.
+--   8. Cinco funciones de disparador (DEFINER de postgres, search_path vacío) y
 --      siete disparadores, en appointments, agenda_bloqueos, cita_correos,
 --      clinica_conexiones_google y gcal_sync_estado.
---   7. La RPC aviso_clinica_registrar (sólo service_role) para lo que el
---      servidor escribe sin sesión de base: la reserva frenada y el «Reagendar»
---      del personal.
---   8. avisos_clinica entra en la publicación supabase_realtime.
+--   9. La RPC aviso_clinica_registrar (sólo service_role) para lo que el
+--      servidor escribe sin sesión de base: la reserva frenada (con el nombre
+--      que tecleó la persona), el «Reagendar» del personal y el «No» de Google
+--      en la última hora.
+--  10. avisos_clinica entra en la publicación supabase_realtime, SI quien
+--      aplica es dueño de la publicación; si no, el resto se aplica igual y la
+--      rejilla lo deja como PENDIENTE (fila 9), con la sentencia que falta.
 --   NO toca: los seis escritores de F4, reservar_por_enlace, cita_rsvp_google,
 --   log_cita_change, ninguna policy de otra tabla, ni el índice
 --   avisos_clinica_pendiente_key.
@@ -46,7 +63,8 @@
 --   regla de log_cita_change. PostgREST no deja a una sesión fijar spinus.via.
 --
 -- Depende de: F5a (agenda_bloqueos), F2 (gcal_sync_estado), F4 (avisos_clinica,
---   cita_correos) y F1 (agenda_v2_encendida). Sólo actúa con la v2 encendida.
+--   cita_correos), F1 (agenda_v2_encendida) y 20261126120000 (prohibir_truncate).
+--   Sólo actúa con la v2 encendida.
 -- Bloqueos (lock_timeout 5 s): ALTER TABLE sobre avisos_clinica (ACCESS
 --   EXCLUSIVE; tabla nueva y pequeña, las cuatro columnas y el DROP NOT NULL
 --   son sólo catálogo; los dos CHECK la recorren) y CREATE TRIGGER (SHARE ROW
@@ -73,7 +91,8 @@ SET LOCAL lock_timeout = '5s';
 DO $$
 DECLARE
   c_mias CONSTANT text[] := ARRAY['aviso_clinica_de_cambio_cita', 'aviso_clinica_de_bloqueo', 'aviso_clinica_de_correo',
-    'aviso_clinica_de_conexion_google', 'aviso_clinica_de_sync_google', 'aviso_clinica_registrar'];
+    'aviso_clinica_de_conexion_google', 'aviso_clinica_de_sync_google', 'aviso_clinica_registrar',
+    'aviso_clinica_reabrir', 'avisos_pendientes', 'aviso_visto_sellar'];
   c_tablas CONSTANT text[] := ARRAY['avisos_clinica', 'appointments', 'agenda_bloqueos', 'cita_correos',
     'clinica_conexiones_google', 'gcal_sync_estado', 'agenda_ajustes', 'profiles'];
   v_t text;
@@ -91,7 +110,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = ANY (c_mias))
      OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'avisos_clinica'
                    AND column_name IN ('destinatario_id', 'actor_id', 'medico_id', 'datos'))
-     OR to_regclass('public.avisos_clinica_sin_cita_key') IS NOT NULL THEN
+     OR to_regclass('public.avisos_clinica_sin_cita_key') IS NOT NULL OR to_regclass('public.avisos_vistos') IS NOT NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: esta migración ya está aplicada (o a medias). No se repite: revisa la rejilla de la primera pasada o corre antes su reversa.';
   END IF;
   -- La forma de F4 que se va a sustituir: el CHECK de 7 tipos y las dos policies.
@@ -114,18 +133,11 @@ BEGIN
   -- Lo que usan las funciones nuevas.
   IF to_regprocedure('public.agenda_v2_encendida(uuid)') IS NULL OR to_regprocedure('public.get_clinica_id()') IS NULL
      OR to_regprocedure('public.get_my_role()') IS NULL OR to_regprocedure('public.soy_admin_de_clinica()') IS NULL
-     OR to_regprocedure('auth.uid()') IS NULL THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta agenda_v2_encendida(uuid), get_clinica_id(), get_my_role(), soy_admin_de_clinica() o auth.uid().';
+     OR to_regprocedure('auth.uid()') IS NULL OR to_regprocedure('public.prohibir_truncate()') IS NULL THEN
+    RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta agenda_v2_encendida(uuid), get_clinica_id(), get_my_role(), soy_admin_de_clinica(), auth.uid() o prohibir_truncate() (20261126120000).';
   END IF;
-  -- La publicación: existe, no es FOR ALL TABLES, quien aplica es su dueño y la tabla aún no está.
-  IF NOT EXISTS (SELECT 1 FROM pg_publication p WHERE p.pubname = 'supabase_realtime' AND NOT p.puballtables
-                    AND pg_has_role(current_user, p.pubowner, 'USAGE')) THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: la publicación supabase_realtime no existe, es FOR ALL TABLES o % no es su dueño.', current_user;
-  END IF;
-  IF EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public'
-                AND tablename = 'avisos_clinica') THEN
-    RAISE EXCEPTION 'PRE-VUELO FALLÓ: avisos_clinica ya está en la publicación supabase_realtime.';
-  END IF;
+  -- La publicación NO se comprueba aquí: si quien aplica no es su dueño, ese paso se salta solo
+  -- (sección 5) y queda PENDIENTE en la rejilla. El resto de la migración no depende de ella.
 END $$;
 
 -- ---------------------------------------------------------------------
@@ -144,32 +156,38 @@ ALTER TABLE public.avisos_clinica
     'reserva_enlace', 'cancelacion_paciente', 'reagendado_paciente', 'google_por_asignar', 'empalme_google',
     'google_movimiento_rechazado', 'confirmacion_paciente',
     'google_movio_cita', 'google_cancelo_cita', 'correo_fallido', 'personal_agendo', 'personal_movio', 'personal_cancelo',
-    'reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados',
+    'paciente_no_asistira', 'reserva_frenada', 'google_desconectado', 'google_sin_sincronizar',
     'personal_bloqueo', 'personal_desbloqueo')),
-  -- Los seis tipos SIN cita no llevan cita; los demás, siempre.
+  -- Los cinco tipos SIN cita no llevan cita; los demás, siempre.
   ADD CONSTRAINT avisos_clinica_cita_tipo_check CHECK (
-    (tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados',
+    (tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar',
               'personal_bloqueo', 'personal_desbloqueo')) = (cita_id IS NULL)),
-  ADD CONSTRAINT avisos_clinica_datos_check CHECK (datos IS NULL OR jsonb_typeof(datos) = 'object');
+  -- El nombre sólo cabe en reserva_frenada, y acotado como reserva_nombre (120).
+  ADD CONSTRAINT avisos_clinica_datos_check CHECK (
+    datos IS NULL OR (jsonb_typeof(datos) = 'object'
+      AND (NOT datos ? 'nombre' OR (tipo = 'reserva_frenada' AND jsonb_typeof(datos -> 'nombre') = 'string'
+                                    AND char_length(datos ->> 'nombre') BETWEEN 1 AND 120))));
 
 COMMENT ON COLUMN public.avisos_clinica.destinatario_id IS
   'Avisos globales: NULL = el aviso es de toda la clínica (quien vea la cita). Con valor, SÓLO ese usuario lo ve (ni el administrador): lo que el personal hace en la agenda de un médico. Sin FK, como revisado_por. Lo imponen las policies avisos_clinica_select/_update.';
 COMMENT ON COLUMN public.avisos_clinica.actor_id IS
   'Avisos globales: quién hizo lo que el aviso cuenta (auth.uid() del disparador, o el actor que pasa el servidor a aviso_clinica_registrar). Atribución sin FK. CONVENIO: quien lo hizo no ve su propio aviso (policy: actor_id IS DISTINCT FROM auth.uid()).';
 COMMENT ON COLUMN public.avisos_clinica.medico_id IS
-  'Avisos globales: el dueño de la agenda en los avisos SIN cita (reserva_frenada, recordatorios_enviados, personal_bloqueo, personal_desbloqueo); NULL en los de toda la clínica (google_desconectado, google_sin_sincronizar). En los avisos CON cita no se usa: el médico es el de la cita. Sin FK.';
+  'Avisos globales: el dueño de la agenda en los avisos SIN cita (reserva_frenada, personal_bloqueo, personal_desbloqueo); NULL en los de toda la clínica (google_desconectado, google_sin_sincronizar). En los avisos CON cita no se usa: el médico es el de la cita. Sin FK.';
 COMMENT ON COLUMN public.avisos_clinica.datos IS
-  'Avisos globales: objeto jsonb con contadores y horas del aviso: {"intentos": n}, {"enviados": n}, {"inicio": ts, "fin": ts, "todo_el_dia": bool, "zona": text}. CONVENIO QUE LA BASE NO IMPONE: NUNCA datos de personas ni nada clínico (ni nombre, ni teléfono, ni correo, ni motivo). Lo pinta textoAviso (src/lib/avisos/avisosClinica.ts).';
+  'Avisos globales: objeto jsonb con contadores y horas del aviso: {"intentos": n}, {"inicio": ts, "fin": ts, "todo_el_dia": bool, "zona": text}. ÚNICA EXCEPCIÓN con un dato de persona (decisión de Angel, 2026-11-24): en reserva_frenada, {"nombre": text} = el nombre que TECLEÓ quien intentó reservar por enlace (puede no ser real; recortado, de 1 a 120 caracteres, como appointments.reserva_nombre; lo impone avisos_clinica_datos_check). CONVENIO QUE LA BASE NO IMPONE: nada más de personas ni nada clínico (ni teléfono, ni correo, ni motivo, ni tipo de cita). Lo pinta textoAviso (src/lib/avisos/avisosClinica.ts).';
 COMMENT ON COLUMN public.avisos_clinica.cita_id IS
-  'La cita del aviso; NULL en los seis tipos sin cita (avisos_clinica_cita_tipo_check). SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita; el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano.';
+  'La cita del aviso; NULL en los cinco tipos sin cita (avisos_clinica_cita_tipo_check). SIN FK a appointments a propósito: es un aviso y no debe impedir nada sobre la cita; el lector cruza con appointments y, si la cita ya no existe, la policy no muestra la fila. Por eso puede quedar huérfano: quien limpie citas (semilla, scripts) lo borra a mano.';
 
--- Uno SIN REVISAR por clínica, tipo y médico en los avisos sin cita que se
--- repiten: los escritores usan ON CONFLICT con ESTE predicado y suben el
--- contador. Los de bloqueo no entran: cada bloqueo es su aviso.
+-- Uno SIN CERRAR por clínica, tipo, médico y nombre en los avisos sin cita que
+-- se repiten: los escritores usan ON CONFLICT con ESTE predicado (y, la reserva
+-- frenada, suben el contador: una línea por nombre). Los de bloqueo no entran:
+-- cada bloqueo es su aviso.
 CREATE UNIQUE INDEX avisos_clinica_sin_cita_key
-  ON public.avisos_clinica (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)))
+  ON public.avisos_clinica (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+                            (lower(coalesce(datos ->> 'nombre', ''))))
   WHERE cita_id IS NULL AND revisado_en IS NULL
-    AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados');
+    AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar');
 
 -- Las dos policies de F4, recreadas. Con destinatario_id, actor_id y cita_id
 -- como en F4 (NULL, NULL, con valor) dan el mismo resultado que antes.
@@ -245,18 +263,11 @@ BEGIN
   END IF;
   IF v_tipo IS NULL OR NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
   BEGIN
-    IF v_tipo LIKE 'personal\_%' THEN
-      INSERT INTO public.avisos_clinica AS a (clinica_id, tipo, cita_id, destinatario_id, actor_id)
-      VALUES (NEW.clinica_id, v_tipo, NEW.id, NEW.medico_id, v_uid)
-      ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL
-      DO UPDATE SET creado_en = now(), actor_id = EXCLUDED.actor_id, destinatario_id = EXCLUDED.destinatario_id;
-    ELSIF v_tipo = 'google_movio_cita' THEN
-      INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (NEW.clinica_id, v_tipo, NEW.id)
-      ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO UPDATE SET creado_en = now();
-    ELSE
-      INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (NEW.clinica_id, v_tipo, NEW.id)
-      ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
-    END IF;
+    -- Si ya hay uno sin cerrar de ese tipo y cita, trg_avisos_clinica_reabrir lo refresca y se salta el alta.
+    INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id, destinatario_id, actor_id)
+    VALUES (NEW.clinica_id, v_tipo, NEW.id,
+            CASE WHEN v_tipo LIKE 'personal\_%' THEN NEW.medico_id END, CASE WHEN v_tipo LIKE 'personal\_%' THEN v_uid END)
+    ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
   EXCEPTION WHEN OTHERS THEN
     -- Un aviso nunca impide guardar la cita. Sin datos de nadie en el mensaje.
     RAISE WARNING 'aviso_clinica_de_cambio_cita: aviso % no escrito (SQLSTATE %)', v_tipo, SQLSTATE;
@@ -297,35 +308,21 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.aviso_clinica_de_bloqueo() FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.aviso_clinica_de_bloqueo() TO anon, authenticated, service_role;
 
--- cita_correos AFTER UPDATE OF estado: un correo que ya no se reintenta
--- (correo_fallido) o un recordatorio enviado (recordatorios_enviados, agrupado
--- por médico). El envío a mano (tipo confirmacion) no avisa: quien lo mandó lo
--- ve fallar en pantalla.
+-- cita_correos AFTER UPDATE OF estado: un correo al paciente que falló y ya no
+-- se reintenta (correo_fallido). El envío a mano (tipo confirmacion) no avisa:
+-- quien lo mandó lo ve fallar en pantalla. Un recordatorio ENVIADO no avisa
+-- (decisión de Angel: lo que importa es la respuesta del paciente).
 CREATE FUNCTION public.aviso_clinica_de_correo()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-DECLARE
-  v_medico uuid;
 BEGIN
   IF NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
   BEGIN
-    IF NEW.estado = 'fallido' THEN
-      INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (NEW.clinica_id, 'correo_fallido', NEW.appointment_id)
-      ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
-    ELSE
-      SELECT a.medico_id INTO v_medico FROM public.appointments a
-       WHERE a.id = NEW.appointment_id AND a.clinica_id = NEW.clinica_id;
-      INSERT INTO public.avisos_clinica AS a (clinica_id, tipo, medico_id, datos)
-      VALUES (NEW.clinica_id, 'recordatorios_enviados', v_medico, jsonb_build_object('enviados', 1))
-      ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)))
-        WHERE cita_id IS NULL AND revisado_en IS NULL
-          AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados')
-      DO UPDATE SET creado_en = now(),
-                    datos = jsonb_build_object('enviados', coalesce((a.datos ->> 'enviados')::integer, 0) + 1);
-    END IF;
+    INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (NEW.clinica_id, 'correo_fallido', NEW.appointment_id)
+    ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'aviso_clinica_de_correo: aviso no escrito (SQLSTATE %)', SQLSTATE;
   END;
@@ -347,10 +344,11 @@ BEGIN
   IF NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
   BEGIN
     INSERT INTO public.avisos_clinica (clinica_id, tipo) VALUES (NEW.clinica_id, 'google_desconectado')
-    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)))
+    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+                 (lower(coalesce(datos ->> 'nombre', ''))))
       WHERE cita_id IS NULL AND revisado_en IS NULL
-        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados')
-    DO UPDATE SET creado_en = now();
+        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
+    DO UPDATE SET creado_en = clock_timestamp();
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'aviso_clinica_de_conexion_google: aviso no escrito (SQLSTATE %)', SQLSTATE;
   END;
@@ -372,10 +370,11 @@ BEGIN
   IF NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
   BEGIN
     INSERT INTO public.avisos_clinica (clinica_id, tipo) VALUES (NEW.clinica_id, 'google_sin_sincronizar')
-    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)))
+    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+                 (lower(coalesce(datos ->> 'nombre', ''))))
       WHERE cita_id IS NULL AND revisado_en IS NULL
-        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados')
-    DO UPDATE SET creado_en = now();
+        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
+    DO UPDATE SET creado_en = clock_timestamp();
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'aviso_clinica_de_sync_google: aviso no escrito (SQLSTATE %)', SQLSTATE;
   END;
@@ -387,14 +386,17 @@ GRANT  EXECUTE ON FUNCTION public.aviso_clinica_de_sync_google() TO anon, authen
 
 -- La única puerta que no es un disparador: lo que el servidor sabe y la base
 -- no puede ver. SÓLO service_role (las rutas la llaman con createAdminClient y
--- la clinica_id de la sesión o del enlace). Lista blanca de DOS tipos:
---   reserva_frenada  (p_medico_id; sin cita ni actor): la reserva por enlace que
---                    frenó el candado o un contacto bloqueado. Agrupado.
---   personal_movio   (p_cita_id y p_actor_id): «Reagendar» del personal, que
---                    escribe con service_role y por eso no trae auth.uid().
+-- la clinica_id de la sesión o del enlace). Lista blanca de TRES tipos:
+--   reserva_frenada       (p_medico_id y p_nombre): la reserva por enlace que
+--                         frenó el candado o un contacto bloqueado. Una línea
+--                         por nombre, con contador.
+--   personal_movio        (p_cita_id y p_actor_id): «Reagendar» del personal,
+--                         que escribe con service_role y no trae auth.uid().
+--   paciente_no_asistira  (p_cita_id): el «No» de Google en la última hora
+--                         (M2): no cancela, avisa UNA vez por cita.
 -- Comprueba que médico, cita y actor son de ESA clínica; si no, false sin más
 -- (la misma respuesta exista o no lo referido). No lanza por datos.
-CREATE FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid)
+CREATE FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -402,42 +404,167 @@ CREATE FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p
 AS $function$
 DECLARE
   v_medico uuid;
+  -- El nombre tecleado, como reserva_nombre: recortado, sin caracteres de control, 120 como mucho.
+  v_nombre text := left(btrim(regexp_replace(coalesce(p_nombre, ''), '[[:cntrl:]]+', ' ', 'g')), 120);
 BEGIN
-  IF p_clinica_id IS NULL OR p_tipo IS NULL OR p_tipo NOT IN ('reserva_frenada', 'personal_movio') THEN
+  IF p_clinica_id IS NULL OR p_tipo IS NULL OR p_tipo NOT IN ('reserva_frenada', 'personal_movio', 'paciente_no_asistira') THEN
     RAISE EXCEPTION 'aviso_clinica_registrar: argumentos inválidos' USING ERRCODE = '22023';
   END IF;
   IF NOT public.agenda_v2_encendida(p_clinica_id) THEN RETURN false; END IF;
   IF p_tipo = 'reserva_frenada' THEN
-    IF p_medico_id IS NULL OR NOT EXISTS (SELECT 1 FROM public.profiles pr
-                                           WHERE pr.id = p_medico_id AND pr.clinica_id = p_clinica_id) THEN
+    IF p_medico_id IS NULL OR v_nombre = '' OR NOT EXISTS (SELECT 1 FROM public.profiles pr
+                                                           WHERE pr.id = p_medico_id AND pr.clinica_id = p_clinica_id) THEN
       RETURN false;
     END IF;
     INSERT INTO public.avisos_clinica AS a (clinica_id, tipo, medico_id, datos)
-    VALUES (p_clinica_id, 'reserva_frenada', p_medico_id, jsonb_build_object('intentos', 1))
-    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)))
+    VALUES (p_clinica_id, 'reserva_frenada', p_medico_id, jsonb_build_object('nombre', v_nombre, 'intentos', 1))
+    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+                 (lower(coalesce(datos ->> 'nombre', ''))))
       WHERE cita_id IS NULL AND revisado_en IS NULL
-        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'recordatorios_enviados')
-    DO UPDATE SET creado_en = now(),
-                  datos = jsonb_build_object('intentos', coalesce((a.datos ->> 'intentos')::integer, 0) + 1);
+        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
+    DO UPDATE SET creado_en = clock_timestamp(),
+                  datos = a.datos || jsonb_build_object('intentos', coalesce((a.datos ->> 'intentos')::integer, 0) + 1);
     RETURN true;
   END IF;
   SELECT c.medico_id INTO v_medico FROM public.appointments c
    WHERE c.id = p_cita_id AND c.clinica_id = p_clinica_id;
+  IF NOT FOUND THEN RETURN false; END IF;
+  IF p_tipo = 'paciente_no_asistira' THEN
+    -- Una vez por cita, la haya visto alguien o no: cada pasada de la sincronización vuelve a llamar.
+    IF EXISTS (SELECT 1 FROM public.avisos_clinica a WHERE a.tipo = 'paciente_no_asistira' AND a.cita_id = p_cita_id
+                  AND a.clinica_id = p_clinica_id) THEN
+      RETURN false;
+    END IF;
+    INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (p_clinica_id, 'paciente_no_asistira', p_cita_id)
+    ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
+    RETURN true;
+  END IF;
   IF v_medico IS NULL OR p_actor_id IS NULL OR v_medico = p_actor_id
      OR NOT EXISTS (SELECT 1 FROM public.profiles pr WHERE pr.id = p_actor_id AND pr.clinica_id = p_clinica_id) THEN
     RETURN false;
   END IF;
   INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id, destinatario_id, actor_id)
   VALUES (p_clinica_id, 'personal_movio', p_cita_id, v_medico, p_actor_id)
-  ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL
-  DO UPDATE SET creado_en = now(), actor_id = EXCLUDED.actor_id, destinatario_id = EXCLUDED.destinatario_id;
+  ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
   RETURN true;
 END
 $function$;
-REVOKE EXECUTE ON FUNCTION public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
-GRANT  EXECUTE ON FUNCTION public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid) TO service_role;
-COMMENT ON FUNCTION public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid) IS
-  'Avisos globales: el aviso de lo que el servidor sabe y un disparador no puede ver. Sólo service_role. Lista blanca: reserva_frenada (médico del enlace; agrupado, sube datos.intentos) y personal_movio (cita y actor: «Reagendar» del personal, que escribe sin auth.uid()). Comprueba que médico, cita y actor son de p_clinica_id y devuelve false si no; sólo con la v2 encendida. Un tipo nuevo exige migración.';
+REVOKE EXECUTE ON FUNCTION public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text) TO service_role;
+COMMENT ON FUNCTION public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text) IS
+  'Avisos globales: el aviso de lo que el servidor sabe y un disparador no puede ver. Sólo service_role. Lista blanca: reserva_frenada (médico del enlace y el nombre tecleado, saneado y de 120 caracteres como mucho; una línea por nombre, sube datos.intentos), personal_movio (cita y actor: «Reagendar» del personal, que escribe sin auth.uid()) y paciente_no_asistira (cita: el «No» de Google en la última hora; una sola vez por cita). Comprueba que médico, cita y actor son de p_clinica_id y devuelve false si no; sólo con la v2 encendida. Un tipo nuevo exige migración.';
+
+-- ---------------------------------------------------------------------
+-- 3-bis · «Revisado» por usuario y reabrir.
+-- ---------------------------------------------------------------------
+-- Quién ha visto qué aviso. Sin FK a avisos_clinica (como avisos_clinica.cita_id:
+-- la semilla y las pruebas borran avisos como postgres) ni a profiles (como
+-- revisado_por). La FK a clinicas es RESTRICT: quien borre una clínica de
+-- prueba borra antes estas filas (scripts/agenda-semilla.ts).
+CREATE TABLE public.avisos_vistos (
+  aviso_id    uuid        NOT NULL,
+  usuario_id  uuid        NOT NULL,
+  clinica_id  uuid        NOT NULL,
+  visto_en    timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT avisos_vistos_pkey PRIMARY KEY (aviso_id, usuario_id),
+  CONSTRAINT avisos_vistos_clinica_id_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT
+);
+CREATE INDEX avisos_vistos_clinica_idx ON public.avisos_vistos (clinica_id);
+-- La lectura de la campana: mis vistos, por aviso (la llave primaria empieza por aviso_id).
+CREATE INDEX avisos_vistos_usuario_idx ON public.avisos_vistos (usuario_id, aviso_id);
+
+ALTER TABLE public.avisos_vistos ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.avisos_vistos FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.avisos_vistos TO authenticated;
+GRANT INSERT (aviso_id, usuario_id, clinica_id) ON TABLE public.avisos_vistos TO authenticated;
+GRANT UPDATE (visto_en) ON TABLE public.avisos_vistos TO authenticated;
+
+-- Cada quien, sólo lo suyo. El alta exige que el aviso sea uno que YO veo: el
+-- EXISTS corre bajo la RLS de avisos_clinica de quien pregunta (lo ajeno ni se
+-- ve: el error es el mismo exista o no el aviso). Sin recursión: avisos_clinica
+-- no lee avisos_vistos en ninguna policy.
+CREATE POLICY avisos_vistos_select ON public.avisos_vistos FOR SELECT TO authenticated
+  USING (usuario_id = auth.uid());
+CREATE POLICY avisos_vistos_insert ON public.avisos_vistos FOR INSERT TO authenticated
+  WITH CHECK (usuario_id = auth.uid() AND clinica_id = public.get_clinica_id()
+              AND EXISTS (SELECT 1 FROM public.avisos_clinica a
+                           WHERE a.id = avisos_vistos.aviso_id AND a.clinica_id = public.get_clinica_id()));
+CREATE POLICY avisos_vistos_update ON public.avisos_vistos FOR UPDATE TO authenticated
+  USING (usuario_id = auth.uid() AND clinica_id = public.get_clinica_id())
+  WITH CHECK (usuario_id = auth.uid() AND clinica_id = public.get_clinica_id());
+
+COMMENT ON TABLE public.avisos_vistos IS
+  'Avisos globales: «revisado» POR USUARIO. Una fila = este usuario vio este aviso a esta hora. Un aviso está pendiente para alguien si no tiene fila suya o si visto_en < avisos_clinica.creado_en (el aviso se reabrió: llegó otro hecho del mismo tipo y cita). La escribe cada usuario para sí mismo (RLS); la hora la pone la base (aviso_visto_sellar). Que uno revise no se lo quita a nadie más. Sin FK a avisos_clinica ni a profiles a propósito.';
+
+-- La hora la pone la base, no el navegador.
+CREATE FUNCTION public.aviso_visto_sellar()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+BEGIN
+  -- Hora REAL (no la del inicio de la transacción): se compara con creado_en para saber si el aviso se reabrió después.
+  NEW.visto_en := clock_timestamp();
+  RETURN NEW;
+END
+$function$;
+REVOKE EXECUTE ON FUNCTION public.aviso_visto_sellar() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.aviso_visto_sellar() TO anon, authenticated, service_role;
+CREATE TRIGGER trg_avisos_vistos_sellar
+  BEFORE INSERT OR UPDATE ON public.avisos_vistos
+  FOR EACH ROW EXECUTE FUNCTION public.aviso_visto_sellar();
+CREATE TRIGGER trg_avisos_vistos_sin_truncate BEFORE TRUNCATE ON public.avisos_vistos
+  FOR EACH STATEMENT EXECUTE FUNCTION public.prohibir_truncate();
+
+-- Reabrir. BEFORE INSERT corre ANTES de que ON CONFLICT mire el índice: si ya
+-- hay un aviso sin cerrar del mismo tipo y cita, se refresca (creado_en = hora real:
+-- vuelve a estar pendiente para quien ya lo vio) y el alta se salta. INVOKER:
+-- quien inserta es siempre un escritor DEFINER de postgres o la RPC.
+-- Los avisos sin cita no pasan por aquí: los agrupa su propio ON CONFLICT.
+CREATE FUNCTION public.aviso_clinica_reabrir()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SET search_path TO ''
+AS $function$
+BEGIN
+  UPDATE public.avisos_clinica a
+     SET creado_en = clock_timestamp(), actor_id = NEW.actor_id, destinatario_id = NEW.destinatario_id
+   WHERE a.tipo = NEW.tipo AND a.cita_id = NEW.cita_id AND a.revisado_en IS NULL;
+  IF FOUND THEN RETURN NULL; END IF;
+  RETURN NEW;
+END
+$function$;
+REVOKE EXECUTE ON FUNCTION public.aviso_clinica_reabrir() FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION public.aviso_clinica_reabrir() TO anon, authenticated, service_role;
+CREATE TRIGGER trg_avisos_clinica_reabrir
+  BEFORE INSERT ON public.avisos_clinica
+  FOR EACH ROW
+  WHEN (NEW.cita_id IS NOT NULL)
+  EXECUTE FUNCTION public.aviso_clinica_reabrir();
+
+-- La lectura de la campana: MIS pendientes, los más nuevos primero. INVOKER:
+-- corre con la sesión, bajo la RLS de avisos_clinica y de avisos_vistos.
+-- p_tipos = los que el código conoce (un tipo nuevo no tapa a los demás).
+CREATE FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer)
+ RETURNS SETOF public.avisos_clinica
+ LANGUAGE sql
+ STABLE
+ SET search_path TO ''
+AS $function$
+  SELECT a.*
+    FROM public.avisos_clinica a
+   WHERE a.clinica_id = public.get_clinica_id()
+     AND a.revisado_en IS NULL
+     AND a.tipo = ANY (coalesce(p_tipos, ARRAY[]::text[]))
+     AND NOT EXISTS (SELECT 1 FROM public.avisos_vistos v
+                      WHERE v.aviso_id = a.id AND v.usuario_id = auth.uid() AND v.visto_en >= a.creado_en)
+   ORDER BY a.creado_en DESC
+   LIMIT least(greatest(coalesce(p_limite, 50), 1), 200)
+$function$;
+REVOKE EXECUTE ON FUNCTION public.avisos_pendientes(text[], integer) FROM PUBLIC, anon, service_role;
+GRANT  EXECUTE ON FUNCTION public.avisos_pendientes(text[], integer) TO authenticated;
+COMMENT ON FUNCTION public.avisos_pendientes(text[], integer) IS
+  'Avisos globales: los avisos pendientes PARA QUIEN LLAMA (los que su RLS le deja ver, sin cerrar para todos, y que no ha visto desde su último cambio: sin fila suya en avisos_vistos o con visto_en < creado_en), de los tipos dados, los más nuevos primero. INVOKER: no se salta ninguna policy. Sólo authenticated.';
 
 -- ---------------------------------------------------------------------
 -- 4 · Lo que toca tablas EXISTENTES, junto y al final, en UN bloque: cada
@@ -471,14 +598,13 @@ BEGIN
     WHEN (auth.uid() IS NOT NULL AND auth.uid() <> OLD.medico_id)
     EXECUTE FUNCTION public.aviso_clinica_de_bloqueo();
   -- Fallido sin reintento posible: el comprobante (no lo reintenta nadie) o el
-  -- tercer intento; y sólo por fallo de envío o de plantilla. O un recordatorio enviado.
+  -- tercer intento del recordatorio; y sólo por fallo de envío o de plantilla.
   CREATE TRIGGER trg_cita_correos_aviso_clinica
     AFTER UPDATE OF estado ON public.cita_correos
     FOR EACH ROW
-    WHEN (OLD.estado IS DISTINCT FROM NEW.estado
-          AND ((NEW.estado = 'fallido' AND NEW.tipo IN ('comprobante', 'recordatorio')
-                AND NEW.motivo IN ('transporte', 'plantilla') AND (NEW.tipo = 'comprobante' OR NEW.intentos >= 3))
-            OR (NEW.estado = 'enviado' AND NEW.tipo = 'recordatorio')))
+    WHEN (OLD.estado IS DISTINCT FROM NEW.estado AND NEW.estado = 'fallido'
+          AND NEW.tipo IN ('comprobante', 'recordatorio') AND NEW.motivo IN ('transporte', 'plantilla')
+          AND (NEW.tipo = 'comprobante' OR NEW.intentos >= 3))
     EXECUTE FUNCTION public.aviso_clinica_de_correo();
   CREATE TRIGGER trg_conexiones_google_aviso_clinica
     AFTER UPDATE OF estado ON public.clinica_conexiones_google
@@ -492,14 +618,36 @@ BEGIN
     EXECUTE FUNCTION public.aviso_clinica_de_sync_google();
 END $triggers$;
 
--- Realtime: la campana se entera sin sondear. Realtime entrega cada cambio
--- SÓLO a quien puede leer la fila con su sesión (RLS de SELECT). Un DELETE no
--- pasa por la RLS y viaja con la llave primaria nada más (identidad de réplica
--- por omisión): aquí nadie borra avisos salvo postgres.
-ALTER PUBLICATION supabase_realtime ADD TABLE public.avisos_clinica;
+-- ---------------------------------------------------------------------
+-- 5 · Realtime, SEPARABLE: la campana se entera sin sondear. Si quien aplica
+--     no es dueño de la publicación (o no existe, o es FOR ALL TABLES), este
+--     paso SE SALTA y el resto de la migración queda aplicado: la rejilla lo
+--     dice en la fila 9 y la campana sigue con su relectura cada 2 minutos.
+--     Realtime entrega cada alta o cambio SÓLO a quien puede leer la fila con
+--     su sesión (RLS de SELECT). ⚠️ Un DELETE no pasa por la RLS: llega a todo
+--     suscrito, de cualquier clínica, con la llave primaria nada más (identidad
+--     de réplica por omisión). Una publicación no deja excluir DELETE por
+--     tabla. Mitigación: nadie borra avisos (authenticated y service_role no
+--     tienen DELETE); sólo postgres, a mano, y lo que viaja es un uuid.
+-- ---------------------------------------------------------------------
+DROP TABLE IF EXISTS pg_temp._m1_realtime;
+CREATE TEMP TABLE _m1_realtime (estado text NOT NULL);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public'
+                AND tablename = 'avisos_clinica') THEN
+    INSERT INTO pg_temp._m1_realtime VALUES ('ya estaba');
+  ELSIF EXISTS (SELECT 1 FROM pg_publication p WHERE p.pubname = 'supabase_realtime' AND NOT p.puballtables
+                   AND pg_has_role(current_user, p.pubowner, 'USAGE')) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.avisos_clinica;
+    INSERT INTO pg_temp._m1_realtime VALUES ('añadida');
+  ELSE
+    INSERT INTO pg_temp._m1_realtime VALUES ('PENDIENTE: como dueño de la publicación, ALTER PUBLICATION supabase_realtime ADD TABLE public.avisos_clinica;');
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------
--- 5 · Post-vuelo, ANTES del COMMIT. Si algo no quedó, aborta y no queda nada.
+-- 6 · Post-vuelo, ANTES del COMMIT. Si algo no quedó, aborta y no queda nada.
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
@@ -518,11 +666,11 @@ BEGIN
   END IF;
   -- La RPC: DEFINER, search_path vacío, y SÓLO service_role la ejecuta.
   IF NOT EXISTS (SELECT 1 FROM pg_proc p
-                  WHERE p.oid = to_regprocedure('public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid)')
+                  WHERE p.oid = to_regprocedure('public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)')
                     AND p.prosecdef AND p.proconfig = ARRAY['search_path=""'])
-     OR has_function_privilege('anon', 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid)', 'EXECUTE') THEN
+     OR has_function_privilege('anon', 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'POST-VUELO FALLÓ: aviso_clinica_registrar no quedó DEFINER, con search_path vacío y sólo para service_role.';
   END IF;
   -- Los siete disparadores, habilitados.
@@ -560,16 +708,45 @@ BEGIN
                 AND (coalesce(qual, '') || coalesce(with_check, '')) ~* 'from\s+(public\.)?avisos_clinica') THEN
     RAISE EXCEPTION 'POST-VUELO FALLÓ: una policy de avisos_clinica consulta avisos_clinica (recursión).';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public'
-                    AND tablename = 'avisos_clinica') THEN
-    RAISE EXCEPTION 'POST-VUELO FALLÓ: avisos_clinica no quedó en la publicación supabase_realtime.';
+  -- avisos_vistos: RLS, sus tres policies, y la sesión sólo escribe lo suyo (sin DELETE ni TRUNCATE para nadie).
+  IF NOT (SELECT relrowsecurity FROM pg_class WHERE oid = 'public.avisos_vistos'::regclass)
+     OR (SELECT string_agg(policyname || ':' || cmd, ',' ORDER BY policyname) FROM pg_policies
+          WHERE schemaname = 'public' AND tablename = 'avisos_vistos')
+        IS DISTINCT FROM 'avisos_vistos_insert:INSERT,avisos_vistos_select:SELECT,avisos_vistos_update:UPDATE' THEN
+    RAISE EXCEPTION 'POST-VUELO FALLÓ: avisos_vistos sin RLS o sin sus tres policies.';
+  END IF;
+  SELECT string_agg(r || ':' || p, ', ') INTO v_mal
+    FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) r
+    CROSS JOIN unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) p
+   WHERE has_table_privilege(r, 'public.avisos_vistos', p) AND NOT (r = 'authenticated' AND p = 'SELECT');
+  IF v_mal IS NOT NULL OR has_column_privilege('authenticated', 'public.avisos_vistos', 'visto_en', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.avisos_vistos', 'usuario_id', 'UPDATE')
+     OR NOT has_column_privilege('authenticated', 'public.avisos_vistos', 'visto_en', 'UPDATE') THEN
+    RAISE EXCEPTION 'POST-VUELO FALLÓ: privilegios de avisos_vistos distintos de los esperados: %', coalesce(v_mal, 'columnas');
+  END IF;
+  -- Ninguna policy de avisos_clinica lee avisos_vistos (si lo hiciera, la de avisos_vistos_insert haría un ciclo).
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'avisos_clinica'
+                AND (coalesce(qual, '') || coalesce(with_check, '')) ~* 'avisos_vistos') THEN
+    RAISE EXCEPTION 'POST-VUELO FALLÓ: una policy de avisos_clinica consulta avisos_vistos (ciclo de RLS).';
+  END IF;
+  -- La lectura: INVOKER, sólo authenticated. Los dos disparadores propios de avisos, habilitados.
+  IF NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.oid = to_regprocedure('public.avisos_pendientes(text[], integer)')
+                    AND NOT p.prosecdef AND p.proconfig = ARRAY['search_path=""'])
+     OR has_function_privilege('anon', 'public.avisos_pendientes(text[], integer)', 'EXECUTE')
+     OR has_function_privilege('service_role', 'public.avisos_pendientes(text[], integer)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.avisos_pendientes(text[], integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'POST-VUELO FALLÓ: avisos_pendientes no quedó INVOKER, con search_path vacío y sólo para authenticated.';
+  END IF;
+  IF (SELECT count(*) FROM pg_trigger g WHERE NOT g.tgisinternal AND g.tgenabled = 'O'
+        AND g.tgname IN ('trg_avisos_clinica_reabrir', 'trg_avisos_vistos_sellar', 'trg_avisos_vistos_sin_truncate')) <> 3 THEN
+    RAISE EXCEPTION 'POST-VUELO FALLÓ: falta trg_avisos_clinica_reabrir, trg_avisos_vistos_sellar o trg_avisos_vistos_sin_truncate.';
   END IF;
 END $$;
 
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 6 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
+-- 7 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
 -- ---------------------------------------------------------------------
 SELECT t.n, t.comprobacion, t.valor, t.esperado,
        CASE WHEN t.esperado IS NULL THEN 'INFO' WHEN t.valor = t.esperado THEN 'OK' ELSE 'REVISAR' END AS estado
@@ -606,16 +783,27 @@ FROM (
          '12'
   UNION ALL
   SELECT 6, 'quién ejecuta aviso_clinica_registrar (anon/authenticated/service_role)',
-         (SELECT string_agg(has_function_privilege(r, 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid)', 'EXECUTE')::text, '/')
+         (SELECT string_agg(has_function_privilege(r, 'public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)', 'EXECUTE')::text, '/')
             FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) WITH ORDINALITY AS x(r, o)),
          'false/false/true'
   UNION ALL
-  SELECT 7, 'avisos_clinica en la publicación supabase_realtime',
-         (SELECT count(*)::text FROM pg_publication_tables
-           WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'avisos_clinica'),
-         '1'
+  SELECT 7, 'avisos_vistos: policies',
+         (SELECT string_agg(policyname || ':' || cmd, ',' ORDER BY policyname) FROM pg_policies
+           WHERE schemaname = 'public' AND tablename = 'avisos_vistos'),
+         'avisos_vistos_insert:INSERT,avisos_vistos_select:SELECT,avisos_vistos_update:UPDATE'
   UNION ALL
-  SELECT 8, 'filas de avisos_clinica (ninguna cambia con esta migración)',
+  SELECT 8, 'reabrir, sellar y sin_truncate (disparadores propios de avisos), habilitados',
+         (SELECT count(*)::text FROM pg_trigger g WHERE NOT g.tgisinternal AND g.tgenabled = 'O'
+             AND g.tgname IN ('trg_avisos_clinica_reabrir', 'trg_avisos_vistos_sellar', 'trg_avisos_vistos_sin_truncate')),
+         '3'
+  UNION ALL
+  -- «añadida» o «ya estaba» = OK. «PENDIENTE: …» sale como REVISAR y trae la sentencia que falta:
+  -- el resto de la migración quedó aplicado y la campana sigue con su relectura cada 2 minutos.
+  SELECT 9, 'Realtime: avisos_clinica en la publicación supabase_realtime',
+         (SELECT estado FROM pg_temp._m1_realtime LIMIT 1),
+         (SELECT CASE WHEN estado LIKE 'PENDIENTE%' THEN 'añadida' ELSE estado END FROM pg_temp._m1_realtime LIMIT 1)
+  UNION ALL
+  SELECT 10, 'filas de avisos_clinica (ninguna cambia con esta migración)',
          (SELECT count(*)::text FROM public.avisos_clinica), NULL
 ) t
 ORDER BY t.n;
