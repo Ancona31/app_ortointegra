@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { SESION, interruptorAgenda, sqlLocal, toastConTexto } from './ayudas'
+import { SESION, enContextoNuevo, interruptorAgenda, sqlLocal, toastConTexto } from './ayudas'
 
 /**
  * Avisos globales (2026-11-24, decisión de Angel) · la campana de «Avisos» y su
@@ -38,7 +38,8 @@ function campana(page: Page): Locator {
 test.beforeEach(() => { interruptorAgenda('A', true) })
 test.afterEach(() => {
   /* Sólo los sembrados aquí. `avisos_clinica` no es `audit_log`: su borrado como postgres es el de la semilla. */
-  if (propios.length) sqlLocal(`delete from public.avisos_clinica where id in (${propios.map((id) => `'${id}'`).join(',')});`)
+  const ids = propios.map((id) => `'${id}'`).join(',')
+  if (propios.length) sqlLocal(`delete from public.avisos_vistos where aviso_id in (${ids}); delete from public.avisos_clinica where id in (${ids});`)
   propios.length = 0
 })
 test.afterAll(() => { interruptorAgenda('A', false) })
@@ -53,7 +54,9 @@ test('fuera de la agenda: la campana cuenta los avisos, la lista los nombra y re
   await expect(fila).toHaveAttribute('href', /^\/agenda\?cita=/)
   await page.locator('[data-panel-avisos-global] [data-revisar-todos]').click()
   await expect(page.locator('[data-panel-avisos-global] [data-avisos-vacio]')).toBeVisible()
-  await expect.poll(() => sqlLocal(`select revisado_en is not null from public.avisos_clinica where id = :'id'`, { id: a.id })).toBe('t')
+  // M1: «revisado» es POR USUARIO. Queda MI marca; el aviso no se cierra para los demás.
+  await expect.poll(() => sqlLocal(`select count(*) || '|' || (select revisado_en is null from public.avisos_clinica where id = :'id')
+    from public.avisos_vistos where aviso_id = :'id'`, { id: a.id })).toBe('1|true')
 })
 
 test('la burbuja sale con el nombre cuando llega un aviso con la página abierta, una sola vez', async ({ page }) => {
@@ -85,4 +88,63 @@ test('con la agenda v2 apagada no hay campana global', async ({ page }) => {
   await page.goto('/dashboard')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expect(page.locator('[data-campana-global]')).toHaveCount(0)
+})
+
+test('revisado por usuario: lo que revisa el administrador sigue pendiente para la secretaria; y un hecho nuevo lo reabre', async ({ page, browser }) => {
+  const a = sembrarAviso('confirmacion_paciente', 4)
+  await page.goto('/dashboard')
+  await campana(page).click()
+  await page.locator(`[data-panel-avisos-global] [data-aviso="${a.id}"]`).waitFor()
+  await page.locator('[data-panel-avisos-global] [data-revisar-todos]').click()
+  await expect(page.locator(`[data-panel-avisos-global] [data-aviso="${a.id}"]`)).toHaveCount(0)
+  await enContextoNuevo(browser, SESION.secretariaA, async (otra) => {
+    await otra.goto('/dashboard')
+    await campana(otra).click()
+    await expect(otra.locator(`[data-panel-avisos-global] [data-aviso="${a.id}"]`)).toBeVisible()
+  })
+  // Otro hecho del mismo tipo y cita (lo que hace un escritor de la base): el mismo aviso vuelve para quien ya lo vio.
+  await page.reload()
+  await campana(page).click()
+  await expect(page.locator(`[data-panel-avisos-global] [data-aviso="${a.id}"]`)).toHaveCount(0)
+  sqlLocal(`insert into public.avisos_clinica (clinica_id, tipo, cita_id) select clinica_id, tipo, cita_id from public.avisos_clinica where id = :'id'
+            on conflict (tipo, cita_id) where revisado_en is null do nothing;`, { id: a.id })
+  await page.reload()
+  await campana(page).click()
+  await expect(page.locator(`[data-panel-avisos-global] [data-aviso="${a.id}"]`)).toBeVisible()
+})
+
+test('«Solo mis avisos»: el administrador deja de ver los de la agenda de la médica invitada; la secretaria no tiene el interruptor', async ({ page, browser }) => {
+  // Un aviso sobre una cita de la médica invitada y otro sobre una del administrador.
+  const fila = sqlLocal(`
+    with inv as (select id from auth.users where email = 'medico.a@semilla.spinus.test'),
+         adm as (select id from auth.users where email = 'admin.a@semilla.spinus.test'),
+         c as (select (select a.id from public.appointments a, inv where a.clinica_id = ${CL} and a.medico_id = inv.id and a.paciente_id is not null
+                         and a.status = 'scheduled' and a.start_time > now() + interval '1 day' order by a.start_time limit 1) as de_ella,
+                      (select a.id from public.appointments a, adm where a.clinica_id = ${CL} and a.medico_id = adm.id and a.paciente_id is not null
+                         and a.status = 'scheduled' and a.start_time > now() + interval '1 day' order by a.start_time offset 6 limit 1) as mia),
+         i as (insert into public.avisos_clinica (clinica_id, tipo, cita_id)
+               select ${CL}, 'cancelacion_paciente', x from c, lateral (values (c.de_ella), (c.mia)) v(x) returning id, cita_id)
+    select (select id from i, c where i.cita_id = c.de_ella) || '|' || (select id from i, c where i.cita_id = c.mia);`)
+  const [deElla, mio] = fila.split('|')
+  propios.push(deElla, mio)
+  await page.goto('/dashboard')
+  await campana(page).click()
+  const panel = page.locator('[data-panel-avisos-global]')
+  await expect(panel.locator(`[data-aviso="${deElla}"]`)).toBeVisible()
+  await expect(panel.locator(`[data-aviso="${mio}"]`)).toBeVisible()
+  await panel.getByRole('radio', { name: 'Solo mis avisos' }).click()
+  await expect(panel.locator(`[data-aviso="${deElla}"]`)).toHaveCount(0)
+  await expect(panel.locator(`[data-aviso="${mio}"]`)).toBeVisible()
+  // Se recuerda en este navegador, y no marca nada como visto: al volver a «Toda la clínica», sigue ahí.
+  await page.reload()
+  await campana(page).click()
+  await expect(panel.getByRole('radio', { name: 'Solo mis avisos' })).toHaveAttribute('aria-checked', 'true')
+  await panel.getByRole('radio', { name: 'Toda la clínica' }).click()
+  await expect(panel.locator(`[data-aviso="${deElla}"]`)).toBeVisible()
+  await enContextoNuevo(browser, SESION.secretariaA, async (otra) => {
+    await otra.goto('/dashboard')
+    await campana(otra).click()
+    await expect(otra.locator('[data-panel-avisos-global]')).toBeVisible()
+    await expect(otra.locator('[data-interruptor-mis-avisos]')).toHaveCount(0)
+  })
 })

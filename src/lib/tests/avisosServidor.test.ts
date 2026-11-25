@@ -23,11 +23,15 @@ const cita = (id: string) => ({
 /** Lo mínimo del cliente de sesión que recorre `leerAvisosClinica`: dos cadenas, una por tabla.
  *  No filtra: el `.in('tipo', …)` de la consulta no llega aquí, así que se prueba la red de
  *  `conTipoConocido` (lo que pasa si el filtro faltara). */
-function cliente(avisos: unknown[], citas: unknown[]): ClienteSesion {
+function cliente(avisos: unknown[], citas: unknown[], pendientes?: unknown[]): ClienteSesion {
   const resultado = (data: unknown[]) => Promise.resolve({ data, error: null })
   const deAvisos = { select: () => deAvisos, eq: () => deAvisos, is: () => deAvisos, in: () => deAvisos, order: () => deAvisos, limit: () => resultado(avisos) }
   const deCitas = { select: () => deCitas, eq: () => deCitas, in: () => resultado(citas) }
-  const c = { from: (tabla: string) => (tabla === 'avisos_clinica' ? deAvisos : deCitas) }
+  /* `pendientes` = lo que devuelve `avisos_pendientes` (la base CON M1); sin él, la función no existe
+     (PGRST202) y la lectura cae a la de antes, por clínica. */
+  const rpc = (): Promise<{ data: unknown; error: { code: string } | null }> =>
+    Promise.resolve(pendientes ? { data: pendientes, error: null } : { data: null, error: { code: 'PGRST202' } })
+  const c = { rpc, from: (tabla: string) => (tabla === 'avisos_clinica' ? deAvisos : deCitas) }
   // Doble de prueba: el tipo entero del cliente de Supabase no se puede construir aquí.
   return c as unknown as ClienteSesion
 }
@@ -49,5 +53,23 @@ describe('leerAvisosClinica con un tipo de aviso desconocido', () => {
       { id: 'a3', tipo: 'google_movimiento_rechazado', cita_id: 'c3', creado_en: '2026-11-18T10:00:00Z' },
     ], [cita('c3')]), CLINICA)
     expect(r.avisos.map(a => a.tipo)).toEqual(['google_movimiento_rechazado'])
+  })
+})
+
+/* Avisos globales, paso 3 · con M1 la lectura es `avisos_pendientes` (por usuario) y trae avisos sin
+   cita. MUTACIÓN (comprobada en rojo): `armarAviso` exigiendo cita a todos (los sin cita no salían). */
+describe('leerAvisosClinica con M1 (pendientes por usuario)', () => {
+  it('usa avisos_pendientes; arma los de cita y los sin cita; el dirigido se marca', async () => {
+    const r = await leerAvisosClinica(cliente([], [cita('c1')], [
+      { id: 'a1', tipo: 'personal_agendo', cita_id: 'c1', creado_en: '2026-11-18T10:00:00Z', destinatario_id: 'u1', actor_id: null, medico_id: null, datos: null },
+      { id: 'a2', tipo: 'reserva_frenada', cita_id: null, creado_en: '2026-11-18T09:00:00Z', destinatario_id: null, actor_id: null, medico_id: 'm1',
+        datos: { nombre: 'Fulano', intentos: 2, telefono: 'no debe pasar' } },
+      { id: 'a3', tipo: 'correo_fallido', cita_id: 'ya-no-existe', creado_en: '2026-11-18T08:00:00Z' },
+    ]), CLINICA)
+    expect(r.disponible).toBe(true)
+    expect(r.avisos.map(a => `${a.id}:${a.tipo}:${a.dirigido}`)).toEqual(['a1:personal_agendo:true', 'a2:reserva_frenada:false'])
+    const frenada = r.avisos[1]
+    // De `datos` sólo pasa lo que el código pinta.
+    expect(frenada.cita === null ? frenada.datos : null).toEqual({ nombre: 'Fulano', intentos: 2 })
   })
 })

@@ -2,8 +2,8 @@
 
 /**
  * src/components/avisos/ListaAvisos.tsx — la lista de «Avisos» de la clínica
- * (tanda I, punto 19 de Angel): lo que pasó sin que nadie de la clínica lo
- * hiciera, conservado hasta que alguien lo revisa.
+ * (tanda I, punto 19 de Angel): lo que pasó en la agenda y alguien debe saber,
+ * conservado hasta que QUIEN LO LEE lo revisa (por usuario, desde M1).
  *
  * ⚠️ PIEZA PENSADA PARA MOVERSE A TODA LA APP: sólo recibe datos y
  * manejadores (`useAvisosClinica` le da los dos). Con `alAbrir`, pulsar un
@@ -40,7 +40,7 @@ function Contenido({ a, ahora }: { a: AvisoClinica; ahora: number }) {
       <span className="min-w-0 flex flex-col">
         <span className="text-[13px] font-semibold" style={{ color: 'var(--ag-text)' }}>{textoAviso(a)}</span>
         <span className="text-[12px]" style={{ color: 'var(--ag-muted)' }}>
-          Cita: {cuandoDeLaCita(a.cita)} · {haceCuanto(a.creado_en, ahora)}
+          {a.cita ? `Cita: ${cuandoDeLaCita(a.cita)} · ` : ''}{haceCuanto(a.creado_en, ahora)}
         </span>
       </span>
     </>
@@ -50,9 +50,10 @@ function Contenido({ a, ahora }: { a: AvisoClinica; ahora: number }) {
 function FilaAviso({ a, ahora, revisar, alAbrir }: { a: AvisoClinica; ahora: number } & Pick<Props, 'revisar' | 'alAbrir'>) {
   const comun = {
     className: 'ag-aviso-fila',
-    'data-aviso': a.id, 'data-aviso-tipo': a.tipo, 'data-aviso-cita': a.cita.id,
+    'data-aviso': a.id, 'data-aviso-tipo': a.tipo, 'data-aviso-cita': a.cita?.id ?? '',
   }
-  if (alAbrir) {
+  /* Un aviso SIN cita no tiene cita que abrir: siempre es un enlace (a la agenda o a su configuración). */
+  if (alAbrir && a.cita) {
     return (
       <button type="button" {...comun} onClick={() => { revisar([a.id]); alAbrir(a) }}>
         <Contenido a={a} ahora={ahora} />
@@ -81,7 +82,7 @@ export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir }: Props) {
             {/* I3 + I5 (integración): en un aviso de Google que SIGUE por asignar,
                 «¿No es una cita?» AL LADO de la fila, no dentro (un botón no va
                 dentro de otro). Decidir que no es una cita también revisa el aviso. */}
-            {a.tipo === 'google_por_asignar' && esPorAsignar(a.cita) && (
+            {a.tipo === 'google_por_asignar' && a.cita && esPorAsignar(a.cita) && (
               <span className="flex justify-end pb-2" data-aviso-no-es-cita={a.cita.id}>
                 <BotonNoEsCita citaId={a.cita.id} alHecho={() => revisar([a.id])} className={CLASE_BOTON} style={ESTILO_BOTON} />
               </span>

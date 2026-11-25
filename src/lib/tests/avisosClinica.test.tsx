@@ -21,7 +21,7 @@ vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => { throw new Er
 
 import {
   avisosParaEmergente, citaDelEnlace, destacarDeAviso, enlaceDeAviso, leerRespuestaAvisos, textoAviso, textoEmergente,
-  type AvisoClinica, type TipoAviso,
+  type AvisoDeCita, type CitaDelAviso, type TipoAviso, type TipoConCita,
 } from '@/lib/avisos/avisosClinica'
 import { cambioPuedeAvisar, type CambioCita, type FilaCambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { ListaAvisos } from '@/components/avisos/ListaAvisos'
@@ -34,7 +34,7 @@ const UUID = '00000000-0000-4000-8000-0000000015a1'
 const AHORA = Date.parse('2026-11-17T16:00:00Z')
 const nada = (): void => undefined
 
-function aviso(tipo: TipoAviso, extra: Partial<AvisoClinica> = {}): AvisoClinica {
+function aviso(tipo: TipoConCita, extra: Partial<AvisoDeCita> = {}): AvisoDeCita {
   return {
     id: `a-${tipo}`, tipo, creado_en: new Date(AHORA - 30_000).toISOString(),
     cita: {
@@ -148,7 +148,7 @@ describe('ListaAvisos (pieza para toda la app)', () => {
     expect(renderToStaticMarkup(<ListaAvisos avisos={[]} revisar={nada} revisarTodos={nada} />)).toContain('No hay avisos sin revisar.')
   })
   it('integración I3 + I5: «¿No es una cita?» al lado del aviso de Google que SIGUE por asignar, y en ningún otro', () => {
-    const conCita = (tipo: TipoAviso, cita: Partial<AvisoClinica['cita']>): AvisoClinica => {
+    const conCita = (tipo: TipoConCita, cita: Partial<CitaDelAviso>): AvisoDeCita => {
       const a = aviso(tipo)
       return { ...a, id: `${a.id}-${cita.google_asignacion ?? cita.paciente_id ?? cita.reserva_canal ?? 'x'}`, cita: { ...a.cita, ...cita } }
     }

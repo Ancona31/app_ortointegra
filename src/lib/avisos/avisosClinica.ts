@@ -10,19 +10,32 @@
  * `useAvisosClinica` y, sin manejador propio, cada aviso es un enlace a
  * `/agenda?cita=<id>` (`enlaceDeAviso`), que abre la cita en la agenda.
  *
- * Los escribe la BASE (disparadores de `20261121150000`), nunca el navegador.
- * Nada clínico: nombre de quien reservó (o el título de la cita), fecha y hora.
+ * Los escribe la BASE (disparadores de F4 y de M1, y la RPC `aviso_clinica_registrar`), nunca el
+ * navegador. Nada clínico: nombre de quien reservó (o el título de la cita), fecha y hora, y quién
+ * lo hizo en los del personal.
  */
 
-export const TIPOS_AVISO = [
+/** Los avisos que cuelgan de una cita. Los 7 primeros son de F4; el resto, de «avisos globales» (M1). */
+export const TIPOS_CON_CITA = [
   'reserva_enlace', 'cancelacion_paciente', 'reagendado_paciente', 'google_por_asignar', 'empalme_google',
   /* Tanda J, punto 10: alguien movió en Google una reservada por enlace (la base lo rechazó y
-     Spinus la devolvió). Lo escribe la pasada de sincronización (`20261122140000`). */
+     Spinus la devolvió). */
   'google_movimiento_rechazado',
-  /* Tanda L, punto 13: el paciente confirmó su cita desde su enlace (correo o WhatsApp). Lo
-     escribe la base al guardar su respuesta (`20261124160000`); la confirmación del personal, no. */
+  /* Tanda L, punto 13: el paciente confirmó su cita (por su enlace o, desde M1, con «Sí» en Google). */
   'confirmacion_paciente',
+  /* Avisos globales (M1, `20261202120000`). */
+  'google_movio_cita', 'google_cancelo_cita', 'correo_fallido', 'paciente_no_asistira',
+  /* Lo que el personal hace en la agenda de un médico: dirigidos SÓLO a ese médico. */
+  'personal_agendo', 'personal_movio', 'personal_cancelo',
 ] as const
+/** Los avisos SIN cita (M1): `cita` es null y lo que cuentan va en `datos`. */
+export const TIPOS_SIN_CITA = [
+  'reserva_frenada', 'google_desconectado', 'google_sin_sincronizar', 'personal_bloqueo', 'personal_desbloqueo',
+] as const
+/* ⚠️ La misma lista que `avisos_clinica_tipo_check` (M1). Un tipo nuevo va en la base ANTES que aquí. */
+export const TIPOS_AVISO = [...TIPOS_CON_CITA, ...TIPOS_SIN_CITA] as const
+export type TipoConCita = typeof TIPOS_CON_CITA[number]
+export type TipoSinCita = typeof TIPOS_SIN_CITA[number]
 export type TipoAviso = typeof TIPOS_AVISO[number]
 
 /** La cita del aviso, con la forma que `irACita` del buscador ya acepta (`CitaEncontrada`). */
@@ -42,12 +55,39 @@ export interface CitaDelAviso {
   google_asignacion?: string | null
 }
 
-export interface AvisoClinica {
+/**
+ * Lo que cuenta un aviso sin cita. ⚠️ Nada clínico ni de contacto: contadores, horas y, SÓLO en
+ * `reserva_frenada`, el nombre que tecleó quien intentó reservar (decisión de Angel; puede no ser real).
+ */
+export interface DatosAviso {
+  nombre?: string
+  intentos?: number
+  inicio?: string
+  fin?: string
+  todo_el_dia?: boolean
+  zona?: string | null
+}
+
+interface AvisoComun {
   id: string
-  tipo: TipoAviso
   creado_en: string
+  /** El nombre de quien lo hizo (avisos del personal); null si no aplica o no se pudo leer. */
+  actor?: string | null
+  /** Va dirigido sólo a quien lo está leyendo (lo del personal en SU agenda). */
+  dirigido?: boolean
+}
+export interface AvisoDeCita extends AvisoComun {
+  tipo: TipoConCita
   cita: CitaDelAviso
 }
+export interface AvisoSinCita extends AvisoComun {
+  tipo: TipoSinCita
+  cita: null
+  /** El dueño de la agenda del aviso; null = de toda la clínica (Google). */
+  medico_id: string | null
+  datos: DatosAviso
+}
+export type AvisoClinica = AvisoDeCita | AvisoSinCita
 
 /** `disponible: false` = la base no tiene la tabla (producción sin la migración). */
 export interface RespuestaAvisos {
@@ -72,12 +112,19 @@ function esCita(x: unknown): x is CitaDelAviso {
     && estado !== null && ESTADOS.has(estado) && typeof Reflect.get(x, 'title') === 'string'
 }
 
+function incluye<T extends string>(lista: readonly T[], v: string | null): v is T {
+  return v !== null && (lista as readonly string[]).includes(v)
+}
+
 /** Valida un aviso llegado por la red, sin `as`. */
 export function esAvisoClinica(x: unknown): x is AvisoClinica {
   if (typeof x !== 'object' || x === null) return false
+  if (texto(x, 'id') === null || texto(x, 'creado_en') === null) return false
   const tipo = texto(x, 'tipo')
-  return texto(x, 'id') !== null && texto(x, 'creado_en') !== null
-    && tipo !== null && (TIPOS_AVISO as readonly string[]).includes(tipo) && esCita(Reflect.get(x, 'cita'))
+  const cita: unknown = Reflect.get(x, 'cita')
+  if (incluye(TIPOS_CON_CITA, tipo)) return esCita(cita)
+  const datos: unknown = Reflect.get(x, 'datos')
+  return incluye(TIPOS_SIN_CITA, tipo) && cita === null && typeof datos === 'object' && datos !== null
 }
 
 /** Lee `{ avisos, avisos_disponibles }` de una respuesta (la de `/api/avisos` o la de «Por confirmar»). */
@@ -94,7 +141,7 @@ const MOVIMIENTO_RECHAZADO = 'Desde Google no se pueden mover las citas reservad
  * Tanda J, punto 10 · La acción que la tarjeta pone de principal al abrir la
  * cita desde el aviso («Reagendar» en el de Google); los demás, ninguna.
  */
-export function destacarDeAviso(a: Pick<AvisoClinica, 'tipo'>): 'reagendar' | undefined {
+export function destacarDeAviso(a: { tipo: TipoAviso }): 'reagendar' | undefined {
   return a.tipo === 'google_movimiento_rechazado' ? 'reagendar' : undefined
 }
 
@@ -120,9 +167,45 @@ function delDiaALaHora(c: CitaDelAviso): string {
   return fecha && hora ? ` del ${fecha} a las ${hora}` : ''
 }
 
+/** Quien lo hizo (avisos del personal). */
+function quienLoHizo(a: AvisoClinica): string {
+  return a.actor?.trim() || 'Alguien de la clínica'
+}
+
+/** «el jueves, 17 de diciembre de 09:00 a 12:00» (o sin horas, todo el día), en la zona del bloqueo. */
+function rangoDeBloqueo(d: DatosAviso): string {
+  if (!d.inicio) return ''
+  const zona = d.zona ?? null
+  const dia = enZona(d.inicio, zona, { weekday: 'long', day: 'numeric', month: 'long' })
+  if (!dia) return ''
+  if (d.todo_el_dia || !d.fin) return ` el ${dia}`
+  const hora = (iso: string): string => enZona(iso, zona, { hour: '2-digit', minute: '2-digit', hour12: false })
+  return ` el ${dia} de ${hora(d.inicio)} a ${hora(d.fin)}`
+}
+
+function textoSinCita(a: AvisoSinCita): string {
+  switch (a.tipo) {
+    case 'reserva_frenada': {
+      const veces = (a.datos.intentos ?? 1) > 1 ? ` (${a.datos.intentos} intentos)` : ''
+      return `${a.datos.nombre?.trim() || 'Alguien'} intentó reservar por enlace y no pudo${veces}`
+    }
+    case 'google_desconectado': return 'Google Calendar se desconectó. Vuelve a conectarlo en la configuración de la agenda'
+    case 'google_sin_sincronizar': return 'La agenda lleva varios intentos sin sincronizar con Google Calendar'
+    case 'personal_bloqueo': return `${quienLoHizo(a)} bloqueó tu agenda${rangoDeBloqueo(a.datos)}`
+    case 'personal_desbloqueo': return `${quienLoHizo(a)} quitó un bloqueo de tu agenda${rangoDeBloqueo(a.datos).replace(/^ el /, ' del ')}`
+  }
+}
+
+/** «al jueves, 17 de diciembre a las 10:45» para lo que se movió. */
+function alDiaALaHora(c: CitaDelAviso): string {
+  return delDiaALaHora(c).replace(/^ del /, ' al ')
+}
+
 /** La línea principal de la lista (vista del personal: el nombre sí sale, como en «Por confirmar»). */
 export function textoAviso(a: AvisoClinica): string {
+  if (a.cita === null) return textoSinCita(a)
   const n = quien(a.cita)
+  const paciente = quienConfirmo(a.cita)
   switch (a.tipo) {
     case 'reserva_enlace': return `${n} reservó por enlace`
     case 'cancelacion_paciente': return `${n} canceló su cita`
@@ -132,7 +215,15 @@ export function textoAviso(a: AvisoClinica): string {
     /* El texto literal de Angel (tanda J, punto 10); la cita va en la línea de debajo. */
     case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
     /* El texto de Angel: «[Nombre] confirmó su cita del [día] a las [hora]». */
-    case 'confirmacion_paciente': return `${quienConfirmo(a.cita)} confirmó su cita${delDiaALaHora(a.cita)}`
+    case 'confirmacion_paciente': return `${paciente} confirmó su cita${delDiaALaHora(a.cita)}`
+    case 'google_movio_cita': return `La cita de ${paciente} se movió desde Google${alDiaALaHora(a.cita)}`
+    case 'google_cancelo_cita': return `La cita de ${paciente}${delDiaALaHora(a.cita)} se canceló porque se borró en Google`
+    case 'correo_fallido': return `No se pudo enviar el correo a ${paciente} por su cita${delDiaALaHora(a.cita)}`
+    /* El «No» de Google en la última hora: no se cancela sola, decide el personal. */
+    case 'paciente_no_asistira': return `${paciente} indicó que no asistirá a su cita${delDiaALaHora(a.cita)}`
+    case 'personal_agendo': return `${quienLoHizo(a)} agendó a ${paciente} en tu agenda${delDiaALaHora(a.cita).replace(/^ del /, ' para el ')}`
+    case 'personal_movio': return `${quienLoHizo(a)} movió la cita de ${paciente}${alDiaALaHora(a.cita)}`
+    case 'personal_cancelo': return `${quienLoHizo(a)} canceló la cita de ${paciente}${delDiaALaHora(a.cita)}`
   }
 }
 
@@ -170,6 +261,7 @@ export function haceCuanto(creadoEn: string, ahora: number): string {
  * ⚠️ Nada clínico: ni tipo de cita, ni motivo, ni observaciones, ni contacto.
  */
 export function textoEmergente(a: AvisoClinica): string {
+  if (a.cita === null) return `${textoSinCita(a)}.`
   const fecha = enZona(a.cita.start_time, a.cita.zona, { weekday: 'long', day: 'numeric', month: 'long' })
   const hora = enZona(a.cita.start_time, a.cita.zona, { hour: '2-digit', minute: '2-digit', hour12: false })
   const cuando = fecha && hora ? ` para el ${fecha} a las ${hora}` : ''
@@ -181,8 +273,20 @@ export function textoEmergente(a: AvisoClinica): string {
     case 'google_por_asignar': return `Evento nuevo de Google por asignar${fecha && hora ? ` el ${fecha} a las ${hora}` : ''}.`
     case 'empalme_google': return `La reserva de ${n} se empalma con un evento de Google.`
     case 'google_movimiento_rechazado': return MOVIMIENTO_RECHAZADO
-    case 'confirmacion_paciente': return `${quienConfirmo(a.cita)} confirmó su cita${delDiaALaHora(a.cita)}.`
+    /* Los demás ya llevan el día y la hora en su línea de la campana: la burbuja dice lo mismo. */
+    default: return `${textoAviso(a)}.`
   }
+}
+
+/**
+ * ¿Es «mío»? Para el interruptor «Solo mis avisos» del médico administrador: los de citas cuyo
+ * médico es él, los dirigidos a él y los de toda la clínica sin médico (Google), que le tocan
+ * como administrador. Los de las agendas de otros médicos, no.
+ */
+export function esAvisoMio(a: AvisoClinica, usuarioId: string): boolean {
+  if (a.dirigido) return true
+  if (a.cita !== null) return a.cita.medico_id === usuarioId
+  return a.medico_id === null || a.medico_id === usuarioId
 }
 
 /**
@@ -194,16 +298,22 @@ export function avisosParaEmergente(
 ): AvisoClinica[] {
   const nuevos: AvisoClinica[] = []
   for (const a of avisos) {
-    if (vistos.has(a.id)) continue
-    vistos.add(a.id)
+    /* Con su hora: un aviso REABIERTO (mismo id, `creado_en` nuevo) vuelve a avisar. */
+    const llave = `${a.id}@${a.creado_en}`
+    if (vistos.has(llave)) continue
+    vistos.add(llave)
     if (tipos.includes(a.tipo) && ahora - Date.parse(a.creado_en) <= AVISO_RECIENTE_MS) nuevos.push(a)
   }
   return nuevos
 }
 
-/** Desde cualquier página: la cita del aviso en la agenda (`/agenda?cita=<id>`). */
+/**
+ * Desde cualquier página: la cita del aviso en la agenda (`/agenda?cita=<id>`). Los de Google sin
+ * cita llevan a la configuración de la agenda (donde se reconecta); los demás sin cita, a la agenda.
+ */
 export function enlaceDeAviso(a: AvisoClinica): string {
-  return `/agenda?cita=${encodeURIComponent(a.cita.id)}`
+  if (a.cita !== null) return `/agenda?cita=${encodeURIComponent(a.cita.id)}`
+  return a.tipo === 'google_desconectado' || a.tipo === 'google_sin_sincronizar' ? '/agenda/configuracion' : '/agenda'
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -213,3 +323,6 @@ export function citaDelEnlace(busqueda: string): string | null {
   const id = new URLSearchParams(busqueda).get('cita')
   return id && UUID.test(id) ? id : null
 }
+
+/** Dónde se guarda «Solo mis avisos»: por navegador, como «Pop-up de eventos». Sin datos de nadie. */
+export const CLAVE_SOLO_MIOS = 'spinus.avisos.solo-mios'

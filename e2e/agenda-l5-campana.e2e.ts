@@ -164,7 +164,9 @@ test('13 y 14: el paciente confirma por su enlace → emergente y aviso con su n
   await avisoEn(page, cita).click()
   await expect(panel(page)).toHaveCount(0)
   await expect(tarjetaLectura(page)).toBeVisible({ timeout: 10000 })
-  await expect.poll(() => sqlLocal(`select bool_and(revisado_en is not null)::text from public.avisos_clinica where cita_id = :'c'`, { c: cita })).toBe('true')
+  // Desde M1 «revisado» es por usuario: queda la marca de quien lo pulsó (`avisos_vistos`).
+  await expect.poll(() => sqlLocal(`select bool_and(exists (select 1 from public.avisos_vistos v where v.aviso_id = a.id and v.visto_en >= a.creado_en))::text
+    from public.avisos_clinica a where a.cita_id = :'c'`, { c: cita })).toBe('true')
 })
 
 test('13: la confirmación marcada por el personal no genera aviso', async ({ page }) => {

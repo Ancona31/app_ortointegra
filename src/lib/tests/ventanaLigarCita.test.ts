@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest'
 import { leerCitaParaLigar, motivoSinLigar, type CitaParaLigar } from '@/components/agenda/VentanaLigarCita'
 import { avisoSeLiga } from '@/components/agenda/CampanaAgenda'
-import type { AvisoClinica } from '@/lib/avisos/avisosClinica'
+import type { AvisoDeCita } from '@/lib/avisos/avisosClinica'
 
 const RESERVA: CitaParaLigar = {
   id: 'c1', title: 'Reserva', start_time: '2026-11-19T16:00:00Z', end_time: '2026-11-19T16:30:00Z',
@@ -50,7 +50,7 @@ describe('leerCitaParaLigar', () => {
 })
 
 describe('avisoSeLiga', () => {
-  const aviso = (tipo: AvisoClinica['tipo'], cita: Partial<AvisoClinica['cita']> = {}): AvisoClinica => ({
+  const aviso = (tipo: AvisoDeCita['tipo'], cita: Partial<AvisoDeCita['cita']> = {}): AvisoDeCita => ({
     id: 'a1', tipo, creado_en: '2026-11-17T00:00:00Z',
     cita: { id: 'c1', title: 'Reserva', start_time: RESERVA.start_time, end_time: RESERVA.end_time, status: 'scheduled',
       medico_id: 'm1', paciente_id: null, reserva_nombre: 'Lucía', zona: null, reserva_canal: 'unico', google_asignacion: null, ...cita },

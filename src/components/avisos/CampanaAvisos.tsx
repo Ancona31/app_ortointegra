@@ -15,8 +15,10 @@
  *   no un redirect: la barrera es la RLS («Autoridad de sesión», CLAUDE.md).
  * · SE ENTERA de lo nuevo releyendo cada `SONDEO_MS` con la pestaña a la vista
  *   y al volver a ella. Nunca en segundo plano.
- * · Pulsar un aviso lo marca revisado y abre su cita en la agenda
+ * · Pulsar un aviso lo marca revisado PARA MÍ (mi fila en `avisos_vistos`, M1;
+ *   directo y bajo RLS, sin pasar por la ruta) y abre su cita en la agenda
  *   (`/agenda?cita=<id>`, `ListaAvisos` sin `alAbrir`).
+ * · El médico administrador puede quedarse con «Solo mis avisos» (`InterruptorMisAvisos`).
  *
  * ⚠️ Nada clínico: lo que pinta sale de `textoAviso`/`textoEmergente`.
  */
@@ -24,12 +26,13 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import { Bell, X } from 'lucide-react'
 import { CapaBarra } from '@/components/agenda/CapaBarra'
+import { InterruptorMisAvisos, useSoloMisAvisos } from '@/components/avisos/InterruptorMisAvisos'
 import { ListaAvisos } from '@/components/avisos/ListaAvisos'
 import { useAvisosClinica, type EstadoAvisos } from '@/hooks/useAvisosClinica'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useProfile } from '@/hooks/useProfile'
 import { TIPOS_AVISO, type RespuestaAvisos } from '@/lib/avisos/avisosClinica'
-import { leerAvisosClinica } from '@/lib/avisos/avisosServidor'
+import { leerAvisosClinica, marcarAvisosRevisados } from '@/lib/avisos/avisosServidor'
 import { createClient } from '@/lib/supabase/client'
 
 /** Cada cuánto se relee con la pestaña a la vista (2 min: la ventana de «recién llegado»). */
@@ -70,7 +73,14 @@ export default function CampanaAvisos(): ReactElement | null {
     if (!clinicaId) return null
     return leerAvisosClinica(createClient(), clinicaId)
   }, [clinicaId])
-  const avisos = useAvisosClinica({ emergentes: TIPOS_AVISO, pedir })
+  const usuarioId = profile?.id ?? null
+  /* Revisar también va directo, bajo RLS: MI fila en `avisos_vistos` (M1). Sin viaje a la ruta ni a Auth. */
+  const marcar = useCallback(async (ids: string[]): Promise<boolean> => {
+    if (!clinicaId || !usuarioId) return false
+    return (await marcarAvisosRevisados(createClient(), clinicaId, usuarioId, ids)).ok
+  }, [clinicaId, usuarioId])
+  const { soloDe } = useSoloMisAvisos()
+  const avisos = useAvisosClinica({ emergentes: TIPOS_AVISO, pedir, marcar, soloDe })
   useSondeo(avisos.recargar)
   const [ranuras] = useState(leerRanuras)
   const [boton, setBoton] = useState<HTMLElement | null>(null)
@@ -110,6 +120,7 @@ function PanelAvisos({ boton, alCerrar, avisos }: { boton: HTMLElement; alCerrar
         <h2 className="flex-1 text-[15px] font-bold" style={{ color: 'var(--tinta)' }}>Avisos</h2>
         <button type="button" className="ag-capa-cerrar" onClick={alCerrar} aria-label="Cerrar"><X size={16} aria-hidden="true" /></button>
       </div>
+      <InterruptorMisAvisos />
       {avisos.avisos === null
         ? <p className="text-[12px]" style={{ color: 'var(--tinta2)' }}>Cargando…</p>
         : <ListaAvisos avisos={avisos.avisos} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos} />}

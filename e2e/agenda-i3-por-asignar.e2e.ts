@@ -205,8 +205,10 @@ test('punto 10 · campana: «¿No es una cita?» en el aviso de Google lo deja e
   interruptorAgenda('A', true)
   const titulo = tituloUnico('Aviso Google I3')
   const id = filaGoogle(titulo, fechaHoraLocalAInstante(DIA_LABORABLE_LIBRE, '18:30', TZ), 'por_asignar')
-  const pendiente = (): string => sqlLocal(`select count(*) from public.avisos_clinica
-    where cita_id = :'id' and tipo = 'google_por_asignar' and revisado_en is null`, { id })
+  /* Desde M1 «revisado» es por usuario: pendiente = sin cerrar para todos y sin que nadie lo haya visto. */
+  const pendiente = (): string => sqlLocal(`select count(*) from public.avisos_clinica a
+    where a.cita_id = :'id' and a.tipo = 'google_por_asignar' and a.revisado_en is null
+      and not exists (select 1 from public.avisos_vistos v where v.aviso_id = a.id and v.visto_en >= a.creado_en)`, { id })
   expect(pendiente()).toBe('1')
   await abrirAgendaV2(page)
   await page.locator('[data-campana]').first().click()

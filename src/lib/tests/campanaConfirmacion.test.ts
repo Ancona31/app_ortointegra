@@ -18,14 +18,14 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  avisosParaEmergente, destacarDeAviso, leerRespuestaAvisos, textoAviso, textoEmergente, type AvisoClinica,
+  avisosParaEmergente, destacarDeAviso, leerRespuestaAvisos, textoAviso, textoEmergente, type AvisoDeCita,
 } from '@/lib/avisos/avisosClinica'
 import { cambioPuedeAvisar, type CambioCita, type FilaCambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { etiquetaCampana, textoBurbuja } from '@/components/agenda/CampanaAgenda'
 
 const AHORA = Date.parse('2026-11-18T16:00:00Z')
 
-function confirmacion(cita: Partial<AvisoClinica['cita']> = {}): AvisoClinica {
+function confirmacion(cita: Partial<AvisoDeCita['cita']> = {}): AvisoDeCita {
   return {
     id: 'a1', tipo: 'confirmacion_paciente', creado_en: new Date(AHORA - 20_000).toISOString(),
     cita: {

@@ -21,7 +21,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { enOcioso, cancelarOcioso } from '@/lib/agenda/ocioso'
 import { useToast } from '@/components/ui/Toast'
 import {
-  avisosParaEmergente, leerRespuestaAvisos, textoEmergente,
+  avisosParaEmergente, esAvisoMio, leerRespuestaAvisos, textoEmergente,
   type AvisoClinica, type RespuestaAvisos, type TipoAviso,
 } from '@/lib/avisos/avisosClinica'
 
@@ -32,6 +32,13 @@ export interface OpcionesAvisos {
   emergentes?: readonly TipoAviso[]
   /** Modo libre: la lectura de quien lo monta, en vez de `GET /api/avisos`. Identidad estable (`useCallback`). */
   pedir?: () => Promise<RespuestaAvisos | null>
+  /** Cómo se apunta «revisado» (por usuario, desde M1); por omisión, `PATCH /api/avisos`. `false` = no se apuntó. Identidad estable. */
+  marcar?: (ids: string[]) => Promise<boolean>
+  /**
+   * «Solo mis avisos» (el médico administrador): con su id, la lista, la cuenta y las burbujas
+   * se quedan en los suyos (`esAvisoMio`). Los demás siguen pendientes: no se marcan ni se pierden.
+   */
+  soloDe?: string | null
 }
 
 export interface EstadoAvisos {
@@ -65,22 +72,30 @@ async function enviarRevision(ids: string[]): Promise<boolean> {
   }
 }
 
-/** Los ids revisados en esta pestaña se ocultan aunque una respuesta en vuelo aún los traiga. */
-function sinRevisados(r: RespuestaAvisos | null, revisados: ReadonlySet<string>): AvisoClinica[] | null {
-  return r ? r.avisos.filter(a => !revisados.has(a.id)) : null
+/**
+ * Los revisados en esta pestaña se ocultan aunque una respuesta en vuelo aún los traiga. Se apunta
+ * el `creado_en` con el que se revisó: si el aviso se REABRE (otro hecho del mismo tipo y cita le
+ * cambia la hora), vuelve a salir.
+ */
+function sinRevisados(r: RespuestaAvisos | null, revisados: ReadonlyMap<string, string>): AvisoClinica[] | null {
+  return r ? r.avisos.filter(a => revisados.get(a.id) !== a.creado_en) : null
 }
 
-export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos }: OpcionesAvisos = {}): EstadoAvisos {
+export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos, marcar = enviarRevision, soloDe = null }: OpcionesAvisos = {}): EstadoAvisos {
   const controlado = datos !== undefined
   const [propios, setPropios] = useState<RespuestaAvisos | null>(null)
-  const [revisados, setRevisados] = useState<ReadonlySet<string>>(() => new Set())
+  const [revisados, setRevisados] = useState<ReadonlyMap<string, string>>(() => new Map())
   const recibida = controlado ? datos : propios
   /* Un fallo pasajero del servidor llega como «no disponible», igual que una
      base sin la tabla: tras una lista buena se conserva la última buena, para
      que la campana no salte a la vista de antes ni cambie su cuenta. */
   const [ultimaBuena, setUltimaBuena] = useState<RespuestaAvisos | null>(null)
   if (recibida?.disponible && recibida !== ultimaBuena) setUltimaBuena(recibida)
-  const fuente = recibida?.disponible ? recibida : (ultimaBuena ?? recibida)
+  const cruda = recibida?.disponible ? recibida : (ultimaBuena ?? recibida)
+  const fuente = useMemo(
+    () => (cruda && soloDe ? { ...cruda, avisos: cruda.avisos.filter(a => esAvisoMio(a, soloDe)) } : cruda),
+    [cruda, soloDe],
+  )
 
   const recargar = useCallback((): void => {
     if (controlado) return
@@ -99,11 +114,12 @@ export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos }
      (un aviso que se cree atendido y no lo está es justo lo que no puede pasar). */
   const revisar = useCallback((ids: string[]): void => {
     if (ids.length === 0) return
-    setRevisados(prev => new Set([...prev, ...ids]))
-    void enviarRevision(ids).then(ok => {
-      if (!ok) setRevisados(prev => new Set([...prev].filter(id => !ids.includes(id))))
+    const horas = new Map((fuente?.avisos ?? []).filter(a => ids.includes(a.id)).map(a => [a.id, a.creado_en]))
+    setRevisados(prev => new Map([...prev, ...horas]))
+    void marcar(ids).then(ok => {
+      if (!ok) setRevisados(prev => new Map([...prev].filter(([id]) => !ids.includes(id))))
     })
-  }, [])
+  }, [marcar, fuente])
 
   const avisos = useMemo(() => sinRevisados(fuente, revisados), [fuente, revisados])
 

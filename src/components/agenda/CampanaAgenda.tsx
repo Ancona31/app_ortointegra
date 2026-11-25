@@ -29,6 +29,7 @@
 import { useCallback, useState, type KeyboardEvent, type ReactElement, type RefObject } from 'react'
 import dynamic from 'next/dynamic'
 import { Bell, X } from 'lucide-react'
+import { InterruptorMisAvisos, useSoloMisAvisos } from '@/components/avisos/InterruptorMisAvisos'
 import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { destacarDeAviso, TIPOS_AVISO, type AvisoClinica, type CitaDelAviso, type TipoAviso } from '@/lib/avisos/avisosClinica'
@@ -86,6 +87,7 @@ const AVISOS_DE_LIGAR: readonly TipoAviso[] = ['reserva_enlace', 'reagendado_pac
  */
 export function avisoSeLiga(a: AvisoClinica, quien: { esMedico: boolean; perfilId: string | null }): boolean {
   const c = a.cita
+  if (c === null) return false
   return quien.esMedico && quien.perfilId !== null && c.medico_id === quien.perfilId && AVISOS_DE_LIGAR.includes(a.tipo)
     && (c.status === 'scheduled' || c.status === 'confirmed') && esPorLigar(c)
 }
@@ -118,7 +120,8 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
   const [ligando, setLigando] = useState<CitaDelAviso | null>(null)
   /* El escudo de siempre: el segundo clic de un doble clic sobre el aviso no cae en la ventana. */
   const escudo = useEscudoTrasRegistro(ligando === null, { dentroDeDialogos: true })
-  const avisos = useAvisosClinica({ datos: listas?.avisos ?? null, emergentes: EMERGENTES })
+  const { soloDe } = useSoloMisAvisos()
+  const avisos = useAvisosClinica({ datos: listas?.avisos ?? null, emergentes: EMERGENTES, soloDe })
   const [boton, setBoton] = useState<HTMLElement | null>(null)
   const cerrar = useCallback(() => setBoton(null), [])
   const n = listas?.citas.length ?? 0
@@ -147,6 +150,7 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
         <PanelCampana boton={boton} alCerrar={cerrar} listas={listas} n={n} m={m} avisos={avisos}
           alConfirmar={alConfirmar} alAbrirAviso={(a) => {
             cerrar()
+            if (a.cita === null) return // los avisos sin cita son enlaces (`ListaAvisos`): no llegan aquí
             if (avisoSeLiga(a, { esMedico: isDoctor, perfilId: profile?.id ?? null })) { escudo.activar(); setLigando(a.cita) }
             else alAbrirCita(a.cita, destacarDeAviso(a))
           }} />
@@ -206,8 +210,11 @@ function ContenidoAvisos({ listas, avisos, alAbrirAviso }: Pick<PropsPanel, 'lis
     )
   }
   return (
-    <ListaAvisos avisos={avisos.avisos ?? []} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos}
-      alAbrir={alAbrirAviso} />
+    <>
+      <InterruptorMisAvisos />
+      <ListaAvisos avisos={avisos.avisos ?? []} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos}
+        alAbrir={alAbrirAviso} />
+    </>
   )
 }
 

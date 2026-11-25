@@ -48,7 +48,10 @@ function cadena(tabla: string): Record<string, unknown> {
 vi.mock('@/lib/reserva/gestionServidor', () => ({
   entradaGestion: async () => (h.entrada === 'ok'
     ? { ok: true, clinicaId: 'clinica-1', perfil: { id: 'perfil-1', role: 'secretaria', es_admin_de_clinica: false },
-        supabase: { from: (t: string) => { h.llamadas.push({ op: 'from', args: [t] }); return cadena(t) } } }
+        /* `rpc`: la base de estas pruebas es la de ANTES de M1 (sin `avisos_pendientes`, PGRST202): la
+           lectura de avisos cae a la de siempre, por clínica, que es la que estas pruebas miran. */
+        supabase: { rpc: async () => ({ data: null, error: { code: 'PGRST202' } }),
+          from: (t: string) => { h.llamadas.push({ op: 'from', args: [t] }); return cadena(t) } } }
     : { ok: false, respuesta: NextResponse.json({ error: 'x' }, { status: h.entrada }) }),
 }))
 vi.mock('@/lib/confirmacion/enlaceConfirmacion', () => ({

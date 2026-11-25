@@ -79,6 +79,7 @@ function borrarCitasPersonal(): void {
     create temp table _c on commit drop as select unnest(string_to_array(:'citas', ','))::uuid as id;
     delete from public.cita_correos where appointment_id in (select id from _c);
     delete from public.cita_confirmaciones where appointment_id in (select id from _c);
+    delete from public.avisos_vistos where aviso_id in (select id from public.avisos_clinica where cita_id in (select id from _c));
     delete from public.avisos_clinica where cita_id in (select id from _c);
     delete from public.appointments where id in (select id from _c);
     delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
@@ -165,8 +166,14 @@ async function abrirAvisos(page: Page): Promise<void> {
   await expect(panel(page).getByRole('tab', { name: /^Avisos/ })).toHaveAttribute('aria-selected', 'true')
 }
 
+/**
+ * ¿Lo revisó alguien? Desde M1 «revisado» es POR USUARIO: una fila en `avisos_vistos` puesta
+ * después del último cambio del aviso (o, en una base sin M1, `revisado_en`).
+ */
 function revisado(tipo: string, cita: string): string {
-  return sqlLocal(`select coalesce(bool_and(revisado_en is not null)::text, 'sin') from public.avisos_clinica where tipo = :'t' and cita_id = :'c'`, { t: tipo, c: cita })
+  return sqlLocal(`select coalesce(bool_and(a.revisado_en is not null or exists (
+      select 1 from public.avisos_vistos v where v.aviso_id = a.id and v.visto_en >= a.creado_en))::text, 'sin')
+    from public.avisos_clinica a where a.tipo = :'t' and a.cita_id = :'c'`, { t: tipo, c: cita })
 }
 
 /* ── 13 a 15: la barra de escritorio ───────────────────────────────────── */

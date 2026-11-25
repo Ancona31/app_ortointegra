@@ -162,6 +162,9 @@ export function limpiarReservasE2e(desde: string): void {
       end if;
       -- I5: los avisos de esas citas (sin FK a la cita: quedarían huérfanos); su auditoría se queda.
       if to_regclass('public.avisos_clinica') is not null then
+        if to_regclass('public.avisos_vistos') is not null then
+          delete from public.avisos_vistos where aviso_id in (select id from public.avisos_clinica where cita_id in (select id from _citas));
+        end if;
         delete from public.avisos_clinica where cita_id in (select id from _citas);
       end if;
       if to_regclass('public.cita_confirmaciones') is not null then
