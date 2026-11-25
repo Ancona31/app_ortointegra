@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent, type ReactElement, type ReactNode } from 'react'
+import CasillaAviso from './CasillaAviso'
 
 export interface Datos { nombre: string; telefono: string; correo: string }
 
@@ -32,23 +33,7 @@ interface Props {
   sinCorreo?: boolean
 }
 
-/**
- * El aviso simplificado, ABIERTO (privacidad 2026-12: nunca plegado ni tras un
- * clic). El texto es el aprobado, sin tocar; sólo la dirección del aviso
- * integral con la que termina se pinta como enlace, en otra pestaña para no
- * perder lo escrito.
- */
-function TextoDelAviso({ aviso, url, ruta }: { aviso: string; url: string; ruta: string }): ReactElement {
-  const conEnlace = url.length > 0 && aviso.endsWith(url)
-  return (
-    <div className="rp-aviso-legal" data-aviso-reserva>
-      {conEnlace ? aviso.slice(0, -url.length) : aviso}
-      {conEnlace && <a href={ruta} target="_blank" rel="noopener noreferrer">{url}</a>}
-    </div>
-  )
-}
-
-/** Nombre, teléfono y correo, y el aviso con su casilla (nace desmarcada). El texto del aviso NO se toca. */
+/** Nombre, teléfono y correo, y la casilla del aviso (nace desmarcada), que lo abre en una capa. El texto del aviso NO se toca. */
 export default function FormularioDatos({ aviso, avisoUrl, avisoRuta, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, sinCorreo = false }: Props): ReactElement {
   const [d, setDatos] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
   const setD = (nuevos: Datos) => { setDatos(nuevos); onCambio?.(nuevos) }
@@ -72,11 +57,7 @@ export default function FormularioDatos({ aviso, avisoUrl, avisoRuta, casilla, o
             onChange={e => setD({ ...d, correo: e.target.value })} />
         </label>
       )}
-      <TextoDelAviso aviso={aviso} url={avisoUrl} ruta={avisoRuta} />
-      <label className="rp-acepto">
-        <input type="checkbox" checked={acepta} onChange={e => setAcepta(e.target.checked)} />
-        <span>{casilla}</span>
-      </label>
+      <CasillaAviso casilla={casilla} aviso={aviso} avisoUrl={avisoUrl} avisoRuta={avisoRuta} acepta={acepta} onAcepta={setAcepta} />
       <div className="rp-pie">
         <div className="rp-pie__fila">
           {volver}

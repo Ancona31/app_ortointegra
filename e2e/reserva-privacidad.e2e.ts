@@ -1,8 +1,9 @@
 /**
  * reserva-privacidad.e2e.ts — privacidad 2026-12 (documentos 2 y 3 y punto 5).
  *
- *   · en «Tus datos» el aviso simplificado se ve ABIERTO, sin plegar, con el
- *     médico y el consultorio rellenados, y la casilla nueva debajo;
+ *   · en «Tus datos» el aviso simplificado NO va desplegado (decisión de Angel):
+ *     va la casilla nueva, y sus palabras «aviso de privacidad» lo abren en una
+ *     capa, con clic y por teclado, sin perder lo escrito;
  *   · su última línea enlaza a `/reservar/{código}/privacidad`, que pinta el
  *     aviso integral del consultorio sin marcadores y siempre en claro;
  *   · esa página es tan pública como la reserva y da el MISMO 404 con un
@@ -42,7 +43,7 @@ function principal(): { id: string; nombre: string; direccion: string; telefono:
   return { id, nombre, direccion, telefono }
 }
 
-test('«Tus datos»: el aviso va abierto y relleno, con la casilla nueva y el enlace al aviso integral', async ({ page }) => {
+test('«Tus datos»: la casilla nueva abre el aviso en una capa, con clic y por teclado, y sigue siendo obligatoria', async ({ page }) => {
   const c = principal()
   await page.goto(`/reservar/${codigo}`)
   // Con otros archivos corridos antes puede haber más de un tipo: se elige el del escenario.
@@ -52,27 +53,62 @@ test('«Tus datos»: el aviso va abierto y relleno, con la casilla nueva y el en
   await primerTurnoDeLaSemanaSiguiente(page)
   await page.getByRole('button', { name: 'Continuar' }).click()
 
+  // Lo escrito antes de abrir el aviso tiene que seguir ahí al cerrarlo.
+  await page.getByLabel('Nombre completo').fill('Persona De Prueba')
+
+  // El aviso NO va desplegado: sólo la casilla, con su texto exacto, desmarcada y obligatoria.
   const aviso = page.locator('[data-aviso-reserva]')
-  await expect(aviso).toBeVisible()
+  const capa = page.getByRole('dialog', { name: 'Aviso de privacidad' })
+  await expect(aviso).toBeHidden()
   await expect(page.locator('details')).toHaveCount(0)
+  await expect(page.locator('.rp-acepto')).toHaveText(
+    'Leí el aviso de privacidad y acepto que se traten mis datos para reservar mi cita, incluido conservar el historial de mis reservas, cancelaciones e inasistencias.')
+  const casilla = page.locator('.rp-acepto input')
+  await expect(casilla).not.toBeChecked()
+  await expect(page.getByRole('button', { name: 'Reservar cita' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Volver', exact: true })).toBeInViewport()
+
+  // Un clic en «aviso de privacidad» lo abre en la capa, sin marcar la casilla ni salir de la página.
+  const abrir = page.getByRole('button', { name: 'aviso de privacidad', exact: true })
+  await abrir.click()
+  await expect(capa).toBeVisible()
+  await expect(casilla).not.toBeChecked()
+  // Abre por el principio (no desplazada hasta el enlace del final), con el foco en su título.
+  await expect(capa.getByRole('heading', { name: 'Aviso de privacidad' })).toBeFocused()
+  await expect(capa.getByText('Aviso de privacidad simplificado para reservar')).toBeInViewport()
+  // Centrada en la pantalla y entera dentro de ella.
+  const caja = await capa.boundingBox()
+  const vista = page.viewportSize()
+  expect(caja && vista && Math.abs((caja.x + caja.width / 2) - vista.width / 2)).toBeLessThanOrEqual(2)
+  expect(caja && vista && caja.y >= 0 && caja.y + caja.height <= vista.height).toBe(true)
+  expect(new URL(page.url()).pathname).toBe(`/reservar/${codigo}`)
   await expect(aviso).toContainText('Aviso de privacidad simplificado para reservar una cita en línea')
   await expect(aviso).toContainText('Versión reserva-2026-12-v1')
   await expect(aviso).toContainText(`con domicilio en ${c.direccion} (${c.nombre}), es responsable`)
   await expect(aviso).toContainText(`comunícate con el consultorio al ${c.telefono} o acude a ${c.direccion}.`)
   await expect(aviso).not.toContainText(/\{[A-Z_]+\}|VERIFICAR|PENDIENTE/)
-
-  await expect(page.locator('.rp-acepto')).toHaveText(
-    'Leí el aviso de privacidad y acepto que se traten mis datos para reservar mi cita, incluido conservar el historial de mis reservas, cancelaciones e inasistencias.')
-  await expect(page.locator('.rp-acepto input')).not.toBeChecked()
-  await expect(page.getByRole('button', { name: 'Reservar cita' })).toBeDisabled()
-
   const enlace = aviso.getByRole('link')
   await expect(enlace).toHaveAttribute('href', `/reservar/${codigo}/privacidad`)
   await expect(enlace).toHaveAttribute('target', '_blank')
   await expect(enlace).toHaveText(new RegExp(`/reservar/${codigo}/privacidad$`))
-  // El aviso abierto alarga el paso: los botones siguen a la vista sin desplazar.
-  await expect(page.getByRole('button', { name: 'Volver', exact: true })).toBeInViewport()
-  await expect(page.getByRole('button', { name: 'Reservar cita' })).toBeInViewport()
+  // El foco queda dentro de la capa; Escape la cierra y lo devuelve al enlace.
+  expect(await capa.evaluate(el => el.contains(document.activeElement))).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(capa).toBeHidden()
+  await expect(abrir).toBeFocused()
+
+  // Por teclado: Enter sobre el enlace la abre; «Cerrar» la cierra.
+  await page.keyboard.press('Enter')
+  await expect(capa).toBeVisible()
+  await capa.getByRole('button', { name: 'Cerrar' }).click()
+  await expect(capa).toBeHidden()
+  await expect(casilla).not.toBeChecked()
+  await expect(page.getByLabel('Nombre completo')).toHaveValue('Persona De Prueba')
+
+  // Sólo marcar la casilla enciende el botón.
+  await page.getByLabel('Teléfono (10 dígitos)').fill('9991234567')
+  await casilla.check()
+  await expect(page.getByRole('button', { name: 'Reservar cita' })).toBeEnabled()
 })
 
 test('el aviso integral: público, relleno con el consultorio, sin marcadores y en claro', async ({ browser }) => {
