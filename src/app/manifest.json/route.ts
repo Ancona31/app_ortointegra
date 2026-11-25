@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 const MANIFEST = JSON.stringify({
   id: '/',
-  name: 'Spinus®',
+  name: 'Spinus',
   short_name: 'Spinus',
   description: 'Sistema de gestión clínica — Cirugía de Columna, Traumatología y Ortopedia',
   start_url: '/inicio',

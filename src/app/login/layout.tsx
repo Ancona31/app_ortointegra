@@ -8,11 +8,10 @@ import { inter } from '@/lib/fonts'
    familia Inter sobre esta ruta y poner el fondo de la pantalla.
 
    SIN `metadata` PROPIA, a propósito. El `<title>` sigue siendo el del layout
-   raíz (`src/app/layout.tsx:5`), que hoy dice "Spinus®". Ese ® es real y está
-   contabilizado en **LP-DT-15** (barrido de ® fuera de la landing); corregirlo
-   aquí con un `metadata` que lo pise sería esconder el síntoma en una ruta y
-   dejarlo vivo en las otras veinte. Se arregla en su proyecto, en el archivo
-   raíz, de una vez. No añadas metadata aquí para "arreglar el título".
+   raíz (`src/app/layout.tsx:5`), que dice "Spinus", ya sin el símbolo de marca
+   registrada: el barrido de **LP-DT-15** se hizo en el archivo raíz y en toda
+   la app (privacidad 2026-12, punto 8). No añadas metadata aquí para
+   "arreglar el título".
 
    ⚠️ `font-lp` NO ES SOLO TIPOGRAFÍA EN ESTE ÁRBOL, y por eso la clase va aquí
    y no en el <div> de la página. El anillo de foco único de la landing

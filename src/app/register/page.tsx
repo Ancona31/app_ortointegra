@@ -399,7 +399,7 @@ function Logo() {
         <img src="/logo.png" alt="Logo Spinus" className="w-16 h-16 object-contain"
           onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
       </div>
-      <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus®</h1>
+      <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus</h1>
       <p className="text-xs text-slate-400 mt-1">Crea tu cuenta gratuita</p>
     </div>
   )
@@ -408,7 +408,7 @@ function Logo() {
 function Footer() {
   return (
     <p className="text-center text-xs text-slate-300 mt-6">
-      © 2026 Spinus® · Todos los derechos reservados
+      © 2026 Spinus · Todos los derechos reservados
     </p>
   )
 }

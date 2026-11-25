@@ -68,7 +68,7 @@ type Apariencia = {
 type EstadoGcal = 'conectado' | 'sin_token' | 'error_google'
 
 const PALETAS = [
-  { nombre: 'Spinus® (defecto)', primario: '#1a3a5c', secundario: '#1e5fa8' },
+  { nombre: 'Spinus (defecto)', primario: '#1a3a5c', secundario: '#1e5fa8' },
   { nombre: 'Verde médico',          primario: '#134e4a', secundario: '#0d9488' },
   { nombre: 'Morado',                primario: '#3b0764', secundario: '#7c3aed' },
   { nombre: 'Rojo burdeos',          primario: '#7f1d1d', secundario: '#dc2626' },

@@ -28,7 +28,7 @@ import MarcoPublico from '@/components/agendaPublica/MarcoPublico'
    terceros, y `noindex`. Sin localStorage. */
 
 export const metadata: Metadata = {
-  title: 'Reservar cita · Spinus®',
+  title: 'Reservar cita · Spinus',
   robots: { index: false, follow: false },
   referrer: 'no-referrer',
 }

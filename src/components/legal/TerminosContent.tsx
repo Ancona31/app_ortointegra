@@ -177,7 +177,7 @@ export default function TerminosContent() {
               icon={<CheckCircle2 size={14} />}
             >
               <p>
-                Al registrarse y utilizar Spinus® (en adelante, &ldquo;la Plataforma&rdquo;), usted
+                Al registrarse y utilizar Spinus (en adelante, &ldquo;la Plataforma&rdquo;), usted
                 acepta de forma íntegra los presentes Términos y Condiciones, así como el{' '}
                 <Link
                   href="/privacidad"
@@ -198,7 +198,7 @@ export default function TerminosContent() {
               icon={<Briefcase size={14} />}
             >
               <p>
-                Spinus® es una plataforma de expedientes clínicos electrónicos con asistencia de
+                Spinus es una plataforma de expedientes clínicos electrónicos con asistencia de
                 inteligencia artificial, dirigida a profesionales de la salud y clínicas. Incluye:
               </p>
               <ul className="list-disc pl-5 space-y-1 text-[13px]">
@@ -721,7 +721,7 @@ export default function TerminosContent() {
             >
               <p>
                 El código fuente, diseño, marca, identidad visual, logotipos y contenido editorial
-                de la Plataforma son propiedad de Spinus®. La marca <strong>Spinus®</strong> y sus
+                de la Plataforma son propiedad de Spinus. La marca <strong>Spinus</strong> y sus
                 elementos distintivos se encuentran protegidos por la legislación aplicable en
                 materia de propiedad industrial e intelectual.
               </p>
@@ -854,7 +854,7 @@ export default function TerminosContent() {
           <div className="px-4 sm:px-8 py-5 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="text-[11px] text-[#86868b]">
               <p className="font-medium text-[#3d3d3f]">
-                Spinus®, operada por Angel Manuel Ancona Pérez
+                Spinus, operada por Angel Manuel Ancona Pérez
               </p>
               <p>Mérida, Yucatán, México</p>
             </div>

@@ -40,7 +40,7 @@ function ConfirmEmailContent() {
     <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus®</h1>
+          <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus</h1>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
@@ -84,7 +84,7 @@ function ConfirmEmailContent() {
           )}
         </div>
 
-        <p className="text-center text-xs text-slate-300 mt-6">© 2026 Spinus® · Todos los derechos reservados</p>
+        <p className="text-center text-xs text-slate-300 mt-6">© 2026 Spinus · Todos los derechos reservados</p>
       </div>
     </div>
   )

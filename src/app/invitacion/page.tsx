@@ -88,7 +88,7 @@ function InvitacionContent() {
     <div className="min-h-screen flex items-center justify-center bg-[#f0f4f8] px-4 pt-[env(safe-area-inset-top,0px)]">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus®</h1>
+          <h1 className="text-2xl font-bold text-[#1a3a5c]">Spinus</h1>
           <p className="text-xs text-slate-400 mt-1 text-center">Gestión clínica inteligente para el especialista moderno</p>
         </div>
 
@@ -225,7 +225,7 @@ function InvitacionContent() {
         </div>
 
         <p className="text-center text-xs text-slate-300 mt-6">
-          © 2026 Spinus® · Todos los derechos reservados
+          © 2026 Spinus · Todos los derechos reservados
         </p>
       </div>
     </div>

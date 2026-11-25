@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# Reglas del proyecto Spinus®
+# Reglas del proyecto Spinus
 
 > **Lee este documento COMPLETO antes de proponer cualquier cambio. Confirma que lo leíste resumiendo en 3 líneas qué entendiste sobre el estado actual del módulo offline antes de tocar código.**
 
