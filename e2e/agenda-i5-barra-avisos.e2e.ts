@@ -291,6 +291,10 @@ test('16-17: punto rojo con pendientes; WhatsApp y correo en el mismo sitio en t
   const filaA = page.locator(`[data-fila-por-confirmar="${ambos}"]`)
   const filaC = page.locator(`[data-fila-por-confirmar="${correo}"]`)
   await expect(filaA).toBeVisible()
+  /* El panel entra escalando de 0,97 a 1 (`ag-capa-entra`, 180 ms) y lo de dentro se corre hasta 1,3 px mientras
+     dura: dos cajas leídas una tras otra a media animación salían con escalas distintas (1 de cada 11). Se mide
+     con el panel ya quieto. */
+  await page.locator('[data-panel-campana]').evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)).then(() => undefined))
   const caja = async (l: Locator) => {
     const b = await l.boundingBox()
     if (!b) throw new Error('sin caja')
