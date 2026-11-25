@@ -165,7 +165,12 @@ test('G2 · 7 y 8 · el funnel abre en el primer paso que falta (la duración); 
    MUTACIÓN: quitar el «sólo la última petición» de `useListaEnlaces` (ConfiguracionAgenda.tsx) → rojo. */
 test('B13 · AG10 · una respuesta atrasada de la lista de enlaces no deja «falta la duración» en el cierre', async ({ page }) => {
   const id = idDe(CORREO.adminA)
+  /* La primera carga (sólo para escribir el paso guardado) pide la lista DESPUÉS de `load`: se espera a que esa
+     petición termine antes de contar, o cae en la cuenta de abajo como la primera y la retenida pasa a ser la de
+     la carga de verdad (la página se quedaba en «Cargando…»; dependía de la prisa de la máquina). */
+  const primeraLista = page.waitForResponse(r => r.url().endsWith('/api/agenda/enlaces') && r.request().method() === 'GET')
   await page.goto(RUTA)
+  await primeraLista
   await page.evaluate(([k, v]) => { window.localStorage.setItem(k, v) }, [`spinus-agenda-primera-vez:${id}`, '1'])
   let gets = 0
   let atrasada: Promise<void> | null = null
