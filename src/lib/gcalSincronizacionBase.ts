@@ -275,6 +275,21 @@ export async function registrarEmpalmesReserva(clinicaId: string, citaIds: strin
   return z.number().int().parse(await llamar('reserva_empalmes_registrar', clinicaId, { p_citas: ids }))
 }
 
+const PendientesSchema = z.object({ r_procesados: z.number().int(), r_pares: z.number().int(), r_quedan: z.boolean() })
+
+/**
+ * AG-DT-264 (M5, `20261205120000`) · procesa la COLA de empalmes de la clínica
+ * (`gcal_empalmes_pendientes`): las citas que Google importó o movió quedan
+ * apuntadas por un disparador en la misma transacción que la cita, y aquí la
+ * base registra sus empalmes y borra los apuntes, todo o nada. Sin la migración
+ * lanza `SincronizacionNoDisponible` (quien llama cae en la lista en memoria).
+ */
+export async function procesarEmpalmesPendientes(clinicaId: string): Promise<{ procesados: number; pares: number; quedan: boolean }> {
+  const filas = z.array(PendientesSchema).parse(await llamar('reserva_empalmes_pendientes_procesar', clinicaId, { p_limite: 500 }))
+  const f = filas[0] ?? { r_procesados: 0, r_pares: 0, r_quedan: false }
+  return { procesados: f.r_procesados, pares: f.r_pares, quedan: f.r_quedan }
+}
+
 /**
  * Tanda J, punto 10 · un intento de mover desde Google una cita reservada por
  * enlace, ya rechazado por la base: deja el aviso de la campana

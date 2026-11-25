@@ -19,7 +19,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000013c1', 
  where id = '00000000-0000-4000-8000-0000000013a1';
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000013c1', role = 'secretaria'
  where id = '00000000-0000-4000-8000-0000000013e1';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000013c1', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000013c1', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.clinica_conexiones_google (clinica_id, user_id, rol, calendar_id, estado) values
   ('00000000-0000-4000-8000-0000000013c1', '00000000-0000-4000-8000-0000000013a1', 'clinica', 'cal-i3', 'activa');
 

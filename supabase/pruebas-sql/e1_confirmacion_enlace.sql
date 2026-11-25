@@ -38,7 +38,8 @@ insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-000000e1c001', true),
   ('00000000-0000-4000-8000-000000e1c002', true),
   ('00000000-0000-4000-8000-000000e1c003', false),
-  ('00000000-0000-4000-8000-000000e1c004', true);
+  ('00000000-0000-4000-8000-000000e1c004', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-000000e1f001', '00000000-0000-4000-8000-000000e1c001', 'Paciente', 'Uno'),
   ('00000000-0000-4000-8000-000000e1f002', '00000000-0000-4000-8000-000000e1c001', 'Paciente', 'Dos'),

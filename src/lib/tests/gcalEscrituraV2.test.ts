@@ -67,7 +67,6 @@ class Consulta implements PromiseLike<unknown> {
     if (tabla === 'profiles') {
       return Promise.resolve({ data: { id: 'u1', clinica_id: 'clinica-1', role: 'medico', es_admin_de_clinica: true } })
     }
-    if (tabla === 'agenda_ajustes') return Promise.resolve({ data: { agenda_v2_encendida: h.interruptor }, error: null })
     if (tabla === 'pacientes') return Promise.resolve({ data: { id: 'p1' }, error: null })
     if (tabla === 'clinicas') return Promise.resolve({ data: { suscripcion_estado: 'activo', es_vip_grant: false }, error: null })
     if (tabla === 'admin:consultorios') {
@@ -94,7 +93,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
     from: (tabla: string) => new Consulta(tabla),
-    rpc: async (nombre: string) => { h.ops.push({ tabla: `rpc:${nombre}`, verbo: 'select', filtros: {} }); return { data: h.puertas, error: null } },
+    rpc: async (nombre: string) => {
+      /* Agenda para todos (M3): el interruptor lo contesta la función de la base; no cuenta como operación. */
+      if (nombre === 'agenda_v2_encendida') return { data: h.interruptor, error: null }
+      h.ops.push({ tabla: `rpc:${nombre}`, verbo: 'select', filtros: {} }); return { data: h.puertas, error: null }
+    },
   }),
 }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({ from: (tabla: string) => new Consulta(`admin:${tabla}`) }) }))
@@ -423,7 +426,10 @@ describe('L1 · bloqueo total en POST y PUT', () => {
 })
 
 describe('attended (POST /api/consultas) — prepararAtendidaEnGoogle', () => {
-  const sesion = { from: (t: string) => new Consulta(t) } as unknown as Parameters<typeof prepararAtendidaEnGoogle>[0]
+  const sesion = {
+    from: (t: string) => new Consulta(t),
+    rpc: async () => ({ data: h.interruptor, error: null }),
+  } as unknown as Parameters<typeof prepararAtendidaEnGoogle>[0]
 
   it('apagado: no programa nada', async () => {
     h.interruptor = false

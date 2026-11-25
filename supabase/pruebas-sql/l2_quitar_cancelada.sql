@@ -18,7 +18,8 @@ select u.id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authentic
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000b2cc1', es_admin_de_clinica = true where id = '00000000-0000-4000-8000-0000000b2ca1';
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000b2cc1', role = 'secretaria' where id = '00000000-0000-4000-8000-0000000b2ce1';
 -- La v2 ENCENDIDA: así cita_proteger_borrado veta el borrado de una cita con paciente (caso 5).
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000b2cc1', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000b2cc1', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-0000000b2cf1', '00000000-0000-4000-8000-0000000b2cc1', 'Paciente', 'Uno');
 

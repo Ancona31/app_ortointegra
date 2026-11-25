@@ -83,7 +83,8 @@ insert into public.clinicas (id, nombre, es_vip_grant) values ('$C', 'Carrera E1
 insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at)
 values ('$U', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'carrera-e1@prueba.local', now(), now());
 update public.profiles set clinica_id = '$C', es_admin_de_clinica = true where id = '$U';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('$C', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('$C', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values ('$P', '$C', 'Paciente', 'Carrera');
 insert into public.appointments (id, clinica_id, paciente_id, medico_id, title, start_time, end_time, status)
 select c, '$C', '$P', '$U', 'Carrera', now() + interval '2 hours', now() + interval '150 min', 'scheduled'

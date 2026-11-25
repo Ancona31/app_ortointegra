@@ -6,8 +6,16 @@
  *
  * Cuáles: agendada o confirmada, con hora (no de todo el día), con paciente o
  * por ligar (un evento sin paciente no tiene asistencia), cuyo INICIO pasó hace
- * más de 48 horas (`HORAS_SIN_PREGUNTAR`) y sin nota clínica ligada
+ * más de 48 horas (`HORAS_SIN_PREGUNTAR`) y hace 30 días como mucho
+ * (`DIAS_QUE_SE_PREGUNTAN`), y sin nota clínica ligada
  * (`consultas.appointment_id`). Nada cambia de estado aquí: sólo se lee.
+ *
+ * EL LÍMITE DE 30 DÍAS (decisión de Angel, 2026-11-25; agenda para todos): por
+ * lo anterior no se pregunta, y NO se toca: esas citas siguen agendadas o
+ * confirmadas en la base, en la rejilla, en el buscador y en las estadísticas,
+ * igual que antes. Los dos cortes son INSTANTES contados desde ahora (48 h y
+ * 30 × 24 h), no días de calendario: valen lo mismo en cualquier zona, así que
+ * no dependen de la del consultorio ni de la del dispositivo.
  *
  * Quién: el médico, las suyas; el administrador y la secretaria, las de la
  * clínica (`canVerAgendaCompleta`). Las citas se leen con el cliente de SESIÓN
@@ -32,6 +40,8 @@ type ClienteSesion = Awaited<ReturnType<typeof createClient>>
 
 /** Antes de esto no se pregunta nada (Angel: «antes de las 48 horas no se pregunta»). */
 export const HORAS_SIN_PREGUNTAR = 48
+/** Más atrás de esto no se pregunta (Angel, 2026-11-25): lo anterior se deja como está. */
+export const DIAS_QUE_SE_PREGUNTAN = 30
 /** Las más recientes primero; las que no caben salen la vez siguiente. */
 export const MAX_PREGUNTAS = 50
 
@@ -60,6 +70,11 @@ export function alcanceDeAsistencia(p: PerfilAsistencia): string | null {
 /** El instante antes del cual una cita ya se pregunta. */
 export function corteDeAsistencia(ahora: number): string {
   return new Date(ahora - HORAS_SIN_PREGUNTAR * 3_600_000).toISOString()
+}
+
+/** El instante desde el cual (incluido) una cita todavía se pregunta. */
+export function inicioDeAsistencia(ahora: number): string {
+  return new Date(ahora - DIAS_QUE_SE_PREGUNTAN * 86_400_000).toISOString()
 }
 
 interface FilaAsistencia {
@@ -97,6 +112,7 @@ export async function leerAsistenciaPendiente(
     .eq('all_day', false)
     .or('paciente_id.not.is.null,reserva_canal.not.is.null')
     .lt('start_time', corteDeAsistencia(ahora))
+    .gte('start_time', inicioDeAsistencia(ahora))
     .order('start_time', { ascending: false })
     .limit(MAX_PREGUNTAS)
   if (medico) q = q.eq('medico_id', medico)

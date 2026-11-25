@@ -23,7 +23,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-00000b03c001', 
 update public.profiles set clinica_id = '00000000-0000-4000-8000-00000b03c001', es_admin_de_clinica = false,
                            nombres = 'Invitada', apellido_paterno = 'Ktres', especialidad = 'Ortopedia'
  where id = '00000000-0000-4000-8000-00000b03b002';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000b03c001', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000b03c001', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion, activo, timezone) values
   ('00000000-0000-4000-8000-00000b03d001', '00000000-0000-4000-8000-00000b03c001', '00000000-0000-4000-8000-00000b03b001',
    'Consultorio k3', 'Ktres', 'Calle 3', true, 'America/Mexico_City');

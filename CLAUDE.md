@@ -488,11 +488,62 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
 
 **Reglas que un editor futuro no debe romper:**
 
-* **Interruptor por clínica** `agenda_ajustes.agenda_v2_encendida`: nace en
-  `false` y sólo `postgres`/`supabase_admin` lo cambian
+* **Interruptor por clínica** `agenda_ajustes.agenda_v2_encendida`: ~~nace en
+  `false`~~ sólo `postgres`/`supabase_admin` lo cambian
   (`trg_agenda_ajustes_proteger`). **Falla cerrado:** un error al leerlo o la
   tabla ausente cuentan como apagado, y apagado la agenda es la de antes. No
   quites esa tolerancia, ni la de las RPC ausentes (PGRST202/42P01).
+  **Agenda para todos (M3, `20261206120000`; decisión de Angel, 2026-11-25;
+  escrita, sin aplicar en producción):** la v2 está ENCENDIDA de fábrica en
+  todas las clínicas; sólo una fila que diga `false` la apaga. Lo que no se
+  debe romper:
+  * **La app no decide: PREGUNTA a la base** (`rpc('agenda_v2_encendida')`, en
+    `agendaV2Encendida` y en `ProximasCitas`). No vuelvas a leer la columna
+    para decidir, ni escribas «sin fila = encendida» en la app: la app y los
+    disparadores tienen que contestar lo mismo antes y después de M3. Única
+    excepción, a propósito: `/agenda/configuracion` sigue leyendo la FILA
+    (interruptor y ajustes en UNA consulta, para no añadir un viaje); sin fila
+    no abre, y es coherente: sin fila la configuración no puede guardar.
+  * **Toda clínica tiene su fila** (`trg_clinicas_agenda_ajustes` en
+    `clinicas`). Ocho funciones de la agenda leen la FILA, no la función común:
+    sin fila la clínica queda a medias. Para borrar una clínica se borra antes
+    su fila (FK RESTRICT; no la cambies a CASCADE).
+  * **«Sin fila» ya no es «apagada».** Quien necesite la v2 apagada (la
+    semilla, una prueba, la limpieza de citas) escribe `false` como postgres;
+    borrar la fila la deja ENCENDIDA.
+  * **Orden de despliegue: el código primero, M3 después** (`main` borra citas
+    con DELETE y `trg_appointments_proteger_borrado` actuaría en todas).
+  * Deshacer M3 = apagar en todas y luego su reversa
+    (`docs/spec/agenda-para-todos/ENSAYO.md`, §4).
+* **Bloque «agenda para todos» (2026-11-25; cuatro migraciones escritas, sin
+  aplicar en producción: MA `20261203130000`, M4 `20261204120000`, M5
+  `20261205120000` y M3 `20261206120000`).** Guion único:
+  `docs/spec/agenda-para-todos/ENSAYO.md`. MA, M4 y M5 pueden ir antes del
+  código nuevo; M3, SIEMPRE después (por eso lleva el sello más alto).
+  * **MA · «Marcar todos» no adelanta a una transacción abierta**
+    (`aviso_visto_hasta_sellar` + `avisos_transaccion_mas_antigua()`, DEFINER
+    porque la sesión no ve `pg_stat_activity` entero). No le quites el recorte:
+    un aviso cuya transacción confirma después de la marca quedaría visto sin
+    que nadie lo viera. Lo vigila `scripts/avisos-carrera.sh` (dos sesiones).
+    `aviso_clinica_de_cambio_medico` espera 200 ms como mucho por los avisos
+    de la cita; no le quites el `lock_timeout` ni el `SKIP LOCKED`.
+  * **M4 · La purga de la reserva** (`reserva_purgar()`, que llama la tarea
+    diaria `/api/cron/purga-reserva`; entrada exacta con `===` en el
+    middleware) tiene el plazo de 30 días DENTRO: no lo conviertas en argumento.
+    Es SECURITY DEFINER y **de eso depende que pueda vaciar el correo de un
+    enlace de un solo uso** sin tocar `proteger_reserva_enlace_unico()`
+    (decisión expresa de Angel): sólo NULL, sólo `correo` y `correo_hmac`, sólo
+    únicos que dejaron de servir hace más de 30 días. No le añadas ningún otro
+    cambio de `reserva_enlaces`. `reserva_codigo_emitir` tiene tope propio (3
+    por correo y hora, `'limite'`), los mismos números que
+    `LIMITES.codigo.correo`: si cambia uno, cambia el otro.
+  * **M5 · Los empalmes de Google van por la cola `gcal_empalmes_pendientes`:**
+    la apuntan dos disparadores de `appointments` que sólo se ejecutan con
+    `spinus.via = 'google'` (no les quites el `WHEN`: es lo que los hace gratis
+    para una escritura normal) y la vacía `reserva_empalmes_pendientes_procesar`.
+    El servidor la procesa al empezar la pasada (un fallo ahí tumba la pasada A
+    PROPÓSITO: es la señal) y al acabar cada página. Sin FK a `appointments`, a
+    propósito. La semilla borra la tabla antes que las clínicas.
 * **Rutas públicas nuevas en `src/middleware.ts`**, cada una en su línea:
   * `/reservar/` y `/confirmar/` con prefijo y barra final;
   * `/api/reservar/` con prefijo;
@@ -533,8 +584,10 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
   `trg_appointments_proteger_borrado` (`cita_proteger_borrado()`,
   `20261201170000`) da 42501 a todo rol salvo `postgres`/`supabase_admin`,
   **también a `service_role`**. Un borrado de citas del servidor con v2
-  encendida falla; quien limpie citas (semilla, scripts) borra antes la fila de
-  `agenda_ajustes` o lo hace como `postgres`.
+  encendida falla; quien limpie citas (semilla, scripts) ~~borra antes la fila de
+  `agenda_ajustes`~~ APAGA antes la v2 (escribe `false` en la fila, como
+  `postgres`: desde M3 borrar la fila la deja encendida) o lo hace como
+  `postgres`.
 * **Las columnas `reserva_*` de `appointments` sólo las escribe el servidor**
   (`trg_appointments_proteger_reserva`, `20261201170000`): para todo rol que no
   sea `service_role`/`postgres`/`supabase_admin`, al crear van todas NULL
@@ -902,7 +955,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   reintenta sin ella.
 * Pregunta de asistencia: `asistenciaServidor.ts` (servidor, viaja con la
   página; `createAdminClient` sólo para saber qué citas tienen nota, filtrado por
-  clínica). Más de 48 h desde el inicio, sin nota. Nada marca `no_show` solo. La
+  clínica). Más de 48 h desde el inicio y 30 días como mucho
+  (`DIAS_QUE_SE_PREGUNTAN`; decisión de Angel, 2026-11-25: lo anterior no se
+  pregunta ni se toca), sin nota. Nada marca `no_show` solo. La
   e2e que siembre una agendada de hace más de 48 h y abra la agenda v2 cierra la
   ventana (`decidirDespues` de `e2e/interaccionesAyudas.ts`).
 * **Cancelada cerrada:** `appointments.cerrada_en` + `sustituida_por` (FK

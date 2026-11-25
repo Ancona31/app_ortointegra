@@ -13,7 +13,7 @@
 import { z } from 'zod'
 import { logger } from '@/lib/logger'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { llamarBloqueo, SincronizacionNoDisponible } from '@/lib/gcalSincronizacionBase'
+import { esFalloPasajeroDeLaBase, llamarBloqueo, SincronizacionNoDisponible } from '@/lib/gcalSincronizacionBase'
 import type { EventoGoogle } from '@/lib/gcalSincronizacionDecidir'
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/
@@ -49,12 +49,16 @@ export function argumentosBloqueo(evento: EventoGoogle, calendarId: string): Rec
 /**
  * Aplica a sus bloqueos los eventos de la página que lo son (con marca) y los
  * BORRADOS que no son de ninguna cita (un borrado llega sin marca). Devuelve los
- * errores; sin la migración (RPC ausente), nada y sin ruido.
+ * errores y, de ellos, cuántos fueron PASAJEROS de la base (AG-DT-264, C: con
+ * alguno, la página no avanza y la pasada siguiente lo repite; aplicar dos
+ * veces el mismo evento a su bloqueo deja lo mismo). Sin la migración (RPC
+ * ausente), nada y sin ruido.
  */
 export async function aplicarBloqueosDePagina(
   clinicaId: string, calendarId: string, marcados: readonly EventoGoogle[], borradosSinFila: readonly EventoGoogle[],
-): Promise<number> {
+): Promise<{ errores: number; pasajeros: number }> {
   let errores = 0
+  let pasajeros = 0
   const borrados = await borradosDeBloqueos(clinicaId, borradosSinFila)
   for (const evento of [...marcados, ...borrados]) {
     const args = argumentosBloqueo(evento, calendarId)
@@ -62,12 +66,13 @@ export async function aplicarBloqueosDePagina(
     try {
       z.number().int().parse(await llamarBloqueo(clinicaId, args))
     } catch (err: unknown) {
-      if (err instanceof SincronizacionNoDisponible) return errores
+      if (err instanceof SincronizacionNoDisponible) return { errores, pasajeros }
       errores += 1
+      if (esFalloPasajeroDeLaBase(err)) pasajeros += 1
       logger.warn('GCalSync', `bloqueo sin aplicar ${JSON.stringify({ clinica: clinicaId, evento: evento.id ?? null })}`)
     }
   }
-  return errores
+  return { errores, pasajeros }
 }
 
 /**

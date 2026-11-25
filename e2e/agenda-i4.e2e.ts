@@ -203,13 +203,19 @@ test('11 · una ventana con las de hace más de 48 h sin nota; «Sí asistió»,
   notaLigada(conNota.id, conNota.paciente)
   const deLaInvitada = cita({ correo: CORREO.medicoA, inicio: haceHoras(52), apellidos: 'Prueba 25', estado: 'scheduled', minutos: 30 })
   const porLigar = crearCitaPorLigar({ correo: CORREO.adminA, inicio: haceHoras(55), minutos: 30, nombre: 'Persona Por Ligar I4', canal: 'unico' })
+  /* Agenda para todos (Angel, 2026-11-25): hacia atrás, 30 días. La de hace 29 se pregunta; la de hace 31, no, y nadie la toca.
+     MUTACIÓN: sin el `.gte` de `leerAsistenciaPendiente` → rojo (salen 6). */
+  const de29 = cita({ correo: CORREO.adminA, inicio: haceHoras(29 * 24), apellidos: 'Prueba 21', estado: 'scheduled', minutos: 30 })
+  const de31 = cita({ correo: CORREO.adminA, inicio: haceHoras(31 * 24), apellidos: 'Prueba 22', estado: 'scheduled', minutos: 30 })
   const incidencias = (): string => sqlLocal(`select count(*) from public.reserva_incidencias where appointment_id = :'id' and anulada_en is null`, { id: porLigar.citaId })
 
   await abrirAgendaV2(page)
   const v = preguntaAsistencia(page)
   await expect(v).toBeVisible()
-  await expect(v.locator('[data-asistencia-cita]')).toHaveCount(4)
-  for (const id of [vieja.id, confirmada.id, deLaInvitada.id, porLigar.citaId]) await expect(filaDe(v, id)).toHaveCount(1)
+  await expect(v.locator('[data-asistencia-cita]')).toHaveCount(5)
+  for (const id of [vieja.id, confirmada.id, deLaInvitada.id, porLigar.citaId, de29.id]) await expect(filaDe(v, id)).toHaveCount(1)
+  await expect(filaDe(v, de31.id)).toHaveCount(0)
+  expect(estado(de31.id)).toBe('scheduled')
   // Abrir la agenda no cambia nada solo, ni cuenta para el candado.
   expect([vieja.id, confirmada.id, reciente.id, deLaInvitada.id, porLigar.citaId].map(estado)).toEqual(['scheduled', 'confirmed', 'scheduled', 'scheduled', 'scheduled'])
   expect(incidencias()).toBe('0')
@@ -229,7 +235,7 @@ test('11 · una ventana con las de hace más de 48 h sin nota; «Sí asistió»,
 
   // La próxima vez vuelve a salir, con las que quedan.
   await page.reload()
-  await expect(preguntaAsistencia(page).locator('[data-asistencia-cita]')).toHaveCount(2)
+  await expect(preguntaAsistencia(page).locator('[data-asistencia-cita]')).toHaveCount(3)
 
   // La médica invitada: sólo las suyas.
   await enContextoNuevo(browser, SESION.medicoA, async (p: Page) => {
@@ -241,7 +247,7 @@ test('11 · una ventana con las de hace más de 48 h sin nota; «Sí asistió»,
   // La secretaria: las de la clínica.
   await enContextoNuevo(browser, SESION.secretariaA, async (p: Page) => {
     await abrirAgendaV2(p)
-    await expect(preguntaAsistencia(p).locator('[data-asistencia-cita]')).toHaveCount(2)
+    await expect(preguntaAsistencia(p).locator('[data-asistencia-cita]')).toHaveCount(3)
   })
 })
 

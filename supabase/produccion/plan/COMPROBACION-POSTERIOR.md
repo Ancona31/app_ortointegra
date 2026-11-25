@@ -54,6 +54,12 @@ Lo que tiene que salir:
   ensayo, sobre el commit final, y el auditor lo apunta aquí. Sus claves quedan en
   `referencia-m1m2.claves`, que es contra lo que se compara producción el día. El detalle esperado de
   `public`: `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §5 y `estructura-antes-despues.local.diff`.
+  **Tercer ensayo, sobre `de317dc8` (equipo de Angel; dato comunicado por la sesión de planificación el
+  2026-11-25, no medido en la rama `feature/agenda-para-todos`):** `142 diferencias` antes ↔ después;
+  `3510 → 3646` objetos en el clon (en producción, `3519 → 3655`); clon ↔ foto `3519 / 3510`, `14
+  diferencias, 14 esperadas, 0 inesperadas`. **M1 y M2 se aplicaron en producción el 2026-11-25, 00:16
+  hora de Mérida** (historial: 16 versiones, hasta `20261202130000`; rejillas iguales a las del ensayo:
+  M1 15 filas, 13 OK y 2 INFO, «la de F4»; M2 3 OK; antes ↔ después, 142 diferencias).
 
 El día, tras `aplicar.sh aplicar` en verde, los §1 a §3 de abajo tal cual, cambiando la referencia:
 `referencia-m1m2.claves` en lugar de `referencia.claves`, y `"$ENSAYO/clon-despues.jsonl"` como

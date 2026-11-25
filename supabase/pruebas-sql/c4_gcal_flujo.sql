@@ -12,7 +12,8 @@ values ('00000000-0000-4000-8000-00000000c4a1', '00000000-0000-0000-0000-0000000
         'authenticated', 'authenticated', 'c4-admin@prueba.local', now(), now());
 update public.profiles set clinica_id = '00000000-0000-4000-8000-00000000c4c1', es_admin_de_clinica = true
  where id = '00000000-0000-4000-8000-00000000c4a1';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000000c4c1', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000000c4c1', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.clinica_conexiones_google (id, clinica_id, user_id, rol, calendar_id, estado) values
   ('00000000-0000-4000-8000-00000000c4e0', '00000000-0000-4000-8000-00000000c4c1',
    '00000000-0000-4000-8000-00000000c4a1', 'clinica', 'cal-c4', 'activa');
@@ -205,7 +206,8 @@ values ('00000000-0000-4000-8000-00000000c4a2', '00000000-0000-0000-0000-0000000
         'authenticated', 'authenticated', 'c4-otra@prueba.local', now(), now());
 update public.profiles set clinica_id = '00000000-0000-4000-8000-00000000c4c2', es_admin_de_clinica = true
  where id = '00000000-0000-4000-8000-00000000c4a2';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000000c4c2', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000000c4c2', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.clinica_conexiones_google (clinica_id, user_id, rol, calendar_id, estado) values
   ('00000000-0000-4000-8000-00000000c4c2', '00000000-0000-4000-8000-00000000c4a2', 'clinica', 'cal-c4-otra', 'activa');
 set local role service_role;

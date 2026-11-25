@@ -35,7 +35,7 @@ Archivos de esta carpeta:
 | Archivo | Para qué |
 |---|---|
 | `aplicar.sh` | El único comando del día: `estado`, `respaldo`, `aplicar`, `reversa`, `reversa-truncate`. |
-| `huellas.sha256` | sha256 de las 11 migraciones (las 9 de la agenda v2 y las 2 de «avisos globales», 2026-11-25) y sus 11 reversas, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
+| `huellas.sha256` | sha256 de las 15 migraciones (las 9 de la agenda v2, las 2 de «avisos globales» y las 4 de «agenda para todos», §16; 2026-11-25) y sus 15 reversas, más `reversa-previa.sql`, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
 | `reversa-previa.sql` | Sólo lee. `aplicar.sh reversa` la corre antes de la primera reversa: reúne las negativas de toda la cadena (§10.1). |
 | `rejillas-del-ensayo.txt` | La rejilla final de cada archivo, literal, del ensayo de punta a punta sobre el clon de la foto (§11). |
 | `diferencias-antes-despues.clon-foto.tsv` | Las 965 diferencias de estructura antes → después de ese ensayo (claves: estado, tipo, esquema, clave, campo). |
@@ -1499,3 +1499,32 @@ entera de 5.
 avisos de error en la página. Para apagar: `agenda_ajustes.agenda_v2_encendida =
 false` en esa clínica, desde el SQL Editor (§4, paso 8); la agenda vuelve a la
 de antes (falla cerrado).
+
+## 16. Segundo despliegue: «agenda para todos» (4 migraciones, 2026-11-25)
+
+> Escritas y ensayadas sólo en local. Nada de esto está aplicado en producción.
+> El guion paso a paso, con los conteos y los huecos por rellenar, es
+> `docs/spec/agenda-para-todos/ENSAYO.md`; esta sección sólo fija el ORDEN.
+> Valen las mismas cuatro condiciones de siempre: ensayo sobre el clon de
+> estructura, auditoría, conteos de sólo lectura corridos por Angel
+> (`../conteos/conteos-agenda-para-todos.sql`) y su ORDEN EXPLÍCITA.
+
+Va DESPUÉS del primer despliegue (el merge de `de317dc8` a `main`, sin esta
+rama: las demás clínicas siguen con la agenda de antes). `aplicar.sh` las lleva
+en este orden y se para si se declina una:
+
+| Orden | Versión | Qué es | Respecto al código de `feature/agenda-para-todos` en `main` |
+|---|---|---|---|
+| 1 | `20261203130000_avisos_globales_cierre_auditoria` (MA) | cierre de la tercera auditoría de M1: «Marcar todos» frente a transacciones abiertas, cambio de médico de una cita, copia del médico | antes o después (recomendado: antes) |
+| 2 | `20261204120000_reserva_purga_y_tope` (M4) | purga a 30 días de la reserva (`reserva_purgar()`) y tope de códigos por correo en la base | antes o después (recomendado: antes; la tarea `/api/cron/purga-reserva` responde 500 sin datos mientras falte) |
+| 3 | `20261205120000_gcal_empalmes_pendientes` (M5) | cola persistente de empalmes de Google | antes o después (recomendado: antes; sin ella el código nuevo sigue como hoy) |
+| — | **código en `main`, desplegado** | | |
+| 4 | `20261206120000_agenda_para_todos` (M3) | la v2 encendida de fábrica en todas las clínicas | **SIEMPRE después, y la última**: el código de antes borra citas con DELETE y `trg_appointments_proteger_borrado` actuaría en todas |
+
+Reversas (sólo con orden de Angel), en el orden inverso: M3, M5, M4, MA. Todas
+exigen la v2 apagada en todas las clínicas; la de M5 se niega si quedan apuntes
+en `gcal_empalmes_pendientes`, salvo `SET LOCAL spinus.reversa_con_datos =
+'si'` (`reversa-previa.sql` dice cuántos hay).
+
+Las secciones 1 a 15 describen el primer despliegue (las 9 de la agenda v2) y
+no se han reescrito: donde dicen «las 9» o «las 11», se refieren a aquél.

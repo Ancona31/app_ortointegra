@@ -223,7 +223,15 @@ export async function POST(req: NextRequest) {
   if (perfilError) {
     /* Se revierte la clínica. Sin esto queda una fila sin dueño —nadie la
        referencia y nadie puede borrarla desde la app— y el médico sigue sin
-       `clinica_id`, o sea atascado en este mismo paso sin saber por qué. */
+       `clinica_id`, o sea atascado en este mismo paso sin saber por qué.
+       Agenda para todos (M3, `20261206120000`): toda clínica nace con su fila
+       en `agenda_ajustes` (FK RESTRICT), así que se borra ANTES esa fila —la
+       de ESTA clínica recién creada, sin nada más colgando— o el borrado de la
+       clínica daría 23503. Sin la tabla o sin la fila, no hace nada. */
+    const { error: ajustesError } = await admin.from('agenda_ajustes').delete().eq('clinica_id', clinica.id)
+    if (ajustesError && ajustesError.code !== '42P01' && ajustesError.code !== 'PGRST205') {
+      logger.warn('api/me/clinica', `fila de agenda_ajustes de la clínica revertida sin borrar: ${ajustesError.code ?? ''}`)
+    }
     await admin.from('clinicas').delete().eq('id', clinica.id)
     logger.error('api/me/clinica', `update de profiles falló, clinica revertida: ${perfilError.message}`)
     return NextResponse.json(

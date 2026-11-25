@@ -25,7 +25,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000063c02', 
  where id = '00000000-0000-4000-8000-000000063b02';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio_horas) values
   ('00000000-0000-4000-8000-000000063c01', true, 24),
-  ('00000000-0000-4000-8000-000000063c02', false, 24);
+  ('00000000-0000-4000-8000-000000063c02', false, 24)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida, recordatorio_horas = excluded.recordatorio_horas;
 insert into public.pacientes (id, clinica_id, nombre, apellidos, email, activo) values
   ('00000000-0000-4000-8000-000000063f01', '00000000-0000-4000-8000-000000063c01', 'Paciente', 'Uno', 'uno.g3@prueba.local', true),
   ('00000000-0000-4000-8000-000000063f02', '00000000-0000-4000-8000-000000063c01', 'Paciente', 'Sin correo', null, true),

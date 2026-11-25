@@ -6172,7 +6172,28 @@ retire la rama, sus dos casos de prueba y, si Angel quiere, el comentario.
 
 ### AG-DT-264 — Los empalmes con reservas pendientes de registrar viven sólo en memoria
 
-**Estado:** abierta, **prioridad media** (decisión de Angel, 2026-11-22);
+> **ACTUALIZACIÓN (2026-11-25, rama `feature/agenda-para-todos`; M5 `20261205120000`, escrita y
+> probada en local, SIN aplicar en producción). CERRADO EN PARTE.**
+> **Qué cierra M5 (alternativas A + C):**
+> - el empalme con reservas (lo que da nombre a esta entrada): la cita que Google importa o mueve
+>   queda apuntada en `gcal_empalmes_pendientes` en su misma transacción y la pasada siguiente procesa
+>   lo que quedara; si el consumidor falla al empezar la pasada, la pasada falla y a la tercera sale el
+>   aviso «Google no sincroniza»;
+> - del punto (d) de abajo: `avisarMovimientoRechazado` y los bloqueos de la página ya no dejan avanzar
+>   la página ante un fallo PASAJERO de la base (se repite).
+> **Qué sigue ABIERTO (alternativa B, diseñada y NO construida; bloque propio):** (a) los reflejos
+> hacia Google de reagendar, confirmar/cancelar por enlace, bloqueos, borrar y editar; (b) el
+> comprobante en `enviando`/`fallido`; (c) el correo a la clínica por reserva; de (d), los RSVP
+> (`confirmarPorRsvps`); y (e) el `timeout` del cliente de Google. Diseño resumido de B: una cola de
+> SALIDA por clínica (`agenda_salidas_pendientes`: tipo, cita o bloqueo, intentos, siguiente intento,
+> último error; RLS sin policies) que cada ruta escribe en la MISMA transacción que su cambio (o, donde
+> escribe la sesión, justo después y antes de responder), y un consumidor en `/api/cron/google-sync`
+> y en una tarea de correo que reintenta con espera creciente y tope de intentos, más un `timeout`
+> explícito en `abrirSesionGoogle`. Tamaño estimado: 2 migraciones, 600–800 líneas de TypeScript,
+> 12–14 archivos. Lo que la hace grande: el consumidor tiene que rehacer cada reflejo con el estado
+> ACTUAL de la cita (no con el de cuando se encoló) y respetar el `etag`.
+
+**Estado:** abierta EN PARTE (ver arriba), **prioridad media** (decisión de Angel, 2026-11-22);
 ampliada en la oleada 3 (2026-11-22) con los demás reflejos y correos que se
 pierden sin reintento: **resolver antes de encender la v2 en otras clínicas**.
 Lo importado o movido desde Google en una página se junta en `pasada.movidas`
@@ -6451,6 +6472,17 @@ EXCLUSIVE MODE NOWAIT` con reintentos, como F1), a costa de alargar la ventana
 de ACCESS EXCLUSIVE; es decisión de Angel junto con A1.
 
 ### AG-DT-274 — Los códigos de verificación de la reserva no tienen plazo de conservación, y el tope de emisión sólo vive en la app
+
+> **ACTUALIZACIÓN (2026-11-25, rama `feature/agenda-para-todos`; M4 `20261204120000`, escrita y
+> probada en local, SIN aplicar en producción). CONSTRUIDO.** `reserva_purgar()` + la tarea diaria
+> `GET /api/cron/purga-reserva` (Vercel, no `pg_cron`) borran a los 30 días los códigos de
+> `reserva_verificaciones` y los intentos de `ip_rate_limits`, y vacían el correo en claro de los
+> enlaces de un solo uso que dejaron de servir hace más de 30 días (decisión expresa de Angel,
+> 2026-11-25; sin tocar `proteger_reserva_enlace_unico()`); cada pasada deja una fila `reserva_purga`
+> en `audit_log`. `reserva_codigo_emitir` tiene tope propio (3 por correo y hora). Sin tope por
+> enlace (decisión de Angel). **Sigue abierto:** el plazo de `reserva_incidencias` y de
+> `appointments.reserva_correo_hmac` (12 meses propuestos, pendiente de la revisión legal) y que el
+> aviso de privacidad de la reserva diga el plazo. Detalle: `docs/spec/agenda-para-todos/REPASO-AUTOR-MA-M4-M5.md`, §2.
 
 **Estado:** abierta, **prioridad ALTA — resolver antes de encender la v2 en
 otras clínicas** (decisión de Angel, 2026-11-22: plazo de **30 días**, aplicado
@@ -7800,3 +7832,34 @@ maqueta (celdas más altas, menos chips o capa más ancha), no un parche.
 `tabIndex = -1`, hacía que el trapo no viera nunca «el último» y el Tab salía de la capa). La tercera copia, la de
 `ModalShell` (toda la app), no se tocó en la auditoría por estar fuera de la agenda: hoy no se sabe de ningún modal
 de `ModalShell` con foco itinerante, pero la regla de las tres copias dice que el arreglo va en las tres.
+
+### AG-DT-287 — Agenda para todos (M3): lo que queda abierto al encender la v2 en todas las clínicas
+
+**Estado:** 🟡 abierta (2026-11-25; rama `feature/agenda-para-todos`) · **Archivos:**
+`supabase/migrations/20261206120000_agenda_para_todos.sql`, `docs/spec/agenda-para-todos/`
+
+M3 enciende la agenda v2 por omisión (DEFAULT, función común, una fila por clínica y un disparador en `clinicas`).
+Lo que no cierra, por decisión de alcance:
+
+* ~~«¿Asistió el paciente?» no tiene límite hacia atrás.~~ **Cerrado (decisión de Angel, 2026-11-25):** sólo
+  pregunta por las citas de los últimos 30 días (`DIAS_QUE_SE_PREGUNTAN`, `src/lib/agenda/asistenciaServidor.ts`;
+  sin migración). Las anteriores no se preguntan ni se tocan: siguen agendadas o confirmadas para siempre, salvo
+  que alguien las cierre a mano; nada las marca solas. Cuántas quedan dentro y fuera lo dice la fila C.5 de
+  `supabase/produccion/conteos/conteos-agenda-para-todos.sql`.
+* **Una clínica puede quedar sin fila en `agenda_ajustes`** si el alta de la fila falla al crearse la clínica (el
+  disparador avisa con WARNING y no lo impide) o si alguien la borra: queda encendida para `agenda_v2_encendida()`
+  y apagada para las ocho funciones que leen la fila (`REPASO-AUTOR-M3.md`, §1.1). Nada lo repara solo; lo enseña
+  el conteo «clínicas sin fila». Arreglo de fondo (no hecho, y no pequeño): que esas ocho funciones toleren «sin
+  fila», o retirar el interruptor con la agenda v1.
+* **`proteger_agenda_ajustes()` no se tocó:** su rama de INSERT rechaza una fila que nace con el interruptor en
+  `true` a quien no sea `postgres`/`supabase_admin`. Con el DEFAULT nuevo, la sesión y `service_role` ya no pueden
+  dar de alta una fila sin decir el interruptor (42501), pero sí con `false` explícito si la clínica no tuviera
+  fila (el administrador de una clínica sin fila podría apagarse la v2 por PostgREST; volver a encenderla es de
+  postgres). Con una fila por clínica no ocurre.
+* **`spinus-consola`** (otro repositorio): si borra clínicas, tiene que borrar antes su fila de `agenda_ajustes`
+  (FK RESTRICT). Sin comprobar.
+* **AG-DT-264 y AG-DT-274** decían «resolver antes de encender la v2 en otras clínicas»: M3 es ese encendido.
+  M4 (274) y M5 (264, en parte) van en este mismo bloque y se aplican ANTES que M3; lo que queda abierto de la 264
+  (la cola de salida hacia Google y de correos) sigue abierto al encender.
+* **`PLAN-DE-APLICACION.md` y `COMPROBACION-POSTERIOR.md`** (`supabase/produccion/plan/`) siguen describiendo las 11
+  migraciones anteriores; el guion de M3 es `docs/spec/agenda-para-todos/ENSAYO.md`.

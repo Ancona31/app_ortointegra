@@ -18,7 +18,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000a4c001', 
  where id = '00000000-0000-4000-8000-000000a4e001';
 -- VIP: la puerta de suscripción (appointments_gates_insert) deja insertar a la sesión.
 update public.clinicas set es_vip_grant = true where id = '00000000-0000-4000-8000-000000a4c001';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-000000a4c001', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-000000a4c001', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-000000a4f001', '00000000-0000-4000-8000-000000a4c001', 'Paciente', 'Uno');
 insert into public.reserva_avisos (version, texto_sha256) values ('seg4-aviso', repeat('a', 64));

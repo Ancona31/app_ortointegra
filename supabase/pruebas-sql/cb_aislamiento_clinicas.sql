@@ -34,7 +34,8 @@ update public.profiles p
                ('00000000-0000-4000-8000-0000000cbb01'::uuid, '00000000-0000-4000-8000-0000000cbc02'::uuid, true, 'medico')) v(id, clinica, admin, rol)
  where p.id = v.id;
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
-  ('00000000-0000-4000-8000-0000000cbc01', true), ('00000000-0000-4000-8000-0000000cbc02', true);
+  ('00000000-0000-4000-8000-0000000cbc01', true), ('00000000-0000-4000-8000-0000000cbc02', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion, activo, es_default) values
   ('00000000-0000-4000-8000-0000000cbd11', '00000000-0000-4000-8000-0000000cbc01', '00000000-0000-4000-8000-0000000cba01', 'CB A', 'A', 'Calle', true, true),
   ('00000000-0000-4000-8000-0000000cbd12', '00000000-0000-4000-8000-0000000cbc02', '00000000-0000-4000-8000-0000000cbb01', 'CB B', 'B', 'Calle', true, true);

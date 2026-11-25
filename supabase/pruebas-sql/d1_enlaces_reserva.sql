@@ -27,7 +27,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000d1c001', 
 update public.profiles set clinica_id = '00000000-0000-4000-8000-000000d1c002', es_admin_de_clinica = true
  where id = '00000000-0000-4000-8000-000000d1a002';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, vigencia_enlace_unico_dias)
-values ('00000000-0000-4000-8000-000000d1c001', true, 5);
+values ('00000000-0000-4000-8000-000000d1c001', true, 5)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida, vigencia_enlace_unico_dias = excluded.vigencia_enlace_unico_dias;
 
 create function pg_temp.como(p_id uuid) returns void language sql as $$
   select set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated')::text, true);

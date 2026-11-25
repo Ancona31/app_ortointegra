@@ -25,6 +25,8 @@ const h = vi.hoisted(() => ({
   sondeo: 0 as number | null,
   /** K2: lo que contestan `esperaDeLimites` y `esperaReenvio`. */
   espera: null as number | null,
+  /** M4: lo que contesta `emitirCodigo` ('ok', o 'limite' si topa el tope de la base). */
+  emitido: 'ok' as string,
   reenvio: 0 as number | null,
 }))
 
@@ -67,7 +69,7 @@ vi.mock('@/lib/reserva/servidorReserva', () => ({
   ocupacionDeEnlace: async () => { h.orden.push('ocupacion'); return [] },
   reservar: async () => { h.orden.push('rpc'); return { ok: false, ausente: true, codigo: null } },
   reagendar: async () => { h.orden.push('rpc'); return { ok: false, ausente: true, codigo: null } },
-  emitirCodigo: async () => { h.orden.push('emitir'); return 'ok' },
+  emitirCodigo: async () => { h.orden.push('emitir'); return h.emitido },
   verificarCodigo: async () => { h.orden.push('verificar'); return 'incorrecto' },
 }))
 vi.mock('@/lib/reserva/sincronizarReserva', () => ({ sincronizarAntesDeReservar: async () => 'seguir' }))
@@ -96,7 +98,7 @@ const RESERVA = {
 
 beforeEach(() => {
   h.orden = []; h.abrible = true; h.bloquea = new Set(); h.clase = 'fijo'; h.espera = null; h.reenvio = 0
-  h.estado = 'vigente'; h.noAbre = false; h.sondeo = 0
+  h.estado = 'vigente'; h.noAbre = false; h.sondeo = 0; h.emitido = 'ok'
 })
 
 describe('rutas públicas de la reserva: límite antes de la base (seg1, punto 8)', () => {
@@ -225,6 +227,14 @@ describe('rutas públicas de la reserva: cuánto falta (K2, punto 10)', () => {
     expect(r.headers.get('retry-after')).toBeNull()
     expect(await r.json()).toEqual({ error: 'demasiados_intentos' })
     expect(h.orden).not.toContain('espera:codigo:correo')
+  })
+  it('el tope de la BASE (M4, AG-DT-274): si la función contesta «limite», 429 SIN cuánto falta y sin mandar correo', async () => {
+    h.emitido = 'limite'
+    const r = await codigoRuta.POST(req('/codigo', { correo: 'ana@x.mx' }), params)
+    expect(r.status).toBe(429)
+    expect(r.headers.get('retry-after')).toBeNull()
+    expect(await r.json()).toEqual({ error: 'demasiados_intentos' })
+    expect(h.orden).toContain('emitir')
   })
   it('verificar y reservar también: el 429 lleva espera_s y Retry-After', async () => {
     h.bloquea = new Set(['ip'])

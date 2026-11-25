@@ -30,7 +30,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000073c2', 
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio_horas, anticipacion_min_horas, horizonte_dias,
                                    vigencia_enlace_unico_dias, recordatorio_encendido) values
   ('00000000-0000-4000-8000-0000000073c1', true, 48, 5, 90, 14, true),
-  ('00000000-0000-4000-8000-0000000073c2', true, 48, 5, 90, 14, true);
+  ('00000000-0000-4000-8000-0000000073c2', true, 48, 5, 90, 14, true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida, recordatorio_horas = excluded.recordatorio_horas, anticipacion_min_horas = excluded.anticipacion_min_horas, horizonte_dias = excluded.horizonte_dias, vigencia_enlace_unico_dias = excluded.vigencia_enlace_unico_dias, recordatorio_encendido = excluded.recordatorio_encendido;
 -- El horario de cada clínica, distinto: el reinicio copia a sus consultorios el de SU clínica.
 update public.clinicas set horario_consulta = '{"miercoles":{"activo":true,"inicio":"10:00","fin":"14:00"}}'::jsonb
  where id = '00000000-0000-4000-8000-0000000073c1';

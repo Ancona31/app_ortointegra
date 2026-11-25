@@ -430,3 +430,33 @@ ANTES.
 | B.4 | si M1 ya está (M2 la exige) | sólo informa: se aplican en orden |
 
 A.4, A.5 y A.6 + B.1 son los tres conteos que pedía `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md`.
+
+## Agenda para todos (M3)
+
+`conteos-agenda-para-todos.sql` hace lo mismo para `20261206120000_agenda_para_todos` (la agenda v2
+encendida por omisión): las condiciones de su pre-vuelo como consultas de **sólo lectura** y lo que
+sólo los datos reales dicen. No devuelve ningún dato de personas ni ningún id.
+
+```bash
+bash supabase/produccion/conteos/correr-conteos-agenda-para-todos.sh
+```
+
+Mismo mecanismo y mismas variables (`CONTEOS_*`, `IMAGEN_PG`); guarda
+`conteos-agenda-para-todos-<fecha>.txt` en `~/spinus-produccion-conteos-agenda-para-todos/`.
+
+**Cuándo:** antes de aplicar M3, y otra vez justo antes (C.4 mira los candados de ese momento).
+
+| Fila | Qué hacer |
+|---|---|
+| G.1 a G.3, A.1 a A.6 **ALTO** | M3 abortaría en su pre-vuelo, o ya está aplicada (G.3, A.1, A.2 y A.3 a la vez). No aplicar; consultar. |
+| A.7 INFO | Los otros disparadores de `clinicas`: corren junto al nuevo en cada alta de clínica. |
+| B.1 a B.3 INFO | Cuántas clínicas hay, cuántas tienen fila y en qué estado, y cuántas filas creará M3. Tras M3: filas = clínicas, todas encendidas. |
+| B.4 **AVISO** | Hay filas APAGADAS que alguien cambió después de crearlas. Con la v2 apagada la app no las puede cambiar: se tocaron desde el editor SQL. Si alguna se apagó A PROPÓSITO, decidir antes de aplicar: M3 las enciende todas (para dejarla apagada, volver a escribir `false` después de M3). |
+| B.5 INFO | Filas con el recordatorio o el correo a la clínica ya encendidos. M3 no enciende ninguno. |
+| B.6 INFO | Filas que M3 escribirá en `audit_log`. |
+| C.1 INFO | Clínicas con Google conectado: las que empezará a recorrer `/api/cron/google-sync` (hasta 15 s cada una, 45 s por pasada, cada 10 min). |
+| C.2 INFO | Clínicas suspendidas: M3 las enciende igual. |
+| C.3 INFO | Citas futuras con paciente que dejarán de poder borrarse (se cancelan). |
+| C.5 INFO | Citas viejas sin cerrar por las que la agenda nueva preguntará «¿Asistió el paciente?» (sólo las de los últimos 30 días, de 50 en 50, las más recientes primero) y, aparte, las anteriores a 30 días, que quedan fuera: no se preguntan ni se tocan (decisión de Angel, 2026-11-25). Cuatro números: dentro / la clínica con más dentro / fuera / la clínica con más fuera. |
+| C.4 **AVISO** | Alguien tiene un candado fuerte sobre `clinicas` o `agenda_ajustes`: esperar y repetir. |
+

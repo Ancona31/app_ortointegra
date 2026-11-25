@@ -39,7 +39,8 @@ insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio
   ('00000000-0000-4000-8000-000000e4c001', true, 24, true),
   ('00000000-0000-4000-8000-000000e4c002', true, 24, true),
   ('00000000-0000-4000-8000-000000e4c003', false, 24, true),
-  ('00000000-0000-4000-8000-000000e4c005', true, 2, true);
+  ('00000000-0000-4000-8000-000000e4c005', true, 2, true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida, recordatorio_horas = excluded.recordatorio_horas, recordatorio_encendido = excluded.recordatorio_encendido;
 insert into public.pacientes (id, clinica_id, nombre, apellidos, email, activo) values
   ('00000000-0000-4000-8000-000000e4f001', '00000000-0000-4000-8000-000000e4c001', 'Paciente', 'Uno', 'uno@prueba.local', true),
   ('00000000-0000-4000-8000-000000e4f002', '00000000-0000-4000-8000-000000e4c001', 'Paciente', 'Inactivo', 'inactivo@prueba.local', false),

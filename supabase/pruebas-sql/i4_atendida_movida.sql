@@ -24,7 +24,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000a4c002', 
 -- c001 APAGADA (con fila en false) y c002 encendida. Una clínica sin fila también cuenta como apagada (caso 1b).
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-000000a4c001', false),
-  ('00000000-0000-4000-8000-000000a4c002', true);
+  ('00000000-0000-4000-8000-000000a4c002', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-000000a4f001', '00000000-0000-4000-8000-000000a4c001', 'Paciente', 'Uno'),
   ('00000000-0000-4000-8000-000000a4f002', '00000000-0000-4000-8000-000000a4c002', 'Paciente', 'Dos');
@@ -98,7 +99,8 @@ begin
   exception when insufficient_privilege then null;
   end;
   reset role;
-  insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-000000a4c001', false);
+  insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-000000a4c001', false)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 end $$;
 
 -- Caso 2: service_role tampoco, con la v2 apagada.

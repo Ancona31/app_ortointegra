@@ -1,7 +1,7 @@
 -- Corrección de seguridad, punto 3 (20261117120000_agenda_seg_borrado_cita.sql): con la agenda
 -- v2 encendida, la base no deja borrar una cita con paciente o por ligar, ni a la sesión
--- (PostgREST directo, sin la API) ni a service_role; sí una sin paciente. Con v2 apagada o sin
--- fila de ajustes, todo se borra como antes. postgres queda fuera (editor SQL, CASCADE).
+-- (PostgREST directo, sin la API) ni a service_role; sí una sin paciente. Con v2 apagada (fila
+-- con false) todo se borra como antes; sin fila está ENCENDIDA (M3, 20261206120000). postgres queda fuera (editor SQL, CASCADE).
 -- Mutación comprobada en rojo: quitar el RAISE de cita_proteger_borrado() → «caso 1: la sesión
 -- borró una cita con paciente».
 -- Se corre con scripts/pruebas-sql.sh. Crea sus datos y termina en rollback.
@@ -27,7 +27,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000a3c003', 
  where id = '00000000-0000-4000-8000-000000a3a003';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-000000a3c001', true),
-  ('00000000-0000-4000-8000-000000a3c002', false);
+  ('00000000-0000-4000-8000-000000a3c002', false)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-000000a3f001', '00000000-0000-4000-8000-000000a3c001', 'Paciente', 'Uno'),
   ('00000000-0000-4000-8000-000000a3f002', '00000000-0000-4000-8000-000000a3c002', 'Paciente', 'Dos'),
@@ -39,7 +40,7 @@ insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_has
    '00000000-0000-4000-8000-000000a3a001', 'fijo', repeat('b', 64));
 
 -- Citas (como postgres): en la 1, con paciente (d1), por ligar (d2), sin paciente (d3) y otra
--- con paciente (d4, para service_role); en la 2 (v2 apagada) y en la 3 (sin ajustes), con paciente.
+-- con paciente (d4, para service_role); en la 2 (v2 apagada) y en la 3 (de fábrica), con paciente.
 insert into public.appointments (id, clinica_id, medico_id, paciente_id, title, start_time, end_time) values
   ('00000000-0000-4000-8000-000000a3d001', '00000000-0000-4000-8000-000000a3c001', '00000000-0000-4000-8000-000000a3a001',
    '00000000-0000-4000-8000-000000a3f001', 'Con paciente', now() + interval '1 day', now() + interval '1 day 30 minutes'),
@@ -110,21 +111,38 @@ begin
   reset role;
 end $$;
 
--- Caso 3: v2 apagada, y clínica sin fila de ajustes: la sesión borra la cita con paciente como hoy.
+-- Caso 3: con la v2 APAGADA (fila con false) la sesión borra la cita con paciente como siempre.
+-- Agenda para todos (M3, 20261206120000): la clínica 3 no escribió nada y está ENCENDIDA (su
+-- fila de fábrica la creó el disparador de clinicas), y sigue encendida aunque se le quite la
+-- fila («sin fila = encendida»): en las dos la cita con paciente NO se borra.
 do $$
 begin
   perform pg_temp.como('00000000-0000-4000-8000-000000a3a002');
   set local role authenticated;
   delete from public.appointments where id = '00000000-0000-4000-8000-000000a3d005';
   reset role;
+  if exists (select 1 from public.appointments where id = '00000000-0000-4000-8000-000000a3d005') then
+    raise exception 'Seg3 caso 3: con v2 apagada no se borró una cita con paciente';
+  end if;
+  if not (select agenda_v2_encendida from public.agenda_ajustes where clinica_id = '00000000-0000-4000-8000-000000a3c003') then
+    raise exception 'Seg3 caso 3: la clínica 3 no nació con su fila de fábrica encendida (M3)';
+  end if;
   perform pg_temp.como('00000000-0000-4000-8000-000000a3a003');
   set local role authenticated;
-  delete from public.appointments where id = '00000000-0000-4000-8000-000000a3d006';
+  begin
+    delete from public.appointments where id = '00000000-0000-4000-8000-000000a3d006';
+    raise exception 'Seg3 caso 3: una clínica con la fila de fábrica (encendida) borró una cita con paciente';
+  exception when insufficient_privilege then null;
+  end;
   reset role;
-  if exists (select 1 from public.appointments where id in ('00000000-0000-4000-8000-000000a3d005',
-               '00000000-0000-4000-8000-000000a3d006')) then
-    raise exception 'Seg3 caso 3: con v2 apagada o sin ajustes no se borró una cita con paciente';
-  end if;
+  delete from public.agenda_ajustes where clinica_id = '00000000-0000-4000-8000-000000a3c003';
+  set local role authenticated;
+  begin
+    delete from public.appointments where id = '00000000-0000-4000-8000-000000a3d006';
+    raise exception 'Seg3 caso 3: una clínica SIN fila (encendida de fábrica) borró una cita con paciente';
+  exception when insufficient_privilege then null;
+  end;
+  reset role;
 end $$;
 
 -- Caso 4: al apagar v2, la sesión vuelve a poder (el disparador lee el interruptor en cada baja).

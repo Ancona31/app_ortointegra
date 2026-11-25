@@ -2,7 +2,7 @@
 --
 -- SÓLO LEE. La corre `aplicar.sh reversa` ANTES de deshacer la primera reversa
 -- de la cadena (hallazgo A5 de auditoria/RONDA-1.md): reúne por adelantado
--- todas las negativas de las 9 reversas de la agenda (M2 no tiene ninguna), para no quitar T y F5b y
+-- todas las negativas de las reversas de la agenda (M2, M3, MA y M4 no tienen ninguna), para no quitar T y F5b y
 -- descubrir después que F4 no puede seguir.
 --
 -- Una fila por motivo, separada por «|»:   versión | clase | qué
@@ -25,6 +25,9 @@
 BEGIN TRANSACTION READ ONLY;
 
 WITH c(version, clase, que, tabla, columnas, consulta) AS (VALUES
+  -- M5 (20261205120000_gcal_empalmes_pendientes_reversa.sql): los apuntes de la cola se perderían.
+  ('20261205120000', 'DATOS', 'gcal_empalmes_pendientes (empalmes de Google por mirar)', 'public.gcal_empalmes_pendientes', ARRAY[]::text[],
+     'SELECT count(*) AS n FROM public.gcal_empalmes_pendientes'),
   -- M1 (20261202120000_avisos_globales_modelo_reversa.sql): las marcas de visto se perderían, y los
   -- avisos con la forma de M1 impedirían volver a la de F4.
   ('20261202120000', 'DATOS', 'avisos_vistos (marcas de «revisado» por usuario)', 'public.avisos_vistos', ARRAY[]::text[],

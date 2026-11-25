@@ -62,16 +62,17 @@ const COLUMNAS_V2 = ', reserva_canal, reserva_nombre, google_asignacion'
 const CON_PACIENTE_O_POR_LIGAR = 'paciente_id.not.is.null,reserva_canal.not.is.null,google_asignacion.eq.por_asignar'
 
 /**
- * I3 (punto 8) · El interruptor de la agenda v2 de la clínica, con la sesión
- * (la RLS de `agenda_ajustes` deja leer a sus miembros). FALLA CERRADO, como
- * `agendaV2Encendida`: sin tabla, sin fila o con error, apagado. `null` = no se
- * pudo leer (no se recuerda: se vuelve a preguntar en la próxima traída).
+ * I3 (punto 8) · El interruptor de la agenda v2 de la clínica, con la sesión.
+ * Agenda para todos (M3): se le pregunta a la función de la base, la misma
+ * regla que `agendaV2Encendida` (sin fila = lo que diga la base). FALLA
+ * CERRADO: sin la función o sin la tabla, apagado; `null` = no se pudo leer
+ * (no se recuerda: se vuelve a preguntar en la próxima traída).
  */
 async function leerAgendaV2(supabase: Supabase, clinicaId: string): Promise<boolean | null> {
   try {
-    const { data, error } = await supabase.from('agenda_ajustes').select('agenda_v2_encendida').eq('clinica_id', clinicaId).maybeSingle()
-    if (error) return error.code === '42P01' || error.code === 'PGRST205' ? false : null
-    return data?.agenda_v2_encendida === true
+    const { data, error } = await supabase.rpc('agenda_v2_encendida', { p_clinica_id: clinicaId })
+    if (error) return error.code === '42P01' || error.code === '42883' || error.code === 'PGRST202' ? false : null
+    return data === true
   } catch {
     return null
   }
