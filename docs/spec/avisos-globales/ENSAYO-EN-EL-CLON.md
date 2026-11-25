@@ -174,7 +174,7 @@ Una segunda ida de M1 con M1 aplicada, o de M2, hecha a mano (sin el guion) ABOR
 ## 5. Diff de estructura esperado (antes ↔ después de M1 y M2)
 
 El diff completo de mi base local está en `docs/spec/avisos-globales/estructura-antes-despues.local.diff`
-(`pg_dump -s -n public --no-comments`, 790 líneas). En el clon debe salir lo mismo, y NADA más:
+(`pg_dump -s -n public --no-comments`, 826 líneas). En el clon debe salir lo mismo, y NADA más:
 
 - **Tabla nueva** `public.avisos_vistos` (`aviso_id`, `usuario_id`, `clinica_id`, `visto_en`), con su
   llave primaria `(aviso_id, usuario_id)`, FK RESTRICT a `clinicas`, 2 índices, RLS, 3 policies y
@@ -219,7 +219,7 @@ Comprobado en el stack local de Supabase (CLI 2.117.0), sobre esta versión:
   suelto en el 54373: `aplicar.sh` (`estado`, `aplicar`, `reversa`, `aplicar`), `correr-conteos.sh`,
   `correr-conteos-avisos.sh`, `foto-produccion.sh`, `clonar-desde-foto.sh` y `comparar-estructura.sh`
   (`--extraer` con `contenedor:` y con `url:`). Ninguno dio «invalid reference format»;
-- batería SQL: 52 archivos en verde;
+- batería SQL: 52 archivos en verde; Vitest 2682/2682; build; 115 e2e de escritorio (avisos, campana, reserva, confirmación, reagendar, bloqueos);
 - dos sesiones a la vez sobre el aviso de una misma cita: la segunda tarda 0,09 s (antes, 3 s hasta
   el `lock_timeout`);
 - las mediciones de §8.
