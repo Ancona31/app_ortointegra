@@ -73,8 +73,15 @@ Lecturas de la BASE (son las únicas que se cambiaron):
    y `src/lib/reserva/gestionServidor.ts` (enlaces de reserva).
 2. `leerAgendaV2()` / `agendaV2DeClinica()` — `src/components/dashboard/ProximasCitas.tsx`, en el
    navegador (dashboard del médico y de la secretaria). Recuerda la respuesta buena por pestaña.
-3. `leerAjustes()` — `agenda/configuracion/page.tsx`: antes leía interruptor y ajustes de la misma
-   fila; ahora el interruptor sale de (1) y los ajustes de la fila, en paralelo.
+3. `leerAjustes()` — `agenda/configuracion/page.tsx`: **no se cambió.** Lee interruptor y ajustes
+   de la misma fila en UNA consulta (preguntar además a la función añadiría un viaje a esa página).
+   Con fila, la columna y la función dicen lo mismo; sin fila la página no abre (404), que es
+   coherente: sin fila la configuración no puede guardar (§1.1).
+
+**Viajes a la base por navegación, antes → después: ninguno añadido.** `agendaV2Encendida`: 1 → 1
+(un `select` por la clave única pasa a ser un `rpc` que hace esa misma lectura; el layout lo sigue
+lanzando dentro de su `Promise.all`). `ProximasCitas`: 1 → 1 la primera vez por pestaña y clínica, 0
+después (conserva el recuerdo a nivel de módulo). `/agenda/configuracion`: 1 → 1.
 
 Todo lo demás (`AgendaCliente`, `BurbujaAlta`, `AppointmentModal`, las campanas, `useAjusteTurno`…)
 recibe el valor ya leído; no consulta la base. Los crons no leen el interruptor en la app: lo decide
@@ -182,7 +189,7 @@ apagar primero (un `UPDATE` como postgres) y revertir después. Pasos en `ENSAYO
 | 17 Otros caminos | A `agenda_ajustes` se llega también por la sesión del administrador (`agenda_ajustes_insert`/`update`) y por `service_role`: los dos siguen pasando por `proteger_agenda_ajustes()`, sin tocar. La única DEFINER que escribe la tabla es la nueva, que no es RPC |
 | 19 Recursión | No toca policies |
 | 20 Permisos de fábrica | Función nueva: `REVOKE … FROM PUBLIC`, EXECUTE a los tres roles (regla del proyecto para funciones de disparador). Sin tablas nuevas |
-| 21 Rendimiento | La función común hace la misma lectura por la clave única. El disparador de `clinicas` corre sólo al crear una clínica. El disparador de citas no cambia: medido en esta máquina, 300 operaciones × 3 corridas, ms por operación — sin M3: médico 1,07–1,35 · secretaria 1,46–2,20; con M3: médico 1,06–1,69 · secretaria 1,50–2,46 (el mismo intervalo; el código del disparador es idéntico) |
+| 21 Rendimiento | La función común hace la misma lectura por la clave única. El disparador de `clinicas` corre sólo al crear una clínica: medido en esta máquina (5 corridas de 300 altas como `service_role`), 0,10–0,12 ms por alta con él y 0,03–0,06 ms sin él; no toma ningún candado de tabla (inserta una fila y la FK toma el candado de fila de la clínica recién creada, en la misma transacción). El disparador de citas no cambia: medido en esta máquina, 300 operaciones × 3 corridas, ms por operación — sin M3: médico 1,07–1,35 · secretaria 1,46–2,20; con M3: médico 1,06–1,69 · secretaria 1,50–2,46 (el mismo intervalo; el código del disparador es idéntico) |
 | 22 Conjunto | Reescribe UNA función de F1 (`agenda_v2_encendida`), partiendo de su cuerpo (el pre-vuelo exige su huella) y cambiando una palabra. No reescribe `proteger_agenda_ajustes()`. Va la última. La reversa de F1 se niega si sigue existiendo la función nueva (nombra `agenda_ajustes`): la de M3 va antes |
 | 23 Prueba | `supabase/pruebas-sql/ap1_agenda_para_todos.sql`, 7 casos; corrida en local. Tres mutaciones comprobadas en ROJO y restauradas: `coalesce(…, false)` → caso 2; disparador deshabilitado → caso 0; función del disparador sin `EXCEPTION` → caso 5 |
 | 24 DEFINER | `agenda_ajustes_de_clinica_nueva()`: `search_path = ''`, sin PUBLIC (post-vuelo) |

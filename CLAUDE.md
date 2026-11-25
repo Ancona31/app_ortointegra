@@ -500,7 +500,10 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
   * **La app no decide: PREGUNTA a la base** (`rpc('agenda_v2_encendida')`, en
     `agendaV2Encendida` y en `ProximasCitas`). No vuelvas a leer la columna
     para decidir, ni escribas «sin fila = encendida» en la app: la app y los
-    disparadores tienen que contestar lo mismo antes y después de M3.
+    disparadores tienen que contestar lo mismo antes y después de M3. Única
+    excepción, a propósito: `/agenda/configuracion` sigue leyendo la FILA
+    (interruptor y ajustes en UNA consulta, para no añadir un viaje); sin fila
+    no abre, y es coherente: sin fila la configuración no puede guardar.
   * **Toda clínica tiene su fila** (`trg_clinicas_agenda_ajustes` en
     `clinicas`). Ocho funciones de la agenda leen la FILA, no la función común:
     sin fila la clínica queda a medias. Para borrar una clínica se borra antes

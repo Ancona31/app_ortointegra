@@ -3,7 +3,7 @@ import { sesionServidor } from '@/lib/supabase/sesionServidor'
 import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { canManageClinica, canVerAgendaCompleta, isMedico } from '@/lib/permissions'
 import {
-  AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, agendaV2Encendida, leerRecordatorioEncendido, leerCorreoReservaClinica, type AjustesAgenda,
+  AjustesAgendaSchema, CAMPOS_AJUSTES_AGENDA, COLUMNAS_AJUSTES, leerRecordatorioEncendido, leerCorreoReservaClinica, type AjustesAgenda,
 } from '@/lib/agenda/ajustesAgenda'
 import { COLUMNAS_TIPO_CITA, type TipoCita } from '@/lib/agenda/tiposCita'
 import { logger } from '@/lib/logger'
@@ -12,7 +12,7 @@ import ConfiguracionAgenda from '@/components/agenda/configuracion/Configuracion
 /**
  * /agenda/configuracion — la pantalla de configuración del calendario (plan
  * del bloque B, paso B4; decisiones P6 y P7). Detrás del interruptor de la
- * agenda v2: apagado (lo dice la base) o sin la tabla `agenda_ajustes`, `notFound()`.
+ * agenda v2: apagado, sin fila o sin la tabla `agenda_ajustes`, `notFound()`.
  *
  * ⚠️ AUTORIDAD: `sesionServidor()`, o sea `getUser()`, compartido con el
  * layout. Esta página NO redirige: sin sesión redirige el layout, como
@@ -39,25 +39,17 @@ import ConfiguracionAgenda from '@/components/agenda/configuracion/Configuracion
 type ClienteSesion = Awaited<ReturnType<typeof sesionServidor>>['supabase']
 
 /**
- * El interruptor y los cuatro ajustes, a la vez. `'apagado'` ante cualquier
- * duda (falla cerrado). Agenda para todos (M3): el interruptor lo contesta la
- * base (`agendaV2Encendida`, la misma regla que el resto de la app), no la
- * fila; los ajustes sí salen de la fila. Encendida pero sin fila o con unos
- * ajustes que no cuadran, `ajustes: null`: la sección lo dice y no deja
- * guardar, en vez de enseñar los de fábrica como si fueran los de la clínica y
- * dejar que alguien los guarde encima.
+ * El interruptor y los cuatro ajustes, en UNA consulta. `'apagado'` ante
+ * cualquier duda (falla cerrado, como `agendaV2Encendida`). Con el interruptor
+ * encendido pero unos ajustes que no cuadran, `ajustes: null`: la sección lo
+ * dice y no deja guardar, en vez de enseñar los de fábrica como si fueran los
+ * de la clínica y dejar que alguien los guarde encima.
  */
 async function leerAjustes(supabase: ClienteSesion, clinicaId: string): Promise<'apagado' | { ajustes: AjustesAgenda | null }> {
   try {
-    const [encendida, { data, error }] = await Promise.all([
-      agendaV2Encendida(supabase, clinicaId),
-      supabase.from('agenda_ajustes').select(COLUMNAS_AJUSTES).eq('clinica_id', clinicaId).maybeSingle(),
-    ])
-    if (!encendida || error) return 'apagado'
-    if (!data) {
-      logger.warn('agenda', 'clínica con la agenda encendida y sin fila de ajustes en la pantalla de configuración')
-      return { ajustes: null }
-    }
+    const { data, error } = await supabase.from('agenda_ajustes')
+      .select(`agenda_v2_encendida, ${COLUMNAS_AJUSTES}`).eq('clinica_id', clinicaId).maybeSingle()
+    if (error || data?.agenda_v2_encendida !== true) return 'apagado'
     const r = AjustesAgendaSchema.safeParse(Object.fromEntries(CAMPOS_AJUSTES_AGENDA.map(c => [c, data[c]])))
     if (!r.success) logger.warn('agenda', 'ajustes de la agenda con forma inesperada en la pantalla de configuración')
     return { ajustes: r.success ? r.data : null }
