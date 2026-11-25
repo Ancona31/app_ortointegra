@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { interruptorAgenda, sqlLocal, soloEscritorio, SESION, tituloUnico, diaDeLaSemana } from './ayudas'
+import { interruptorAgenda, sqlLocal, soloEscritorio, SESION, tituloUnico, diaDeLaSemana, toastConTexto } from './ayudas'
 
 /**
  * «Avisa a la clínica» (agenda E8, plan_E.md E10 caso 4, segunda mitad): con
  * la agenda del administrador abierta, el paciente cancela por el enlace y
- * sale «Un paciente canceló su cita…» (sin su nombre); el panel «Por
+ * sale «[Nombre] canceló su cita…» (con su nombre desde 2026-11-24, una sola burbuja); el panel «Por
  * confirmar» lo lista en «Canceladas por el paciente (48 h)».
  *
  * La cancelación del paciente se hace como la haría el POST público de E3
@@ -69,8 +69,12 @@ test('el paciente cancela por el enlace: aviso en la agenda abierta y fila en el
     select r_resultado from public.cita_confirmacion_responder(:'clinica', :'hash', 'cancelar');
     commit;`,
   { clinica: clinicaId, hash: HASH })
-  await expect(page.getByText(/Un paciente canceló su cita del/)).toBeVisible({ timeout: 10000 })
-  expect(await page.getByText(/Un paciente canceló su cita del/).first().textContent()).not.toContain(titulo)
+  /* Avisos globales (2026-11-24): la burbuja lleva el NOMBRE y sale de la campana (el aviso
+     `cancelacion_paciente`), ya no de E8. EXACTAMENTE UNA: ni se pierde ni se duplica con la de antes. */
+  const burbuja = toastConTexto(page, `${titulo} canceló su cita del`)
+  await expect(burbuja).toBeVisible({ timeout: 10000 })
+  await expect(burbuja).toHaveCount(1)
+  await expect(page.getByText(/Un paciente canceló su cita/)).toHaveCount(0)
   // I5 (punto 19): la cancelación es un aviso de la pestaña «Avisos» de la campana.
   await page.locator('[data-por-confirmar]').click()
   await page.getByRole('dialog', { name: 'Por confirmar y avisos' }).getByRole('tab', { name: /^Avisos/ }).click()
@@ -86,5 +90,5 @@ test('una cancelación del personal no avisa', async ({ page }) => {
   sqlLocal(`update public.cita_confirmaciones set respondido_en = now() - interval '10 minutes' where appointment_id = :'id';
             update public.appointments set status = 'cancelled' where id = :'id';`, { id: citaId })
   await page.waitForTimeout(3000)
-  await expect(page.getByText(/Un paciente canceló su cita/)).toHaveCount(0)
+  await expect(page.getByText(/canceló su cita/)).toHaveCount(0)
 })

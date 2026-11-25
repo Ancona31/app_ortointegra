@@ -25,7 +25,7 @@ import { LeyendaEstados } from '@/components/agenda/LeyendaEstados'
 import { AvisosAgenda } from '@/components/agenda/AvisosAgenda'
 import type { CitaDelAviso } from '@/lib/avisos/avisosClinica'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
-import { esRespuestaReciente, leerRespuesta, textoAvisoCancelacion } from '@/lib/agenda/avisoCancelacion'
+import { esRespuestaReciente, leerRespuesta } from '@/lib/agenda/avisoCancelacion'
 import {
   VISTAS_FC, VISTAS_FC_MOVIL, VISTAS_FC_TABLETA, VISTAS_FC_V2, VISTAS_FC_V2_TABLETA, VISTAS_FC_V2_MOVIL, TOOLBAR_ESCRITORIO, PLUGINS_FC, TEXTO_BOTONES_FC, FORMATO_HORA_FC,
 } from '@/components/agenda/opcionesCalendario'
@@ -1015,18 +1015,16 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
      Sólo con la v2 encendida. Cuando el canal trae una cancelación AJENA de
      una cita pintada (no eco propio), se pregunta UNA vez a
      `/api/agenda/respuestas` si fue el paciente por el enlace hace menos de
-     2 min; si sí, un aviso sin el nombre del paciente y el panel se recarga.
+     2 min; si sí, el panel se recarga (y con él llega el aviso, que da la burbuja).
      Apagada, el gancho no recibe el callback y no sale ninguna petición. */
   const avisarCancelacionPaciente = agendaV2 ? (id: string): void => {
-    const ev = calendarRef.current?.getApi().getEventById(id)
-    const inicio = ev?.start?.toISOString() ?? null
-    const zona: unknown = ev?.extendedProps.consultorio_timezone
     fetch(`/api/agenda/respuestas?cita=${encodeURIComponent(id)}`)
       .then(async (res) => (res.ok ? leerRespuesta(await res.json()) : null))
       .then((r) => {
         if (!r || !esRespuestaReciente(r.respuesta, r.respondidoEn, Date.now())) return
+        /* Avisos globales (2026-11-24): la burbuja ya no sale de aquí (iba sin nombre). Al recargarse el
+           panel llega el aviso `cancelacion_paciente` y la campana lanza SU burbuja, con el nombre, una vez. */
         setRecargaPanel((n) => n + 1)
-        toast.info(textoAvisoCancelacion(inicio, typeof zona === 'string' ? zona : null))
       })
       .catch(() => undefined)
   } : undefined

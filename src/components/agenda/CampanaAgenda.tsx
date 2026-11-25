@@ -31,7 +31,7 @@ import dynamic from 'next/dynamic'
 import { Bell, X } from 'lucide-react'
 import type { CambiarEstadoCita } from '@/lib/agenda/contratosV2'
 import type { CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
-import { destacarDeAviso, type AvisoClinica, type CitaDelAviso, type TipoAviso } from '@/lib/avisos/avisosClinica'
+import { destacarDeAviso, TIPOS_AVISO, type AvisoClinica, type CitaDelAviso, type TipoAviso } from '@/lib/avisos/avisosClinica'
 import { esPorLigar } from '@/lib/agenda/tarjetasAgenda'
 import { useProfile } from '@/hooks/useProfile'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
@@ -44,14 +44,13 @@ import {
 } from '@/components/agenda/PanelPorConfirmar'
 
 /**
- * Los que lanzan aviso emergente desde aquí. La cancelación (E8) y el empalme
- * (D11) ya tienen el suyo en la agenda y NO se repiten. Tanda L (punto 13):
- * la confirmación del paciente por su enlace, que no tenía ninguno. Avisos
- * globales (2026-11-24): la reservada por enlace que alguien movió en Google.
+ * Los que lanzan aviso emergente desde aquí: TODOS los que la campana conoce
+ * (avisos globales, 2026-11-24, decisión de Angel: toda eventualidad avisa en
+ * campana y burbuja, con nombre). La cancelación (E8) y el empalme (D11) tenían
+ * su burbuja propia, sin nombre, en `AgendaCliente` y `PanelPorConfirmar`: se
+ * quitaron de allí para que salga UNA sola, la de aquí.
  */
-const EMERGENTES: readonly TipoAviso[] = [
-  'reserva_enlace', 'reagendado_paciente', 'google_por_asignar', 'confirmacion_paciente', 'google_movimiento_rechazado',
-]
+const EMERGENTES: readonly TipoAviso[] = TIPOS_AVISO
 
 /** Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. */
 export function textoBurbuja(pendientes: number): string {

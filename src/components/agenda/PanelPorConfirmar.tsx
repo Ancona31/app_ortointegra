@@ -41,8 +41,7 @@ import type { FilaCancelada } from '@/lib/agenda/avisoCancelacion'
 import { cambioPuedeAvisar, efectoEnPorConfirmar, type CambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
-import { useToast } from '@/components/ui/Toast'
-import { esEmpalmeReciente, textoAvisoEmpalme, type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
+import { type FilaEmpalme } from '@/lib/agenda/avisoEmpalmeReserva'
 import { leerRespuestaAvisos, type RespuestaAvisos } from '@/lib/avisos/avisosClinica'
 
 function esFila(x: unknown): x is FilaPorConfirmar {
@@ -213,9 +212,8 @@ const ESPERA_RECARGA_MS = 250
  */
 export function usePorConfirmar(recarga: number, cambiosRef: RefObject<((c: CambioCita) => void) | null> | undefined) {
   const [listas, setListas] = useState<ListasPorConfirmar | null>(null)
-  const toast = useToast()
-  /** D11: los empalmes ya avisados en esta pestaña (el aviso emergente sale una vez). */
-  const avisados = useRef(new Set<string>())
+  /* Avisos globales (2026-11-24): la burbuja del empalme (D11) ya no sale de aquí (iba sin nombre): la
+     lanza la campana con el aviso `empalme_google`, que viaja en esta misma respuesta. */
   const vuelo = useRef({ enVuelo: false, otraVez: false })
   const listasRef = useRef<ListasPorConfirmar | null>(null)
   useEffect(() => { listasRef.current = listas }, [listas])
@@ -227,14 +225,13 @@ export function usePorConfirmar(recarga: number, cambiosRef: RefObject<((c: Camb
       void pedirPorConfirmar().then((l) => {
         if (!l) return
         setListas(l)
-        avisarEmpalmes(l.empalmes, avisados.current, (t) => toast.info(t))
       }).finally(() => {
         vuelo.current.enVuelo = false
         if (vuelo.current.otraVez) { vuelo.current.otraVez = false; pedir() }
       })
     }
     pedir()
-  }, [toast])
+  }, [])
 
   const quitar = useCallback((id: string): void => {
     if (vuelo.current.enVuelo) vuelo.current.otraVez = true
@@ -248,17 +245,6 @@ export function usePorConfirmar(recarga: number, cambiosRef: RefObject<((c: Camb
 
   useCambiosEnVivo(cambiosRef, listasRef, quitar, recargar)
   return { listas, recargar, quitar }
-}
-
-/** D11 · El aviso emergente de un empalme reciente, una vez por pestaña. */
-function avisarEmpalmes(empalmes: FilaEmpalme[], avisados: Set<string>, avisar: (texto: string) => void): void {
-  const ahora = Date.now()
-  for (const e of empalmes) {
-    const llave = `${e.id}@${e.detectado_en}`
-    if (avisados.has(llave) || !esEmpalmeReciente(e.detectado_en, ahora)) continue
-    avisados.add(llave)
-    avisar(textoAvisoEmpalme(e.inicio, e.zona))
-  }
 }
 
 /** H4 (punto 18) · Se engancha al canal de la agenda por `cambiosRef` (no abre otro). */
