@@ -93,7 +93,16 @@ export type AvisoClinica = AvisoDeCita | AvisoSinCita
 export interface RespuestaAvisos {
   disponible: boolean
   avisos: AvisoClinica[]
+  /**
+   * Hay avisos que la lista YA NO trae: pasó del tope de la respuesta, o quedan fuera de la lectura
+   * acotada de la base (más de 60 días, o más de 500 recientes: `avisos_mas_antiguos`, M1). La
+   * campana lo DICE (`TEXTO_MAS_ANTIGUOS`) y su contador pone «+»: no se ocultan en silencio.
+   */
+  mas_antiguos?: boolean
 }
+
+/** Lo que dice la campana cuando hay avisos fuera de lo que muestra. Uno solo, para las dos campanas. */
+export const TEXTO_MAS_ANTIGUOS = 'Hay avisos más antiguos que ya no se muestran aquí.'
 
 /** Un aviso «recién llegado» para el aviso emergente (el mismo criterio de E8 y D11: 2 min). */
 export const AVISO_RECIENTE_MS = 120_000
@@ -132,7 +141,10 @@ export function leerRespuestaAvisos(d: unknown): RespuestaAvisos | null {
   if (typeof d !== 'object' || d === null) return null
   const lista: unknown = Reflect.get(d, 'avisos')
   if (!Array.isArray(lista)) return null
-  return { disponible: Reflect.get(d, 'avisos_disponibles') === true, avisos: lista.filter(esAvisoClinica) }
+  return {
+    disponible: Reflect.get(d, 'avisos_disponibles') === true, avisos: lista.filter(esAvisoClinica),
+    ...(Reflect.get(d, 'avisos_mas_antiguos') === true ? { mas_antiguos: true } : {}),
+  }
 }
 
 const MOVIMIENTO_RECHAZADO = 'Desde Google no se pueden mover las citas reservadas por enlace. Para cambiarla, usa Reagendar: se le avisará al paciente.'

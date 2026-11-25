@@ -79,7 +79,7 @@ describe('cambioPuedeAvisar · una cita que pasa a confirmada (tanda L, punto 13
 
 describe('la burbuja de la campana (tanda L, punto 14)', () => {
   it('el número; con más de 9, «9+»', () => {
-    expect([1, 3, 9, 10, 57].map(textoBurbuja)).toEqual(['1', '3', '9', '9+', '9+'])
+    expect([1, 3, 9, 10, 57].map(n => textoBurbuja(n))).toEqual(['1', '3', '9', '9+', '9+'])
   })
   it('el nombre accesible: el desglose y «N pendiente(s)» con el número exacto', () => {
     expect(etiquetaCampana(null)).toBe('Por confirmar y avisos')
@@ -87,5 +87,10 @@ describe('la burbuja de la campana (tanda L, punto 14)', () => {
     expect(etiquetaCampana({ n: 1, m: 0 })).toBe('Por confirmar (1) y avisos (0): 1 pendiente')
     expect(etiquetaCampana({ n: 2, m: 1 })).toBe('Por confirmar (2) y avisos (1): 3 pendientes')
     expect(etiquetaCampana({ n: 7, m: 5 })).toBe('Por confirmar (7) y avisos (5): 12 pendientes')
+  })
+  it('con avisos más antiguos fuera de la lista: «3+» y se dice en el nombre', () => {
+    expect([textoBurbuja(3, true), textoBurbuja(12, true), textoBurbuja(3, false)]).toEqual(['3+', '9+', '3'])
+    expect(etiquetaCampana({ n: 2, m: 1 }, true)).toBe('Por confirmar (2) y avisos (1): 3 pendientes; hay avisos más antiguos')
+    expect(etiquetaCampana({ n: 0, m: 0 }, true)).toBe('Por confirmar (0) y avisos (0); hay avisos más antiguos')
   })
 })

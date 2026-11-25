@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { etiquetaCampanaGlobal, SONDEO_MS } from '@/components/avisos/CampanaAvisos'
+import { etiquetaCampanaGlobal, SONDEO_MS, textoContador } from '@/components/avisos/CampanaAvisos'
 import { AVISO_RECIENTE_MS } from '@/lib/avisos/avisosClinica'
 
 const leer = (ruta: string): string => readFileSync(new URL(`../../${ruta}`, import.meta.url), 'utf8')
@@ -15,6 +15,12 @@ describe('campana global', () => {
     expect(etiquetaCampanaGlobal(null)).toBe('Avisos')
     expect(etiquetaCampanaGlobal(0)).toBe('Avisos')
     expect(etiquetaCampanaGlobal(3)).toBe('Avisos (3 sin revisar)')
+  })
+  /* MUTACIÓN (comprobada en rojo): `textoContador` y la etiqueta sin mirar `masAntiguos`. */
+  it('con avisos fuera de lo que la lista trae, el contador no se da por exacto y se dice', () => {
+    expect([textoContador(3), textoContador(3, true), textoContador(12, true)]).toEqual(['3', '3+', '9+'])
+    expect(etiquetaCampanaGlobal(3, true)).toBe('Avisos (3 o más sin revisar)')
+    expect(etiquetaCampanaGlobal(0, true)).toBe('Avisos (hay avisos más antiguos)')
   })
   it('el sondeo no es más lento que la ventana de «recién llegado»: si lo fuera, se perderían burbujas', () => {
     expect(SONDEO_MS).toBeLessThanOrEqual(AVISO_RECIENTE_MS)

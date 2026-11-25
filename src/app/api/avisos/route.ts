@@ -25,7 +25,7 @@ export async function GET(): Promise<NextResponse> {
   const e = await entradaGestion()
   if (!e.ok) return e.respuesta
   const r = await leerAvisosClinica(e.supabase, e.clinicaId)
-  return NextResponse.json({ avisos: r.avisos, avisos_disponibles: r.disponible }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ avisos: r.avisos, avisos_disponibles: r.disponible, avisos_mas_antiguos: r.mas_antiguos === true }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function PATCH(req: NextRequest): Promise<NextResponse> {

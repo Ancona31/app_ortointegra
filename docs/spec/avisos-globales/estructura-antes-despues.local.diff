@@ -1,933 +1,790 @@
---- antes.sql	2026-11-25 01:42:43.373428326 +0000
-+++ despues.sql	2026-11-25 01:42:43.921428359 +0000
-@@ -2,7 +2,7 @@
- -- PostgreSQL database dump
- --
- 
--\restrict q29fATMvPExjHw1EgqwoBz3FZEZ42GMVc1X73CFMF8UEEYNN5vnSa6aV5szHzFC
-+\restrict o5Uxikqffc3LbevaLzHqbOyGK7hI4UNRyG36D9y33g471e6fZjAzNY8XiFBDu70
- 
- -- Dumped from database version 17.6
- -- Dumped by pg_dump version 17.6
-@@ -388,6 +388,86 @@
- ALTER FUNCTION public.asignar_folio_documento() OWNER TO postgres;
- 
- --
-+-- Name: aviso_clinica_de_bloqueo(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_de_bloqueo() RETURNS trigger
-+    LANGUAGE plpgsql SECURITY DEFINER
-+    SET search_path TO ''
-+    AS $$
-+DECLARE
-+  v_uid uuid := auth.uid();
-+  v_b   record;
-+BEGIN
-+  IF TG_OP = 'DELETE' THEN v_b := OLD; ELSE v_b := NEW; END IF;
-+  IF v_uid IS NULL OR v_b.medico_id = v_uid OR NOT public.agenda_v2_encendida(v_b.clinica_id) THEN RETURN NULL; END IF;
-+  BEGIN
-+    INSERT INTO public.avisos_clinica (clinica_id, tipo, medico_id, destinatario_id, actor_id, datos)
-+    VALUES (v_b.clinica_id, CASE TG_OP WHEN 'DELETE' THEN 'personal_desbloqueo' ELSE 'personal_bloqueo' END,
-+            v_b.medico_id, v_b.medico_id, v_uid,
-+            jsonb_build_object('inicio', v_b.inicio, 'fin', v_b.fin, 'todo_el_dia', v_b.todo_el_dia, 'zona', v_b.zona));
-+  EXCEPTION WHEN OTHERS THEN
-+    RAISE WARNING 'aviso_clinica_de_bloqueo: aviso no escrito (SQLSTATE %)', SQLSTATE;
-+  END;
-+  RETURN NULL;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_de_bloqueo() OWNER TO postgres;
-+
-+--
-+-- Name: aviso_clinica_de_cambio_cita(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_de_cambio_cita() RETURNS trigger
-+    LANGUAGE plpgsql SECURITY DEFINER
-+    SET search_path TO ''
-+    AS $$
-+DECLARE
-+  v_uid   uuid := auth.uid();
-+  v_via   text := current_setting('spinus.via', true);
-+  v_tipo  text;
-+  v_movio   boolean := false;
-+  v_cancelo boolean := false;
-+  v_confirmo boolean := false;
-+BEGIN
-+  -- OLD sólo existe en UPDATE: no se nombra fuera de este IF.
-+  IF TG_OP = 'UPDATE' THEN
-+    v_movio := OLD.start_time IS DISTINCT FROM NEW.start_time OR OLD.end_time IS DISTINCT FROM NEW.end_time;
-+    v_cancelo := NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled';
-+    v_confirmo := NEW.status = 'confirmed' AND OLD.status IS DISTINCT FROM 'confirmed';
-+  END IF;
-+  IF v_uid IS NOT NULL THEN
-+    IF NEW.medico_id IS NULL OR NEW.medico_id = v_uid THEN RETURN NULL; END IF;
-+    v_tipo := CASE WHEN TG_OP = 'INSERT' THEN 'personal_agendo' WHEN v_cancelo THEN 'personal_cancelo'
-+                   WHEN v_movio AND NEW.status <> 'cancelled' THEN 'personal_movio' END;
-+  ELSIF TG_OP = 'UPDATE' AND (NEW.paciente_id IS NOT NULL OR NEW.reserva_canal IS NOT NULL) THEN
-+    v_tipo := CASE
-+      WHEN v_via = 'google_rsvp' AND v_confirmo THEN 'confirmacion_paciente'
-+      WHEN v_via = 'google_rsvp' AND v_cancelo THEN 'cancelacion_paciente'
-+      WHEN v_via = 'google' AND v_cancelo THEN 'google_cancelo_cita'
-+      WHEN v_via = 'google' AND v_movio AND NEW.status <> 'cancelled' THEN 'google_movio_cita' END;
-+  END IF;
-+  IF v_tipo IS NULL OR NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
-+  BEGIN
-+    -- Si ya hay uno sin cerrar de ese tipo y cita, trg_avisos_clinica_reabrir lo refresca y se salta el alta.
-+    INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id, destinatario_id, actor_id)
-+    VALUES (NEW.clinica_id, v_tipo, NEW.id,
-+            CASE WHEN v_tipo LIKE 'personal\_%' THEN NEW.medico_id END, CASE WHEN v_tipo LIKE 'personal\_%' THEN v_uid END)
-+    ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
-+  EXCEPTION WHEN OTHERS THEN
-+    -- Un aviso nunca impide guardar la cita. Sin datos de nadie en el mensaje.
-+    RAISE WARNING 'aviso_clinica_de_cambio_cita: aviso % no escrito (SQLSTATE %)', v_tipo, SQLSTATE;
-+  END;
-+  RETURN NULL;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_de_cambio_cita() OWNER TO postgres;
-+
-+--
- -- Name: aviso_clinica_de_cita(); Type: FUNCTION; Schema: public; Owner: postgres
- --
- 
-@@ -407,6 +487,33 @@
- ALTER FUNCTION public.aviso_clinica_de_cita() OWNER TO postgres;
- 
- --
-+-- Name: aviso_clinica_de_conexion_google(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_de_conexion_google() RETURNS trigger
-+    LANGUAGE plpgsql SECURITY DEFINER
-+    SET search_path TO ''
-+    AS $$
-+BEGIN
-+  IF NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
-+  BEGIN
-+    INSERT INTO public.avisos_clinica (clinica_id, tipo) VALUES (NEW.clinica_id, 'google_desconectado')
-+    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
-+                 (lower(coalesce(datos ->> 'nombre', ''))))
-+      WHERE cita_id IS NULL AND revisado_en IS NULL
-+        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
-+    DO UPDATE SET creado_en = clock_timestamp();
-+  EXCEPTION WHEN OTHERS THEN
-+    RAISE WARNING 'aviso_clinica_de_conexion_google: aviso no escrito (SQLSTATE %)', SQLSTATE;
-+  END;
-+  RETURN NULL;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_de_conexion_google() OWNER TO postgres;
-+
-+--
- -- Name: aviso_clinica_de_confirmacion(); Type: FUNCTION; Schema: public; Owner: postgres
- --
- 
-@@ -426,6 +533,29 @@
- ALTER FUNCTION public.aviso_clinica_de_confirmacion() OWNER TO postgres;
- 
- --
-+-- Name: aviso_clinica_de_correo(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_de_correo() RETURNS trigger
-+    LANGUAGE plpgsql SECURITY DEFINER
-+    SET search_path TO ''
-+    AS $$
-+BEGIN
-+  IF NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
-+  BEGIN
-+    INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (NEW.clinica_id, 'correo_fallido', NEW.appointment_id)
-+    ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
-+  EXCEPTION WHEN OTHERS THEN
-+    RAISE WARNING 'aviso_clinica_de_correo: aviso no escrito (SQLSTATE %)', SQLSTATE;
-+  END;
-+  RETURN NULL;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_de_correo() OWNER TO postgres;
-+
-+--
- -- Name: aviso_clinica_de_empalme(); Type: FUNCTION; Schema: public; Owner: postgres
- --
- 
-@@ -508,6 +638,112 @@
- ALTER FUNCTION public.aviso_clinica_de_respuesta() OWNER TO postgres;
- 
- --
-+-- Name: aviso_clinica_de_sync_google(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_de_sync_google() RETURNS trigger
-+    LANGUAGE plpgsql SECURITY DEFINER
-+    SET search_path TO ''
-+    AS $$
-+BEGIN
-+  IF NOT public.agenda_v2_encendida(NEW.clinica_id) THEN RETURN NULL; END IF;
-+  BEGIN
-+    INSERT INTO public.avisos_clinica (clinica_id, tipo) VALUES (NEW.clinica_id, 'google_sin_sincronizar')
-+    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
-+                 (lower(coalesce(datos ->> 'nombre', ''))))
-+      WHERE cita_id IS NULL AND revisado_en IS NULL
-+        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
-+    DO UPDATE SET creado_en = clock_timestamp();
-+  EXCEPTION WHEN OTHERS THEN
-+    RAISE WARNING 'aviso_clinica_de_sync_google: aviso no escrito (SQLSTATE %)', SQLSTATE;
-+  END;
-+  RETURN NULL;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_de_sync_google() OWNER TO postgres;
-+
-+--
-+-- Name: aviso_clinica_reabrir(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_reabrir() RETURNS trigger
-+    LANGUAGE plpgsql
-+    SET search_path TO ''
-+    AS $$
-+BEGIN
-+  UPDATE public.avisos_clinica a
-+     SET creado_en = clock_timestamp(), actor_id = NEW.actor_id, destinatario_id = NEW.destinatario_id
-+   WHERE a.tipo = NEW.tipo AND a.cita_id = NEW.cita_id AND a.revisado_en IS NULL;
-+  IF FOUND THEN RETURN NULL; END IF;
-+  RETURN NEW;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_reabrir() OWNER TO postgres;
-+
-+--
-+-- Name: aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) RETURNS boolean
-+    LANGUAGE plpgsql SECURITY DEFINER
-+    SET search_path TO ''
-+    AS $$
-+DECLARE
-+  v_medico uuid;
-+  -- El nombre tecleado, como reserva_nombre: recortado, sin caracteres de control, 120 como mucho.
-+  v_nombre text := left(btrim(regexp_replace(coalesce(p_nombre, ''), '[[:cntrl:]]+', ' ', 'g')), 120);
-+BEGIN
-+  IF p_clinica_id IS NULL OR p_tipo IS NULL OR p_tipo NOT IN ('reserva_frenada', 'personal_movio', 'paciente_no_asistira') THEN
-+    RAISE EXCEPTION 'aviso_clinica_registrar: argumentos inválidos' USING ERRCODE = '22023';
-+  END IF;
-+  IF NOT public.agenda_v2_encendida(p_clinica_id) THEN RETURN false; END IF;
-+  IF p_tipo = 'reserva_frenada' THEN
-+    IF p_medico_id IS NULL OR v_nombre = '' OR NOT EXISTS (SELECT 1 FROM public.profiles pr
-+                                                           WHERE pr.id = p_medico_id AND pr.clinica_id = p_clinica_id) THEN
-+      RETURN false;
-+    END IF;
-+    INSERT INTO public.avisos_clinica AS a (clinica_id, tipo, medico_id, datos)
-+    VALUES (p_clinica_id, 'reserva_frenada', p_medico_id, jsonb_build_object('nombre', v_nombre, 'intentos', 1))
-+    ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
-+                 (lower(coalesce(datos ->> 'nombre', ''))))
-+      WHERE cita_id IS NULL AND revisado_en IS NULL
-+        AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
-+    DO UPDATE SET creado_en = clock_timestamp(),
-+                  datos = a.datos || jsonb_build_object('intentos', coalesce((a.datos ->> 'intentos')::integer, 0) + 1);
-+    RETURN true;
-+  END IF;
-+  SELECT c.medico_id INTO v_medico FROM public.appointments c
-+   WHERE c.id = p_cita_id AND c.clinica_id = p_clinica_id;
-+  IF NOT FOUND THEN RETURN false; END IF;
-+  IF p_tipo = 'paciente_no_asistira' THEN
-+    -- Una vez por cita, la haya visto alguien o no: cada pasada de la sincronización vuelve a llamar.
-+    IF EXISTS (SELECT 1 FROM public.avisos_clinica a WHERE a.tipo = 'paciente_no_asistira' AND a.cita_id = p_cita_id
-+                  AND a.clinica_id = p_clinica_id) THEN
-+      RETURN false;
-+    END IF;
-+    INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (p_clinica_id, 'paciente_no_asistira', p_cita_id)
-+    ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
-+    RETURN true;
-+  END IF;
-+  IF v_medico IS NULL OR p_actor_id IS NULL OR v_medico = p_actor_id
-+     OR NOT EXISTS (SELECT 1 FROM public.profiles pr WHERE pr.id = p_actor_id AND pr.clinica_id = p_clinica_id) THEN
-+    RETURN false;
-+  END IF;
-+  INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id, destinatario_id, actor_id)
-+  VALUES (p_clinica_id, 'personal_movio', p_cita_id, v_medico, p_actor_id)
-+  ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
-+  RETURN true;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) OWNER TO postgres;
-+
-+--
- -- Name: aviso_clinica_revisar(); Type: FUNCTION; Schema: public; Owner: postgres
- --
- 
-@@ -530,6 +766,75 @@
- ALTER FUNCTION public.aviso_clinica_revisar() OWNER TO postgres;
- 
- --
-+-- Name: aviso_visto_sellar(); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.aviso_visto_sellar() RETURNS trigger
-+    LANGUAGE plpgsql
-+    SET search_path TO ''
-+    AS $$
-+BEGIN
-+  -- Hora REAL (no la del inicio de la transacción): se compara con creado_en para saber si el aviso se reabrió después.
-+  NEW.visto_en := clock_timestamp();
-+  RETURN NEW;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.aviso_visto_sellar() OWNER TO postgres;
-+
-+SET default_tablespace = '';
-+
-+SET default_table_access_method = heap;
-+
-+--
-+-- Name: avisos_clinica; Type: TABLE; Schema: public; Owner: postgres
-+--
-+
-+CREATE TABLE public.avisos_clinica (
-+    id uuid DEFAULT gen_random_uuid() NOT NULL,
-+    clinica_id uuid NOT NULL,
-+    tipo text NOT NULL,
-+    cita_id uuid,
-+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
-+    revisado_en timestamp with time zone,
-+    revisado_por uuid,
-+    destinatario_id uuid,
-+    actor_id uuid,
-+    medico_id uuid,
-+    datos jsonb,
-+    CONSTRAINT avisos_clinica_cita_tipo_check CHECK (((tipo = ANY (ARRAY['reserva_frenada'::text, 'google_desconectado'::text, 'google_sin_sincronizar'::text, 'personal_bloqueo'::text, 'personal_desbloqueo'::text])) = (cita_id IS NULL))),
-+    CONSTRAINT avisos_clinica_datos_check CHECK (((datos IS NULL) OR ((jsonb_typeof(datos) = 'object'::text) AND ((NOT (datos ? 'nombre'::text)) OR ((tipo = 'reserva_frenada'::text) AND (jsonb_typeof((datos -> 'nombre'::text)) = 'string'::text) AND ((char_length((datos ->> 'nombre'::text)) >= 1) AND (char_length((datos ->> 'nombre'::text)) <= 120))))))),
-+    CONSTRAINT avisos_clinica_revisado_check CHECK (((revisado_por IS NULL) OR (revisado_en IS NOT NULL))),
-+    CONSTRAINT avisos_clinica_tipo_check CHECK ((tipo = ANY (ARRAY['reserva_enlace'::text, 'cancelacion_paciente'::text, 'reagendado_paciente'::text, 'google_por_asignar'::text, 'empalme_google'::text, 'google_movimiento_rechazado'::text, 'confirmacion_paciente'::text, 'google_movio_cita'::text, 'google_cancelo_cita'::text, 'correo_fallido'::text, 'personal_agendo'::text, 'personal_movio'::text, 'personal_cancelo'::text, 'paciente_no_asistira'::text, 'reserva_frenada'::text, 'google_desconectado'::text, 'google_sin_sincronizar'::text, 'personal_bloqueo'::text, 'personal_desbloqueo'::text])))
-+);
-+
-+
-+ALTER TABLE public.avisos_clinica OWNER TO postgres;
-+
-+--
-+-- Name: avisos_pendientes(text[], integer); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) RETURNS SETOF public.avisos_clinica
-+    LANGUAGE sql STABLE
-+    SET search_path TO ''
-+    AS $$
-+  SELECT a.*
-+    FROM public.avisos_clinica a
-+   WHERE a.clinica_id = public.get_clinica_id()
-+     AND a.revisado_en IS NULL
-+     AND a.tipo = ANY (coalesce(p_tipos, ARRAY[]::text[]))
-+     AND NOT EXISTS (SELECT 1 FROM public.avisos_vistos v
-+                      WHERE v.aviso_id = a.id AND v.usuario_id = auth.uid() AND v.visto_en >= a.creado_en)
-+   ORDER BY a.creado_en DESC
-+   LIMIT least(greatest(coalesce(p_limite, 50), 1), 200)
-+$$;
-+
-+
-+ALTER FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) OWNER TO postgres;
-+
-+--
- -- Name: cita_asignacion_google(); Type: FUNCTION; Schema: public; Owner: postgres
- --
- 
-@@ -1394,6 +1699,92 @@
- ALTER FUNCTION public.cita_rsvp_google(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_aceptaron text[]) OWNER TO postgres;
- 
- --
-+-- Name: cita_rsvp_google_rechazo(uuid, uuid, text, text, text[]); Type: FUNCTION; Schema: public; Owner: postgres
-+--
-+
-+CREATE FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) RETURNS TABLE(r_resultado text, r_para text, r_nombre text, r_inicio timestamp with time zone, r_fin timestamp with time zone, r_zona text, r_medico jsonb, r_consultorio jsonb, r_gcal_etag text, r_medico_id uuid)
-+    LANGUAGE plpgsql
-+    SET search_path TO ''
-+    AS $$
-+DECLARE
-+  v_a       record;
-+  v_correos text[];
-+  v_ahora   timestamptz;
-+BEGIN
-+  IF p_clinica_id IS NULL OR p_cita_id IS NULL OR p_calendar_id IS NULL OR p_google_event_id IS NULL
-+     OR p_rechazaron IS NULL OR cardinality(p_rechazaron) > 50
-+     OR EXISTS (SELECT 1 FROM unnest(p_rechazaron) c WHERE c IS NULL OR length(c) > 254) THEN
-+    RAISE EXCEPTION 'cita_rsvp_google_rechazo: argumentos inválidos' USING ERRCODE = '22023';
-+  END IF;
-+  r_resultado := 'sin_cambio';
-+  SELECT coalesce(array_agg(DISTINCT lower(btrim(c))) FILTER (WHERE btrim(c) <> ''), ARRAY[]::text[])
-+    INTO v_correos FROM unnest(p_rechazaron) c;
-+  IF cardinality(v_correos) = 0
-+     OR NOT public.agenda_v2_encendida(p_clinica_id)
-+     OR NOT EXISTS (SELECT 1 FROM public.clinica_conexiones_google g
-+                     WHERE g.clinica_id = p_clinica_id AND g.rol = 'clinica' AND g.estado = 'activa'
-+                       AND g.calendar_id = p_calendar_id) THEN
-+    RETURN NEXT; RETURN;
-+  END IF;
-+  SELECT a.id, a.updated_at, a.end_time, a.medico_id, a.gcal_etag, a.consultorio_timezone,
-+         a.consultorio_nombre, a.consultorio_direccion, a.consultorio_telefono,
-+         -- A quién se le escribe: al correo que rechazó. A un paciente dado de baja, a nadie.
-+         CASE WHEN p.id IS NOT NULL AND p.activo IS FALSE THEN NULL
-+              WHEN lower(btrim(p.email)) = ANY (v_correos) THEN btrim(p.email)
-+              ELSE btrim(a.reserva_correo) END AS para,
-+         coalesce(nullif(btrim(p.nombre), ''), nullif(btrim(a.reserva_nombre), '')) AS nombre
-+    INTO v_a
-+    FROM public.appointments a
-+    LEFT JOIN public.pacientes p ON p.id = a.paciente_id AND p.clinica_id = p_clinica_id
-+   WHERE a.id = p_cita_id AND a.clinica_id = p_clinica_id
-+     AND a.google_event_id = p_google_event_id
-+     AND (a.gcal_calendar_id IS NULL OR a.gcal_calendar_id = p_calendar_id)
-+     AND a.status IN ('scheduled', 'confirmed') AND NOT a.all_day
-+     AND (a.paciente_id IS NOT NULL OR a.reserva_canal IS NOT NULL)
-+     AND (lower(btrim(p.email)) = ANY (v_correos) OR lower(btrim(a.reserva_correo)) = ANY (v_correos))
-+   FOR UPDATE OF a;
-+  IF NOT FOUND THEN
-+    RETURN NEXT; RETURN;
-+  END IF;
-+  -- Hora REAL tras el candado: la cita tiene que seguir siendo futura.
-+  v_ahora := clock_timestamp();
-+  SELECT a.start_time INTO r_inicio FROM public.appointments a WHERE a.id = v_a.id AND a.start_time > v_ahora;
-+  IF NOT FOUND THEN
-+    RETURN NEXT; RETURN;
-+  END IF;
-+  r_nombre := v_a.nombre;
-+  -- Hasta 1 hora antes. A T-1h exacto ya no: la MISMA expresión que cita_confirmacion_responder.
-+  IF r_inicio - interval '1 hour' <= v_ahora THEN
-+    -- Última hora: no se cancela. Aviso «indicó que no asistirá», una vez por cita; decide el personal.
-+    IF public.aviso_clinica_registrar(p_clinica_id, 'paciente_no_asistira', v_a.id, NULL, NULL, NULL) THEN
-+      r_resultado := 'no_asistira';
-+    END IF;
-+    RETURN NEXT; RETURN;
-+  END IF;
-+  PERFORM set_config('spinus.via', 'google_rsvp', true);
-+  UPDATE public.appointments
-+     SET status = 'cancelled', updated_at = greatest(coalesce(v_a.updated_at, v_ahora), v_ahora)
-+   WHERE id = v_a.id AND clinica_id = p_clinica_id AND status IN ('scheduled', 'confirmed');
-+  r_resultado := 'cancelada';
-+  r_para := v_a.para;
-+  r_fin := v_a.end_time;
-+  r_zona := v_a.consultorio_timezone;
-+  r_gcal_etag := v_a.gcal_etag;
-+  -- Para que el servidor busque el enlace de reserva de ESE médico y lo ponga en el correo.
-+  r_medico_id := v_a.medico_id;
-+  r_medico := (SELECT jsonb_build_object('titulo', pr.titulo, 'nombres', pr.nombres, 'apellido_paterno', pr.apellido_paterno,
-+                                         'apellido_materno', pr.apellido_materno)
-+                 FROM public.profiles pr WHERE pr.id = v_a.medico_id AND pr.clinica_id = p_clinica_id);
-+  r_consultorio := jsonb_build_object('nombre', v_a.consultorio_nombre, 'direccion', v_a.consultorio_direccion,
-+                                      'telefono', v_a.consultorio_telefono);
-+  RETURN NEXT;
-+END
-+$$;
-+
-+
-+ALTER FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) OWNER TO postgres;
-+
-+--
- -- Name: cita_tiene_nota_ligada(uuid, uuid); Type: FUNCTION; Schema: public; Owner: postgres
- --
- 
-@@ -2930,10 +3321,6 @@
- 
- ALTER FUNCTION public.log_tabla_change() OWNER TO postgres;
- 
--SET default_tablespace = '';
--
--SET default_table_access_method = heap;
--
- --
- -- Name: consultorios; Type: TABLE; Schema: public; Owner: postgres
- --
-@@ -4899,23 +5286,18 @@
- ALTER TABLE public.audit_log OWNER TO postgres;
- 
- --
---- Name: avisos_clinica; Type: TABLE; Schema: public; Owner: postgres
-+-- Name: avisos_vistos; Type: TABLE; Schema: public; Owner: postgres
- --
- 
--CREATE TABLE public.avisos_clinica (
--    id uuid DEFAULT gen_random_uuid() NOT NULL,
-+CREATE TABLE public.avisos_vistos (
-+    aviso_id uuid NOT NULL,
-+    usuario_id uuid NOT NULL,
-     clinica_id uuid NOT NULL,
--    tipo text NOT NULL,
--    cita_id uuid NOT NULL,
--    creado_en timestamp with time zone DEFAULT now() NOT NULL,
--    revisado_en timestamp with time zone,
--    revisado_por uuid,
--    CONSTRAINT avisos_clinica_revisado_check CHECK (((revisado_por IS NULL) OR (revisado_en IS NOT NULL))),
--    CONSTRAINT avisos_clinica_tipo_check CHECK ((tipo = ANY (ARRAY['reserva_enlace'::text, 'cancelacion_paciente'::text, 'reagendado_paciente'::text, 'google_por_asignar'::text, 'empalme_google'::text, 'google_movimiento_rechazado'::text, 'confirmacion_paciente'::text])))
-+    visto_en timestamp with time zone DEFAULT now() NOT NULL
- );
- 
- 
--ALTER TABLE public.avisos_clinica OWNER TO postgres;
-+ALTER TABLE public.avisos_vistos OWNER TO postgres;
- 
- --
- -- Name: calculadora_resultados; Type: TABLE; Schema: public; Owner: postgres
-@@ -5810,6 +6192,14 @@
- 
- 
- --
-+-- Name: avisos_vistos avisos_vistos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
-+--
-+
-+ALTER TABLE ONLY public.avisos_vistos
-+    ADD CONSTRAINT avisos_vistos_pkey PRIMARY KEY (aviso_id, usuario_id);
-+
-+
-+--
- -- Name: calculadora_resultados calculadora_resultados_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
- --
- 
-@@ -6290,6 +6680,27 @@
- 
- 
- --
-+-- Name: avisos_clinica_sin_cita_key; Type: INDEX; Schema: public; Owner: postgres
-+--
-+
-+CREATE UNIQUE INDEX avisos_clinica_sin_cita_key ON public.avisos_clinica USING btree (clinica_id, tipo, COALESCE(medico_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(COALESCE((datos ->> 'nombre'::text), ''::text))) WHERE ((cita_id IS NULL) AND (revisado_en IS NULL) AND (tipo = ANY (ARRAY['reserva_frenada'::text, 'google_desconectado'::text, 'google_sin_sincronizar'::text])));
-+
-+
-+--
-+-- Name: avisos_vistos_clinica_idx; Type: INDEX; Schema: public; Owner: postgres
-+--
-+
-+CREATE INDEX avisos_vistos_clinica_idx ON public.avisos_vistos USING btree (clinica_id);
-+
-+
-+--
-+-- Name: avisos_vistos_usuario_idx; Type: INDEX; Schema: public; Owner: postgres
-+--
-+
-+CREATE INDEX avisos_vistos_usuario_idx ON public.avisos_vistos USING btree (usuario_id, aviso_id);
-+
-+
-+--
- -- Name: cita_confirmaciones_cita; Type: INDEX; Schema: public; Owner: postgres
- --
- 
-@@ -7151,6 +7562,20 @@
- 
- 
- --
-+-- Name: agenda_bloqueos trg_agenda_bloqueos_aviso_alta; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_agenda_bloqueos_aviso_alta AFTER INSERT ON public.agenda_bloqueos FOR EACH ROW WHEN (((auth.uid() IS NOT NULL) AND (auth.uid() <> new.medico_id))) EXECUTE FUNCTION public.aviso_clinica_de_bloqueo();
-+
-+
-+--
-+-- Name: agenda_bloqueos trg_agenda_bloqueos_aviso_baja; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_agenda_bloqueos_aviso_baja AFTER DELETE ON public.agenda_bloqueos FOR EACH ROW WHEN (((auth.uid() IS NOT NULL) AND (auth.uid() <> old.medico_id))) EXECUTE FUNCTION public.aviso_clinica_de_bloqueo();
-+
-+
-+--
- -- Name: agenda_bloqueos trg_agenda_bloqueos_preparar; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7172,6 +7597,20 @@
- 
- 
- --
-+-- Name: appointments trg_appointments_aviso_alta_personal; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_appointments_aviso_alta_personal AFTER INSERT ON public.appointments FOR EACH ROW WHEN (((new.medico_id IS NOT NULL) AND (auth.uid() IS NOT NULL) AND (auth.uid() <> new.medico_id))) EXECUTE FUNCTION public.aviso_clinica_de_cambio_cita();
-+
-+
-+--
-+-- Name: appointments trg_appointments_aviso_cambio; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_appointments_aviso_cambio AFTER UPDATE OF status, start_time, end_time ON public.appointments FOR EACH ROW WHEN ((((old.status IS DISTINCT FROM new.status) OR (old.start_time IS DISTINCT FROM new.start_time) OR (old.end_time IS DISTINCT FROM new.end_time)) AND (auth.uid() IS DISTINCT FROM new.medico_id))) EXECUTE FUNCTION public.aviso_clinica_de_cambio_cita();
-+
-+
-+--
- -- Name: appointments trg_appointments_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7249,6 +7688,13 @@
- 
- 
- --
-+-- Name: avisos_clinica trg_avisos_clinica_reabrir; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_avisos_clinica_reabrir BEFORE INSERT ON public.avisos_clinica FOR EACH ROW WHEN ((new.cita_id IS NOT NULL)) EXECUTE FUNCTION public.aviso_clinica_reabrir();
-+
-+
-+--
- -- Name: avisos_clinica trg_avisos_clinica_revisar; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7263,6 +7709,20 @@
- 
- 
- --
-+-- Name: avisos_vistos trg_avisos_vistos_sellar; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_avisos_vistos_sellar BEFORE INSERT OR UPDATE ON public.avisos_vistos FOR EACH ROW EXECUTE FUNCTION public.aviso_visto_sellar();
-+
-+
-+--
-+-- Name: avisos_vistos trg_avisos_vistos_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_avisos_vistos_sin_truncate BEFORE TRUNCATE ON public.avisos_vistos FOR EACH STATEMENT EXECUTE FUNCTION public.prohibir_truncate();
-+
-+
-+--
- -- Name: calculadora_resultados trg_calculadora_resultados_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7319,6 +7779,13 @@
- 
- 
- --
-+-- Name: cita_correos trg_cita_correos_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_cita_correos_aviso_clinica AFTER UPDATE OF estado ON public.cita_correos FOR EACH ROW WHEN (((old.estado IS DISTINCT FROM new.estado) AND (new.estado = 'fallido'::text) AND (new.tipo = ANY (ARRAY['comprobante'::text, 'recordatorio'::text])) AND (new.motivo = ANY (ARRAY['transporte'::text, 'plantilla'::text])) AND ((new.tipo = 'comprobante'::text) OR (new.intentos >= 3)))) EXECUTE FUNCTION public.aviso_clinica_de_correo();
-+
-+
-+--
- -- Name: cita_correos trg_cita_correos_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7354,6 +7821,13 @@
- 
- 
- --
-+-- Name: clinica_conexiones_google trg_conexiones_google_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_conexiones_google_aviso_clinica AFTER UPDATE OF estado ON public.clinica_conexiones_google FOR EACH ROW WHEN (((old.estado = 'activa'::text) AND (new.estado = 'revocada'::text) AND (new.rol = 'clinica'::text))) EXECUTE FUNCTION public.aviso_clinica_de_conexion_google();
-+
-+
-+--
- -- Name: consultas trg_consultas_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7445,6 +7919,13 @@
- 
- 
- --
-+-- Name: gcal_sync_estado trg_gcal_sync_estado_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
-+--
-+
-+CREATE TRIGGER trg_gcal_sync_estado_aviso_clinica AFTER UPDATE OF errores_seguidos ON public.gcal_sync_estado FOR EACH ROW WHEN (((new.errores_seguidos >= 3) AND (old.errores_seguidos < 3))) EXECUTE FUNCTION public.aviso_clinica_de_sync_google();
-+
-+
-+--
- -- Name: mediciones_analitos trg_mediciones_analitos_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
- --
- 
-@@ -7697,6 +8178,14 @@
- 
- 
- --
-+-- Name: avisos_vistos avisos_vistos_clinica_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
-+--
-+
-+ALTER TABLE ONLY public.avisos_vistos
-+    ADD CONSTRAINT avisos_vistos_clinica_id_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT;
-+
-+
-+--
- -- Name: calculadora_resultados calculadora_resultados_clinica_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
- --
- 
-@@ -8438,18 +8927,55 @@
- -- Name: avisos_clinica avisos_clinica_select; Type: POLICY; Schema: public; Owner: postgres
- --
- 
--CREATE POLICY avisos_clinica_select ON public.avisos_clinica FOR SELECT TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (EXISTS ( SELECT 1
--   FROM public.appointments a
--  WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))))));
-+CREATE POLICY avisos_clinica_select ON public.avisos_clinica FOR SELECT TO authenticated USING (((clinica_id = public.get_clinica_id()) AND ((destinatario_id IS NULL) OR (destinatario_id = auth.uid())) AND (actor_id IS DISTINCT FROM auth.uid()) AND
-+CASE
-+    WHEN (cita_id IS NOT NULL) THEN (EXISTS ( SELECT 1
-+       FROM public.appointments a
-+      WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))))
-+    ELSE ((medico_id IS NULL) OR (medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text))
-+END));
- 
- 
- --
- -- Name: avisos_clinica avisos_clinica_update; Type: POLICY; Schema: public; Owner: postgres
- --
- 
--CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (revisado_en IS NULL) AND (EXISTS ( SELECT 1
--   FROM public.appointments a
--  WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id())))))) WITH CHECK (((clinica_id = public.get_clinica_id()) AND (revisado_por = auth.uid())));
-+CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (revisado_en IS NULL) AND ((destinatario_id IS NULL) OR (destinatario_id = auth.uid())) AND (actor_id IS DISTINCT FROM auth.uid()) AND
-+CASE
-+    WHEN (cita_id IS NOT NULL) THEN (EXISTS ( SELECT 1
-+       FROM public.appointments a
-+      WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))))
-+    ELSE ((medico_id IS NULL) OR (medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text))
-+END)) WITH CHECK (((clinica_id = public.get_clinica_id()) AND (revisado_por = auth.uid())));
-+
-+
-+--
-+-- Name: avisos_vistos; Type: ROW SECURITY; Schema: public; Owner: postgres
-+--
-+
-+ALTER TABLE public.avisos_vistos ENABLE ROW LEVEL SECURITY;
-+
-+--
-+-- Name: avisos_vistos avisos_vistos_insert; Type: POLICY; Schema: public; Owner: postgres
-+--
-+
-+CREATE POLICY avisos_vistos_insert ON public.avisos_vistos FOR INSERT TO authenticated WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id()) AND (EXISTS ( SELECT 1
-+   FROM public.avisos_clinica a
-+  WHERE ((a.id = avisos_vistos.aviso_id) AND (a.clinica_id = public.get_clinica_id()))))));
-+
-+
-+--
-+-- Name: avisos_vistos avisos_vistos_select; Type: POLICY; Schema: public; Owner: postgres
-+--
-+
-+CREATE POLICY avisos_vistos_select ON public.avisos_vistos FOR SELECT TO authenticated USING ((usuario_id = auth.uid()));
-+
-+
-+--
-+-- Name: avisos_vistos avisos_vistos_update; Type: POLICY; Schema: public; Owner: postgres
-+--
-+
-+CREATE POLICY avisos_vistos_update ON public.avisos_vistos FOR UPDATE TO authenticated USING (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id()))) WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id())));
- 
- 
- --
-@@ -9324,6 +9850,26 @@
- 
- 
- --
-+-- Name: FUNCTION aviso_clinica_de_bloqueo(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_de_bloqueo() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_bloqueo() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_bloqueo() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_bloqueo() TO service_role;
-+
-+
-+--
-+-- Name: FUNCTION aviso_clinica_de_cambio_cita(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() TO service_role;
-+
-+
-+--
- -- Name: FUNCTION aviso_clinica_de_cita(); Type: ACL; Schema: public; Owner: postgres
- --
- 
-@@ -9334,6 +9880,16 @@
- 
- 
- --
-+-- Name: FUNCTION aviso_clinica_de_conexion_google(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_de_conexion_google() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_conexion_google() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_conexion_google() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_conexion_google() TO service_role;
-+
-+
-+--
- -- Name: FUNCTION aviso_clinica_de_confirmacion(); Type: ACL; Schema: public; Owner: postgres
- --
- 
-@@ -9344,6 +9900,16 @@
- 
- 
- --
-+-- Name: FUNCTION aviso_clinica_de_correo(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_de_correo() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_correo() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_correo() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_correo() TO service_role;
-+
-+
-+--
- -- Name: FUNCTION aviso_clinica_de_empalme(); Type: ACL; Schema: public; Owner: postgres
- --
- 
-@@ -9384,6 +9950,34 @@
- 
- 
- --
-+-- Name: FUNCTION aviso_clinica_de_sync_google(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_de_sync_google() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_sync_google() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_sync_google() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_clinica_de_sync_google() TO service_role;
-+
-+
-+--
-+-- Name: FUNCTION aviso_clinica_reabrir(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_reabrir() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_reabrir() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_clinica_reabrir() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_clinica_reabrir() TO service_role;
-+
-+
-+--
-+-- Name: FUNCTION aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) TO service_role;
-+
-+
-+--
- -- Name: FUNCTION aviso_clinica_revisar(); Type: ACL; Schema: public; Owner: postgres
- --
- 
-@@ -9394,6 +9988,45 @@
- 
- 
- --
-+-- Name: FUNCTION aviso_visto_sellar(); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.aviso_visto_sellar() FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO anon;
-+GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO authenticated;
-+GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO service_role;
-+
-+
-+--
-+-- Name: TABLE avisos_clinica; Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+GRANT SELECT ON TABLE public.avisos_clinica TO authenticated;
-+
-+
-+--
-+-- Name: COLUMN avisos_clinica.revisado_en; Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+GRANT UPDATE(revisado_en) ON TABLE public.avisos_clinica TO authenticated;
-+
-+
-+--
-+-- Name: COLUMN avisos_clinica.revisado_por; Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+GRANT UPDATE(revisado_por) ON TABLE public.avisos_clinica TO authenticated;
-+
-+
-+--
-+-- Name: FUNCTION avisos_pendientes(p_tipos text[], p_limite integer); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) TO authenticated;
-+
-+
-+--
- -- Name: FUNCTION cita_asignacion_google(); Type: ACL; Schema: public; Owner: postgres
- --
- 
-@@ -9570,6 +10203,14 @@
- 
- 
- --
-+-- Name: FUNCTION cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]); Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+REVOKE ALL ON FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) FROM PUBLIC;
-+GRANT ALL ON FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) TO service_role;
-+
-+
-+--
- -- Name: FUNCTION cita_tiene_nota_ligada(p_cita uuid, p_clinica uuid); Type: ACL; Schema: public; Owner: postgres
- --
- 
-@@ -10385,24 +11026,38 @@
- 
- 
- --
---- Name: TABLE avisos_clinica; Type: ACL; Schema: public; Owner: postgres
-+-- Name: TABLE avisos_vistos; Type: ACL; Schema: public; Owner: postgres
- --
- 
--GRANT SELECT ON TABLE public.avisos_clinica TO authenticated;
-+GRANT SELECT ON TABLE public.avisos_vistos TO authenticated;
- 
- 
- --
---- Name: COLUMN avisos_clinica.revisado_en; Type: ACL; Schema: public; Owner: postgres
-+-- Name: COLUMN avisos_vistos.aviso_id; Type: ACL; Schema: public; Owner: postgres
- --
- 
--GRANT UPDATE(revisado_en) ON TABLE public.avisos_clinica TO authenticated;
-+GRANT INSERT(aviso_id) ON TABLE public.avisos_vistos TO authenticated;
- 
- 
- --
---- Name: COLUMN avisos_clinica.revisado_por; Type: ACL; Schema: public; Owner: postgres
-+-- Name: COLUMN avisos_vistos.usuario_id; Type: ACL; Schema: public; Owner: postgres
- --
- 
--GRANT UPDATE(revisado_por) ON TABLE public.avisos_clinica TO authenticated;
-+GRANT INSERT(usuario_id) ON TABLE public.avisos_vistos TO authenticated;
-+
-+
-+--
-+-- Name: COLUMN avisos_vistos.clinica_id; Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+GRANT INSERT(clinica_id) ON TABLE public.avisos_vistos TO authenticated;
-+
-+
-+--
-+-- Name: COLUMN avisos_vistos.visto_en; Type: ACL; Schema: public; Owner: postgres
-+--
-+
-+GRANT UPDATE(visto_en) ON TABLE public.avisos_vistos TO authenticated;
- 
- 
- --
-@@ -10915,5 +11570,5 @@
- -- PostgreSQL database dump complete
- --
- 
--\unrestrict q29fATMvPExjHw1EgqwoBz3FZEZ42GMVc1X73CFMF8UEEYNN5vnSa6aV5szHzFC
-+\unrestrict o5Uxikqffc3LbevaLzHqbOyGK7hI4UNRyG36D9y33g471e6fZjAzNY8XiFBDu70
- 
+389a390,479
+> -- Name: aviso_clinica_de_bloqueo(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_de_bloqueo() RETURNS trigger
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> DECLARE
+>   v_uid uuid;
+>   v_b   record;
+> BEGIN
+>   BEGIN
+>     v_uid := auth.uid();
+>     IF TG_OP = 'DELETE' THEN v_b := OLD; ELSE v_b := NEW; END IF;
+>     -- Sin sesión (Google, el servidor) o el médico en lo suyo: nada.
+>     IF v_uid IS NOT NULL AND v_b.medico_id IS DISTINCT FROM v_uid AND public.agenda_v2_encendida(v_b.clinica_id) THEN
+>       INSERT INTO public.avisos_clinica (clinica_id, tipo, medico_id, destinatario_id, actor_id, datos)
+>       VALUES (v_b.clinica_id, CASE TG_OP WHEN 'DELETE' THEN 'personal_desbloqueo' ELSE 'personal_bloqueo' END,
+>               v_b.medico_id, v_b.medico_id, v_uid,
+>               jsonb_build_object('inicio', v_b.inicio, 'fin', v_b.fin, 'todo_el_dia', v_b.todo_el_dia, 'zona', v_b.zona));
+>     END IF;
+>   EXCEPTION WHEN OTHERS THEN
+>     RAISE WARNING 'aviso_clinica_de_bloqueo: aviso no escrito (SQLSTATE %)', SQLSTATE;
+>   END;
+>   RETURN NULL;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_de_bloqueo() OWNER TO postgres;
+> 
+> --
+> -- Name: aviso_clinica_de_cambio_cita(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_de_cambio_cita() RETURNS trigger
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> DECLARE
+>   v_uid   uuid;
+>   v_via   text;
+>   v_tipo  text;
+>   v_movio   boolean := false;
+>   v_cancelo boolean := false;
+>   v_confirmo boolean := false;
+> BEGIN
+>   -- ⚠️ TODO dentro del subbloque: leer la sesión, el interruptor y el alta. Un fallo de
+>   -- cualquiera de los tres deja un WARNING y la cita se guarda igual.
+>   BEGIN
+>     v_uid := auth.uid();
+>     v_via := current_setting('spinus.via', true);
+>     -- OLD sólo existe en UPDATE: no se nombra fuera de este IF.
+>     IF TG_OP = 'UPDATE' THEN
+>       v_movio := OLD.start_time IS DISTINCT FROM NEW.start_time OR OLD.end_time IS DISTINCT FROM NEW.end_time;
+>       v_cancelo := NEW.status = 'cancelled' AND OLD.status IS DISTINCT FROM 'cancelled';
+>       v_confirmo := NEW.status = 'confirmed' AND OLD.status IS DISTINCT FROM 'confirmed';
+>     END IF;
+>     IF v_uid IS NOT NULL THEN
+>       -- El médico en su propia agenda (o una fila sin médico) no avisa a nadie.
+>       IF NEW.medico_id IS NOT NULL AND NEW.medico_id <> v_uid THEN
+>         v_tipo := CASE WHEN TG_OP = 'INSERT' THEN 'personal_agendo' WHEN v_cancelo THEN 'personal_cancelo'
+>                        WHEN v_movio AND NEW.status <> 'cancelled' THEN 'personal_movio' END;
+>       END IF;
+>     ELSIF TG_OP = 'UPDATE' AND (NEW.paciente_id IS NOT NULL OR NEW.reserva_canal IS NOT NULL) THEN
+>       v_tipo := CASE
+>         WHEN v_via = 'google_rsvp' AND v_confirmo THEN 'confirmacion_paciente'
+>         WHEN v_via = 'google_rsvp' AND v_cancelo THEN 'cancelacion_paciente'
+>         WHEN v_via = 'google' AND v_cancelo THEN 'google_cancelo_cita'
+>         WHEN v_via = 'google' AND v_movio AND NEW.status <> 'cancelled' THEN 'google_movio_cita' END;
+>     END IF;
+>     IF v_tipo IS NOT NULL AND public.agenda_v2_encendida(NEW.clinica_id) THEN
+>       -- Si ya hay uno sin cerrar de ese tipo y cita, trg_avisos_clinica_reabrir lo refresca y se salta el alta.
+>       INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id, destinatario_id, actor_id)
+>       VALUES (NEW.clinica_id, v_tipo, NEW.id,
+>               CASE WHEN v_tipo LIKE 'personal\_%' THEN NEW.medico_id END, CASE WHEN v_tipo LIKE 'personal\_%' THEN v_uid END)
+>       ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
+>     END IF;
+>   EXCEPTION WHEN OTHERS THEN
+>     -- Un aviso nunca impide guardar la cita. Sin datos de nadie en el mensaje.
+>     RAISE WARNING 'aviso_clinica_de_cambio_cita: aviso % no escrito (SQLSTATE %)', coalesce(v_tipo, '(sin decidir)'), SQLSTATE;
+>   END;
+>   RETURN NULL;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_de_cambio_cita() OWNER TO postgres;
+> 
+> --
+408a499,526
+> -- Name: aviso_clinica_de_conexion_google(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_de_conexion_google() RETURNS trigger
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   BEGIN
+>     IF public.agenda_v2_encendida(NEW.clinica_id) THEN
+>       INSERT INTO public.avisos_clinica (clinica_id, tipo) VALUES (NEW.clinica_id, 'google_desconectado')
+>       ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+>                    (lower(coalesce(datos ->> 'nombre', ''))))
+>         WHERE cita_id IS NULL AND revisado_en IS NULL
+>           AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
+>       DO UPDATE SET creado_en = clock_timestamp();
+>     END IF;
+>   EXCEPTION WHEN OTHERS THEN
+>     RAISE WARNING 'aviso_clinica_de_conexion_google: aviso no escrito (SQLSTATE %)', SQLSTATE;
+>   END;
+>   RETURN NULL;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_de_conexion_google() OWNER TO postgres;
+> 
+> --
+427a546,569
+> -- Name: aviso_clinica_de_correo(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_de_correo() RETURNS trigger
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   BEGIN
+>     IF public.agenda_v2_encendida(NEW.clinica_id) THEN
+>       INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (NEW.clinica_id, 'correo_fallido', NEW.appointment_id)
+>       ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
+>     END IF;
+>   EXCEPTION WHEN OTHERS THEN
+>     RAISE WARNING 'aviso_clinica_de_correo: aviso no escrito (SQLSTATE %)', SQLSTATE;
+>   END;
+>   RETURN NULL;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_de_correo() OWNER TO postgres;
+> 
+> --
+509a652,770
+> -- Name: aviso_clinica_de_sync_google(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_de_sync_google() RETURNS trigger
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   BEGIN
+>     IF public.agenda_v2_encendida(NEW.clinica_id) THEN
+>       INSERT INTO public.avisos_clinica (clinica_id, tipo) VALUES (NEW.clinica_id, 'google_sin_sincronizar')
+>       ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+>                    (lower(coalesce(datos ->> 'nombre', ''))))
+>         WHERE cita_id IS NULL AND revisado_en IS NULL
+>           AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
+>       DO UPDATE SET creado_en = clock_timestamp();
+>     END IF;
+>   EXCEPTION WHEN OTHERS THEN
+>     RAISE WARNING 'aviso_clinica_de_sync_google: aviso no escrito (SQLSTATE %)', SQLSTATE;
+>   END;
+>   RETURN NULL;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_de_sync_google() OWNER TO postgres;
+> 
+> --
+> -- Name: aviso_clinica_reabrir(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_reabrir() RETURNS trigger
+>     LANGUAGE plpgsql
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   BEGIN
+>     -- ¿Hay ya uno sin cerrar? Lectura sin candado: lo ve aunque otra transacción lo esté refrescando.
+>     IF EXISTS (SELECT 1 FROM public.avisos_clinica b
+>                 WHERE b.tipo = NEW.tipo AND b.cita_id = NEW.cita_id AND b.revisado_en IS NULL) THEN
+>       UPDATE public.avisos_clinica a
+>          SET creado_en = clock_timestamp(), actor_id = NEW.actor_id, destinatario_id = NEW.destinatario_id
+>        WHERE a.id IN (SELECT b.id FROM public.avisos_clinica b
+>                        WHERE b.tipo = NEW.tipo AND b.cita_id = NEW.cita_id AND b.revisado_en IS NULL
+>                          FOR UPDATE SKIP LOCKED);
+>       -- Refrescado, o tomado por otro hecho de la misma cita: en los dos casos el alta sobra.
+>       RETURN NULL;
+>     END IF;
+>   EXCEPTION WHEN OTHERS THEN
+>     RAISE WARNING 'aviso_clinica_reabrir: aviso % no refrescado (SQLSTATE %)', NEW.tipo, SQLSTATE;
+>   END;
+>   RETURN NEW;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_reabrir() OWNER TO postgres;
+> 
+> --
+> -- Name: aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) RETURNS boolean
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> DECLARE
+>   v_medico uuid;
+>   -- El nombre tecleado, como reserva_nombre: recortado, sin caracteres de control, 120 como mucho.
+>   v_nombre text := left(btrim(regexp_replace(coalesce(p_nombre, ''), '[[:cntrl:]]+', ' ', 'g')), 120);
+> BEGIN
+>   IF p_clinica_id IS NULL OR p_tipo IS NULL OR p_tipo NOT IN ('reserva_frenada', 'personal_movio', 'paciente_no_asistira') THEN
+>     RAISE EXCEPTION 'aviso_clinica_registrar: argumentos inválidos' USING ERRCODE = '22023';
+>   END IF;
+>   IF NOT public.agenda_v2_encendida(p_clinica_id) THEN RETURN false; END IF;
+>   IF p_tipo = 'reserva_frenada' THEN
+>     IF p_medico_id IS NULL OR v_nombre = '' OR NOT EXISTS (SELECT 1 FROM public.profiles pr
+>                                                            WHERE pr.id = p_medico_id AND pr.clinica_id = p_clinica_id
+>                                                              AND pr.role = 'medico') THEN
+>       RETURN false;
+>     END IF;
+>     INSERT INTO public.avisos_clinica AS a (clinica_id, tipo, medico_id, datos)
+>     VALUES (p_clinica_id, 'reserva_frenada', p_medico_id, jsonb_build_object('nombre', v_nombre, 'intentos', 1))
+>     ON CONFLICT (clinica_id, tipo, (coalesce(medico_id, '00000000-0000-0000-0000-000000000000'::uuid)),
+>                  (lower(coalesce(datos ->> 'nombre', ''))))
+>       WHERE cita_id IS NULL AND revisado_en IS NULL
+>         AND tipo IN ('reserva_frenada', 'google_desconectado', 'google_sin_sincronizar')
+>     DO UPDATE SET creado_en = clock_timestamp(),
+>                   datos = a.datos || jsonb_build_object('intentos', coalesce((a.datos ->> 'intentos')::integer, 0) + 1);
+>     RETURN true;
+>   END IF;
+>   SELECT c.medico_id INTO v_medico FROM public.appointments c
+>    WHERE c.id = p_cita_id AND c.clinica_id = p_clinica_id;
+>   IF NOT FOUND THEN RETURN false; END IF;
+>   IF p_tipo = 'paciente_no_asistira' THEN
+>     -- Una vez por cita, la haya visto alguien o no: cada pasada de la sincronización vuelve a llamar.
+>     IF EXISTS (SELECT 1 FROM public.avisos_clinica a WHERE a.tipo = 'paciente_no_asistira' AND a.cita_id = p_cita_id
+>                   AND a.clinica_id = p_clinica_id) THEN
+>       RETURN false;
+>     END IF;
+>     INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id) VALUES (p_clinica_id, 'paciente_no_asistira', p_cita_id)
+>     ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
+>     RETURN true;
+>   END IF;
+>   IF v_medico IS NULL OR p_actor_id IS NULL OR v_medico = p_actor_id
+>      OR NOT EXISTS (SELECT 1 FROM public.profiles pr WHERE pr.id = p_actor_id AND pr.clinica_id = p_clinica_id) THEN
+>     RETURN false;
+>   END IF;
+>   INSERT INTO public.avisos_clinica (clinica_id, tipo, cita_id, destinatario_id, actor_id)
+>   VALUES (p_clinica_id, 'personal_movio', p_cita_id, v_medico, p_actor_id)
+>   ON CONFLICT (tipo, cita_id) WHERE revisado_en IS NULL DO NOTHING;
+>   RETURN true;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) OWNER TO postgres;
+> 
+> --
+531a793,868
+> -- Name: aviso_visto_sellar(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_visto_sellar() RETURNS trigger
+>     LANGUAGE plpgsql
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   -- Hora REAL (no la del inicio de la transacción): se compara con creado_en para saber si el aviso se reabrió después.
+>   NEW.visto_en := clock_timestamp();
+>   RETURN NEW;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_visto_sellar() OWNER TO postgres;
+> 
+> SET default_tablespace = '';
+> 
+> SET default_table_access_method = heap;
+> 
+> --
+> -- Name: avisos_clinica; Type: TABLE; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TABLE public.avisos_clinica (
+>     id uuid DEFAULT gen_random_uuid() NOT NULL,
+>     clinica_id uuid NOT NULL,
+>     tipo text NOT NULL,
+>     cita_id uuid,
+>     creado_en timestamp with time zone DEFAULT now() NOT NULL,
+>     revisado_en timestamp with time zone,
+>     revisado_por uuid,
+>     destinatario_id uuid,
+>     actor_id uuid,
+>     medico_id uuid,
+>     datos jsonb,
+>     CONSTRAINT avisos_clinica_cita_tipo_check CHECK (((tipo = ANY (ARRAY['reserva_frenada'::text, 'google_desconectado'::text, 'google_sin_sincronizar'::text, 'personal_bloqueo'::text, 'personal_desbloqueo'::text])) = (cita_id IS NULL))),
+>     CONSTRAINT avisos_clinica_datos_check CHECK (((datos IS NULL) OR ((jsonb_typeof(datos) = 'object'::text) AND ((NOT (datos ? 'nombre'::text)) OR ((tipo = 'reserva_frenada'::text) AND (jsonb_typeof((datos -> 'nombre'::text)) = 'string'::text) AND ((char_length((datos ->> 'nombre'::text)) >= 1) AND (char_length((datos ->> 'nombre'::text)) <= 120))))))),
+>     CONSTRAINT avisos_clinica_revisado_check CHECK (((revisado_por IS NULL) OR (revisado_en IS NOT NULL))),
+>     CONSTRAINT avisos_clinica_tipo_check CHECK ((tipo = ANY (ARRAY['reserva_enlace'::text, 'cancelacion_paciente'::text, 'reagendado_paciente'::text, 'google_por_asignar'::text, 'empalme_google'::text, 'google_movimiento_rechazado'::text, 'confirmacion_paciente'::text, 'google_movio_cita'::text, 'google_cancelo_cita'::text, 'correo_fallido'::text, 'personal_agendo'::text, 'personal_movio'::text, 'personal_cancelo'::text, 'paciente_no_asistira'::text, 'reserva_frenada'::text, 'google_desconectado'::text, 'google_sin_sincronizar'::text, 'personal_bloqueo'::text, 'personal_desbloqueo'::text])))
+> );
+> 
+> 
+> ALTER TABLE public.avisos_clinica OWNER TO postgres;
+> 
+> --
+> -- Name: avisos_pendientes(text[], integer); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) RETURNS SETOF public.avisos_clinica
+>     LANGUAGE sql STABLE
+>     SET search_path TO ''
+>     AS $$
+>   SELECT a.*
+>     FROM (SELECT c.*
+>             FROM public.avisos_clinica c
+>            WHERE c.clinica_id = public.get_clinica_id()
+>              AND c.revisado_en IS NULL
+>              AND c.creado_en >= now() - interval '60 days'
+>              AND c.tipo = ANY (coalesce(p_tipos, ARRAY[]::text[]))
+>            ORDER BY c.creado_en DESC
+>            LIMIT 500) a
+>    -- Mi marca de ESE aviso, buscada por su llave (aviso_id, usuario_id). Va como subconsulta
+>    -- escalar a propósito: con NOT EXISTS Postgres puede cargar TODAS mis marcas de siempre
+>    -- para cruzarlas, y esa tabla tampoco deja de crecer. Sin marca (NULL) = pendiente.
+>    WHERE coalesce((SELECT v.visto_en FROM public.avisos_vistos v
+>                     WHERE v.aviso_id = a.id AND v.usuario_id = auth.uid()) < a.creado_en, true)
+>    ORDER BY a.creado_en DESC
+>    LIMIT least(greatest(coalesce(p_limite, 50), 1), 200)
+> $$;
+> 
+> 
+> ALTER FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) OWNER TO postgres;
+> 
+> --
+1395a1733,1818
+> -- Name: cita_rsvp_google_rechazo(uuid, uuid, text, text, text[]); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) RETURNS TABLE(r_resultado text, r_para text, r_nombre text, r_inicio timestamp with time zone, r_fin timestamp with time zone, r_zona text, r_medico jsonb, r_consultorio jsonb, r_gcal_etag text, r_medico_id uuid)
+>     LANGUAGE plpgsql
+>     SET search_path TO ''
+>     AS $$
+> DECLARE
+>   v_a       record;
+>   v_correos text[];
+>   v_ahora   timestamptz;
+> BEGIN
+>   IF p_clinica_id IS NULL OR p_cita_id IS NULL OR p_calendar_id IS NULL OR p_google_event_id IS NULL
+>      OR p_rechazaron IS NULL OR cardinality(p_rechazaron) > 50
+>      OR EXISTS (SELECT 1 FROM unnest(p_rechazaron) c WHERE c IS NULL OR length(c) > 254) THEN
+>     RAISE EXCEPTION 'cita_rsvp_google_rechazo: argumentos inválidos' USING ERRCODE = '22023';
+>   END IF;
+>   r_resultado := 'sin_cambio';
+>   SELECT coalesce(array_agg(DISTINCT lower(btrim(c))) FILTER (WHERE btrim(c) <> ''), ARRAY[]::text[])
+>     INTO v_correos FROM unnest(p_rechazaron) c;
+>   IF cardinality(v_correos) = 0
+>      OR NOT public.agenda_v2_encendida(p_clinica_id)
+>      OR NOT EXISTS (SELECT 1 FROM public.clinica_conexiones_google g
+>                      WHERE g.clinica_id = p_clinica_id AND g.rol = 'clinica' AND g.estado = 'activa'
+>                        AND g.calendar_id = p_calendar_id) THEN
+>     RETURN NEXT; RETURN;
+>   END IF;
+>   SELECT a.id, a.updated_at, a.end_time, a.medico_id, a.gcal_etag, a.consultorio_timezone,
+>          a.consultorio_nombre, a.consultorio_direccion, a.consultorio_telefono,
+>          -- A quién se le escribe: al correo que rechazó. A un paciente dado de baja, a nadie.
+>          CASE WHEN p.id IS NOT NULL AND p.activo IS FALSE THEN NULL
+>               WHEN lower(btrim(p.email)) = ANY (v_correos) THEN btrim(p.email)
+>               ELSE btrim(a.reserva_correo) END AS para,
+>          coalesce(nullif(btrim(p.nombre), ''), nullif(btrim(a.reserva_nombre), '')) AS nombre
+>     INTO v_a
+>     FROM public.appointments a
+>     LEFT JOIN public.pacientes p ON p.id = a.paciente_id AND p.clinica_id = p_clinica_id
+>    WHERE a.id = p_cita_id AND a.clinica_id = p_clinica_id
+>      AND a.google_event_id = p_google_event_id
+>      AND (a.gcal_calendar_id IS NULL OR a.gcal_calendar_id = p_calendar_id)
+>      AND a.status IN ('scheduled', 'confirmed') AND NOT a.all_day
+>      AND (a.paciente_id IS NOT NULL OR a.reserva_canal IS NOT NULL)
+>      AND (lower(btrim(p.email)) = ANY (v_correos) OR lower(btrim(a.reserva_correo)) = ANY (v_correos))
+>    FOR UPDATE OF a;
+>   IF NOT FOUND THEN
+>     RETURN NEXT; RETURN;
+>   END IF;
+>   -- Hora REAL tras el candado: la cita tiene que seguir siendo futura.
+>   v_ahora := clock_timestamp();
+>   SELECT a.start_time INTO r_inicio FROM public.appointments a WHERE a.id = v_a.id AND a.start_time > v_ahora;
+>   IF NOT FOUND THEN
+>     RETURN NEXT; RETURN;
+>   END IF;
+>   r_nombre := v_a.nombre;
+>   -- Hasta 1 hora antes. A T-1h exacto ya no: la MISMA expresión que cita_confirmacion_responder.
+>   IF r_inicio - interval '1 hour' <= v_ahora THEN
+>     -- Última hora: no se cancela. Aviso «indicó que no asistirá», una vez por cita; decide el personal.
+>     IF public.aviso_clinica_registrar(p_clinica_id, 'paciente_no_asistira', v_a.id, NULL, NULL, NULL) THEN
+>       r_resultado := 'no_asistira';
+>     END IF;
+>     RETURN NEXT; RETURN;
+>   END IF;
+>   PERFORM set_config('spinus.via', 'google_rsvp', true);
+>   UPDATE public.appointments
+>      SET status = 'cancelled', updated_at = greatest(coalesce(v_a.updated_at, v_ahora), v_ahora)
+>    WHERE id = v_a.id AND clinica_id = p_clinica_id AND status IN ('scheduled', 'confirmed');
+>   r_resultado := 'cancelada';
+>   r_para := v_a.para;
+>   r_fin := v_a.end_time;
+>   r_zona := v_a.consultorio_timezone;
+>   r_gcal_etag := v_a.gcal_etag;
+>   -- Para que el servidor busque el enlace de reserva de ESE médico y lo ponga en el correo.
+>   r_medico_id := v_a.medico_id;
+>   r_medico := (SELECT jsonb_build_object('titulo', pr.titulo, 'nombres', pr.nombres, 'apellido_paterno', pr.apellido_paterno,
+>                                          'apellido_materno', pr.apellido_materno)
+>                  FROM public.profiles pr WHERE pr.id = v_a.medico_id AND pr.clinica_id = p_clinica_id);
+>   r_consultorio := jsonb_build_object('nombre', v_a.consultorio_nombre, 'direccion', v_a.consultorio_direccion,
+>                                       'telefono', v_a.consultorio_telefono);
+>   RETURN NEXT;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) OWNER TO postgres;
+> 
+> --
+2932,2935d3354
+< SET default_tablespace = '';
+< 
+< SET default_table_access_method = heap;
+< 
+4901c5320
+< -- Name: avisos_clinica; Type: TABLE; Schema: public; Owner: postgres
+---
+> -- Name: avisos_vistos; Type: TABLE; Schema: public; Owner: postgres
+4904,4905c5323,5325
+< CREATE TABLE public.avisos_clinica (
+<     id uuid DEFAULT gen_random_uuid() NOT NULL,
+---
+> CREATE TABLE public.avisos_vistos (
+>     aviso_id uuid NOT NULL,
+>     usuario_id uuid NOT NULL,
+4907,4913c5327
+<     tipo text NOT NULL,
+<     cita_id uuid NOT NULL,
+<     creado_en timestamp with time zone DEFAULT now() NOT NULL,
+<     revisado_en timestamp with time zone,
+<     revisado_por uuid,
+<     CONSTRAINT avisos_clinica_revisado_check CHECK (((revisado_por IS NULL) OR (revisado_en IS NOT NULL))),
+<     CONSTRAINT avisos_clinica_tipo_check CHECK ((tipo = ANY (ARRAY['reserva_enlace'::text, 'cancelacion_paciente'::text, 'reagendado_paciente'::text, 'google_por_asignar'::text, 'empalme_google'::text, 'google_movimiento_rechazado'::text, 'confirmacion_paciente'::text])))
+---
+>     visto_en timestamp with time zone DEFAULT now() NOT NULL
+4917c5331
+< ALTER TABLE public.avisos_clinica OWNER TO postgres;
+---
+> ALTER TABLE public.avisos_vistos OWNER TO postgres;
+5811a6226,6233
+> -- Name: avisos_vistos avisos_vistos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+> --
+> 
+> ALTER TABLE ONLY public.avisos_vistos
+>     ADD CONSTRAINT avisos_vistos_pkey PRIMARY KEY (aviso_id, usuario_id);
+> 
+> 
+> --
+6291a6714,6734
+> -- Name: avisos_clinica_sin_cita_key; Type: INDEX; Schema: public; Owner: postgres
+> --
+> 
+> CREATE UNIQUE INDEX avisos_clinica_sin_cita_key ON public.avisos_clinica USING btree (clinica_id, tipo, COALESCE(medico_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(COALESCE((datos ->> 'nombre'::text), ''::text))) WHERE ((cita_id IS NULL) AND (revisado_en IS NULL) AND (tipo = ANY (ARRAY['reserva_frenada'::text, 'google_desconectado'::text, 'google_sin_sincronizar'::text])));
+> 
+> 
+> --
+> -- Name: avisos_vistos_clinica_idx; Type: INDEX; Schema: public; Owner: postgres
+> --
+> 
+> CREATE INDEX avisos_vistos_clinica_idx ON public.avisos_vistos USING btree (clinica_id);
+> 
+> 
+> --
+> -- Name: avisos_vistos_usuario_idx; Type: INDEX; Schema: public; Owner: postgres
+> --
+> 
+> CREATE INDEX avisos_vistos_usuario_idx ON public.avisos_vistos USING btree (usuario_id, aviso_id);
+> 
+> 
+> --
+7152a7596,7609
+> -- Name: agenda_bloqueos trg_agenda_bloqueos_aviso_alta; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_agenda_bloqueos_aviso_alta AFTER INSERT ON public.agenda_bloqueos FOR EACH ROW EXECUTE FUNCTION public.aviso_clinica_de_bloqueo();
+> 
+> 
+> --
+> -- Name: agenda_bloqueos trg_agenda_bloqueos_aviso_baja; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_agenda_bloqueos_aviso_baja AFTER DELETE ON public.agenda_bloqueos FOR EACH ROW EXECUTE FUNCTION public.aviso_clinica_de_bloqueo();
+> 
+> 
+> --
+7173a7631,7644
+> -- Name: appointments trg_appointments_aviso_alta_personal; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_appointments_aviso_alta_personal AFTER INSERT ON public.appointments FOR EACH ROW WHEN ((new.medico_id IS NOT NULL)) EXECUTE FUNCTION public.aviso_clinica_de_cambio_cita();
+> 
+> 
+> --
+> -- Name: appointments trg_appointments_aviso_cambio; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_appointments_aviso_cambio AFTER UPDATE OF status, start_time, end_time ON public.appointments FOR EACH ROW WHEN (((old.status IS DISTINCT FROM new.status) OR (old.start_time IS DISTINCT FROM new.start_time) OR (old.end_time IS DISTINCT FROM new.end_time))) EXECUTE FUNCTION public.aviso_clinica_de_cambio_cita();
+> 
+> 
+> --
+7250a7722,7728
+> -- Name: avisos_clinica trg_avisos_clinica_reabrir; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_avisos_clinica_reabrir BEFORE INSERT ON public.avisos_clinica FOR EACH ROW WHEN ((new.cita_id IS NOT NULL)) EXECUTE FUNCTION public.aviso_clinica_reabrir();
+> 
+> 
+> --
+7264a7743,7756
+> -- Name: avisos_vistos trg_avisos_vistos_sellar; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_avisos_vistos_sellar BEFORE INSERT OR UPDATE ON public.avisos_vistos FOR EACH ROW EXECUTE FUNCTION public.aviso_visto_sellar();
+> 
+> 
+> --
+> -- Name: avisos_vistos trg_avisos_vistos_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_avisos_vistos_sin_truncate BEFORE TRUNCATE ON public.avisos_vistos FOR EACH STATEMENT EXECUTE FUNCTION public.prohibir_truncate();
+> 
+> 
+> --
+7320a7813,7819
+> -- Name: cita_correos trg_cita_correos_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_cita_correos_aviso_clinica AFTER UPDATE OF estado ON public.cita_correos FOR EACH ROW WHEN (((old.estado IS DISTINCT FROM new.estado) AND (new.estado = 'fallido'::text) AND (new.tipo = ANY (ARRAY['comprobante'::text, 'recordatorio'::text])) AND (new.motivo = ANY (ARRAY['transporte'::text, 'plantilla'::text])) AND ((new.tipo = 'comprobante'::text) OR (new.intentos >= 3)))) EXECUTE FUNCTION public.aviso_clinica_de_correo();
+> 
+> 
+> --
+7355a7855,7861
+> -- Name: clinica_conexiones_google trg_conexiones_google_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_conexiones_google_aviso_clinica AFTER UPDATE OF estado ON public.clinica_conexiones_google FOR EACH ROW WHEN (((old.estado = 'activa'::text) AND (new.estado = 'revocada'::text) AND (new.rol = 'clinica'::text))) EXECUTE FUNCTION public.aviso_clinica_de_conexion_google();
+> 
+> 
+> --
+7446a7953,7959
+> -- Name: gcal_sync_estado trg_gcal_sync_estado_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_gcal_sync_estado_aviso_clinica AFTER UPDATE OF errores_seguidos ON public.gcal_sync_estado FOR EACH ROW WHEN (((new.errores_seguidos >= 3) AND (old.errores_seguidos < 3))) EXECUTE FUNCTION public.aviso_clinica_de_sync_google();
+> 
+> 
+> --
+7698a8212,8219
+> -- Name: avisos_vistos avisos_vistos_clinica_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+> --
+> 
+> ALTER TABLE ONLY public.avisos_vistos
+>     ADD CONSTRAINT avisos_vistos_clinica_id_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT;
+> 
+> 
+> --
+8440,8442c8961,8968
+< CREATE POLICY avisos_clinica_select ON public.avisos_clinica FOR SELECT TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (EXISTS ( SELECT 1
+<    FROM public.appointments a
+<   WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))))));
+---
+> CREATE POLICY avisos_clinica_select ON public.avisos_clinica FOR SELECT TO authenticated USING (((clinica_id = public.get_clinica_id()) AND ((destinatario_id IS NULL) OR (destinatario_id = auth.uid())) AND (actor_id IS DISTINCT FROM auth.uid()) AND
+> CASE
+>     WHEN (cita_id IS NOT NULL) THEN (EXISTS ( SELECT 1
+>        FROM public.appointments a
+>       WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))
+>      OFFSET 0))
+>     ELSE ((medico_id IS NULL) OR (medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text))
+> END));
+8449,8451c8975,9011
+< CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (revisado_en IS NULL) AND (EXISTS ( SELECT 1
+<    FROM public.appointments a
+<   WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id())))))) WITH CHECK (((clinica_id = public.get_clinica_id()) AND (revisado_por = auth.uid())));
+---
+> CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (revisado_en IS NULL) AND ((destinatario_id IS NULL) OR (destinatario_id = auth.uid())) AND (actor_id IS DISTINCT FROM auth.uid()) AND
+> CASE
+>     WHEN (cita_id IS NOT NULL) THEN (EXISTS ( SELECT 1
+>        FROM public.appointments a
+>       WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))
+>      OFFSET 0))
+>     ELSE ((medico_id IS NULL) OR (medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text))
+> END)) WITH CHECK (((clinica_id = public.get_clinica_id()) AND (revisado_por = auth.uid())));
+> 
+> 
+> --
+> -- Name: avisos_vistos; Type: ROW SECURITY; Schema: public; Owner: postgres
+> --
+> 
+> ALTER TABLE public.avisos_vistos ENABLE ROW LEVEL SECURITY;
+> 
+> --
+> -- Name: avisos_vistos avisos_vistos_insert; Type: POLICY; Schema: public; Owner: postgres
+> --
+> 
+> CREATE POLICY avisos_vistos_insert ON public.avisos_vistos FOR INSERT TO authenticated WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id()) AND (EXISTS ( SELECT 1
+>    FROM public.avisos_clinica a
+>   WHERE ((a.id = avisos_vistos.aviso_id) AND (a.clinica_id = public.get_clinica_id()))))));
+> 
+> 
+> --
+> -- Name: avisos_vistos avisos_vistos_select; Type: POLICY; Schema: public; Owner: postgres
+> --
+> 
+> CREATE POLICY avisos_vistos_select ON public.avisos_vistos FOR SELECT TO authenticated USING ((usuario_id = auth.uid()));
+> 
+> 
+> --
+> -- Name: avisos_vistos avisos_vistos_update; Type: POLICY; Schema: public; Owner: postgres
+> --
+> 
+> CREATE POLICY avisos_vistos_update ON public.avisos_vistos FOR UPDATE TO authenticated USING (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id()))) WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id())));
+9325a9886,9905
+> -- Name: FUNCTION aviso_clinica_de_bloqueo(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_de_bloqueo() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_bloqueo() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_bloqueo() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_bloqueo() TO service_role;
+> 
+> 
+> --
+> -- Name: FUNCTION aviso_clinica_de_cambio_cita(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_cita() TO service_role;
+> 
+> 
+> --
+9335a9916,9925
+> -- Name: FUNCTION aviso_clinica_de_conexion_google(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_de_conexion_google() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_conexion_google() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_conexion_google() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_conexion_google() TO service_role;
+> 
+> 
+> --
+9345a9936,9945
+> -- Name: FUNCTION aviso_clinica_de_correo(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_de_correo() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_correo() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_correo() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_correo() TO service_role;
+> 
+> 
+> --
+9385a9986,10013
+> -- Name: FUNCTION aviso_clinica_de_sync_google(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_de_sync_google() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_sync_google() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_sync_google() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_sync_google() TO service_role;
+> 
+> 
+> --
+> -- Name: FUNCTION aviso_clinica_reabrir(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_reabrir() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_reabrir() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_reabrir() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_reabrir() TO service_role;
+> 
+> 
+> --
+> -- Name: FUNCTION aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) TO service_role;
+> 
+> 
+> --
+9395a10024,10062
+> -- Name: FUNCTION aviso_visto_sellar(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_visto_sellar() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO service_role;
+> 
+> 
+> --
+> -- Name: TABLE avisos_clinica; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT SELECT ON TABLE public.avisos_clinica TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_clinica.revisado_en; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT UPDATE(revisado_en) ON TABLE public.avisos_clinica TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_clinica.revisado_por; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT UPDATE(revisado_por) ON TABLE public.avisos_clinica TO authenticated;
+> 
+> 
+> --
+> -- Name: FUNCTION avisos_pendientes(p_tipos text[], p_limite integer); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) TO authenticated;
+> 
+> 
+> --
+9571a10239,10246
+> -- Name: FUNCTION cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) TO service_role;
+> 
+> 
+> --
+10387c11062
+< -- Name: TABLE avisos_clinica; Type: ACL; Schema: public; Owner: postgres
+---
+> -- Name: TABLE avisos_vistos; Type: ACL; Schema: public; Owner: postgres
+10390c11065
+< GRANT SELECT ON TABLE public.avisos_clinica TO authenticated;
+---
+> GRANT SELECT ON TABLE public.avisos_vistos TO authenticated;
+10394c11069
+< -- Name: COLUMN avisos_clinica.revisado_en; Type: ACL; Schema: public; Owner: postgres
+---
+> -- Name: COLUMN avisos_vistos.aviso_id; Type: ACL; Schema: public; Owner: postgres
+10397c11072
+< GRANT UPDATE(revisado_en) ON TABLE public.avisos_clinica TO authenticated;
+---
+> GRANT INSERT(aviso_id) ON TABLE public.avisos_vistos TO authenticated;
+10401c11076
+< -- Name: COLUMN avisos_clinica.revisado_por; Type: ACL; Schema: public; Owner: postgres
+---
+> -- Name: COLUMN avisos_vistos.usuario_id; Type: ACL; Schema: public; Owner: postgres
+10404c11079,11093
+< GRANT UPDATE(revisado_por) ON TABLE public.avisos_clinica TO authenticated;
+---
+> GRANT INSERT(usuario_id) ON TABLE public.avisos_vistos TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_vistos.clinica_id; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT INSERT(clinica_id) ON TABLE public.avisos_vistos TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_vistos.visto_en; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT UPDATE(visto_en) ON TABLE public.avisos_vistos TO authenticated;

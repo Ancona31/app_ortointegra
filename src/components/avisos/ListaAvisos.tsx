@@ -18,7 +18,7 @@ import { useState, type CSSProperties } from 'react'
 import BotonNoEsCita from '@/components/agenda/BotonNoEsCita'
 import { esPorAsignar } from '@/lib/agenda/tarjetasAgenda'
 import {
-  cuandoDeLaCita, enlaceDeAviso, haceCuanto, textoAviso, type AvisoClinica,
+  cuandoDeLaCita, enlaceDeAviso, haceCuanto, TEXTO_MAS_ANTIGUOS, textoAviso, type AvisoClinica,
 } from '@/lib/avisos/avisosClinica'
 
 /* El botón de siempre de esta lista («Marcar todos como revisados»), también para «¿No es una cita?». */
@@ -31,6 +31,13 @@ interface Props {
   revisarTodos: () => void
   /** Sin él, cada aviso es un enlace a la agenda. */
   alAbrir?: (a: AvisoClinica) => void
+  /** Hay avisos que la lista ya no trae (tope o más de 60 días): se dice, no se ocultan en silencio. */
+  masAntiguos?: boolean
+}
+
+/** La nota de «hay más atrás». Con la letra de la ayuda de esta lista. */
+function NotaMasAntiguos() {
+  return <p className="mt-3 text-[12px]" style={{ color: 'var(--ag-muted)' }} data-avisos-mas-antiguos>{TEXTO_MAS_ANTIGUOS}</p>
 }
 
 function Contenido({ a, ahora }: { a: AvisoClinica; ahora: number }) {
@@ -67,11 +74,16 @@ function FilaAviso({ a, ahora, revisar, alAbrir }: { a: AvisoClinica; ahora: num
   )
 }
 
-export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir }: Props) {
+export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir, masAntiguos = false }: Props) {
   // «hace N min» se fija al pintar la lista; no hace falta un reloj vivo.
   const [ahora] = useState(() => Date.now())
   if (avisos.length === 0) {
-    return <p className="text-[13px]" style={{ color: 'var(--ag-muted)' }} data-avisos-vacio>No hay avisos sin revisar.</p>
+    return (
+      <>
+        <p className="text-[13px]" style={{ color: 'var(--ag-muted)' }} data-avisos-vacio>No hay avisos sin revisar.</p>
+        {masAntiguos && <NotaMasAntiguos />}
+      </>
+    )
   }
   return (
     <div data-lista-avisos>
@@ -93,6 +105,7 @@ export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir }: Props) {
       <button type="button" data-revisar-todos onClick={revisarTodos} className={`mt-3 ${CLASE_BOTON}`} style={ESTILO_BOTON}>
         Marcar todos como revisados
       </button>
+      {masAntiguos && <NotaMasAntiguos />}
     </div>
   )
 }

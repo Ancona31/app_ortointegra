@@ -1,5 +1,10 @@
 # Conteos antes de aplicar el conjunto a producción
 
+> **Para «avisos globales» (M1 `20261202120000` y M2 `20261202130000`) este archivo NO sirve:**
+> es de antes de las 9 de la agenda y, contra la base de hoy (con las 9 aplicadas), da ALTO en casi
+> todo y no mira nada de M1 ni de M2. Para esas dos se corre `conteos-avisos-globales.sql` con
+> `correr-conteos-avisos.sh`: ver al final, «Avisos globales (M1 y M2)».
+
 `conteos.sql` reúne, como consultas de **sólo lectura**, todo lo que los
 pre-vuelos (y los post-vuelos que miran el estado de antes) de las **9**
 migraciones nuevas exigen a la base, más lo que sólo los datos reales dicen
@@ -383,3 +388,44 @@ compartido; ninguna conexión a producción.
 | historial sin `20260919230000` | G.08 (y la G.09 de entonces, retirada) | la CLI la volvería a empujar (`db push --dry-run`) |
 | historial con una versión desconocida | G.11 | la CLI se niega a empujar |
 | sesión con un candado y transacción larga | G.15 (AVISO) | — |
+
+---
+
+## Avisos globales (M1 y M2)
+
+`conteos-avisos-globales.sql` hace lo mismo que `conteos.sql`, para las dos migraciones de «avisos
+globales»: las condiciones de sus pre-vuelos como consultas de **sólo lectura** (`BEGIN TRANSACTION
+READ ONLY` … `ROLLBACK`), una rejilla con las mismas seis columnas y los mismos veredictos. Supone
+las 9 de la agenda aplicadas. No devuelve ningún dato de personas: números, nombres de objetos y
+versiones.
+
+```bash
+bash supabase/produccion/conteos/correr-conteos-avisos.sh
+```
+
+Mismo mecanismo y mismas variables (`CONTEOS_*`, `IMAGEN_PG`) que `correr-conteos.sh`; guarda
+`conteos-avisos-<fecha>.txt`. Salida: 0 = todo OK/INFO · 1 = algún ALTO · 4 = sin ALTO pero con
+AVISO · 3 = psql falló.
+
+**Cuándo:** antes de aplicar M1, y otra vez justo antes (A.12 mira la actividad de ese momento). Con
+M1 o M2 ya aplicadas, G.3, A.6 y B.1 salen ALTO («ya existe»): es lo esperado; vale para la base de
+ANTES.
+
+| Fila | Qué mira | Si no sale OK |
+|---|---|---|
+| G.1 | que preguntas como `postgres` | AVISO: repite con el rol con el que vas a aplicar |
+| G.2 | las 9 de la agenda en el historial | ALTO: no es la base que se supone; parar |
+| G.3 | M1 y M2 todavía no en el historial | ALTO: ya se aplicaron (o el historial miente): `aplicar.sh estado` |
+| A.1, A.2, A.3 | tablas, dueño y funciones que M1 necesita | ALTO: M1 abortaría en su pre-vuelo |
+| **A.4** | avisos sin cita o de un tipo que no es de F4 | ALTO: M1 abortaría limpia; mirar esas filas (no deberían existir) |
+| **A.5** | las dos policies de F4 y ninguna más | ALTO: alguien tocó las policies; M1 abortaría |
+| **A.6** | nada de M1 existe todavía | ALTO: M1 ya aplicada o a medias. `0 / 0 / 4 / false` es la «forma conservada» por su reversa y es OK (A.6b lo dice): M1 se puede aplicar |
+| A.7, A.8 | el CHECK de tipos y el índice de F4 | ALTO: falta algo de F4 |
+| A.9 | `avisos_clinica` fuera de la publicación de Realtime | AVISO: alguien la publicó; M1 no la toca, pero la decisión de Angel es que no esté |
+| A.10, A.11 | cuántos avisos hay; cuántas clínicas con la v2 | sólo informan |
+| A.12 | transacciones abiertas hace más de 5 s | AVISO: M1 pide candados con `lock_timeout` 5 s; si no los obtiene aborta limpia. Esperar y repetir |
+| **B.1** | `cita_rsvp_google_rechazo` no existe | ALTO: M2 ya aplicada |
+| B.2, B.3 | lo que M2 usa de la agenda | ALTO: M2 abortaría en su pre-vuelo |
+| B.4 | si M1 ya está (M2 la exige) | sólo informa: se aplican en orden |
+
+A.4, A.5 y A.6 + B.1 son los tres conteos que pedía `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md`.

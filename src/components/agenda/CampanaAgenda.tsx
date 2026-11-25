@@ -53,9 +53,13 @@ import {
  */
 const EMERGENTES: readonly TipoAviso[] = TIPOS_AVISO
 
-/** Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. */
-export function textoBurbuja(pendientes: number): string {
-  return pendientes > 9 ? '9+' : String(pendientes)
+/**
+ * Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. Con avisos fuera de
+ * lo que la lista trae (`masAntiguos`), «3+»: el número no se da por exacto.
+ */
+export function textoBurbuja(pendientes: number, masAntiguos = false): string {
+  if (pendientes > 9) return '9+'
+  return masAntiguos ? `${pendientes}+` : String(pendientes)
 }
 
 /**
@@ -63,11 +67,12 @@ export function textoBurbuja(pendientes: number): string {
  * siempre y, con algo pendiente, «N pendiente(s)» con el número exacto.
  * `null` = la primera traída no llegó.
  */
-export function etiquetaCampana(cuentas: { n: number; m: number } | null): string {
+export function etiquetaCampana(cuentas: { n: number; m: number } | null, masAntiguos = false): string {
   if (!cuentas) return 'Por confirmar y avisos'
   const total = cuentas.n + cuentas.m
   const base = `Por confirmar (${cuentas.n}) y avisos (${cuentas.m})`
-  return total > 0 ? `${base}: ${total} ${total === 1 ? 'pendiente' : 'pendientes'}` : base
+  const dicho = total > 0 ? `${base}: ${total} ${total === 1 ? 'pendiente' : 'pendientes'}` : base
+  return masAntiguos ? `${dicho}; hay avisos más antiguos` : dicho
 }
 
 type Pestana = 'por-confirmar' | 'avisos'
@@ -126,7 +131,7 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
   const cerrar = useCallback(() => setBoton(null), [])
   const n = listas?.citas.length ?? 0
   const m = cuentaAvisos(listas, avisos)
-  const etiqueta = etiquetaCampana(listas ? { n, m } : null)
+  const etiqueta = etiquetaCampana(listas ? { n, m } : null, avisos.masAntiguos)
   const alConfirmar = confirmar ? (id: string): void => {
     quitar(id)
     void confirmar(id, 'confirmed').then((ok) => { if (!ok) recargar() })
@@ -143,7 +148,7 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
         }}>
         <Bell size={enBanda ? 18 : 16} aria-hidden="true" />
         {n + m > 0 && (
-          <span className="ag-campana-punto" data-punto-rojo="" data-pendientes={n + m} aria-hidden="true">{textoBurbuja(n + m)}</span>
+          <span className="ag-campana-punto" data-punto-rojo="" data-pendientes={n + m} aria-hidden="true">{textoBurbuja(n + m, avisos.masAntiguos)}</span>
         )}
       </button>
       {boton && (
@@ -213,7 +218,7 @@ function ContenidoAvisos({ listas, avisos, alAbrirAviso }: Pick<PropsPanel, 'lis
     <>
       <InterruptorMisAvisos />
       <ListaAvisos avisos={avisos.avisos ?? []} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos}
-        alAbrir={alAbrirAviso} />
+        alAbrir={alAbrirAviso} masAntiguos={avisos.masAntiguos} />
     </>
   )
 }

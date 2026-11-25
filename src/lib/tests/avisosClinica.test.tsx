@@ -146,6 +146,15 @@ describe('ListaAvisos (pieza para toda la app)', () => {
   })
   it('vacía lo dice', () => {
     expect(renderToStaticMarkup(<ListaAvisos avisos={[]} revisar={nada} revisarTodos={nada} />)).toContain('No hay avisos sin revisar.')
+    // Lo que la lectura acotada deja fuera se DICE, con lista y sin ella; sin la marca, no sale.
+    const sinNota = renderToStaticMarkup(<ListaAvisos avisos={[aviso('reserva_enlace')]} revisar={nada} revisarTodos={nada} />)
+    const conNota = renderToStaticMarkup(<ListaAvisos avisos={[aviso('reserva_enlace')]} revisar={nada} revisarTodos={nada} masAntiguos />)
+    const vacioConNota = renderToStaticMarkup(<ListaAvisos avisos={[]} revisar={nada} revisarTodos={nada} masAntiguos />)
+    expect(sinNota).not.toContain('data-avisos-mas-antiguos')
+    expect(conNota).toContain('Hay avisos más antiguos que ya no se muestran aquí.')
+    expect(vacioConNota).toContain('No hay avisos sin revisar.')
+    expect(vacioConNota).toContain('data-avisos-mas-antiguos')
+    expect(leerRespuestaAvisos({ avisos_disponibles: true, avisos: [], avisos_mas_antiguos: true })?.mas_antiguos).toBe(true)
   })
   it('integración I3 + I5: «¿No es una cita?» al lado del aviso de Google que SIGUE por asignar, y en ningún otro', () => {
     const conCita = (tipo: TipoConCita, cita: Partial<CitaDelAviso>): AvisoDeCita => {

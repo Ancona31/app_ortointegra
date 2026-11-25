@@ -39,7 +39,9 @@ FOTO="$HOME/spinus-produccion-foto"
 
 [[ -s "$SQL" ]] || { echo "error: no encuentro $SQL" >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo "error: Docker no responde; enciéndelo primero." >&2; exit 2; }
-IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
+# Sin el contenedor local, «docker inspect» deja una línea VACÍA antes de fallar: «grep .» la quita
+# (si no, la imagen quedaba con un salto de línea delante: «docker: invalid reference format»).
+IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null | grep . || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
 
 DESTINO="${CONTEOS_DESTINO:-}"
 if [[ -z "$DESTINO" ]]; then

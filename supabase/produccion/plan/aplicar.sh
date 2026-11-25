@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # supabase/produccion/plan/aplicar.sh
 #
-# Aplica las 11 migraciones nuevas (las 11 de «agenda v2 lista para producción»,
+# Aplica las 11 migraciones nuevas (las 9 de «agenda v2 lista para producción»,
 # ya aplicadas en producción el 2026-11-23, y las 2 de «avisos globales») UNA A
 # UNA, con psql y confirmación escrita antes de cada una, y registra cada
 # versión en supabase_migrations.schema_migrations con
@@ -127,7 +127,9 @@ if [[ "$MODO" =~ ^(aplicar|reversa|reversa-truncate)$ ]]; then
 fi
 [[ -f "$REPO/supabase/config.toml" && -d "$REPO/supabase/migrations" ]] || die "córrelo desde el repo (no encuentro supabase/)."
 docker info >/dev/null 2>&1 || die "Docker no responde; enciéndelo primero."
-IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
+# Sin el contenedor local, «docker inspect» deja una línea VACÍA antes de fallar: «grep .» la quita
+# (si no, la imagen quedaba con un salto de línea delante: «docker: invalid reference format»).
+IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null | grep . || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
 
 leer() {  # $1 = aviso; $2 = s para no mostrar lo escrito. Deja la respuesta en RESP.
   if [[ -t 0 ]]; then
@@ -209,6 +211,9 @@ testigo_sql() {
     20261201170000) echo "exists(select 1 from pg_trigger where tgrelid = to_regclass('public.appointments') and tgname = 'trg_appointments_proteger_borrado' and not tgisinternal)" ;;
     20261201180000) echo "exists(select 1 from pg_trigger where tgrelid = to_regclass('public.agenda_bloqueos') and tgname = 'trg_agenda_bloqueos_sin_truncate' and not tgisinternal)" ;;
     # M1: la RPC (su reversa SIEMPRE la quita; avisos_vistos no serviría de testigo en una base a medias).
+    # Si la reversa de M1 corrió CON datos, avisos_clinica conserva la forma de M1 (no borra avisos) pero
+    # la RPC ya no está: M1 sale «pendiente» y «aplicar» la vuelve a ofrecer; su pre-vuelo reconoce esa
+    # forma conservada y completa lo que falta (rejilla de M1, fila 11).
     20261202120000) echo "to_regprocedure('public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)') is not null" ;;
     20261202130000) echo "to_regprocedure('public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])') is not null" ;;
     *) return 1 ;;

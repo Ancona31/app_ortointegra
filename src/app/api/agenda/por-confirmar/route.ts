@@ -150,7 +150,7 @@ export async function GET(): Promise<NextResponse> {
       empalmesConReservas(e.supabase, e.clinicaId, ahora),
       leerAvisosClinica(e.supabase, e.clinicaId),
     ])
-    return NextResponse.json({ citas, canceladas, empalmes, avisos: avisos.avisos, avisos_disponibles: avisos.disponible },
+    return NextResponse.json({ citas, canceladas, empalmes, avisos: avisos.avisos, avisos_disponibles: avisos.disponible, avisos_mas_antiguos: avisos.mas_antiguos === true },
       { headers: { 'Cache-Control': 'no-store' } })
   } catch (err: unknown) {
     logger.error('agenda', `GET por confirmar: ${err instanceof Error ? err.name : 'error'}`)

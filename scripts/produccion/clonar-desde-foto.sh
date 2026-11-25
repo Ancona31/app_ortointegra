@@ -19,7 +19,9 @@ FOTO="${1:?uso: $0 FOTO_DIR [NOMBRE] [PUERTO]}"
 NOMBRE="${2:-spinus-clon-produccion}"
 PUERTO="${3:-54330}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
+# Sin el contenedor local, «docker inspect» deja una línea VACÍA antes de fallar: «grep .» la quita
+# (si no, la imagen quedaba con un salto de línea delante: «docker: invalid reference format»).
+IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null | grep . || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
 LOG="$(dirname "$FOTO")/clon-$NOMBRE.log"
 
 for f in 01-roles.sql 03-esquema-completo.sql 04-migraciones.tsv 05-catalogo.jsonl; do

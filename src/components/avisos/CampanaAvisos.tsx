@@ -38,10 +38,19 @@ import { createClient } from '@/lib/supabase/client'
 /** Cada cuánto se relee con la pestaña a la vista (2 min: la ventana de «recién llegado»). */
 export const SONDEO_MS = 120_000
 
-/** «Avisos», «Avisos (3 sin revisar)»: el número no puede vivir sólo en el dibujo. */
-export function etiquetaCampanaGlobal(m: number | null): string {
-  if (!m) return 'Avisos'
-  return `Avisos (${m} sin revisar)`
+/**
+ * «Avisos», «Avisos (3 sin revisar)»: el número no puede vivir sólo en el dibujo. Con avisos fuera
+ * de lo que la lista trae (`masAntiguos`), el número no se da por exacto: «3 o más sin revisar».
+ */
+export function etiquetaCampanaGlobal(m: number | null, masAntiguos = false): string {
+  if (!m) return masAntiguos ? 'Avisos (hay avisos más antiguos)' : 'Avisos'
+  return masAntiguos ? `Avisos (${m} o más sin revisar)` : `Avisos (${m} sin revisar)`
+}
+
+/** Lo que dice el contador rojo: «9+» con más de 9 y «3+» si hay más de los que la lista trae. */
+export function textoContador(m: number, masAntiguos = false): string {
+  if (m > 9) return '9+'
+  return masAntiguos ? `${m}+` : String(m)
 }
 
 /**
@@ -91,14 +100,14 @@ export default function CampanaAvisos(): ReactElement | null {
     <>
       {ranuras.map(r => createPortal(
         <button type="button" data-campana-global="" className={`${CLASE_BOTON[r.dataset.ranuraCampana ?? ''] ?? 'nav-icono'} nav-campana k-pulsable`}
-          aria-label={etiquetaCampanaGlobal(m)} title="Avisos" aria-haspopup="dialog" aria-expanded={boton !== null}
+          aria-label={etiquetaCampanaGlobal(m, avisos.masAntiguos)} title="Avisos" aria-haspopup="dialog" aria-expanded={boton !== null}
           onClick={(e) => {
             const b = e.currentTarget
             setBoton(a => (a ? null : b))
             if (!boton) avisos.recargar()
           }}>
           <Bell size={20} aria-hidden="true" />
-          {m > 0 && <span className="nav-distintivo nav-distintivo--avisos" data-avisos-pendientes={m} aria-hidden="true">{m > 9 ? '9+' : m}</span>}
+          {m > 0 && <span className="nav-distintivo nav-distintivo--avisos" data-avisos-pendientes={m} aria-hidden="true">{textoContador(m, avisos.masAntiguos)}</span>}
         </button>, r, r.dataset.ranuraCampana,
       ))}
       {boton && <PanelAvisos boton={boton} alCerrar={cerrar} avisos={avisos} />}
@@ -123,7 +132,7 @@ function PanelAvisos({ boton, alCerrar, avisos }: { boton: HTMLElement; alCerrar
       <InterruptorMisAvisos />
       {avisos.avisos === null
         ? <p className="text-[12px]" style={{ color: 'var(--tinta2)' }}>Cargando…</p>
-        : <ListaAvisos avisos={avisos.avisos} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos} />}
+        : <ListaAvisos avisos={avisos.avisos} revisar={avisos.revisar} revisarTodos={avisos.revisarTodos} masAntiguos={avisos.masAntiguos} />}
     </CapaBarra>
   )
 }

@@ -145,19 +145,31 @@ async function leerFilas(supabase: ClienteSesion, clinicaId: string): Promise<Fi
   return conTipoConocido(data)
 }
 
+/**
+ * ¿Quedan avisos FUERA de la lectura acotada de la base (más de 60 días, o más de 500 recientes)?
+ * `avisos_mas_antiguos` (M1), con la sesión y bajo RLS. Sin la función, o si falla, `false`: la
+ * lista sale igual, sólo que sin la nota.
+ */
+async function hayMasAntiguos(supabase: ClienteSesion): Promise<boolean> {
+  const { data, error } = await supabase.rpc('avisos_mas_antiguos', { p_tipos: [...TIPOS_AVISO] })
+  return !error && data === true
+}
+
 /** Mis avisos pendientes, los más nuevos primero, con su cita y quién lo hizo. Nunca lanza. */
 export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: string): Promise<RespuestaAvisos> {
   try {
-    const filas = await leerFilas(supabase, clinicaId)
+    const [filas, fuera] = await Promise.all([leerFilas(supabase, clinicaId), hayMasAntiguos(supabase).catch(() => false)])
     if (filas === null) return { disponible: false, avisos: [] }
-    if (filas.length === 0) return { disponible: true, avisos: [] }
+    /* Pasó del tope de la respuesta (lo demás sale al revisar lo de arriba) o la base dice que hay más atrás. */
+    const mas_antiguos = fuera || filas.length >= TOPE_AVISOS
+    if (filas.length === 0) return { disponible: true, avisos: [], mas_antiguos }
     const unicos = (ids: (string | null | undefined)[]): string[] => [...new Set(ids.filter((x): x is string => !!x))]
     const [citas, actores] = await Promise.all([
       leerCitasDeAvisos(supabase, clinicaId, unicos(filas.map(f => f.cita_id))),
       leerActores(supabase, clinicaId, unicos(filas.map(f => f.actor_id))),
     ])
     if (citas === null) return { disponible: false, avisos: [] }
-    return { disponible: true, avisos: filas.flatMap(f => armarAviso(f, citas, actores)) }
+    return { disponible: true, avisos: filas.flatMap(f => armarAviso(f, citas, actores)), mas_antiguos }
   } catch (err: unknown) {
     logger.error('avisos', `avisos sin leer: ${err instanceof Error ? err.name : 'error'}`)
     return { disponible: false, avisos: [] }

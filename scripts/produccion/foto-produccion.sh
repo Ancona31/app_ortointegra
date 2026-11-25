@@ -33,7 +33,9 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$DIR/../.." && pwd)"
 
 docker info >/dev/null 2>&1 || { echo "error: Docker no responde; enciéndelo primero." >&2; exit 2; }
-IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
+# Sin el contenedor local, «docker inspect» deja una línea VACÍA antes de fallar: «grep .» la quita
+# (si no, la imagen quedaba con un salto de línea delante: «docker: invalid reference format»).
+IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null | grep . || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
 
 if [[ -e "$DESTINO" && -n "$(ls -A "$DESTINO" 2>/dev/null)" ]]; then
   echo "error: $DESTINO ya tiene archivos. Muévelo o bórralo antes (no se sobrescribe una foto)." >&2

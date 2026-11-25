@@ -473,4 +473,95 @@ begin
   perform pg_temp.esperar('caso 16 el administrador no lee las marcas de otros', v::text, '0');
 end $$;
 
+-- ── Caso 17: la reserva frenada exige que el «médico» SEA médico (no cualquier perfil de la clínica) ──
+do $$
+declare v text;
+begin
+  set local role service_role;
+  -- b4 es la secretaria de c1: existe y es de la clínica, pero no es médico.
+  v := public.aviso_clinica_registrar('00000000-0000-4000-8000-0000001a0c01', 'reserva_frenada', null, '00000000-0000-4000-8000-0000001a0b04', null, 'Zutano')::text;
+  reset role;
+  perform pg_temp.esperar('caso 17 respuesta', v, 'false');
+  perform pg_temp.esperar('caso 17 sin aviso', (select count(*)::text from public.avisos_clinica where datos ->> 'nombre' = 'Zutano'), '0');
+end $$;
+
+-- ── Caso 18: la lectura de la campana está ACOTADA: ventana de 60 días y tope de 500 ──
+-- b6 (médico invitado) no tiene nada pendiente de estos tipos. Como postgres, 510 avisos sin cita suyos:
+-- 5 de hace 61 días (fuera de la ventana) y 505 recientes, cada uno un segundo más viejo que el anterior.
+select pg_temp.esperar('caso 18 antes', (select count(*)::text from public.avisos_clinica where medico_id = '00000000-0000-4000-8000-0000001a0b06'), '0');
+insert into public.avisos_clinica (clinica_id, tipo, medico_id, destinatario_id, datos, creado_en)
+select '00000000-0000-4000-8000-0000001a0c01', 'personal_bloqueo', '00000000-0000-4000-8000-0000001a0b06', '00000000-0000-4000-8000-0000001a0b06',
+       jsonb_build_object('n', n), case when n <= 5 then now() - interval '61 days' else now() - make_interval(secs => n) end
+  from generate_series(1, 510) n;
+create function pg_temp.pend_b6(p_limite int) returns text language plpgsql as $$
+declare v text;
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b06');
+  set local role authenticated;
+  select count(*)::text || ':' || coalesce(min((datos ->> 'n')::int)::text, '-') || ':' || coalesce(max((datos ->> 'n')::int)::text, '-') into v
+    from public.avisos_pendientes(array['personal_bloqueo'], p_limite);
+  reset role;
+  perform pg_temp.sin_sesion();
+  return v;
+end $$;
+-- El límite pedido manda hasta 200; salen los más nuevos (n = 6 es el más nuevo de los recientes).
+select pg_temp.esperar('caso 18 los más nuevos', pg_temp.pend_b6(50), '50:6:55');
+select pg_temp.esperar('caso 18 tope de la respuesta (200)', pg_temp.pend_b6(1000), '200:6:205');
+-- Ve los 500 más nuevos (n de 6 a 505) y los marca vistos: los 5 recientes que quedan detrás (506 a 510)
+-- ya no salen (tope de 500), y los 5 de hace 61 días, tampoco (ventana). Nada se borró: siguen en la tabla.
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b06');
+  set local role authenticated;
+  insert into public.avisos_vistos (aviso_id, usuario_id, clinica_id)
+  select a.id, '00000000-0000-4000-8000-0000001a0b06', a.clinica_id from public.avisos_clinica a
+   where a.medico_id = '00000000-0000-4000-8000-0000001a0b06' and (a.datos ->> 'n')::int between 6 and 505;
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 18 visto todo lo que cabe en el tope', pg_temp.pend_b6(50), '0:-:-');
+select pg_temp.esperar('caso 18 nada se borra ni se cierra', (select count(*)::text || ':' || count(*) filter (where revisado_en is null)::text
+  from public.avisos_clinica where medico_id = '00000000-0000-4000-8000-0000001a0b06'), '510:510');
+-- Un aviso viejo que se REABRE (creado_en nuevo) vuelve a entrar en la ventana.
+update public.avisos_clinica set creado_en = clock_timestamp() where medico_id = '00000000-0000-4000-8000-0000001a0b06' and (datos ->> 'n')::int = 1;
+select pg_temp.esperar('caso 18 reabierto, vuelve', pg_temp.pend_b6(50), '1:1:1');
+
+-- ── Caso 19: lo que la lectura acotada deja fuera SE DICE (avisos_mas_antiguos) ──
+create function pg_temp.mas(p_id uuid) returns text language plpgsql as $$
+declare v boolean;
+begin
+  perform pg_temp.como(p_id);
+  set local role authenticated;
+  v := public.avisos_mas_antiguos(array['personal_bloqueo', 'google_desconectado', 'google_sin_sincronizar']);
+  reset role;
+  perform pg_temp.sin_sesion();
+  return v::text;
+end $$;
+-- b6 tiene 506 avisos suyos dentro de la ventana (caso 18): pasa del tope de 500.
+select pg_temp.esperar('caso 19 el tope se dice', pg_temp.mas('00000000-0000-4000-8000-0000001a0b06'), 'true');
+-- El administrador no ve los de b6 (van dirigidos): de estos tipos sólo los dos de Google del caso 8, recientes.
+select pg_temp.esperar('caso 19 sin nada fuera', pg_temp.mas('00000000-0000-4000-8000-0000001a0b01'), 'false');
+-- Uno suyo sale de la ventana (61 días) sin haberlo visto: se dice. Al verlo, deja de decirse.
+update public.avisos_clinica set creado_en = now() - interval '61 days' where tipo = 'google_desconectado' and clinica_id = '00000000-0000-4000-8000-0000001a0c01';
+select pg_temp.esperar('caso 19 la ventana se dice', pg_temp.mas('00000000-0000-4000-8000-0000001a0b01'), 'true');
+select pg_temp.esperar('caso 19 la secretaria también lo tiene sin ver', pg_temp.mas('00000000-0000-4000-8000-0000001a0b04'), 'true');
+do $$
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b01');
+  set local role authenticated;
+  insert into public.avisos_vistos (aviso_id, usuario_id, clinica_id)
+  select a.id, '00000000-0000-4000-8000-0000001a0b01', a.clinica_id from public.avisos_clinica a where a.tipo = 'google_desconectado';
+  reset role;
+  perform pg_temp.sin_sesion();
+end $$;
+select pg_temp.esperar('caso 19 visto, ya no se dice', pg_temp.mas('00000000-0000-4000-8000-0000001a0b01'), 'false');
+select pg_temp.esperar('caso 19 que uno lo vea no se lo quita a otro', pg_temp.mas('00000000-0000-4000-8000-0000001a0b04'), 'true');
+-- Más de 120 días: deja de anunciarse (la búsqueda está acotada), y sigue en la tabla.
+update public.avisos_clinica set creado_en = now() - interval '121 days' where tipo = 'google_desconectado' and clinica_id = '00000000-0000-4000-8000-0000001a0c01';
+select pg_temp.esperar('caso 19 más de 120 días no se anuncia', pg_temp.mas('00000000-0000-4000-8000-0000001a0b04'), 'false');
+-- Sólo la sesión: ni anon ni service_role la ejecutan.
+select pg_temp.esperar('caso 19 privilegios', has_function_privilege('anon', 'public.avisos_mas_antiguos(text[])', 'EXECUTE')::text
+  || has_function_privilege('authenticated', 'public.avisos_mas_antiguos(text[])', 'EXECUTE')::text
+  || has_function_privilege('service_role', 'public.avisos_mas_antiguos(text[])', 'EXECUTE')::text, 'falsetruefalse');
+
 rollback;

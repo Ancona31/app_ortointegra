@@ -46,6 +46,8 @@ export interface EstadoAvisos {
   avisos: AvisoClinica[] | null
   /** false = la base no tiene la tabla: quien pinta vuelve a lo de antes. */
   disponible: boolean
+  /** Hay avisos que la lista ya no trae (tope o más de 60 días): la campana lo dice y su contador pone «+». */
+  masAntiguos: boolean
   revisar: (ids: string[]) => void
   revisarTodos: () => void
   recargar: () => void
@@ -128,7 +130,7 @@ export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos, 
     revisar(avisos?.map(a => a.id) ?? [])
   }, [avisos, revisar])
 
-  return { avisos, disponible: fuente?.disponible ?? false, revisar, revisarTodos, recargar }
+  return { avisos, disponible: fuente?.disponible ?? false, masAntiguos: fuente?.mas_antiguos === true, revisar, revisarTodos, recargar }
 }
 
 /**

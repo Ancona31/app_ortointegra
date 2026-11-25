@@ -25,7 +25,9 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CATALOGO="$DIR/catalogo.sql"
-IMAGEN_PG="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
+# Sin el contenedor local, «docker inspect» deja una línea VACÍA antes de fallar: «grep .» la quita
+# (si no, la imagen quedaba con un salto de línea delante: «docker: invalid reference format»).
+IMAGEN_PG="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null | grep . || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
 
 extraer() {  # $1 = fuente; escribe JSONL en stdout
   local f="$1"

@@ -100,7 +100,7 @@ repo, en la rama que va a desplegar:
 
 ```bash
 sha256sum supabase/produccion/plan/aplicar.sh
-# tiene que dar: b530194de92dc21765666076234ad454375d83af852056c994f7402df0232834
+# tiene que dar: 4bbbb971efe5a3565d382fd63c8c4bb1e4f71e4b3f6ac00165523005f6e13864
 sha256sum -c supabase/produccion/plan/huellas.sha256   # las 22 de SQL (11 migraciones y 11 reversas) y reversa-previa.sql: todas OK
 ```
 

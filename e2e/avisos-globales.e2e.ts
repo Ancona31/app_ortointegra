@@ -59,6 +59,28 @@ test('fuera de la agenda: la campana cuenta los avisos, la lista los nombra y re
     from public.avisos_vistos where aviso_id = :'id'`, { id: a.id })).toBe('1|true')
 })
 
+/* MUTACIÓN (comprobada en rojo): `leerAvisosClinica` sin preguntar por `avisos_mas_antiguos`. */
+test('un aviso sin ver de hace más de 60 días ya no sale en la lista, pero la campana LO DICE', async ({ page }) => {
+  const viejo = sembrarAviso('cancelacion_paciente', 2)
+  sqlLocal(`update public.avisos_clinica set creado_en = now() - interval '61 days' where id = :'id'`, { id: viejo.id })
+  const nuevo = sembrarAviso('confirmacion_paciente', 3)
+  await page.goto('/dashboard')
+  // El contador no se da por exacto («o más») y en el dibujo lleva «+».
+  await expect(campana(page)).toHaveAttribute('aria-label', /^Avisos \(\d+ o más sin revisar\)$/)
+  await expect(campana(page).locator('[data-avisos-pendientes]')).toHaveText(/\+$/)
+  await campana(page).click()
+  const panel = page.locator('[data-panel-avisos-global]')
+  await expect(panel.locator(`[data-aviso="${nuevo.id}"]`)).toBeVisible()
+  await expect(panel.locator(`[data-aviso="${viejo.id}"]`)).toHaveCount(0)
+  await expect(panel.locator('[data-avisos-mas-antiguos]')).toHaveText('Hay avisos más antiguos que ya no se muestran aquí.')
+  // Revisado lo que se ve, la nota sigue: el viejo no se puede revisar desde aquí y no se oculta en silencio.
+  await panel.locator('[data-revisar-todos]').click()
+  await expect(panel.locator('[data-avisos-vacio]')).toBeVisible()
+  await expect(panel.locator('[data-avisos-mas-antiguos]')).toBeVisible()
+  // No se borró ni se cerró: sigue en la tabla.
+  expect(sqlLocal(`select (revisado_en is null)::text from public.avisos_clinica where id = :'id'`, { id: viejo.id })).toBe('true')
+})
+
 test('la burbuja sale con el nombre cuando llega un aviso con la página abierta, una sola vez', async ({ page }) => {
   await page.goto('/dashboard')
   await expect(campana(page)).toBeVisible()

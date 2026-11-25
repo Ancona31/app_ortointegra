@@ -8,6 +8,57 @@
 > `foto-produccion.sh` y la de `catalogo-despues.sql` (`BEGIN TRANSACTION READ
 > ONLY` + `ROLLBACK`).
 
+> **Para M1 y M2 de «avisos globales» (`20261202120000` y `20261202130000`): empieza por el
+> apartado «M1 y M2 (avisos globales)», justo debajo.** Lo demás de este documento se escribió para
+> las 9 de la agenda (aplicadas en producción el 2026-11-23) con la foto del 2026-11-22: sus números
+> (`965 diferencias`, `63 OK, 10 INFO`, «Las 9 aplicadas») y `diferencias-antes-despues.clon-foto.tsv`
+> son la **referencia histórica de las 9**, no la de M1/M2. El mecanismo de los §1 a §3 es el mismo.
+
+## M1 y M2 (avisos globales): cómo se fija la referencia y cómo se comprueba
+
+La foto de partida es la del 2026-11-24, `~/spinus-produccion-foto-20261124` (con las 9 ya
+aplicadas). Nombres y puerto por variable, para no pisar nada:
+
+```bash
+export FOTO="${FOTO:-$HOME/spinus-produccion-foto-20261124}"
+export CLON="${CLON:-spinus-ensayo-avisos}" PUERTO_CLON="${PUERTO_CLON:-54373}"
+export ENSAYO="${ENSAYO:-$HOME/spinus-produccion-ensayo/avisos}"      # fuera de la carpeta de la foto
+free -h    # con menos de 5 GB disponibles, esperar
+ESPERADAS=scripts/produccion/esperadas-clon.tsv bash scripts/produccion/clonar-desde-foto.sh "$FOTO" "$CLON" "$PUERTO_CLON"
+docker exec -i "$CLON" psql -X -q -U supabase_admin -d postgres -c "ALTER ROLE postgres PASSWORD 'postgres'"   # contraseña LOCAL del clon
+
+mkdir -p "$ENSAYO" && chmod 700 "$ENSAYO"
+scripts/produccion/comparar-estructura.sh --extraer "contenedor:$CLON" > "$ENSAYO/clon-antes.jsonl"
+APL_HOST=127.0.0.1 APL_PUERTO="$PUERTO_CLON" APL_USUARIO=postgres APL_SSL=disable APL_RED=host \
+  APL_DESTINO="$ENSAYO/aplicacion" bash supabase/produccion/plan/aplicar.sh aplicar      # sólo ofrece M1 y M2
+scripts/produccion/comparar-estructura.sh --extraer "contenedor:$CLON" > "$ENSAYO/clon-despues.jsonl"
+scripts/produccion/comparar-estructura.sh --silencioso --etiquetas antes,despues \
+  --tsv "$ENSAYO/difs-antes-despues.tsv" "$ENSAYO/clon-antes.jsonl" "$ENSAYO/clon-despues.jsonl"
+cut -f1-5 "$ENSAYO/difs-antes-despues.tsv" | sort > "$ENSAYO/referencia-m1m2.claves"
+```
+
+Lo que tiene que salir:
+
+- **El clon ↔ la foto del 24:** `0 errores de restauración`. En el primer ensayo (2026-11-24, equipo
+  de Angel) dio `14 diferencias (14 esperadas, 0 inesperadas)`, con dos avisos «no apareció» para
+  las líneas 7 y 11 de `esperadas-clon.tsv` (ver la cabecera de ese archivo). El recuento exacto de
+  objetos **lo fija el ensayo sobre el commit final**; lo que no puede cambiar es `0 inesperadas`.
+- **`aplicar.sh`:** `Las 11 aplicadas y registradas.`; las dos rejillas, fila por fila, como en
+  `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §4 (M1: 13 filas, 11 OK y 2 INFO; M2: 3 OK).
+- **Antes ↔ después de M1 + M2:** el comparador sale con `exit 1` (normal: no se le dan esperadas) y
+  su `Resumen: … diferencias`. **El número lo fija el ensayo sobre el commit final** (con el M1 del
+  primer ensayo fueron 95; ese M1 ya no es el vigente, así que 95 NO es la referencia). Sus claves
+  quedan en `referencia-m1m2.claves`, que es contra lo que se compara producción el día. El detalle
+  esperado de `public`: `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §5 y
+  `estructura-antes-despues.local.diff`.
+
+El día, tras `aplicar.sh aplicar` en verde, los §1 a §3 de abajo tal cual, cambiando la referencia:
+`referencia-m1m2.claves` en lugar de `referencia.claves`, y `"$ENSAYO/clon-despues.jsonl"` como
+ensayo. La foto «antes» de ese día tiene que salir idéntica a la del 24; si no, se repite este
+apartado con la foto nueva. En el §4 el historial tiene 16 versiones y `estado` dice «las 11».
+
+---
+
 Carpetas (todas fuera del repo, 700):
 
 | Carpeta | Qué hay | Cuándo nace |
@@ -28,7 +79,7 @@ contenedor, y se borra al terminar.
 ```bash
 free -h    # con menos de 5 GB disponibles, esperar
 ESPERADAS=scripts/produccion/esperadas-clon.tsv \
-  bash scripts/produccion/clonar-desde-foto.sh ~/spinus-produccion-foto spinus-ensayo-prod 54330
+  bash scripts/produccion/clonar-desde-foto.sh ~/spinus-produccion-foto spinus-ensayo-prod 54330   # la foto del 22-nov: REFERENCIA HISTÓRICA de las 9. Para M1/M2, el apartado de arriba (foto del 24)
 # contraseña LOCAL del clon (no es la de producción; el clon no tiene datos)
 docker exec -i spinus-ensayo-prod psql -X -q -U supabase_admin -d postgres -c "ALTER ROLE postgres PASSWORD 'postgres'"
 
@@ -83,6 +134,11 @@ Pide la contraseña (como la foto «antes»). Tiene que acabar en `Foto completa
 grande.`
 
 ## 2. (a) Antes ↔ después: cambió exactamente el conjunto
+
+> Los comandos valen para las 9 y para M1/M2. Los NÚMEROS de este apartado (`965 diferencias`, las
+> `14` foto ↔ clon) son los del ensayo de las 9 con la foto del 2026-11-22. Para M1/M2 la referencia
+> es `referencia-m1m2.claves` (apartado «M1 y M2», arriba) y el número de diferencias, el que dé el
+> ensayo sobre el commit final.
 
 ```bash
 scripts/produccion/comparar-estructura.sh --silencioso --etiquetas antes,despues \

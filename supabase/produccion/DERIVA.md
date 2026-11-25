@@ -136,7 +136,7 @@ pasaron todas en el clon: ninguna otra aborta.
 |---|---|---|---|
 | Extensiones | `plpgsql 1.0`, `pg_stat_statements 1.11`, `uuid-ossp 1.1`, `pgcrypto 1.3`, `supabase_vault 0.3.1`, `pg_trgm 1.6` y `unaccent 1.1` (en `public`), `btree_gist 1.7`, **`pg_cron 1.6.4`** | las mismas versiones, sin `pg_cron` | no: ninguna de las 8 usa cron; los recordatorios van por `/api/cron/*`. La foto no dice si hay trabajos programados (no trae datos) |
 | Roles | `postgres`: sin superusuario, CREATEROLE, CREATEDB, BYPASSRLS, `search_path` `"\$user", public, extensions`; `supabase_admin` superusuario; `service_role` BYPASSRLS; existe `cli_login_postgres` (LOGIN, miembro de `postgres`, el de la CLI) | sin `cli_login_postgres`; con `supabase_functions_admin` (y `postgres` miembro de él) | no: el clon con estos atributos aplicó las 8 |
-| Ajustes | `authenticator` `session_preload_libraries=safeupdate`; base `postgres` con `app.settings.jwt_exp` (sin `jwt_secret`) | `supautils, safeupdate`; con `jwt_secret` | no |
+| Ajustes | `authenticator` `session_preload_libraries=safeupdate` en la foto del 2026-11-22; **`supautils, safeupdate` desde la del 2026-11-24** (ver §8); base `postgres` con `app.settings.jwt_exp` (sin `jwt_secret`) | `supautils, safeupdate`; con `jwt_secret` | no |
 | Publicaciones | además `supabase_realtime_messages_publication` (de Realtime) | no | no |
 | Esquemas `auth`, `storage`, `realtime`, `extensions`, `graphql`, `pgbouncer`, `cron`; `_realtime` y `supabase_functions` sólo en local | ~560 filas de diferencia: otras versiones de GoTrue, Storage y Realtime (tablas `auth.scim_*`, ciclo de vida de buckets, particiones diarias de `realtime.messages`…) | — | no: de esos esquemas las 8 sólo llaman a `auth.uid()`, que existe |
 | Buckets (`06-buckets.tsv`) | 6: `casos-clinicos`, `clinica-logos` (público), `documentos-pdf`, `firmas-medicos`, `identificaciones`, `labs-documentos` | 0 en la foto local | no: las 8 no tocan Storage |
@@ -168,6 +168,31 @@ roles) y los tres CHECK de §4 (deparseo). Con la lista nueva: 14 diferencias,
 locales (anotado en la cabecera del archivo). Detalle: `CREATE DATABASE …
 TEMPLATE postgres` no sirve para guardar una copia del clon (el lanzador de
 `pg_cron` mantiene sesiones abiertas); no afecta al script.
+
+**Con la foto del 2026-11-24** (primer ensayo de «avisos globales»): 0 errores de
+restauración; 14 diferencias, 14 esperadas, 0 inesperadas, con dos avisos «no
+apareció» para las líneas 7 y 11 de `esperadas-clon.tsv` (la 11 es la de
+`session_preload_libraries` de `authenticator`, que producción ya tiene igual que
+la imagen: §8). No se borró ninguna línea esperada.
+
+## 8. Deriva de la PLATAFORMA entre la foto del 2026-11-23 y la del 2026-11-24
+
+No es nuestra: Supabase la cambió al reiniciar el proyecto (cambio de tamaño,
+Nano→Micro). Salió al comparar las dos fotos de producción, no en clon ↔ foto
+(el clon se restaura de la foto y trae lo nuevo). Ninguna migración del repo
+toca estos objetos y **no se añade ninguna línea esperada por ellas**:
+
+| estado · tipo · clave | antes (23-nov) | después (24-nov) |
+|---|---|---|
+| `distinto` · `funcion` · `extensions.pgrst_ddl_watch()` · `md5_cuerpo` | `7f27b811…` | `13ad6c2d…` |
+| `distinto` · `funcion` · `extensions.pgrst_drop_watch()` · `md5_cuerpo` | `bc09cc30…` | `af2fdf1f…` |
+| `distinto` · `config` · `rol authenticator en (todas) : session_preload_libraries` | `safeupdate` | `supautils, safeupdate` |
+
+Consecuencia práctica: una comparación «foto de antes ↔ foto de después» que
+cruce ese reinicio enseña estas tres además de lo que cambien las migraciones.
+Las referencias de M1/M2 se fijan sobre la foto del 24, que ya las trae
+(`plan/COMPROBACION-POSTERIOR.md`, «M1 y M2»). Datos del reporte del auditor en
+el equipo de Angel (2026-11-24); los md5 completos están en sus fotos.
 
 ## 8. Lo que no se comprobó
 
