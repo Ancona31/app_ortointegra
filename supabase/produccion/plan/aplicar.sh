@@ -96,8 +96,10 @@ MIGRACIONES=(
   20261202130000_avisos_globales_rsvp_rechazo
   20261203120000_agenda_para_todos
   20261203130000_avisos_globales_cierre_auditoria
+  20261204120000_reserva_purga_y_tope
 )
-# Orden inverso: MA, M3, M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
+# Orden inverso: M4, MA, M3, M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
+# M4 (purga y tope de la reserva) antes que F3: devuelve reserva_codigo_emitir a su cuerpo.
 # MA (cierre de la auditoría de M1) antes que M2 y M1: reescribe tres funciones de M1.
 # M3 antes que F1 (su disparador de clinicas escribe agenda_ajustes, que borra la de F1; no depende de
 # M1 ni de M2). M2 antes que M1 (M2 exige M1) y M1 antes que T y F4 (la de F4 borra avisos_clinica,
@@ -106,6 +108,7 @@ MIGRACIONES=(
 # en todas. Para deshacerla hay que apagarla antes, fila a fila, como postgres: ver
 # docs/spec/agenda-para-todos/ENSAYO-M3.md, «Deshacer M3».
 REVERSAS=(
+  20261204120000_reserva_purga_y_tope
   20261203130000_avisos_globales_cierre_auditoria
   20261203120000_agenda_para_todos
   20261202130000_avisos_globales_rsvp_rechazo
@@ -229,6 +232,7 @@ testigo_sql() {
     # M3: la función del disparador de clinicas (su reversa la quita; el DEFAULT y las filas no sirven de testigo).
     20261203120000) echo "to_regprocedure('public.agenda_ajustes_de_clinica_nueva()') is not null" ;;
     20261203130000) echo "to_regprocedure('public.avisos_transaccion_mas_antigua()') is not null" ;;
+    20261204120000) echo "to_regprocedure('public.reserva_purgar(integer)') is not null" ;;
     *) return 1 ;;
   esac
 }
@@ -247,6 +251,7 @@ testigo_nombre() {
     20261202130000) echo "función public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])" ;;
     20261203120000) echo "función public.agenda_ajustes_de_clinica_nueva()" ;;
     20261203130000) echo "función public.avisos_transaccion_mas_antigua()" ;;
+    20261204120000) echo "función public.reserva_purgar(integer)" ;;
   esac
 }
 

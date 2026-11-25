@@ -84,7 +84,7 @@ export async function ocupacionDeEnlace(ctx: ContextoReserva, desde: string, has
 
 const TextoSchema = z.string()
 
-/** Emite el código (ya en HMAC). 'ok' | 'enlace_invalido' | null si falla. */
+/** Emite el código (ya en HMAC). 'ok' | 'enlace_invalido' | 'limite' (M4: el tope de la base) | null si falla. */
 export async function emitirCodigo(ctx: ContextoReserva, correoHmac: string, codigoHmac: string): Promise<string | null> {
   const r = await llamar('reserva_codigo_emitir', { p_clinica_id: ctx.clinica_id, p_enlace_id: ctx.enlace_id, p_correo_hmac: correoHmac, p_codigo_hmac: codigoHmac })
   return r.ok && TextoSchema.safeParse(r.data).success ? String(r.data) : null

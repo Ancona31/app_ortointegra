@@ -64,6 +64,9 @@ export async function POST(req: NextRequest, ctx: RouteContext<'/api/reservar/[c
   if (!codigoHmac) return noEncontrado()
   const emitido = await emitirCodigo(enlace.ctx, correoHmac, codigoHmac)
   if (emitido === 'enlace_invalido') return noEncontrado()
+  // M4 (AG-DT-274): el tope de la BASE (3 por correo y hora, el mismo que el de arriba). Sólo salta si
+  // alguien emitió por otro camino: se contesta igual que el tope global por correo, sin cuánto falta.
+  if (emitido === 'limite') return demasiadosIntentos(null)
   if (emitido !== 'ok') return responder({ status: 500, cuerpo: { error: 'no_disponible' } })
 
   // Tanda I, punto 21: el consultorio de la cabecera, sólo si es uno de ESTE enlace (si no, sin él).

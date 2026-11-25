@@ -119,3 +119,12 @@ describe('middleware — confirmación de asistencia (E3)', () => {
     expect(await vaALogin('/api/reservar/AbCdEfGhIjKlMnOpQrStUv')).toBe(false)
   })
 })
+
+describe('middleware — purga diaria de la reserva (AG-DT-274)', () => {
+  it('/api/cron/purga-reserva pasa sin cookie; sus vecinas, no', async () => {
+    expect(await vaALogin('/api/cron/purga-reserva')).toBe(false)
+    for (const ruta of ['/api/cron/purga-reserva-x', '/api/cron/purga-reserva/x', '/api/cron/purga', '/api/cron/Purga-reserva']) {
+      expect(await vaALogin(ruta), ruta).toBe(true)
+    }
+  })
+})

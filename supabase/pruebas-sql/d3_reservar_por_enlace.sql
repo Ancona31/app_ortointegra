@@ -97,6 +97,10 @@ create function pg_temp.emitir(p_enlace uuid, p_correo text, p_codigo text,
 language plpgsql as $$
 declare v_cor text := pg_temp.h('c:' || p_correo); v_cod text := pg_temp.h('cod:' || p_codigo); v text;
 begin
+  -- M4 (20261204120000): la base no da más de 3 códigos por correo y hora (lo prueba ap2). Esta prueba
+  -- pide muchos seguidos al mismo correo: los anteriores se envejecen una hora, todos por igual (el
+  -- orden entre ellos y su caducidad no cambian).
+  update public.reserva_verificaciones set created_at = created_at - interval '61 minutes' where correo_hmac = v_cor;
   perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
   set local role service_role;
   v := public.reserva_codigo_emitir(p_clinica, p_enlace, v_cor, v_cod);
