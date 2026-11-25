@@ -224,7 +224,7 @@ export async function POST(req: NextRequest) {
     /* Se revierte la clínica. Sin esto queda una fila sin dueño —nadie la
        referencia y nadie puede borrarla desde la app— y el médico sigue sin
        `clinica_id`, o sea atascado en este mismo paso sin saber por qué.
-       Agenda para todos (M3, `20261203120000`): toda clínica nace con su fila
+       Agenda para todos (M3, `20261206120000`): toda clínica nace con su fila
        en `agenda_ajustes` (FK RESTRICT), así que se borra ANTES esa fila —la
        de ESTA clínica recién creada, sin nada más colgando— o el borrado de la
        clínica daría 23503. Sin la tabla o sin la fila, no hace nada. */

@@ -1,7 +1,7 @@
 -- Corrección de seguridad, punto 3 (20261117120000_agenda_seg_borrado_cita.sql): con la agenda
 -- v2 encendida, la base no deja borrar una cita con paciente o por ligar, ni a la sesión
 -- (PostgREST directo, sin la API) ni a service_role; sí una sin paciente. Con v2 apagada (fila
--- con false) todo se borra como antes; sin fila está ENCENDIDA (M3, 20261203120000). postgres queda fuera (editor SQL, CASCADE).
+-- con false) todo se borra como antes; sin fila está ENCENDIDA (M3, 20261206120000). postgres queda fuera (editor SQL, CASCADE).
 -- Mutación comprobada en rojo: quitar el RAISE de cita_proteger_borrado() → «caso 1: la sesión
 -- borró una cita con paciente».
 -- Se corre con scripts/pruebas-sql.sh. Crea sus datos y termina en rollback.
@@ -112,7 +112,7 @@ begin
 end $$;
 
 -- Caso 3: con la v2 APAGADA (fila con false) la sesión borra la cita con paciente como siempre.
--- Agenda para todos (M3, 20261203120000): la clínica 3 no escribió nada y está ENCENDIDA (su
+-- Agenda para todos (M3, 20261206120000): la clínica 3 no escribió nada y está ENCENDIDA (su
 -- fila de fábrica la creó el disparador de clinicas), y sigue encendida aunque se le quite la
 -- fila («sin fila = encendida»): en las dos la cita con paciente NO se borra.
 do $$

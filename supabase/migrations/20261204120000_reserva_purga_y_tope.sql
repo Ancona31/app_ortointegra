@@ -4,7 +4,7 @@
 -- Rama: feature/agenda-para-todos · Escrita: 2026-11-25
 -- Guion y repaso del autor: docs/spec/agenda-para-todos/
 -- ───────────────────────────────────────────────────────────────────────
--- ESTADO · LOCAL: 2026-11-25, stack local de Supabase (CLI 2.117.0) con las 18
+-- ESTADO · LOCAL: 2026-11-25, stack local de Supabase (CLI 2.117.0) con las 17
 --   migraciones anteriores: aplicada, deshecha con su reversa y vuelta a
 --   aplicar; prueba ap2_reserva_purga_y_tope.sql en verde.
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. PENDIENTE DE ENSAYO SOBRE EL CLON

@@ -1,6 +1,6 @@
 # Agenda para todos — M3: diseño, informe del interruptor y repaso del AUTOR
 
-Migración: **M3** `supabase/migrations/20261203120000_agenda_para_todos.sql`. Rama
+Migración: **M3** `supabase/migrations/20261206120000_agenda_para_todos.sql`. Rama
 `feature/agenda-para-todos`. Fecha: 2026-11-25.
 
 > **Esto NO es la auditoría.** La dimensión 25 de `supabase/AUDITORIA-MIGRACIONES.md` exige que audite
@@ -162,10 +162,10 @@ ningún objeto de M1 ni de M2 (sólo va detrás en el orden de archivos).
 
 ## 4. Deshacer
 
-La reversa (`supabase/reversas/20261203120000_agenda_para_todos_reversa.sql`) devuelve el DEFAULT y
+La reversa (`supabase/reversas/20261206120000_agenda_para_todos_reversa.sql`) devuelve el DEFAULT y
 la función y quita el disparador. **No toca filas, así que por sí sola no apaga nada.** El guion
 exige, para cualquier reversa de la agenda, la v2 apagada en todas las clínicas: deshacer M3 es
-apagar primero (un `UPDATE` como postgres) y revertir después. Pasos en `ENSAYO-M3.md`, §4.
+apagar primero (un `UPDATE` como postgres) y revertir después. Pasos en `ENSAYO.md`, §4.
 
 ## 5. Dimensión por dimensión (`supabase/AUDITORIA-MIGRACIONES.md`, 1 a 31)
 

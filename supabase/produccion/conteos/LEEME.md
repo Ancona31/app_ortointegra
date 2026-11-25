@@ -433,7 +433,7 @@ A.4, A.5 y A.6 + B.1 son los tres conteos que pedía `docs/spec/avisos-globales/
 
 ## Agenda para todos (M3)
 
-`conteos-agenda-para-todos.sql` hace lo mismo para `20261203120000_agenda_para_todos` (la agenda v2
+`conteos-agenda-para-todos.sql` hace lo mismo para `20261206120000_agenda_para_todos` (la agenda v2
 encendida por omisión): las condiciones de su pre-vuelo como consultas de **sólo lectura** y lo que
 sólo los datos reales dicen. No devuelve ningún dato de personas ni ningún id.
 

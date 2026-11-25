@@ -493,7 +493,7 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
   (`trg_agenda_ajustes_proteger`). **Falla cerrado:** un error al leerlo o la
   tabla ausente cuentan como apagado, y apagado la agenda es la de antes. No
   quites esa tolerancia, ni la de las RPC ausentes (PGRST202/42P01).
-  **Agenda para todos (M3, `20261203120000`; decisión de Angel, 2026-11-25;
+  **Agenda para todos (M3, `20261206120000`; decisión de Angel, 2026-11-25;
   escrita, sin aplicar en producción):** la v2 está ENCENDIDA de fábrica en
   todas las clínicas; sólo una fila que diga `false` la apaga. Lo que no se
   debe romper:
@@ -514,7 +514,36 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
   * **Orden de despliegue: el código primero, M3 después** (`main` borra citas
     con DELETE y `trg_appointments_proteger_borrado` actuaría en todas).
   * Deshacer M3 = apagar en todas y luego su reversa
-    (`docs/spec/agenda-para-todos/ENSAYO-M3.md`, §4).
+    (`docs/spec/agenda-para-todos/ENSAYO.md`, §4).
+* **Bloque «agenda para todos» (2026-11-25; cuatro migraciones escritas, sin
+  aplicar en producción: MA `20261203130000`, M4 `20261204120000`, M5
+  `20261205120000` y M3 `20261206120000`).** Guion único:
+  `docs/spec/agenda-para-todos/ENSAYO.md`. MA, M4 y M5 pueden ir antes del
+  código nuevo; M3, SIEMPRE después (por eso lleva el sello más alto).
+  * **MA · «Marcar todos» no adelanta a una transacción abierta**
+    (`aviso_visto_hasta_sellar` + `avisos_transaccion_mas_antigua()`, DEFINER
+    porque la sesión no ve `pg_stat_activity` entero). No le quites el recorte:
+    un aviso cuya transacción confirma después de la marca quedaría visto sin
+    que nadie lo viera. Lo vigila `scripts/avisos-carrera.sh` (dos sesiones).
+    `aviso_clinica_de_cambio_medico` espera 200 ms como mucho por los avisos
+    de la cita; no le quites el `lock_timeout` ni el `SKIP LOCKED`.
+  * **M4 · La purga de la reserva** (`reserva_purgar()`, que llama la tarea
+    diaria `/api/cron/purga-reserva`; entrada exacta con `===` en el
+    middleware) tiene el plazo de 30 días DENTRO: no lo conviertas en argumento.
+    Es SECURITY DEFINER y **de eso depende que pueda vaciar el correo de un
+    enlace de un solo uso** sin tocar `proteger_reserva_enlace_unico()`
+    (decisión expresa de Angel): sólo NULL, sólo `correo` y `correo_hmac`, sólo
+    únicos que dejaron de servir hace más de 30 días. No le añadas ningún otro
+    cambio de `reserva_enlaces`. `reserva_codigo_emitir` tiene tope propio (3
+    por correo y hora, `'limite'`), los mismos números que
+    `LIMITES.codigo.correo`: si cambia uno, cambia el otro.
+  * **M5 · Los empalmes de Google van por la cola `gcal_empalmes_pendientes`:**
+    la apuntan dos disparadores de `appointments` que sólo se ejecutan con
+    `spinus.via = 'google'` (no les quites el `WHEN`: es lo que los hace gratis
+    para una escritura normal) y la vacía `reserva_empalmes_pendientes_procesar`.
+    El servidor la procesa al empezar la pasada (un fallo ahí tumba la pasada A
+    PROPÓSITO: es la señal) y al acabar cada página. Sin FK a `appointments`, a
+    propósito. La semilla borra la tabla antes que las clínicas.
 * **Rutas públicas nuevas en `src/middleware.ts`**, cada una en su línea:
   * `/reservar/` y `/confirmar/` con prefijo y barra final;
   * `/api/reservar/` con prefijo;

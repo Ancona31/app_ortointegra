@@ -3,7 +3,7 @@ import { SESION, interruptorAgenda, sqlLocal } from './ayudas'
 import { abrirAgendaApagada, abrirAgendaV2 } from './interaccionesAyudas'
 
 /**
- * Agenda para todos (M3, `20261203120000_agenda_para_todos.sql`) — la agenda
+ * Agenda para todos (M3, `20261206120000_agenda_para_todos.sql`) — la agenda
  * v2 encendida por omisión, vista desde el navegador (escritorio y teléfono):
  *   · una clínica SIN fila en `agenda_ajustes` ve la agenda v2 (antes, la de
  *     siempre): la app le pregunta a la base y la base dice «encendida»;

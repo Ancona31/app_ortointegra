@@ -1,4 +1,4 @@
--- Agenda para todos · M3 (20261203120000_agenda_para_todos.sql): la agenda v2 encendida por
+-- Agenda para todos · M3 (20261206120000_agenda_para_todos.sql): la agenda v2 encendida por
 -- omisión. Falla si la migración no está o se deshizo (caso 0).
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en rollback: no deja
 -- nada en la base ni depende de la semilla. No borra nada de audit_log.

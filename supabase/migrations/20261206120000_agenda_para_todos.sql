@@ -3,7 +3,7 @@
 -- Rama: feature/agenda-para-todos · Escrita: 2026-11-25
 -- Guion y repaso del autor: docs/spec/agenda-para-todos/
 -- ───────────────────────────────────────────────────────────────────────
--- ESTADO · LOCAL: 2026-11-25, stack local de Supabase (CLI 2.117.0) con las 16
+-- ESTADO · LOCAL: 2026-11-25, stack local de Supabase (CLI 2.117.0) con las 19
 --   migraciones anteriores: aplicada, deshecha con su reversa y vuelta a
 --   aplicar; prueba ap1_agenda_para_todos.sql en verde.
 -- ESTADO · PRODUCCIÓN: PENDIENTE DE APLICAR. PENDIENTE DE ENSAYO SOBRE EL CLON
@@ -74,7 +74,7 @@
 -- Riesgo: MEDIO. La migración es pequeña; lo que pesa es su EFECTO: enciende
 --   la agenda nueva, con sus protecciones de base, en todas las clínicas.
 -- No re-ejecutable: una segunda pasada ABORTA en el pre-vuelo sin cambiar nada.
--- Vuelta atrás: supabase/reversas/20261203120000_agenda_para_todos_reversa.sql
+-- Vuelta atrás: supabase/reversas/20261206120000_agenda_para_todos_reversa.sql
 --   (devuelve el DEFAULT y la función y quita el disparador; NO toca filas:
 --   para APAGAR hay que escribir false en las filas, como postgres).
 -- Prueba: supabase/pruebas-sql/ap1_agenda_para_todos.sql
@@ -192,11 +192,11 @@ GRANT  EXECUTE ON FUNCTION public.agenda_ajustes_de_clinica_nueva() TO anon, aut
 COMMENT ON FUNCTION public.agenda_ajustes_de_clinica_nueva() IS
   'Agenda para todos (M3): crea la fila de fábrica de agenda_ajustes de cada clínica nueva (sólo clinica_id; lo demás, los DEFAULT). SECURITY DEFINER a propósito: como postgres pasa proteger_agenda_ajustes() con el interruptor en true. Si falla, avisa con WARNING y NO impide crear la clínica. No la uses para nada más ni le añadas columnas.';
 COMMENT ON TABLE public.agenda_ajustes IS
-  'Ajustes de agenda por clínica (mejora_agendaV2 §2). Desde M3 (20261203120000) TODA clínica tiene su fila: la crea trg_clinicas_agenda_ajustes al nacer la clínica. Ocho funciones de la agenda leen la fila directamente: una clínica SIN fila queda a medias (encendida para agenda_v2_encendida(), apagada para ellas). Para borrar una clínica hay que borrar antes su fila (FK RESTRICT). Los límites viven aquí en CHECK y en LIMITES_AJUSTES_AGENDA (src/lib/agenda/ajustesAgenda.ts): cambiar los dos.';
+  'Ajustes de agenda por clínica (mejora_agendaV2 §2). Desde M3 (20261206120000) TODA clínica tiene su fila: la crea trg_clinicas_agenda_ajustes al nacer la clínica. Ocho funciones de la agenda leen la fila directamente: una clínica SIN fila queda a medias (encendida para agenda_v2_encendida(), apagada para ellas). Para borrar una clínica hay que borrar antes su fila (FK RESTRICT). Los límites viven aquí en CHECK y en LIMITES_AJUSTES_AGENDA (src/lib/agenda/ajustesAgenda.ts): cambiar los dos.';
 COMMENT ON COLUMN public.agenda_ajustes.agenda_v2_encendida IS
-  'Interruptor de la agenda v2 de ESTA clínica. ENCENDIDO de fábrica desde M3 (20261203120000): sólo una fila que diga false la apaga. Sólo lo cambia postgres (trg_agenda_ajustes_proteger). En la app, un ERROR al leerlo se trata como apagado (falla cerrado); «sin fila» no es un error.';
+  'Interruptor de la agenda v2 de ESTA clínica. ENCENDIDO de fábrica desde M3 (20261206120000): sólo una fila que diga false la apaga. Sólo lo cambia postgres (trg_agenda_ajustes_proteger). En la app, un ERROR al leerlo se trata como apagado (falla cerrado); «sin fila» no es un error.';
 COMMENT ON FUNCTION public.agenda_v2_encendida(uuid) IS
-  'La única lectura común del interruptor de la agenda v2 de una clínica. Desde M3 (20261203120000): sin fila = true (encendida de fábrica); sólo una fila con false la apaga. La app la llama por RPC y trata cualquier error como apagado. INVOKER a propósito: con la sesión lee con la RLS de agenda_ajustes (sólo la clínica propia; de otra clínica no ve la fila y contesta true, igual que para un uuid que no existe); dentro de una SECURITY DEFINER, como su dueño. No la hagas DEFINER. Sin EXECUTE para anon.';
+  'La única lectura común del interruptor de la agenda v2 de una clínica. Desde M3 (20261206120000): sin fila = true (encendida de fábrica); sólo una fila con false la apaga. La app la llama por RPC y trata cualquier error como apagado. INVOKER a propósito: con la sesión lee con la RLS de agenda_ajustes (sólo la clínica propia; de otra clínica no ve la fila y contesta true, igual que para un uuid que no existe); dentro de una SECURITY DEFINER, como su dueño. No la hagas DEFINER. Sin EXECUTE para anon.';
 
 -- ---------------------------------------------------------------------
 -- 3 · Lo que toma candados, junto y al final (dimensión 29). El candado sobre

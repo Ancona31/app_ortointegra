@@ -272,7 +272,7 @@ async function borrar(): Promise<void> {
        `false`, como postgres: `apagarAgendaV2`): con la v2 encendida la base
        no deja borrar una cita con paciente ni por ligar, tampoco al rol de
        servicio (`cita_proteger_borrado`). Agenda para todos (M3,
-       `20261203120000`): ya no vale borrar la fila de `agenda_ajustes` para
+       `20261206120000`): ya no vale borrar la fila de `agenda_ajustes` para
        apagarla, porque sin fila la v2 está ENCENDIDA. */
     apagarAgendaV2(clinicas)
     limpiarReserva(clinicas, 'antes')

@@ -196,7 +196,7 @@ export async function leerCorreoReservaClinica(supabase: ClienteSesion, clinicaI
  * fábrica; sólo una fila que diga `false` la apaga. La regla NO se escribe
  * aquí: se le PREGUNTA A LA BASE, a la misma función que usan sus
  * disparadores y sus RPC (`public.agenda_v2_encendida(uuid)`, de F1; M3
- * `20261203120000` cambia su «sin fila» de false a true). Así la app y la base
+ * `20261206120000` cambia su «sin fila» de false a true). Así la app y la base
  * contestan siempre lo mismo, antes y después de aplicar M3.
  *
  * ⚠️ SIGUE FALLANDO CERRADO: un error de red, la función o la tabla ausentes,

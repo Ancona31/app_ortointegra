@@ -1,6 +1,6 @@
 -- Agenda B1 — agenda_ajustes: fábrica, rangos, RLS, candado e interruptor
 -- (20261112130000_agenda_b1_ajustes_interruptor.sql).
--- Agenda para todos (M3, 20261203120000): la fila de cada clínica la crea el disparador de
+-- Agenda para todos (M3, 20261206120000): la fila de cada clínica la crea el disparador de
 -- clinicas, el interruptor nace ENCENDIDO, y la sesión ya no da de alta la fila (el alta con el
 -- interruptor encendido es sólo de postgres: proteger_agenda_ajustes(), que M3 no toca).
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en

@@ -3,7 +3,7 @@
 -- Rama: feature/agenda-para-todos · Escrita: 2026-11-25
 -- Guion y repaso del autor: docs/spec/agenda-para-todos/
 -- ───────────────────────────────────────────────────────────────────────
--- ESTADO · LOCAL: 2026-11-25, stack local de Supabase (CLI 2.117.0) con las 17
+-- ESTADO · LOCAL: 2026-11-25, stack local de Supabase (CLI 2.117.0) con las 16
 --   migraciones anteriores: aplicada, deshecha con su reversa y vuelta a
 --   aplicar; pruebas av5_avisos_cierre_auditoria.sql y scripts/avisos-carrera.sh
 --   en verde.

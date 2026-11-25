@@ -3,7 +3,7 @@
 #
 # Corre conteos-agenda-para-todos.sql (SÓLO LECTURA) contra producción y guarda la
 # rejilla: los conteos de ANTES de aplicar M3 de «agenda para todos»
-# (20261203120000). Es correr-conteos.sh con otro archivo SQL y
+# (20261206120000). Es correr-conteos.sh con otro archivo SQL y
 # otro nombre de salida; ese (conteos.sql) es de antes de las 9 de la agenda y
 # contra la base de hoy da ALTO en casi todo.
 # Lo corre Angel en su terminal, desde la raíz del repo, con Docker encendido:

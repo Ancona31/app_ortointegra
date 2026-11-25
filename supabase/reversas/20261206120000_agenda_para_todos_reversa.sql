@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════
--- REVERSA de M3 (20261203120000_agenda_para_todos.sql)
+-- REVERSA de M3 (20261206120000_agenda_para_todos.sql)
 -- NO es una migración: vive fuera de supabase/migrations/. Se corre a mano y
 -- SÓLO si Angel lo pide.
 -- ═══════════════════════════════════════════════════════════════════════
@@ -12,7 +12,7 @@
 --   clínica es su FILA con false. Por eso el guion (aplicar.sh, regla de Angel
 --   para TODA reversa de la agenda) exige que la v2 esté apagada en todas las
 --   clínicas ANTES de correr ésta: quien quiere deshacer M3 apaga primero
---   (docs/spec/agenda-para-todos/ENSAYO-M3.md, «Deshacer M3») y revierte
+--   (docs/spec/agenda-para-todos/ENSAYO.md, «Deshacer M3») y revierte
 --   después. Con las filas en false, tras esta reversa todo queda como antes
 --   de M3, salvo que cada clínica tiene ya su fila (apagada).
 -- QUÉ SE PIERDE: ningún dato. Una clínica creada DESPUÉS de esta reversa nace

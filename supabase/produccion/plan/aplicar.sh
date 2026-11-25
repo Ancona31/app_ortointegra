@@ -12,7 +12,7 @@
 #   bash supabase/produccion/plan/aplicar.sh estado            # sólo lee: versión, ida y vuelta, cuentas, historial, qué falta
 #   bash supabase/produccion/plan/aplicar.sh respaldo          # volcado lógico CIFRADO (estructura + datos)
 #   bash supabase/produccion/plan/aplicar.sh aplicar           # las 15, una a una (las ya registradas y aplicadas se saltan)
-#   bash supabase/produccion/plan/aplicar.sh reversa           # las reversas de la agenda (M5, M4, MA, M3, M2, M1, T, F5b … F1), en orden inverso
+#   bash supabase/produccion/plan/aplicar.sh reversa           # las reversas de la agenda (M3, M5, M4, MA, M2, M1, T, F5b … F1), en orden inverso
 #   bash supabase/produccion/plan/aplicar.sh reversa-truncate  # las 2 de TRUNCATE (20261126, luego 20261125); reabre el hueco
 #
 # CÓMO VIAJA CADA ARCHIVO (hallazgo A1 de auditoria/RONDA-1.md): ENTERO, EN UNA
@@ -94,26 +94,28 @@ MIGRACIONES=(
   20261201180000_agenda_sin_truncate
   20261202120000_avisos_globales_modelo
   20261202130000_avisos_globales_rsvp_rechazo
-  20261203120000_agenda_para_todos
   20261203130000_avisos_globales_cierre_auditoria
   20261204120000_reserva_purga_y_tope
   20261205120000_gcal_empalmes_pendientes
+  20261206120000_agenda_para_todos
 )
-# Orden inverso: M5, M4, MA, M3, M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
+# Orden inverso: M3, M5, M4, MA, M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
 # M5 (cola de empalmes de Google) antes que F2: usa reserva_empalmes_registrar. Se niega con apuntes en la cola.
 # M4 (purga y tope de la reserva) antes que F3: devuelve reserva_codigo_emitir a su cuerpo.
 # MA (cierre de la auditoría de M1) antes que M2 y M1: reescribe tres funciones de M1.
-# M3 antes que F1 (su disparador de clinicas escribe agenda_ajustes, que borra la de F1; no depende de
+# M3 (agenda para todos) lleva el sello MÁS ALTO a propósito: es la única que va DESPUÉS del código
+# nuevo en main; MA, M4 y M5 pueden ir antes. Así «aplicar» las ofrece en ese orden y se puede parar
+# antes de M3. M3 antes que F1 (su disparador de clinicas escribe agenda_ajustes, que borra la de F1; no depende de
 # M1 ni de M2). M2 antes que M1 (M2 exige M1) y M1 antes que T y F4 (la de F4 borra avisos_clinica,
 # de la que cuelgan los escritores de M1).
 # OJO con M3: toda reversa exige la v2 APAGADA en todas las clínicas (correr_sql), y M3 la enciende
 # en todas. Para deshacerla hay que apagarla antes, fila a fila, como postgres: ver
-# docs/spec/agenda-para-todos/ENSAYO-M3.md, «Deshacer M3».
+# docs/spec/agenda-para-todos/ENSAYO.md, «Deshacer M3».
 REVERSAS=(
+  20261206120000_agenda_para_todos
   20261205120000_gcal_empalmes_pendientes
   20261204120000_reserva_purga_y_tope
   20261203130000_avisos_globales_cierre_auditoria
-  20261203120000_agenda_para_todos
   20261202130000_avisos_globales_rsvp_rechazo
   20261202120000_avisos_globales_modelo
   20261201180000_agenda_sin_truncate
@@ -233,7 +235,7 @@ testigo_sql() {
     20261202120000) echo "to_regprocedure('public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)') is not null" ;;
     20261202130000) echo "to_regprocedure('public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])') is not null" ;;
     # M3: la función del disparador de clinicas (su reversa la quita; el DEFAULT y las filas no sirven de testigo).
-    20261203120000) echo "to_regprocedure('public.agenda_ajustes_de_clinica_nueva()') is not null" ;;
+    20261206120000) echo "to_regprocedure('public.agenda_ajustes_de_clinica_nueva()') is not null" ;;
     20261203130000) echo "to_regprocedure('public.avisos_transaccion_mas_antigua()') is not null" ;;
     20261204120000) echo "to_regprocedure('public.reserva_purgar(integer)') is not null" ;;
     20261205120000) echo "to_regclass('public.gcal_empalmes_pendientes') is not null" ;;
@@ -253,7 +255,7 @@ testigo_nombre() {
     20261201180000) echo "disparador trg_agenda_bloqueos_sin_truncate" ;;
     20261202120000) echo "función public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)" ;;
     20261202130000) echo "función public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])" ;;
-    20261203120000) echo "función public.agenda_ajustes_de_clinica_nueva()" ;;
+    20261206120000) echo "función public.agenda_ajustes_de_clinica_nueva()" ;;
     20261203130000) echo "función public.avisos_transaccion_mas_antigua()" ;;
     20261204120000) echo "función public.reserva_purgar(integer)" ;;
     20261205120000) echo "tabla public.gcal_empalmes_pendientes" ;;
@@ -587,7 +589,7 @@ reversa_previa() {  # imprime CON_DATOS=si|no en la última línea si se puede s
 # nombran agenda_bloqueos»; F3: «sigue F2»; F2: «quedan disparadores de F4»; F1:
 # «quedan objetos de bloques posteriores»; las de TRUNCATE: la nº 2 antes que la
 # nº 1 y T antes que la nº 2) no están en reversa-previa.sql a propósito: con el
-# historial coherente, el orden fijo de la cadena (M5, M4, MA, M3, M2, M1, T, F5b, F4, F2, F3, F5a, F1;
+# historial coherente, el orden fijo de la cadena (M3, M5, M4, MA, M2, M1, T, F5b, F4, F2, F3, F5a, F1;
 # luego 20261126, 20261125) las cumple siempre. Lo que las rompería es una
 # versión aplicada sin registrar o registrada sin aplicar, y eso se para aquí.
 exigir_coherencia() {
