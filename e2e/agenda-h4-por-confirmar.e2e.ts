@@ -1,0 +1,269 @@
+import { test, expect, type Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
+import { SESION, interruptorAgenda, soloEscritorio, sqlLocal, tituloUnico } from './ayudas'
+import { abrirAgendaV2 } from './interaccionesAyudas'
+import { ipAlAzar } from './reservaPublicaAyudas' // además carga .env.local (RESERVA_SECRETO)
+import { codigoDeConfirmacion, hashDeCodigo } from '../src/lib/reserva/secretos'
+import { ANOTACION_A_PROPOSITO } from './guardaAsistencia'
+
+/**
+ * H4 · «Por confirmar» (puntos 15 a 19 de Angel):
+ *   15. sólo las citas de MAÑANA que siguen agendadas;
+ *   16. al abrirlo, la leyenda «Estos pacientes están pendientes…»;
+ *   17. cada fila, los avisos según lo que tenga el paciente (WhatsApp, correo,
+ *       los dos) y, sin ninguno, lo dice y ofrece «Marcar como confirmada»;
+ *   18. al confirmar o cancelar (a mano o el paciente por /confirmar), la fila
+ *       sale sin cerrar el menú, por el canal ÚNICO de tiempo real (un join);
+ *   19. el punto rojo del botón también con pendientes, y el contador de
+ *       canceladas y empalmes de siempre. I5: el botón es la campana (panel
+ *       «Por confirmar y avisos»), las canceladas y los empalmes son avisos de
+ *       su pestaña «Avisos» y el contador es el punto rojo.
+ *
+ * MUTACIONES que lo ponen en rojo (comprobadas): sin la leyenda; `con_correo`
+ * siempre `true` en la ruta; sin `onCambioCita` en `AgendaCliente` (las filas no
+ * salen solas); `AlertaBoton` sin el punto de pendientes; «Marcar como
+ * confirmada» sin `cambiarEstadoCita`.
+ */
+test.describe.configure({ mode: 'serial' })
+soloEscritorio()
+test.use({ storageState: SESION.adminA })
+
+const TZ = 'America/Merida'
+const CL = `(select id from public.clinicas where nombre = 'Clínica Semilla A')`
+type Fila = { cita: string; paciente: string; titulo: string; codigo: string }
+const filas: Record<'ambos' | 'tel' | 'correo' | 'ninguno', Fila> = {
+  ambos: { cita: '', paciente: '', titulo: '', codigo: '' },
+  tel: { cita: '', paciente: '', titulo: '', codigo: '' },
+  correo: { cita: '', paciente: '', titulo: '', codigo: '' },
+  ninguno: { cita: '', paciente: '', titulo: '', codigo: '' },
+}
+/** Lo que crean las pruebas además de las cuatro filas (la cita nueva de mañana y su paciente). */
+const extras: string[] = []
+const pacientesExtra: string[] = []
+
+/** Una cita de MAÑANA (hora de Mérida) del administrador en Centro, con su paciente y su enlace de confirmación. */
+function citaDeManana(hora: string, titulo: string, tel: string | null, correo: string | null): Fila {
+  const enlace = randomUUID()
+  const codigo = codigoDeConfirmacion(enlace)
+  if (!codigo) throw new Error('Falta RESERVA_SECRETO en .env.local')
+  const salida = sqlLocal(`
+    with p as (insert into public.pacientes (clinica_id, nombre, apellidos, telefono, email)
+               values (${CL}, :'titulo', 'H4', nullif(:'tel', ''), nullif(:'correo', '')) returning id),
+         co as (select id, medico_id, nombre, timezone from public.consultorios
+                 where clinica_id = ${CL} and nombre = 'Consultorio Centro (ficticio)'),
+         d as (select (((now() at time zone :'tz')::date + 1) + :'hora'::time) at time zone :'tz' as t),
+         a as (insert into public.appointments (clinica_id, paciente_id, medico_id, consultorio_id, title, start_time, end_time,
+                                                status, all_day, consultorio_nombre, consultorio_timezone, origen)
+               select ${CL}, (select id from p), co.medico_id, co.id, :'titulo', d.t, d.t + interval '30 min',
+                      'scheduled', false, co.nombre, co.timezone, 'spinus' from co, d returning id, paciente_id)
+    insert into public.cita_confirmaciones (id, clinica_id, appointment_id, codigo_hash, paciente_id)
+    select :'enlace', ${CL}, a.id, :'hash', a.paciente_id from a
+    returning appointment_id || '|' || paciente_id;`,
+  { titulo, tel: tel ?? '', correo: correo ?? '', tz: TZ, hora, enlace, hash: hashDeCodigo(codigo) })
+  const [cita = '', paciente = ''] = salida.split('|')
+  return { cita, paciente, titulo, codigo }
+}
+
+/*
+ * AG-DT-256 · «Por confirmar» lista las agendadas de MAÑANA: estas citas no pueden ir a la semana
+ * siguiente. De lunes a viernes «mañana» es de la semana visible y la guarda las vería al final del
+ * domingo. Por eso cada prueba que las usa las crea al empezar (`sembrarFilas`) y el `afterEach` las
+ * borra antes de que termine: al acabar ya no disparan la ventana y la guarda las perdona con la
+ * anotación (`A_PROPOSITO`). Antes nacían en un `beforeAll` y vivían hasta el final del archivo
+ * (también en el proyecto `telefono`, donde las pruebas se saltan).
+ */
+const A_PROPOSITO = { annotation: { type: ANOTACION_A_PROPOSITO, description: 'citas de mañana; las borra el afterEach' } }
+
+function sembrarFilas(): void {
+  filas.ambos = citaDeManana('07:00', tituloUnico('H4 Ambos'), '9990000091', 'h4.ambos@semilla.spinus.test')
+  filas.tel = citaDeManana('07:15', tituloUnico('H4 Telefono'), '9990000092', null)
+  filas.correo = citaDeManana('07:30', tituloUnico('H4 Correo'), null, 'h4.correo@semilla.spinus.test')
+  filas.ninguno = citaDeManana('07:45', tituloUnico('H4 Ninguno'), null, null)
+}
+
+test.beforeAll(() => { interruptorAgenda('A', true) })
+
+test.afterEach(() => {
+  const citas = [...Object.values(filas).map(f => f.cita), ...extras].filter(Boolean)
+  const pacientes = [...Object.values(filas).map(f => f.paciente), ...pacientesExtra].filter(Boolean)
+  for (const f of Object.values(filas)) Object.assign(f, { cita: '', paciente: '', titulo: '', codigo: '' })
+  extras.length = 0
+  pacientesExtra.length = 0
+  if (citas.length === 0 && pacientes.length === 0) return
+  sqlLocal(`
+    begin;
+    set local session_replication_role = replica;
+    create temp table _c on commit drop as select unnest(string_to_array(:'citas', ','))::uuid as id;
+    delete from public.cita_correos where appointment_id in (select id from _c);
+    delete from public.cita_confirmaciones where appointment_id in (select id from _c);
+    -- Los avisos de la campana de estas citas (I5: la cancelación; tanda L: la confirmación del paciente).
+    delete from public.avisos_clinica where cita_id in (select id from _c);
+    delete from public.appointments where id in (select id from _c);
+    delete from public.pacientes where id = any(string_to_array(:'pacientes', ',')::uuid[]);
+    commit;`, { citas: citas.join(',') || '00000000-0000-0000-0000-000000000000', pacientes: pacientes.join(',') })
+})
+
+test.afterAll(() => {
+  interruptorAgenda('A', false) // como el resto de las e2e: quien lo enciende, lo apaga (global-setup)
+})
+
+// I5 (punto 16): la campana sustituye al botón; su capa lleva dos pestañas y abre en «Por confirmar».
+const panel = (page: Page) => page.getByRole('dialog', { name: 'Por confirmar y avisos' })
+const fila = (page: Page, f: Fila) => page.locator(`[data-fila-por-confirmar="${f.cita}"]`)
+
+async function abrirPanel(page: Page): Promise<void> {
+  await page.locator('[data-por-confirmar]').click()
+  await expect(panel(page)).toBeVisible()
+  await expect(fila(page, filas.ambos)).toBeVisible()
+}
+
+/** Cuenta los `phx_join` del canal de la agenda. Antes de `goto`. */
+function contarJoins(page: Page): () => number {
+  let n = 0
+  page.on('websocket', ws => ws.on('framesent', ({ payload }) => {
+    const t = typeof payload === 'string' ? payload : payload.toString('utf8')
+    if (t.includes('"phx_join"') && t.includes('appointments-realtime')) n += 1
+  }))
+  return () => n
+}
+
+test('15-17: sólo agendadas de mañana; la leyenda; cada fila con sus medios; sin ninguno, «Marcar como confirmada»', A_PROPOSITO, async ({ page }) => {
+  sembrarFilas()
+  await abrirAgendaV2(page)
+  await abrirPanel(page)
+  await expect(panel(page).getByText('Estos pacientes están pendientes de confirmar su cita. Envía un recordatorio.', { exact: true })).toBeVisible()
+  const medios = async (f: Fila) => {
+    const l = fila(page, f)
+    return [
+      await l.getByRole('button', { name: 'WhatsApp' }).count(),
+      await l.getByRole('button', { name: 'Enviar confirmación por correo' }).count(),
+      await l.getByRole('button', { name: 'Marcar como confirmada' }).count(),
+    ].join('')
+  }
+  expect(await medios(filas.ambos)).toBe('110')
+  expect(await medios(filas.tel)).toBe('100')
+  expect(await medios(filas.correo)).toBe('010')
+  expect(await medios(filas.ninguno)).toBe('001')
+  await expect(fila(page, filas.ninguno)).toContainText('Sin teléfono válido ni correo.')
+  // Nombre, hora y consultorio; nada clínico.
+  await expect(fila(page, filas.ambos)).toContainText('07:00 · Consultorio Centro (ficticio)')
+  // El correo sale por la ruta de G3 (Mailpit en local).
+  const post = page.waitForResponse(r => r.url().endsWith('/api/agenda/correo') && r.request().method() === 'POST')
+  await fila(page, filas.correo).getByRole('button', { name: 'Enviar confirmación por correo' }).click()
+  expect((await post).status()).toBe(200)
+  // I5 (punto 17): el estado va en una línea debajo de la fila, en forma corta.
+  await expect(fila(page, filas.correo).locator('[data-estado-fila]')).toHaveText(/^Correo enviado \d\d:\d\d$/)
+})
+
+test('18: «Marcar como confirmada» la saca al instante, sin cerrar el menú, por el PUT de «Confirmar» (firma y auditoría)', A_PROPOSITO, async ({ page }) => {
+  sembrarFilas()
+  await abrirAgendaV2(page)
+  await abrirPanel(page)
+  const auditAntes = Number(sqlLocal(`select count(*) from public.audit_log where registro_id = :'id'`, { id: filas.ninguno.cita }))
+  const put = page.waitForRequest(r => r.url().endsWith(`/api/appointments/${filas.ninguno.cita}`) && r.method() === 'PUT')
+  await fila(page, filas.ninguno).getByRole('button', { name: 'Marcar como confirmada' }).click()
+  const cuerpo: unknown = (await put).postDataJSON()
+  expect(cuerpo).toMatchObject({ status: 'confirmed' })
+  expect(typeof (cuerpo as { client_id?: unknown }).client_id).toBe('string')
+  await expect(fila(page, filas.ninguno)).toHaveCount(0)
+  await expect(panel(page)).toBeVisible()
+  await expect.poll(() => sqlLocal(`select status from public.appointments where id = :'id'`, { id: filas.ninguno.cita })).toBe('confirmed')
+  await expect.poll(() => Number(sqlLocal(`select count(*) from public.audit_log where registro_id = :'id'`, { id: filas.ninguno.cita })))
+    .toBeGreaterThan(auditAntes)
+})
+
+test('18: el paciente confirma por /confirmar en otra pestaña y la fila sale sin cerrar el menú; un solo join y sin peticiones en reposo', A_PROPOSITO, async ({ page, browser }) => {
+  sembrarFilas()
+  const joins = contarJoins(page)
+  let gets = 0
+  page.on('request', r => { if (r.url().includes('/api/agenda/por-confirmar')) gets += 1 })
+  await abrirAgendaV2(page)
+  await expect.poll(() => gets).toBe(1) // la de siempre, en ocioso al montar
+  await page.waitForTimeout(2500)
+  expect(gets).toBe(1) // en reposo, nada
+  await abrirPanel(page)
+  const getsTrasAbrir = gets
+  const paciente = await browser.newContext({ extraHTTPHeaders: { 'x-forwarded-for': ipAlAzar() } })
+  try {
+    const p = await paciente.newPage()
+    await p.goto(`/confirmar/${filas.tel.codigo}`)
+    await p.getByRole('button', { name: 'Confirmo mi asistencia' }).click()
+    await p.waitForURL(/\?r=confirmada$/)
+  } finally { await paciente.close() }
+  await expect(fila(page, filas.tel)).toHaveCount(0, { timeout: 10000 })
+  await expect(panel(page)).toBeVisible()
+  // La fila sale sin esperar a la red. Tanda L (punto 13): la confirmación del paciente es además un
+  // aviso de «Avisos», que llega por esta misma ruta: UNA traída (agrupada), como la de su cancelación.
+  await expect.poll(() => gets).toBe(getsTrasAbrir + 1)
+  await page.waitForTimeout(1500)
+  expect(gets).toBe(getsTrasAbrir + 1) // y nada más
+  await panel(page).getByRole('tab', { name: /^Avisos/ }).click()
+  await expect(page.locator(`[data-aviso-tipo="confirmacion_paciente"][data-aviso-cita="${filas.tel.cita}"]`)).toBeVisible()
+  expect(joins()).toBe(1)
+})
+
+test('18 y 19: cancelar (el paciente y el personal) la saca; una cita nueva para mañana entra; el contador rojo de canceladas', A_PROPOSITO, async ({ page, browser }) => {
+  sembrarFilas()
+  await abrirAgendaV2(page)
+  await abrirPanel(page)
+  const paciente = await browser.newContext({ extraHTTPHeaders: { 'x-forwarded-for': ipAlAzar() } })
+  try {
+    const p = await paciente.newPage()
+    await p.goto(`/confirmar/${filas.correo.codigo}?paso=cancelar`)
+    await p.getByRole('button', { name: 'Sí, cancelar mi cita' }).click()
+    await p.waitForURL(/\?r=cancelada$/)
+  } finally { await paciente.close() }
+  await expect(fila(page, filas.correo)).toHaveCount(0, { timeout: 10000 })
+  // I5 (punto 19): la cancelación del paciente es un aviso de la pestaña «Avisos», con el punto rojo.
+  await panel(page).getByRole('tab', { name: /^Avisos/ }).click()
+  await expect(page.locator(`[data-aviso-tipo="cancelacion_paciente"][data-aviso-cita="${filas.correo.cita}"]`)).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('[data-campana] [data-punto-rojo]')).toBeVisible()
+  await panel(page).getByRole('tab', { name: /^Por confirmar/ }).click()
+
+  // El personal, desde otra sesión: el mismo PUT que «Cancelar» de la tarjeta.
+  const secretaria = await browser.newContext({ storageState: SESION.secretariaA })
+  try {
+    const r = await secretaria.request.put(`/api/appointments/${filas.ambos.cita}`, { data: { status: 'cancelled', client_id: randomUUID() } })
+    expect(r.status()).toBe(200)
+  } finally { await secretaria.close() }
+  await expect(fila(page, filas.ambos)).toHaveCount(0, { timeout: 10000 })
+
+  // Una cita nueva para mañana entra sola.
+  const nueva = citaDeManana('06:45', tituloUnico('H4 Nueva'), '9990000093', null)
+  extras.push(nueva.cita)
+  pacientesExtra.push(nueva.paciente)
+  await expect(page.locator(`[data-fila-por-confirmar="${nueva.cita}"]`)).toBeVisible({ timeout: 10000 })
+  await expect(panel(page)).toBeVisible()
+})
+
+test('19 (I5; tanda L, punto 14): la burbuja de la campana — vacío, nada; con pendientes, el número (más de 9, «9+») y «N pendientes»', async ({ page }) => {
+  const inicio = new Date(Date.now() + 26 * 3_600_000).toISOString()
+  const fila = (i: number): Record<string, unknown> => ({ id: `x${i}`, inicio, zona: TZ, titulo: 'X', consultorio: 'C',
+    con_whatsapp: false, con_correo: false, whatsapp_reminder_sent_at: null })
+  const aviso = (i: number): Record<string, unknown> => ({ id: randomUUID(), tipo: 'reserva_enlace', creado_en: new Date(Date.now() - 3_600_000 - i).toISOString(),
+    cita: { id: randomUUID(), title: 'Y', start_time: inicio, end_time: inicio, status: 'scheduled', medico_id: null, paciente_id: null,
+      reserva_nombre: 'Y', zona: TZ } })
+  const lista = <T,>(n: number, f: (i: number) => T): T[] => Array.from({ length: n }, (_, i) => f(i))
+  const vacio = { citas: [], canceladas: [], empalmes: [], avisos: [], avisos_disponibles: true }
+  // [caso, respuesta, texto de la burbuja (null = no hay), nombre accesible]
+  const casos: [string, unknown, string | null, string][] = [
+    ['vacío', vacio, null, 'Por confirmar (0) y avisos (0)'],
+    ['pendientes', { ...vacio, citas: lista(1, fila) }, '1', 'Por confirmar (1) y avisos (0): 1 pendiente'],
+    ['avisos', { ...vacio, avisos: lista(1, aviso) }, '1', 'Por confirmar (0) y avisos (1): 1 pendiente'],
+    ['las dos', { ...vacio, citas: lista(2, fila), avisos: lista(1, aviso) }, '3', 'Por confirmar (2) y avisos (1): 3 pendientes'],
+    ['más de 9', { ...vacio, citas: lista(7, fila), avisos: lista(5, aviso) }, '9+', 'Por confirmar (7) y avisos (5): 12 pendientes'],
+  ]
+  for (const [caso, json, burbuja, etiqueta] of casos) {
+    await page.route('**/api/agenda/por-confirmar', r => r.fulfill({ json }))
+    await abrirAgendaV2(page)
+    await expect(page.locator('[data-campana]'), caso).toHaveAttribute('aria-label', etiqueta)
+    const marca = page.locator('[data-campana] [data-punto-rojo]')
+    await expect(marca, caso).toHaveCount(burbuja ? 1 : 0)
+    if (burbuja) {
+      await expect(marca, caso).toHaveText(burbuja)
+      // El número lo dice el nombre del botón: la burbuja no se lee dos veces.
+      await expect(marca, caso).toHaveAttribute('aria-hidden', 'true')
+    }
+    await page.unroute('**/api/agenda/por-confirmar')
+  }
+})

@@ -38,7 +38,7 @@ type Phase =
 
 const WELCOME_TIP: ContextTip = {
   id: 'welcome',
-  title: '¡Bienvenido a Spinus®!',
+  title: '¡Bienvenido a Spinus!',
   message: 'Te llevaré paso a paso a conocer tu nueva plataforma de expediente clínico. Puedes navegar libremente — estaré aquí para guiarte.',
 }
 

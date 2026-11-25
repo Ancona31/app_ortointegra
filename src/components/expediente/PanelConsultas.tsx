@@ -1,15 +1,15 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Stethoscope, RotateCw } from 'lucide-react'
-import Link from 'next/link'
+import { Stethoscope } from 'lucide-react'
 import type { Paciente, Consulta, MedicoInfo } from '@/types'
 import { buildNotaRenderData, type AddendumInput } from '@/lib/notaRenderData'
 import { generarPdf } from '@/lib/mobileShare'
 import { generateDocFileName } from '@/lib/patientUtils'
 import { useProfile } from '@/hooks/useProfile'
 import { useAuditAccess } from '@/hooks/useAudit'
-import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import EstadoError from '@/components/ui/EstadoError'
 import CarrilConsultas from './CarrilConsultas'
 import VisorNota from './VisorNota'
 
@@ -46,10 +46,10 @@ type Addendum = {
 
 function VisorCargando() {
   return (
-    <div className="rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-4)] py-[var(--sp-5)] lg:px-[26px]">
+    <div className="k-tarjeta" aria-busy="true">
       <div className="mx-auto w-full max-w-[620px]">
         <div className="skeleton h-[22px] w-2/3 rounded-[8px]" />
-        <div className="mt-[var(--sp-5)] flex flex-col gap-[var(--sp-3)]">
+        <div className="mt-5 flex flex-col gap-3">
           {[1, 2, 3].map(i => <div key={i} className="skeleton h-[56px] rounded-[8px]" />)}
         </div>
       </div>
@@ -197,45 +197,31 @@ export default function PanelConsultas({
   const puedeAclarar = !!consulta?.medico_id && !!profile?.id && consulta.medico_id === profile.id
 
   if (errorActividad) {
-    return (
-      <AvisoColumna
-        icono={RotateCw}
-        mensaje="No se pudieron cargar las consultas."
-        onReintentar={onReintentarActividad}
-      />
-    )
+    return <EstadoError variante="tarjeta" className="k-tarjeta" mensaje="No se pudieron cargar las consultas." alReintentar={onReintentarActividad} />
   }
 
   if (cargandoActividad) {
     return (
-      <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
-        <div className="skeleton hidden h-[220px] w-[44px] shrink-0 rounded-[var(--sp-r-card)] lg:block" />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="skeleton hidden h-[220px] w-[44px] shrink-0 rounded-[var(--r-tarjeta-ancha)] lg:block" />
         <div className="min-w-0 flex-1"><VisorCargando /></div>
       </div>
     )
   }
 
   if (consultas.length === 0) {
+    /* Acción tonal: el relleno de la pantalla es «Nueva consulta» de la cabecera. */
     return (
-      <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-pad-row-x)] py-[var(--sp-10)]">
-        <Stethoscope size={20} className="text-[var(--sp-ink-150)]" />
-        <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
-          La nota de cada consulta aparecerá aquí en cuanto cierres la primera.
-        </p>
-        <Link
-          href={`/expediente/${paciente.id}/nueva-nota`}
-          prefetch={false}
-          className="sp-btn sp-btn--primary mt-[var(--sp-2)]"
-          style={{ height: 'var(--sp-tap)', paddingTop: 0, paddingBottom: 0, fontSize: 'var(--sp-fs-body-sm)' }}
-        >
-          <Stethoscope size={15} /> Iniciar primera consulta
-        </Link>
-      </div>
+      <EstadoVacio
+        icono={Stethoscope}
+        titulo="La nota de cada consulta aparecerá aquí en cuanto cierres la primera."
+        accion={{ etiqueta: 'Iniciar primera consulta', href: `/expediente/${paciente.id}/nueva-nota` }}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <CarrilConsultas
         consultas={consultas}
         total={totalConsultas}

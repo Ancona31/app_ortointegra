@@ -54,7 +54,8 @@ const PRIMER_DIA_SEMANA = 1
  * anterior pedía por `currentRange` para esquivar `hiddenDays`, y en vista MES
  * dejaba huecos: ahí `activeRange ⊋ currentRange` —`buildDayTableRenderRange`
  * encaja el mes a semanas completas y `fixedWeekCount` lo rellena a seis
- * (`@fullcalendar/daygrid/internal.js:949-958`), y `showNonCurrentDates` es
+ * (`@fullcalendar/daygrid/internal.js:949-958`; desde F1.6 sólo en el
+ * teléfono: el escritorio pinta sus semanas reales, y la regla vale igual), y `showNonCurrentDates` es
  * `true` por defecto, así que el relleno se PINTA—. Agosto de 2026 enseña desde
  * el 26 de julio, y esas citas no llegaban.
  *

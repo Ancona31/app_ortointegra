@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { RegistroSchema, InvitarUsuarioSchema, PerfilMedicoUpdateSchema } from '@/lib/perfil/schemas'
+import { MENSAJE_ACEPTA_LEGAL, RegistroSchema, InvitarUsuarioSchema, PerfilMedicoUpdateSchema } from '@/lib/perfil/schemas'
 
 /**
  * Tres schemas en un archivo, y es a propósito: los tres se mueven juntos
@@ -28,6 +28,7 @@ import { RegistroSchema, InvitarUsuarioSchema, PerfilMedicoUpdateSchema } from '
 const REGISTRO_VALIDO = {
   email: 'medico@ejemplo.com',
   password: 'contrasena-segura-1',
+  acepta_legal: true,
 }
 
 /* La invitación ya no tiene ramas: los dos roles mandan lo mismo. */
@@ -40,6 +41,23 @@ const INVITACION_SECRETARIA = {
   role: 'secretaria' as const,
   email: 'asistente@ejemplo.com',
 }
+
+describe('RegistroSchema — aceptación del aviso y de los términos (privacidad 2026-12)', () => {
+  it('sin la casilla, con false o con otra cosa no hay registro, y el mensaje lo dice', () => {
+    const { acepta_legal: _fuera, ...sinCasilla } = REGISTRO_VALIDO
+    void _fuera
+    for (const cuerpo of [sinCasilla, { ...sinCasilla, acepta_legal: false }, { ...sinCasilla, acepta_legal: 'true' }, { ...sinCasilla, acepta_legal: 1 }]) {
+      const r = RegistroSchema.safeParse(cuerpo)
+      expect(r.success).toBe(false)
+      if (r.success) continue
+      expect(r.error.issues[0]?.path).toEqual(['acepta_legal'])
+      expect(r.error.issues[0]?.message).toBe(MENSAJE_ACEPTA_LEGAL)
+    }
+  })
+  it('con la casilla en true, sí', () => {
+    expect(RegistroSchema.safeParse(REGISTRO_VALIDO).success).toBe(true)
+  })
+})
 
 describe('RegistroSchema — registro válido', () => {
   it('acepta correo y contraseña', () => {
@@ -70,7 +88,7 @@ describe('RegistroSchema — registro válido', () => {
     })
     expect(r.success).toBe(true)
     if (!r.success) return
-    expect(Object.keys(r.data).sort()).toEqual(['email', 'password'])
+    expect(Object.keys(r.data).sort()).toEqual(['acepta_legal', 'email', 'password'])
   })
 })
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CheckCircle2, ChevronLeft, ChevronRight, LifeBuoy, Loader2 } from 'lucide-react'
+import { Check, CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, LifeBuoy, Loader2 } from 'lucide-react'
 import { mutate } from 'swr'
 import EspecialidadSelector from '@/components/ui/EspecialidadSelector'
 import FirmaCaptura from '@/components/perfil/FirmaCaptura'
@@ -540,15 +540,15 @@ export default function OnboardingModal({
            El «Atrás» se pinta en los dos: el paso puede NO ser el primero (el
            gate los pide en orden: datos, clínica, consultorio) y sin pie el
            invitado se quedaba sin poder corregir lo anterior. */
-        <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+        <div className="flex items-center justify-between gap-3 px-6 py-3 ext:px-4">
           <div>
             {indice > 0 && (
               <button
                 onClick={atras}
                 disabled={guardando}
-                className="sp-btn sp-btn--secondary"
+                className="k-b k-b-quieto"
               >
-                <ChevronLeft size={15} /> Atrás
+                <ChevronLeft size={16} aria-hidden="true" /> Atrás
               </button>
             )}
           </div>
@@ -559,15 +559,18 @@ export default function OnboardingModal({
                 <button
                   onClick={siguiente}
                   disabled={guardando}
-                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                  className="k-b k-b-texto px-1 text-[14px] text-tinta2"
                 >
                   Omitir por ahora
                 </button>
               ) : (
-                <span className="text-xs text-slate-400">Paso requerido</span>
+                <span className="text-[13px] leading-[18px] text-tinta2">Paso requerido</span>
               )}
 
-              {/* ⚠️ `sp-btn--primary` Y NO UNA ARBITRARIA SOBRE LA VARIABLE DE
+              {/* Rediseño B10: `k-b-prim` (relleno `--accion`, que `sistema.css`
+                  declara en `:root` con el valor del kit, así que existe también
+                  sin `ThemeProvider`). Antes `sp-btn--primary`, por esto:
+                  ⚠️ NO UNA ARBITRARIA SOBRE LA VARIABLE DE
                   MARCA, QUE ERA LO QUE TENÍA Y NO SE VEÍA. Esa variable la
                   inyecta `ThemeProvider`, montado SOLO en
                   `(app)/layout.tsx:106`; en el launcher —que es donde vive este
@@ -581,14 +584,14 @@ export default function OnboardingModal({
               <button
                 onClick={avanzar}
                 disabled={guardando || esperandoFirma}
-                className="sp-btn sp-btn--primary"
+                className="k-b k-b-prim"
               >
                 {guardando ? (
-                  <><Loader2 size={15} className="animate-spin" /> Guardando…</>
+                  <><Loader2 size={16} aria-hidden="true" className="animate-spin" /> Guardando…</>
                 ) : esUltimo ? (
-                  <><CheckCircle2 size={15} /> Finalizar</>
+                  <><CheckCircle2 size={16} aria-hidden="true" /> Finalizar</>
                 ) : (
-                  <>Continuar <ChevronRight size={15} /></>
+                  <>Continuar <ChevronRight size={16} aria-hidden="true" /></>
                 )}
               </button>
             </div>
@@ -598,60 +601,58 @@ export default function OnboardingModal({
     >
       {/* Stepper — INDICADOR, no navegación. Se mueve solo con «Atrás» y
           «Continuar» del pie; ver el porqué en `atras()`. */}
-      <div className="flex items-center gap-1 px-5 pt-4">
+      <div className="flex items-center gap-1 border-b border-linea px-6 pt-2 pb-3 ext:px-5" aria-hidden="true">
         {pasos.map((p, i) => {
           const activo = i === indice
           const completado = i < indice
           return (
             <div key={p} className="flex items-center gap-1 flex-1">
               <div className={`flex items-center gap-1.5 ${activo ? 'flex-1' : ''}`}>
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
-                  completado ? 'bg-emerald-500 text-white'
-                    : activo ? 'bg-[var(--sp-primary)] text-white'
-                    : 'bg-slate-200 text-slate-500'
+                <div className={`k-num flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                  completado || activo ? 'bg-accion text-sobre-accion' : 'bg-sup2 text-tinta2'
                 }`}>
-                  {completado ? <CheckCircle2 size={14} /> : i + 1}
+                  {completado ? <Check size={14} strokeWidth={3} /> : i + 1}
                 </div>
-                {activo && <span className="text-xs font-medium text-slate-700">{ETIQUETAS[p]}</span>}
+                {activo && <span className="whitespace-nowrap text-[13px] font-semibold text-tinta">{ETIQUETAS[p]}</span>}
               </div>
               {i < pasos.length - 1 && (
-                <div className={`h-px flex-1 ${completado ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                <div className={`h-px min-w-2 flex-1 ${completado ? 'bg-accion' : 'bg-borde'}`} />
               )}
             </div>
           )
         })}
       </div>
 
-      <div className="px-5 py-5 max-h-[60vh] overflow-y-auto">
+      <div className="max-h-[60vh] overflow-y-auto px-6 py-5 ext:px-5">
         {paso === 'nombre' && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-[15px] leading-[22px] text-tinta">
               Así te verá el resto del equipo en la clínica.
             </p>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Nombre(s) <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Nombre(s) <span className="text-mal-tinta">*</span>
               </label>
               <input
                 type="text" value={nombres} onChange={e => setNombres(e.target.value)}
-                placeholder="Ej: María" className="sp-input"
+                placeholder="Ej: María" className="k-campo"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Apellido paterno <span className="text-red-500">*</span>
+                <label className="k-etiqueta mb-1">
+                  Apellido paterno <span className="text-mal-tinta">*</span>
                 </label>
                 <input
                   type="text" value={apellidoPaterno} onChange={e => setApellidoPaterno(e.target.value)}
-                  placeholder="Ej: González" className="sp-input"
+                  placeholder="Ej: González" className="k-campo"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Apellido materno</label>
+                <label className="k-etiqueta mb-1">Apellido materno</label>
                 <input
                   type="text" value={apellidoMaterno} onChange={e => setApellidoMaterno(e.target.value)}
-                  placeholder="Ej: López" className="sp-input"
+                  placeholder="Ej: López" className="k-campo"
                 />
               </div>
             </div>
@@ -660,62 +661,66 @@ export default function OnboardingModal({
 
         {paso === 'datos' && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">¿Cómo aparecerás en tus documentos médicos?</p>
+            <p className="text-[15px] leading-[22px] text-tinta">¿Cómo aparecerás en tus documentos médicos?</p>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Título <span className="text-red-500">*</span>
+                <label className="k-etiqueta mb-1">
+                  Título <span className="text-mal-tinta">*</span>
                 </label>
-                <select value={titulo} onChange={e => setTitulo(e.target.value)} className="sp-input">
+                <select value={titulo} onChange={e => setTitulo(e.target.value)} className="k-campo">
                   <option value="">— Elige —</option>
                   {TITULOS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Nombre(s) <span className="text-red-500">*</span>
+                <label className="k-etiqueta mb-1">
+                  Nombre(s) <span className="text-mal-tinta">*</span>
                 </label>
                 <input
                   type="text" value={nombres} onChange={e => setNombres(e.target.value)}
-                  placeholder="Ej: Juan" className="sp-input"
+                  placeholder="Ej: Juan" className="k-campo"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Apellido paterno <span className="text-red-500">*</span>
+                <label className="k-etiqueta mb-1">
+                  Apellido paterno <span className="text-mal-tinta">*</span>
                 </label>
                 <input
                   type="text" value={apellidoPaterno} onChange={e => setApellidoPaterno(e.target.value)}
-                  placeholder="Ej: García" className="sp-input"
+                  placeholder="Ej: García" className="k-campo"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">Apellido materno</label>
+                <label className="k-etiqueta mb-1">Apellido materno</label>
                 <input
                   type="text" value={apellidoMaterno} onChange={e => setApellidoMaterno(e.target.value)}
-                  placeholder="Ej: López" className="sp-input"
+                  placeholder="Ej: López" className="k-campo"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Especialidad <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Especialidad <span className="text-mal-tinta">*</span>
               </label>
-              <EspecialidadSelector
-                value={especialidades}
-                onChange={setEspecialidades}
-                selectClassName="sp-input"
-              />
+              {/* El «Agregar especialidad» del selector compartido se viste desde
+                  aquí (14/600 en `--enlace`, alto táctil), sin tocar `ui/`. */}
+              <div className="[&>div>button]:min-h-11 [&>div>button]:text-[14px] [&>div>button]:font-semibold [&>div>button]:text-enlace">
+                <EspecialidadSelector
+                  value={especialidades}
+                  onChange={setEspecialidades}
+                  selectClassName="k-campo"
+                />
+              </div>
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Universidad / Institución <span className="text-slate-400 font-normal">(opcional)</span>
+              <label className="k-etiqueta mb-1">
+                Universidad / Institución <span className="font-normal text-tinta2">(opcional)</span>
               </label>
               <input
                 type="text" value={universidad} onChange={e => setUniversidad(e.target.value)}
-                placeholder="Ej: UNAM, IPN, UAG…" className="sp-input"
+                placeholder="Ej: UNAM, IPN, UAG…" className="k-campo"
               />
             </div>
           </div>
@@ -723,32 +728,32 @@ export default function OnboardingModal({
 
         {paso === 'cedulas' && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">Tus cédulas aparecerán al pie de cada documento oficial.</p>
+            <p className="text-[15px] leading-[22px] text-tinta">Tus cédulas aparecerán al pie de cada documento oficial.</p>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Cédula profesional <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Cédula profesional <span className="text-mal-tinta">*</span>
               </label>
               <input
                 type="text" value={cedulaProfesional}
                 onChange={e => { setCedulaProfesional(e.target.value); setErrorCedula('') }}
-                placeholder="7 u 8 dígitos" className="sp-input"
+                placeholder="7 u 8 dígitos" className="k-campo"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Cédula de especialidad <span className="text-slate-400 font-normal">(opcional)</span>
+              <label className="k-etiqueta mb-1">
+                Cédula de especialidad <span className="font-normal text-tinta2">(opcional)</span>
               </label>
               <input
                 type="text" value={cedulaEspecialidad}
                 onChange={e => { setCedulaEspecialidad(e.target.value); setErrorCedula('') }}
-                placeholder="7 u 8 dígitos" className="sp-input"
+                placeholder="7 u 8 dígitos" className="k-campo"
               />
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="k-campo-ayuda mt-1">
                 Déjala vacía si ejerces como médico general.
               </p>
             </div>
-            {errorCedula && <p className="text-xs text-red-500">{errorCedula}</p>}
-            <p className="text-xs text-slate-400 bg-slate-50 rounded-lg p-3">
+            {errorCedula && <p role="alert" className="k-campo-error">{errorCedula}</p>}
+            <p className="rounded-[12px] bg-fondo p-3 text-[13px] leading-[18px] text-tinta2">
               Las cédulas son datos que amparan legalmente tus documentos médicos bajo la NOM-004-SSA3-2012.
             </p>
           </div>
@@ -756,20 +761,20 @@ export default function OnboardingModal({
 
         {esPanelSoporte && (
           <div className="space-y-4">
-            <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
-              <LifeBuoy size={22} className="text-amber-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-aviso-fondo">
+              <LifeBuoy size={24} aria-hidden="true" className="text-aviso-tinta" />
             </div>
-            <p className="text-sm font-semibold text-slate-800">Tu cuenta no está asociada a ninguna clínica</p>
-            <p className="text-sm text-slate-600">
+            <p className="k-t-tarjeta">Tu cuenta no está asociada a ninguna clínica</p>
+            <p className="text-[15px] leading-[22px] text-tinta">
               Los médicos invitados no pueden crear una clínica: quien administra la tuya
               debe volver a añadirte.
             </p>
-            <p className="text-sm text-slate-600">
+            <p className="text-[15px] leading-[22px] text-tinta">
               Escríbenos y lo resolvemos contigo —no es algo que puedas arreglar desde aquí.
             </p>
             <a
               href="mailto:soporte@spinus.com.mx?subject=Cuenta sin clínica asignada"
-              className="sp-btn sp-btn--primary no-underline"
+              className="k-b k-b-prim self-start no-underline"
             >
               Escribir a soporte
             </a>
@@ -778,11 +783,11 @@ export default function OnboardingModal({
 
         {paso === 'clinica' && !gate.requiereSoporte && clinicaCreada && (
           <div className="space-y-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 size={22} className="text-emerald-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ok-fondo">
+              <CheckCircle2 size={24} aria-hidden="true" className="text-ok-tinta" />
             </div>
-            <p className="text-sm font-semibold text-slate-800">{nombreClinica.trim()} ya está creada</p>
-            <p className="text-sm text-slate-600">
+            <p className="k-t-tarjeta">{nombreClinica.trim()} ya está creada</p>
+            <p className="text-[15px] leading-[22px] text-tinta">
               Volviste a este paso, pero la clínica ya existe y no hace falta crearla otra vez.
               Para cambiarle el nombre, entra a Mi Perfil.
             </p>
@@ -795,14 +800,14 @@ export default function OnboardingModal({
                 confundía: su campo decía «nombre del consultorio» y lo que
                 creaba era esto. Se explica aquí igual que el paso siguiente
                 explica lo suyo. */}
-            <p className="text-sm text-slate-600">
+            <p className="text-[15px] leading-[22px] text-tinta">
               Tu clínica es la cuenta: el contenedor de tus pacientes, tus documentos y,
               si algún día lo necesitas, tu equipo. El consultorio —el lugar físico donde
               atiendes— lo configuras en el paso siguiente.
             </p>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Nombre de la clínica <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Nombre de la clínica <span className="text-mal-tinta">*</span>
               </label>
               <input
                 type="text"
@@ -810,9 +815,9 @@ export default function OnboardingModal({
                 onChange={e => setNombreClinica(e.target.value)}
                 maxLength={120}
                 placeholder="Ej: Clínica Ortointegra"
-                className="sp-input"
+                className="k-campo"
               />
-              <p className="text-[11px] text-slate-500 mt-1">
+              <p className="k-campo-ayuda mt-1">
                 Si trabajas por tu cuenta, pon tu nombre o el de tu práctica. Aparece en el
                 encabezado de tus documentos y puedes cambiarlo luego en Mi Perfil.
               </p>
@@ -822,11 +827,11 @@ export default function OnboardingModal({
 
         {paso === 'consultorio' && consultorioCreado && (
           <div className="space-y-3">
-            <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 size={22} className="text-emerald-600" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-ok-fondo">
+              <CheckCircle2 size={24} aria-hidden="true" className="text-ok-tinta" />
             </div>
-            <p className="text-sm font-semibold text-slate-800">{nombreCons.trim()} ya está creado</p>
-            <p className="text-sm text-slate-600">
+            <p className="k-t-tarjeta">{nombreCons.trim()} ya está creado</p>
+            <p className="text-[15px] leading-[22px] text-tinta">
               Volviste a este paso, pero el consultorio ya existe y no hace falta crearlo otra vez.
               Para cambiarle la dirección, el teléfono o la zona horaria, entra a
               Mi Perfil → Mis consultorios.
@@ -836,56 +841,56 @@ export default function OnboardingModal({
 
         {paso === 'consultorio' && !consultorioCreado && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-[15px] leading-[22px] text-tinta">
               El consultorio es el lugar físico donde atiendes. Su dirección y su zona horaria
               mandan en tus documentos y en tu agenda.
             </p>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Nombre del consultorio <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Nombre del consultorio <span className="text-mal-tinta">*</span>
               </label>
               <input
                 type="text" value={nombreCons} onChange={e => setNombreCons(e.target.value)}
-                placeholder="Ej: Consultorio Centro" className="sp-input"
+                placeholder="Ej: Consultorio Centro" className="k-campo"
               />
             </div>
             {requiereNombreCorto && (
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1">
-                  Nombre corto (máx. 12 caracteres) <span className="text-red-500">*</span>
+                <label className="k-etiqueta mb-1">
+                  Nombre corto (máx. 12 caracteres) <span className="text-mal-tinta">*</span>
                 </label>
                 <input
                   type="text" value={nombreCorto} onChange={e => setNombreCorto(e.target.value)}
-                  maxLength={12} placeholder="Ej: Centro" className="sp-input"
+                  maxLength={12} placeholder="Ej: Centro" className="k-campo"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="k-campo-ayuda mt-1">
                   Se muestra en el sidebar y en agenda cuando el nombre completo es muy largo.
                 </p>
               </div>
             )}
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Dirección <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Dirección <span className="text-mal-tinta">*</span>
               </label>
               <input
                 type="text" value={direccion} onChange={e => setDireccion(e.target.value)}
-                placeholder="Ej: Calle 60 #400, Mérida, Yucatán" className="sp-input"
+                placeholder="Ej: Calle 60 #400, Mérida, Yucatán" className="k-campo"
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Teléfono <span className="text-slate-400 font-normal">(opcional)</span>
+              <label className="k-etiqueta mb-1">
+                Teléfono <span className="font-normal text-tinta2">(opcional)</span>
               </label>
               <input
                 type="tel" value={telefono}
                 onChange={e => { setTelefono(formatearTelefono(e.target.value)); setErrorTelefono('') }}
-                placeholder="Ej: 999 123 4567" className="sp-input"
+                placeholder="Ej: 999 123 4567" className="k-campo"
               />
-              {errorTelefono && <p className="text-xs text-red-500 mt-1">{errorTelefono}</p>}
+              {errorTelefono && <p role="alert" className="k-campo-error mt-1">{errorTelefono}</p>}
             </div>
             <div>
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Zona horaria <span className="text-red-500">*</span>
+              <label className="k-etiqueta mb-1">
+                Zona horaria <span className="text-mal-tinta">*</span>
               </label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {CHIPS_RAPIDOS.map(chip => (
@@ -893,17 +898,16 @@ export default function OnboardingModal({
                     key={chip.value}
                     type="button"
                     onClick={() => setTimezone(chip.value)}
-                    className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                      timezone === chip.value
-                        ? 'bg-[var(--sp-primary)] text-white border-[var(--sp-primary)]'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-400'
+                    aria-pressed={timezone === chip.value}
+                    className={`k-b h-9 rounded-full px-3 text-[13px] ${
+                      timezone === chip.value ? 'bg-tonal text-tonal-tinta outline-2 -outline-offset-2 outline-accion' : 'k-b-quieto'
                     }`}
                   >
                     {chip.label}
                   </button>
                 ))}
               </div>
-              <select value={timezone} onChange={e => setTimezone(e.target.value)} className="sp-input">
+              <select value={timezone} onChange={e => setTimezone(e.target.value)} className="k-campo">
                 <option value="">— Selecciona tu zona —</option>
                 {ZONAS_MEXICO.map(z => (
                   <option key={z.value} value={z.value}>{z.label}</option>
@@ -915,26 +919,26 @@ export default function OnboardingModal({
 
         {paso === 'logo' && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
+            <p className="text-[15px] leading-[22px] text-tinta">El logo de tu clínica aparece en el encabezado de todos los documentos.</p>
+            <div className="rounded-[14px] border border-dashed border-tinta3 p-6 text-center">
               {logoPreview ? (
                 <div className="space-y-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={logoPreview} alt="Logo" className="h-20 mx-auto object-contain rounded-lg" />
                   <button
                     onClick={() => { setLogoFile(null); setLogoPreview(null) }}
-                    className="text-xs text-red-400 hover:text-red-600"
+                    className="k-b k-b-texto mx-auto text-[14px] text-mal-tinta"
                   >
                     Quitar logo
                   </button>
                 </div>
               ) : (
                 <label className="cursor-pointer block">
-                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <span className="text-2xl">🏥</span>
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-sup2 text-enlace">
+                    <ImagePlus size={22} aria-hidden="true" />
                   </div>
-                  <p className="text-sm font-medium text-slate-700">Haz clic para subir el logo</p>
-                  <p className="text-xs text-slate-400 mt-1">PNG, JPG, WEBP o SVG · Máximo 500 KB</p>
+                  <p className="text-[15px] font-semibold leading-5 text-tinta">Haz clic para subir el logo</p>
+                  <p className="mt-1 text-[13px] leading-[18px] text-tinta2">PNG, JPG, WEBP o SVG · Máximo 500 KB</p>
                   <input type="file" accept={LOGO_ACCEPT} onChange={handleLogoChange} className="hidden" />
                 </label>
               )}
@@ -944,10 +948,10 @@ export default function OnboardingModal({
 
         {paso === 'firma' && (
           <div className="space-y-4">
-            <p className="text-sm text-slate-600">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
+            <p className="text-[15px] leading-[22px] text-tinta">Tu firma autógrafa aparece sobre la línea de firma en todos tus documentos PDF.</p>
             <FirmaCaptura firmaActual={firmaUrl} onFirmaCambiada={url => setFirmaUrl(url)} />
             {!firmaUrl && (
-              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="rounded-[12px] bg-aviso-fondo p-3 text-[13px] leading-[18px] text-aviso-tinta">
                 Si la omites, tus recetas y escritos saldrán <strong>sin firma</strong>: con la línea y tus
                 datos, pero sin el trazo. Puedes capturarla más tarde en Mi Perfil.
                 {' '}Para terminar <strong>con</strong> firma, pulsa «Aceptar firma» aquí arriba y espera a que

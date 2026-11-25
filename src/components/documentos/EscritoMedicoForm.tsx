@@ -3,12 +3,13 @@ import { generateDocFileName } from '@/lib/patientUtils'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { AlertTriangle, Plus, X } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import EditorEscrito from '@/components/documentos/EditorEscrito'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
@@ -24,6 +25,8 @@ import { decodificarNbsp } from '@/lib/textUtils'
 import { useEditor } from '@tiptap/react'
 import { generateHTML, type JSONContent } from '@tiptap/core'
 import { editorExtensions } from '@/lib/documentos/editorExtensions'
+import { DOMParser as PMDOMParser, Slice } from '@tiptap/pm/model'
+import { contarPalabras, htmlPegadoAlEsquema, markdownAHtml } from '@/lib/documentos/pegadoEscrito'
 
 const FECHA_MIN = '1900-01-01'
 
@@ -198,21 +201,65 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
   const [pieEnganchado, setPieEnganchado] = useState(true)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
   // formulario recién abierto no acusa de nada. Después permanece y se
   // actualiza en vivo.
   const [intentado, setIntentado] = useState(false)
+  // La hoja (maqueta aprobada): «Paciente · fecha · Cambiar» se abre para editar;
+  // «＋ Título del pie» aparece al pedirlo (o si ya tiene valor propio).
+  const [editandoDatos, setEditandoDatos] = useState(false)
+  const [pieVisible, setPieVisible] = useState(false)
+  const hojaRef = useRef<HTMLElement>(null)
 
   const formRef = useRef<HTMLDivElement>(null)
+  /** El último atajo fue Ctrl/⌘+Mayús+V: el pegado que sigue va sin formato. */
+  const sinFormatoRef = useRef(false)
 
   const editor = useEditor({
     extensions: editorExtensions,
     immediatelyRender: false,
-    editorProps: { attributes: { class: 'sp-ed-prose' } },
+    editorProps: {
+      attributes: { class: 'sp-ed-prose' },
+      /*
+       * MARKDOWN PEGADO COMO TEXTO PLANO → FORMATO REAL. Sólo cuando el
+       * portapapeles NO trae HTML (con HTML manda el HTML, como siempre) y no se
+       * pegó con Ctrl/⌘+Mayús+V, que sigue pegando sin formato. Sin estructura
+       * Markdown, `markdownAHtml` devuelve `null` y el pegado es el de siempre.
+       * El HTML resultante lo parsea el ESQUEMA del editor: no entra nada que el
+       * editor no sepa ya representar.
+       */
+      /*
+       * Del HTML pegado, antes de parsearlo: las tablas llegaban con las celdas
+       * fundidas en un párrafo y ahora son renglones («campo: valor»), y `h4`–`h6`
+       * caían a párrafo y ahora son Subtítulo. Ver `htmlPegadoAlEsquema`.
+       */
+      transformPastedHTML: html => htmlPegadoAlEsquema(html),
+      handleKeyDown: (_vista, e) => {
+        sinFormatoRef.current = (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'v'
+        return false
+      },
+      handlePaste: (vista, e) => {
+        const sinFormato = sinFormatoRef.current
+        sinFormatoRef.current = false
+        const datos = e.clipboardData
+        if (sinFormato || !datos || datos.getData('text/html')) return false
+        const html = markdownAHtml(datos.getData('text/plain'))
+        if (html === null) return false
+        const caja = document.createElement('div')
+        caja.innerHTML = html
+        // Trozo CERRADO (bloques enteros): uno abierto fundía el primer bloque
+        // pegado —p. ej. un «## Título»— con el párrafo donde estaba el cursor.
+        const pegado = PMDOMParser.fromSchema(vista.state.schema).parse(caja)
+        vista.dispatch(vista.state.tr.replaceSelection(new Slice(pegado.content, 0, 0)).scrollIntoView())
+        return true
+      },
+    },
   })
 
   const isEmpty = editor?.isEmpty ?? true
+  const palabras = editor ? contarPalabras(editor.state.doc.textBetween(0, editor.state.doc.content.size, ' ', ' ')) : 0
   const bloques = editor?.state.doc.childCount ?? 0
   const tituloPie = pieEnganchado ? asunto : piePropio
 
@@ -269,6 +316,85 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
     const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
+
+  /**
+   * EL ALTO DE LA HOJA: el del área de contenido menos sus rellenos de arriba y
+   * de abajo, los avisos que sigan a la hoja y el pie de acciones, medido (nada de alturas mágicas: el relleno de
+   * `.app-contenido` cambia por formato y lleva las franjas). Con el teclado en
+   * pantalla (iPad/teléfono) manda `visualViewport`, para que el cursor no quede
+   * bajo el teclado; entonces el pie de acciones queda detrás de él y no cuenta.
+   * Sin `<main>` (el búnker), la ventana.
+   */
+  useEffect(() => {
+    const hoja = hojaRef.current
+    if (!hoja) return
+    const main = hoja.closest('main')
+    const medir = (): void => {
+      const cont = hoja.closest<HTMLElement>('.app-contenido')
+      const pie = formRef.current?.querySelector<HTMLElement>('.sp-doc-actions')
+      const arriba = cont ? parseFloat(getComputedStyle(cont).paddingTop) || 0 : 0
+      const ventana = main?.clientHeight ?? window.innerHeight
+      const vv = window.visualViewport
+      const teclado = vv !== null && ventana - vv.height > 120
+      const visible = teclado && vv ? vv.height : ventana
+      // Al fondo del desplazamiento, bajo la hoja van —en flujo— los avisos que
+      // haya, el pie y el relleno de abajo de `.app-contenido` (que lleva la
+      // franja): todo eso se resta, o la hoja (sticky) los tapa (auditoría H1).
+      const hueco = parseFloat(getComputedStyle(hoja.parentElement ?? hoja).rowGap) || 0
+      let entre = 0
+      for (let el = hoja.nextElementSibling; el && el !== pie; el = el.nextElementSibling) {
+        if (el instanceof HTMLElement && el.offsetHeight > 0) entre += el.offsetHeight + hueco
+      }
+      const relleno = cont ? parseFloat(getComputedStyle(cont).paddingBottom) || 0 : 0
+      const abajo = teclado ? 8 : entre + (pie?.offsetHeight ?? 0) + hueco + relleno
+      hoja.style.setProperty('--esc-arriba', `${arriba}px`)
+      hoja.style.setProperty('--esc-alto', `${Math.max(280, Math.round(visible - arriba - abajo))}px`)
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    if (main) ro.observe(main)
+    const pie = formRef.current?.querySelector('.sp-doc-actions')
+    if (pie) ro.observe(pie)
+    // El cuerpo del formulario crece cuando aparece un aviso entre hoja y pie.
+    const cuerpo = hoja.parentElement
+    if (cuerpo) ro.observe(cuerpo)
+    window.visualViewport?.addEventListener('resize', medir)
+    window.addEventListener('resize', medir)
+    return () => {
+      ro.disconnect()
+      window.visualViewport?.removeEventListener('resize', medir)
+      window.removeEventListener('resize', medir)
+    }
+  }, [])
+
+  /**
+   * Al ENTRAR a escribir en el cuerpo, la hoja sube hasta quedar pegada arriba:
+   * así se ve entera —título, barra, cuerpo y su pie— y desde ahí sólo se
+   * desplaza el cuerpo. Antes de escribir, la cabecera de la página sigue a la
+   * vista (el foco inicial no la esconde).
+   */
+  useEffect(() => {
+    if (!editor) return
+    const pegar = (): void => {
+      const hoja = hojaRef.current
+      const main = hoja?.closest('main')
+      if (!hoja || !main) return
+      const arriba = parseFloat(hoja.style.getPropertyValue('--esc-arriba')) || 0
+      const delta = hoja.getBoundingClientRect().top - main.getBoundingClientRect().top - arriba
+      if (delta > 1) main.scrollBy({ top: delta, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    }
+    editor.on('focus', pegar)
+    return () => { editor.off('focus', pegar) }
+  }, [editor])
+
+  /** Enter en los datos los cierra y lleva al título. */
+  function teclaDatos(e: KeyboardEvent<HTMLInputElement>): void {
+    if (e.key === 'Enter') { e.preventDefault(); cerrarDatos() }
+  }
+  function cerrarDatos(): void {
+    flushSync(() => setEditandoDatos(false))
+    document.getElementById('escrito-titulo')?.focus()
+  }
 
   function editarPie(valor: string): void {
     setPieEnganchado(false)
@@ -446,8 +572,8 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
         msg = 'El escrito quedó registrado, pero no se pudo generar el PDF. Búscalo en la lista de '
           + 'documentos del paciente y recupéralo desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[EscritoMedicoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
@@ -468,84 +594,110 @@ export default function EscritoMedicoForm({ pacienteInicial = '', pacienteId, of
 
       {plantillas.selector}
 
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Datos del documento</h2>
-        </div>
-        <div className="sp-doc-cardbody">
-          {/* Dos columnas y no tres: los dos títulos necesitan la fila entera,
-              y con tres la primera fila quedaría con una celda coja. */}
-          <div className="sp-doc-grid" data-cols="2">
-            <div className="sp-doc-field">
-              <label htmlFor="escrito-fecha" className="sp-label-field">Fecha</label>
+      {/* LA HOJA (maqueta `escrito.html`, aprobada): datos en una línea, el
+          título como título, la barra y el cuerpo. Mide el alto disponible del
+          área de contenido (`--esc-alto`, ver el efecto de arriba) y SOLO el
+          cuerpo se desplaza: título y barra quedan siempre a la vista. */}
+      <section ref={hojaRef} className="sp-esc-hoja" aria-label="Escrito">
+        {editandoDatos ? (
+          <div className="sp-esc-datos">
+            {/* Único junto a Honorarios que puede emitirse sin paciente: una carta
+                de recomendación o un resumen para un colega no siempre son de un
+                paciente del sistema. */}
+            <div className="sp-rx-campo">
+              <label htmlFor="escrito-paciente" className="sp-rx-rot">Paciente</label>
+              <input id="escrito-paciente" type="text" value={paciente} autoComplete="off"
+                onChange={e => setPaciente(e.target.value)} onKeyDown={teclaDatos}
+                placeholder="Sin paciente" aria-label="Paciente (opcional)" className="sp-rx-fi" />
+            </div>
+            <div className="sp-rx-campo">
+              <label htmlFor="escrito-fecha" className="sp-rx-rot">Fecha</label>
               <input id="escrito-fecha" type="date" value={fecha}
                 min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
-                onChange={e => setFecha(e.target.value)} className="sp-input" />
+                onChange={e => setFecha(e.target.value)} onKeyDown={teclaDatos} className="sp-rx-fi" />
             </div>
-
-            {/* Único junto a Honorarios que puede emitirse sin paciente, y aquí
-                sí tiene sentido: una carta de recomendación o un resumen para un
-                colega no siempre son de un paciente del sistema. */}
-            <div className="sp-doc-field">
-              <label htmlFor="escrito-paciente" className="sp-label-field">
-                Paciente <span className="sp-hint">opcional</span>
-              </label>
-              <input id="escrito-paciente" type="text" value={paciente}
-                onChange={e => setPaciente(e.target.value)} placeholder="Sin paciente"
-                className="sp-input" />
-              {!paciente.trim() && <p className="sp-hint">Se puede emitir sin paciente</p>}
-            </div>
-
-            {/* Es `asunto` renombrado y no un campo nuevo: se cambia la etiqueta
-                y se conserva la clave en `contenido`, así que los documentos ya
-                emitidos siguen leyéndose. Sin asterisco y sin validación —
-                vacío es un caso legítimo. */}
-            <div className="sp-doc-field sp-doc-span-all">
-              <label htmlFor="escrito-titulo" className="sp-label-field">Título del documento</label>
-              <input id="escrito-titulo" type="text" value={asunto}
-                onChange={e => setAsunto(e.target.value)} placeholder="Sin título"
-                className="sp-input" />
-              <p className="sp-hint">
-                {asunto.trim() === ''
-                  ? 'Sin título, el documento arranca con el cuerpo bajo el filete del membrete.'
-                  : 'Encabeza el documento. Puede quedar vacío.'}
-              </p>
-            </div>
-
-            <div className="sp-doc-field sp-doc-span-all">
-              <label htmlFor="escrito-pie" className="sp-label-field">Título del pie</label>
-              <div className="sp-ed-pie">
-                <input id="escrito-pie" type="text" value={tituloPie}
-                  onChange={e => editarPie(e.target.value)} placeholder="Sin título"
-                  className="sp-input" />
-                {!pieEnganchado && (
-                  <button type="button" onClick={reengancharPie} className="sp-link-alt">
-                    Usar el título
-                  </button>
-                )}
-              </div>
-              <p className="sp-hint">
-                Se imprime en el pie de cada página. Por defecto copia el título;
-                en cuanto lo editas, deja de seguirlo.
-              </p>
-            </div>
+            <button type="button" onClick={cerrarDatos} className="k-b k-b-tonal sp-esc-listo">Listo</button>
+            {!paciente.trim() && <p className="sp-esc-nota">Se puede emitir sin paciente</p>}
           </div>
-        </div>
-      </section>
+        ) : (
+          <button type="button" className="sp-esc-meta" aria-expanded={false}
+            onClick={() => { flushSync(() => setEditandoDatos(true)); document.getElementById('escrito-paciente')?.focus() }}>
+            <b>{paciente.trim() || 'Sin paciente'}</b>
+            <span aria-hidden="true">·</span>
+            <span>{fecha ? format(new Date(fecha + 'T12:00:00'), "d 'de' MMMM 'de' yyyy", { locale: es }) : 'Sin fecha'}</span>
+            <span className="sp-esc-cambiar">Cambiar</span>
+          </button>
+        )}
 
-      <section className="sp-card sp-doc-card">
-        <div className="sp-doc-cardhead">
-          <h2 className="sp-label">Cuerpo del escrito</h2>
+        {/* Es `asunto` renombrado y no un campo nuevo: la clave de `contenido` no
+            cambia. Sin asterisco y sin validación: vacío es un caso legítimo.
+            Enter (o ↓) pasa al cuerpo. */}
+        <input id="escrito-titulo" type="text" value={asunto} autoComplete="off"
+          onChange={e => setAsunto(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); editor?.commands.focus('start') } }}
+          placeholder="Título del documento" aria-label="Título del documento"
+          aria-describedby="escrito-titulo-nota" className="sp-esc-titulo" />
+        <span id="escrito-titulo-nota" className="sr-only">
+          {asunto.trim() === ''
+            ? 'Sin título, el documento arranca con el cuerpo bajo el filete del membrete.'
+            : 'Encabeza el documento. Puede quedar vacío.'}
+        </span>
+
+        <EditorEscrito editor={editor} />
+
+        <div className="sp-esc-pieh">
+          {pieVisible || !pieEnganchado ? (
+            <div className="sp-esc-piecampo">
+              <div className="sp-rx-campo">
+                <label htmlFor="escrito-pie" className="sp-rx-rot">Pie</label>
+                <input id="escrito-pie" type="text" value={tituloPie} autoComplete="off"
+                  onChange={e => editarPie(e.target.value)} placeholder="Igual que el título"
+                  aria-label="Título del pie" aria-describedby="escrito-pie-nota" className="sp-rx-fi" />
+                {!pieEnganchado && (
+                  <button type="button" onClick={reengancharPie} className="k-b k-b-texto sp-esc-usar">Usar el título</button>
+                )}
+                <button type="button" tabIndex={-1} aria-label="Quitar el título del pie" className="k-b k-b-icono sp-int-quitar"
+                  onClick={() => { reengancharPie(); setPieVisible(false) }}>
+                  <X aria-hidden="true" />
+                </button>
+              </div>
+              <p id="escrito-pie-nota" className="sp-esc-nota">
+                Se imprime en el pie de cada página. Por defecto copia el título; en cuanto lo editas, deja de seguirlo.
+              </p>
+            </div>
+          ) : (
+            <button type="button" className="k-b k-b-texto"
+              onClick={() => { flushSync(() => setPieVisible(true)); document.getElementById('escrito-pie')?.focus() }}>
+              <Plus aria-hidden="true" /> Título del pie
+            </button>
+          )}
           {/* Sirve sobre todo tras aplicar una plantilla: dice de un vistazo
-              cuánto trajo. Mismo recuento que el predicado de vacío. */}
-          <span className="sp-badge" style={{ marginLeft: 'auto' }}>
-            {isEmpty ? 'Vacío' : `${bloques} ${bloques === 1 ? 'bloque' : 'bloques'}`}
+              cuánto trajo. Sin estimar páginas: no se sabe sin componer el PDF. */}
+          <span className="sp-esc-cnt" aria-live="polite">
+            {isEmpty ? 'Vacío' : `${palabras} ${palabras === 1 ? 'palabra' : 'palabras'} · ${bloques} ${bloques === 1 ? 'bloque' : 'bloques'}`}
           </span>
         </div>
-        <EditorEscrito editor={editor} />
       </section>
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">

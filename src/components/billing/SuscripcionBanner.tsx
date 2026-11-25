@@ -6,11 +6,12 @@ import { useSubscriptionGate } from './SubscriptionGateProvider'
 
 type Props = {
   /**
-   * Si true, en desktop (lg+) el banner se desplaza `lg:ml-64` para no
-   * superponerse al sidebar fixed de (app)/layout.tsx (ancho 240px,
-   * mismo offset que usa <main>). En launcher (sin sidebar) NO se pasa.
+   * Si true, se pinta como TARJETA dentro del área de contenido de `(app)`
+   * (B4 del rediseño): vive dentro de `<main>`, así que ya respeta la barra, el
+   * riel, el encabezado y las franjas sin desplazamientos propios. En launcher
+   * (`/inicio`, fuera del rediseño hasta B14) NO se pasa y queda el de siempre.
    */
-  desktopSidebarOffset?: boolean
+  tarjeta?: boolean
 }
 
 /**
@@ -32,14 +33,33 @@ type Props = {
  *
  * Paleta amber consistente con OfflineAlert.
  */
-export default function SuscripcionBanner({ desktopSidebarOffset = false }: Props = {}) {
+/** La tarjeta de `(app)`: aviso ámbar del kit, texto justificado (CALMA §20) y el botón debajo. */
+function BannerTarjeta() {
+  return (
+    <div lang="es" className="flex flex-col items-start gap-3 rounded-[16px] bg-aviso-fondo p-4 text-aviso-tinta">
+      <div className="flex items-start gap-3">
+        <span aria-hidden="true" className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[color-mix(in_srgb,var(--aviso-punto)_18%,transparent)]">
+          <AlertCircle size={18} />
+        </span>
+        <p className="text-[15px] leading-[20px] text-justify [hyphens:auto]">
+          Tu suscripción terminó. Tienes acceso a tus datos pero no puedes
+          crear nuevos pacientes, consultas ni documentos.
+        </p>
+      </div>
+      <Link href="/billing" className="k-pulsable ml-11 inline-flex min-h-10 items-center rounded-[12px] bg-aviso-tinta px-4 text-[14px] font-semibold text-sup">
+        Reactivar suscripción
+      </Link>
+    </div>
+  )
+}
+
+export default function SuscripcionBanner({ tarjeta = false }: Props = {}) {
   const { state } = useSubscriptionGate()
   if (!state.isBlocked) return null
-
-  const offsetClass = desktopSidebarOffset ? ' lg:ml-64' : ''
+  if (tarjeta) return <BannerTarjeta />
 
   return (
-    <div className={`sticky top-0 z-40 border-b border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30${offsetClass}`}>
+    <div className="sticky top-0 z-40 border-b border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
       <div className="mx-auto flex max-w-7xl flex-col items-start gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
         <div className="flex items-start gap-3">
           <AlertCircle

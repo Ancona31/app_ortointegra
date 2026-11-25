@@ -122,7 +122,7 @@ export default function AutocompleteAnalito({
       <div className="relative">
         <Search
           size={14}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-tinta2 pointer-events-none"
         />
         <input
           ref={inputRef}
@@ -137,25 +137,25 @@ export default function AutocompleteAnalito({
           onKeyDown={onKeyDown}
           disabled={disabled}
           placeholder="Buscar analito (ej. HbA1c, creatinina, peso)..."
-          className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white focus:outline-none focus:ring-2 focus:ring-[var(--cp)]/30 focus:border-[var(--cp)] disabled:bg-slate-50 disabled:text-slate-500"
+          className="k-campo pl-9"
           style={{ transition: 'all 200ms', transitionTimingFunction: IOS_EASING }}
         />
       </div>
 
       {open && !disabled && (
         <div
-          className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden"
+          className="absolute z-10 left-0 right-0 top-full mt-1 overflow-hidden rounded-[12px] bg-sup shadow-[var(--sombra-capa)] ring-1 ring-linea"
           style={{ transition: 'opacity 200ms', transitionTimingFunction: IOS_EASING }}
         >
           <div className="max-h-80 overflow-y-auto">
             {resultadosPlanos.length === 0 ? (
-              <div className="px-4 py-6 text-center text-[12px] text-slate-500">
+              <div className="k-t-sec px-4 py-6 text-center">
                 Sin resultados para <span className="font-medium">&ldquo;{query}&rdquo;</span>
               </div>
             ) : (
               grupos.map(([categoria, items]) => (
                 <div key={categoria}>
-                  <div className="px-3 py-1.5 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                  <div className="k-t-rotulo bg-sup2 px-3 py-1.5">
                     {CATEGORIA_LABEL[categoria]}
                   </div>
                   {items.map(a => {
@@ -167,13 +167,13 @@ export default function AutocompleteAnalito({
                         type="button"
                         onMouseDown={e => { e.preventDefault(); seleccionar(a) }}
                         onMouseEnter={() => setHighlighted(idx)}
-                        className={`w-full px-3 py-2 flex items-center justify-between text-left text-[13px] border-b border-slate-50 last:border-b-0 ${
-                          isHigh ? 'bg-[var(--cp)]/10 text-slate-900' : 'text-slate-700 hover:bg-slate-50'
+                        className={`flex min-h-[44px] w-full items-center justify-between border-b border-linea px-3 py-2 text-left text-[15px] last:border-b-0 ih:min-h-[36px] esc:min-h-[36px] ${
+                          isHigh ? 'bg-tonal text-tonal-tinta' : 'text-tinta hover:bg-sup2'
                         }`}
                         style={{ transition: 'background 120ms' }}
                       >
                         <span className="truncate">{a.nombre}</span>
-                        <span className="text-[11px] text-slate-400 ml-2 flex-shrink-0">
+                        <span className="ml-2 flex-shrink-0 text-[13px] text-tinta2">
                           {a.unidad}
                         </span>
                       </button>
@@ -187,7 +187,7 @@ export default function AutocompleteAnalito({
           <button
             type="button"
             onMouseDown={e => { e.preventDefault(); onCustomClick(); setOpen(false) }}
-            className="w-full px-3 py-2.5 flex items-center justify-center gap-1.5 text-[12px] font-medium text-[var(--cp)] border-t border-slate-100 bg-slate-50/50 hover:bg-slate-100 transition-colors"
+            className="flex min-h-[44px] w-full items-center justify-center gap-1.5 border-t border-linea px-3 py-2 text-[14px] font-semibold text-enlace hover:bg-sup2 ih:min-h-[36px] esc:min-h-[36px]"
           >
             <PlusCircle size={13} />
             ¿No encuentras el analito? Crear como custom

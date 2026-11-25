@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, EyeOff, Plus, Receipt, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { AlertTriangle, EyeOff, Plus, X } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { format } from 'date-fns'
@@ -12,8 +12,14 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
-import ComboEscribible from '@/components/documentos/ComboEscribible'
+import CampoSugerido from '@/components/documentos/CampoSugerido'
+import OpcionesRapidas from '@/components/documentos/OpcionesRapidas'
+import {
+  abrirTras, agregarAlFinal, conCampo, conTexto, esEmitible, quitarConRetroceso,
+  type LineaConcepto,
+} from '@/components/documentos/honorariosLineas'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
@@ -40,14 +46,6 @@ import type { AseguradoraInfo } from '@/types'
 type TipoDoc = 'honorarios' | 'cotizacion'
 type Divisa = 'MXN' | 'USD'
 
-interface LineaConcepto {
-  id: number
-  concepto: string
-  /** Solo cotización. Texto libre: los subtotales agrupan por lo escrito. */
-  origen: string
-  precio: number
-}
-
 const FECHA_MIN = '1900-01-01'
 
 const FORMAS_PAGO = [
@@ -68,8 +66,12 @@ const ORIGENES = [
 const SIN_ORIGEN = 'Sin origen'
 
 /**
- * `.sp-select` con las 20 aseguradoras y `Otra` (§4.5), en vez del `<datalist>`
- * que había: no filtra igual en Safari iOS y no se lee como campo con opciones.
+ * Las 20 aseguradoras (§4.5). Primero fueron un `<datalist>` —no filtra igual
+ * en Safari iOS y no se lee como campo con opciones—, luego un `<select>` con
+ * «Otra»; desde la maqueta aprobada son las sugerencias de un buscador propio
+ * (`CampoSugerido`, lista `role="listbox"`, no datalist) con texto libre
+ * encima: «Otra» es escribir el nombre. Mismo componente en todos los
+ * formatos: la lista es nuestra, así que Safari iOS no la cambia.
  */
 const ASEGURADORAS = [
   'MetLife', 'GNP Seguros', 'AXA Seguros', 'Quálitas',
@@ -78,9 +80,6 @@ const ASEGURADORAS = [
   'Plan Seguro', 'La Latinoamericana', 'General de Salud', 'Multiva',
   'HDI Seguros', 'Pan-American México',
 ] as const
-
-/** Centinela del `<option>` que abre el campo de texto. No es una aseguradora. */
-const OTRA = '__otra__'
 
 const ASEGURADORA_VACIA: AseguradoraInfo = { nombre: '', poliza: '', cobertura: '' }
 
@@ -140,15 +139,8 @@ function fechaLarga(iso: string): string {
   return format(new Date(`${iso}T12:00:00`), "d 'de' MMMM 'de' yyyy", { locale: es })
 }
 
-/** Una línea cuenta como escrita cuando tiene concepto o precio. */
-function conTexto(l: LineaConcepto): boolean {
-  return l.concepto.trim() !== '' || l.origen.trim() !== '' || l.precio > 0
-}
-
-/** Lo que llega al documento: concepto con precio. Precio 0 es «sin escribir». */
-function esEmitible(l: LineaConcepto): boolean {
-  return l.concepto.trim() !== '' && l.precio > 0
-}
+/* `conTexto` y `esEmitible` viven en `honorariosLineas.ts`, con la lógica de
+   teclado de las líneas compactas. */
 
 /**
  * Un subtotal por origen usado, en orden de aparición (§4.4). Agrupa por el
@@ -315,12 +307,13 @@ export default function NotaHonorariosForm({
    * así no dejar que entre basura en el número.
    */
   const [borradores, setBorradores]   = useState<Record<string, string>>({})
-  // «Otra» no se puede derivar del nombre: recién elegida, el nombre está vacío
-  // y el select volvería solo a «— Elegir —» con el campo de texto abierto.
-  const [otraAseguradora, setOtra]    = useState(false)
+  // Vista limpia (maqueta): las notas no se ven hasta «＋ Notas»; si ya traen
+  // texto (plantilla), se ven solas.
+  const [notasAbiertas, setNotasAbiertas] = useState(false)
 
   const [imprimiendo, setImprimiendo]     = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [docGenerado, setDocGenerado]     = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
   // formulario recién abierto no acusa de nada. Después permanece y se
@@ -337,7 +330,6 @@ export default function NotaHonorariosForm({
   const subtotales    = subtotalesDe(lineas)
   const saldo         = roundCurrency(total - anticipo)
   const vigenciaHasta = desplazarFecha(fecha, { dias: vigenciaDias })
-  const simbolo       = divisa === 'MXN' ? '$' : 'US$'
 
   /* Lo que decide «¿está vacío?». La tupla se extiende sobre `isFormEmpty`, así
      que el compilador impide que diverja de su firma.
@@ -389,6 +381,8 @@ export default function NotaHonorariosForm({
       setFormaPago(typeof c.forma_pago === 'string' && c.forma_pago !== '' ? c.forma_pago : FORMAS_PAGO[0])
       setVigencia(typeof c.vigencia_dias === 'number' ? c.vigencia_dias : VIGENCIA_INICIAL)
       setNotas(typeof c.notas === 'string' ? c.notas : '')
+      // Con texto las notas se ven solas; sin él vuelven a «＋ Notas».
+      setNotasAbiertas(false)
       // EXCEPCIÓN DECLARADA: el tipo solo se toca si la plantilla trae uno. Una
       // plantilla de cotización lo es entera —vigencia y orígenes incluidos— y
       // aplicarla sin cambiar el tipo dejaría esos campos escritos y ocultos;
@@ -405,18 +399,59 @@ export default function NotaHonorariosForm({
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
 
-  // ─── Operaciones de línea ──────────────────────────────────────────────────
+  // ─── Operaciones de línea (un cobro por línea; teclado de la maqueta) ──────
+  /** Enfoca un campo de una línea ya pintada, por su id de línea. */
+  function enfocarLinea(lista: readonly LineaConcepto[], id: number, campo: 'concepto' | 'origen' | 'precio'): void {
+    const i = lista.findIndex(l => l.id === id)
+    const el = document.getElementById(`honorarios-${campo}-${i}`)
+    if (el instanceof HTMLInputElement) { el.focus(); el.select() }
+  }
+
+  function conAlta(alta: { lineas: LineaConcepto[]; foco: number; creada: boolean }): void {
+    flushSync(() => {
+      setLineas(alta.lineas)
+      if (alta.creada) setNextId(n => n + 1)
+    })
+    enfocarLinea(alta.lineas, alta.foco, 'concepto')
+  }
+
+  /** «＋ Agregar concepto»: no crea otra en blanco si la última ya lo está. */
   function agregarLinea(): void {
-    setLineas(prev => [...prev, { id: nextId, ...LINEA_VACIA }])
-    setNextId(n => n + 1)
+    conAlta(agregarAlFinal(lineas, nextId, esCotizacion))
   }
 
   function eliminarLinea(id: number): void {
-    setLineas(prev => (prev.length === 1 ? prev : prev.filter(l => l.id !== id)))
+    const i = lineas.findIndex(l => l.id === id)
+    if (lineas.length === 1 || i < 0) return
+    const quedan = lineas.filter(l => l.id !== id)
+    flushSync(() => setLineas(quedan))
+    enfocarLinea(quedan, quedan[Math.min(i, quedan.length - 1)].id, 'concepto')
   }
 
   function updateLinea(id: number, campo: 'concepto' | 'origen', valor: string): void {
-    setLineas(prev => prev.map(l => (l.id === id ? { ...l, [campo]: valor } : l)))
+    setLineas(prev => prev.map(l => (l.id === id ? conCampo(l, campo, valor) : l)))
+  }
+
+  /** Enter en el concepto pasa al origen (cotización) o al precio (recibo); Retroceso en uno vacío quita la línea. */
+  function teclaConcepto(e: KeyboardEvent<HTMLInputElement>, l: LineaConcepto): void {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      enfocarLinea(lineas, l.id, esCotizacion ? 'origen' : 'precio')
+    } else if (e.key === 'Backspace' && e.currentTarget.value === '') {
+      const r = quitarConRetroceso(lineas, l.id)
+      if (!r) return
+      e.preventDefault()
+      flushSync(() => setLineas(r.lineas))
+      enfocarLinea(r.lineas, r.foco, r.campo)
+    }
+  }
+
+  /** Enter en el precio abre la línea siguiente (sólo si ésta tiene algo). */
+  function teclaPrecio(e: KeyboardEvent<HTMLInputElement>, l: LineaConcepto): void {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    limpiarImporte(`precio-${l.id}`)
+    conAlta(abrirTras(lineas, l.id, nextId, esCotizacion))
   }
 
   // ─── Campos de importe ─────────────────────────────────────────────────────
@@ -450,9 +485,18 @@ export default function NotaHonorariosForm({
     setAseguradora(prev => ({ ...(prev ?? ASEGURADORA_VACIA), [campo]: valor }))
   }
 
-  function elegirAseguradora(valor: string): void {
-    setOtra(valor === OTRA)
-    campoAseguradora('nombre', valor === OTRA ? '' : valor)
+  /** «＋ Seguro»: el seguro existe (vacío) y el foco va al buscador. «✕» lo vuelve a `null`, como el interruptor apagado de antes. */
+  function abrirSeguro(): void {
+    flushSync(() => setAseguradora(prev => prev ?? { ...ASEGURADORA_VACIA }))
+    document.getElementById('honorarios-aseguradora')?.focus()
+  }
+  function quitarSeguro(): void {
+    flushSync(() => setAseguradora(null))
+    document.getElementById('honorarios-mas-seguro')?.focus()
+  }
+  function abrirNotas(): void {
+    flushSync(() => setNotasAbiertas(true))
+    document.getElementById('honorarios-notas')?.focus()
   }
 
   // ─── Validación (§3.8) ─────────────────────────────────────────────────────
@@ -689,8 +733,8 @@ export default function NotaHonorariosForm({
         msg = `El documento quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
           + 'generar el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       // eslint-disable-next-line no-console
       console.error('[NotaHonorariosForm] imprimir falló:', err)
     } finally {
@@ -717,23 +761,24 @@ export default function NotaHonorariosForm({
           ? `El anticipo (${fmt(anticipo, divisa)}) se conserva escrito, pero no sale en la cotización.`
           : ''
 
-  const nombreAseguradora = aseguradora?.nombre ?? ''
-  const valorSelectAseguradora = otraAseguradora
-    || (nombreAseguradora !== '' && !ASEGURADORAS.some(a => a === nombreAseguradora))
-    ? OTRA
-    : nombreAseguradora
+  const notasVisibles = notasAbiertas || notas !== ''
+  const conSeguro = esCotizacion && aseguradora !== null
 
   return (
     <div ref={formRef} className="sp-doc-form">
       {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
           está abierto: se apaga con display:none y el panel se monta como
           hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
-      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+      <div className="sp-doc-formbody sp-doc-formbody--pie-encima" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
       {plantillas.selector}
 
       {/* ── Datos del documento ───────────────────────────────────────────── */}
-      <section className="sp-card sp-doc-card">
+      {/* Maqueta aprobada `honorarios.html`: datos en una fila compacta, un
+          cobro por línea con los totales siempre a la vista, seguro y notas
+          sólo si se agregan, y pago/divisa como botones de un toque. Todo
+          local, sin red (lo comparte el búnker). */}
+      <section className="sp-card sp-doc-card sp-hon">
         <div className="sp-doc-cardhead sp-doc-honohead">
           <h2 className="sp-label">Datos del documento</h2>
           {/* El segmentado vive AQUÍ y no en una card propia: una card entera
@@ -750,232 +795,151 @@ export default function NotaHonorariosForm({
             ))}
           </div>
         </div>
-        <div className="sp-doc-cardbody">
-          {/* Cuatro campos en cotización y tres en recibo, y por eso dos
-              rejillas: la primitiva de cuatro abre a tres columnas en 600 y ahí
-              el folio se queda en 165 px (§0). */}
-          <div className={esCotizacion ? 'sp-doc-honodatos' : 'sp-doc-grid'}
-            data-cols={esCotizacion ? undefined : '3'}>
-            <div className="sp-doc-field">
-              <label htmlFor="honorarios-fecha" className="sp-label-field">Fecha</label>
+        <div className="sp-doc-cardbody sp-hon-cuerpo">
+          <div className="sp-hon-datos">
+            <div className={`sp-rx-campo${senalar('honorarios-paciente') ? ' sp-rx-campo--falta' : ''}`}>
+              <label htmlFor="honorarios-paciente" className="sp-rx-rot">
+                Paciente<span aria-hidden="true" className="sp-int-ob">*</span><span className="sr-only"> obligatorio</span>
+              </label>
+              <input ref={pacienteRef} id="honorarios-paciente" type="text" value={paciente} autoComplete="off"
+                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
+                aria-invalid={senalar('honorarios-paciente') || undefined} className="sp-rx-fi" />
+            </div>
+            <div className="sp-rx-campo">
+              <label htmlFor="honorarios-fecha" className="sp-rx-rot">Fecha</label>
               <input id="honorarios-fecha" type="date" value={fecha}
                 min={FECHA_MIN} max={desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })}
-                onChange={e => setFecha(e.target.value)} className="sp-input" />
+                onChange={e => setFecha(e.target.value)} className="sp-rx-fi" />
             </div>
-
-            <div className="sp-doc-field">
-              <label htmlFor="honorarios-paciente" className="sp-label-field">
-                Paciente <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                <span className="sr-only">obligatorio</span>
-              </label>
-              <input ref={pacienteRef} id="honorarios-paciente" type="text" value={paciente}
-                onChange={e => setPaciente(e.target.value)} placeholder="Nombre completo"
-                aria-invalid={senalar('honorarios-paciente') || undefined}
-                className={`sp-input ${senalar('honorarios-paciente') ? 'sp-doc-invalid' : ''}`} />
-              {pacienteInicial && <p className="sp-hint">De la ficha · editable</p>}
-            </div>
-
-            <div className="sp-doc-field">
-              <label htmlFor="honorarios-folio" className="sp-label-field">Folio</label>
+            <div className="sp-rx-campo">
+              <label htmlFor="honorarios-folio" className="sp-rx-rot">Folio</label>
               <input id="honorarios-folio" type="text" readOnly value="Se asigna al emitir"
-                className="sp-input sp-doc-folio" />
-              <p className="sp-hint">Lo genera la base · prefijo {esCotizacion ? 'COT' : 'NOH'}</p>
+                aria-describedby="honorarios-folio-nota" className="sp-rx-fi sp-hon-folio" />
             </div>
-
-            {esCotizacion && (
-              <div className="sp-doc-field">
-                <label htmlFor="honorarios-vigencia" className="sp-label-field">Vigencia</label>
-                <select id="honorarios-vigencia" value={vigenciaDias}
-                  onChange={e => setVigencia(Number(e.target.value))} className="sp-input">
-                  {VIGENCIAS.map(d => <option key={d} value={d}>{d} días</option>)}
-                </select>
-                <p className="sp-hint">{vigenciaDias} días · hasta {fechaLarga(vigenciaHasta)}</p>
-              </div>
-            )}
           </div>
-        </div>
-      </section>
-
-      {/* ── Seguro de gastos médicos — solo cotización ────────────────────── */}
-      {esCotizacion && (
-        <section className="sp-card sp-doc-card">
-          <div className="sp-doc-cardhead">
-            <h2 className="sp-label">Seguro de gastos médicos</h2>
-            {/* Nace cerrada: la mayoría de las cotizaciones no llevan seguro. */}
-            <button type="button" role="switch" aria-checked={aseguradora !== null}
-              aria-label="Cotización con seguro de gastos médicos"
-              onClick={() => { setAseguradora(prev => (prev ? null : { ...ASEGURADORA_VACIA })); setOtra(false) }}
-              className="sp-doc-switch">
-              <span className="sp-doc-switch__track"><span className="sp-doc-switch__knob" /></span>
-            </button>
-          </div>
-          {aseguradora && (
-            <div className="sp-doc-cardbody">
-              <div className="sp-doc-grid" data-cols="3">
-                <div className="sp-doc-field">
-                  <label htmlFor="honorarios-aseguradora" className="sp-label-field">Aseguradora</label>
-                  <select id="honorarios-aseguradora" value={valorSelectAseguradora}
-                    onChange={e => elegirAseguradora(e.target.value)} className="sp-input">
-                    <option value="">— Elegir —</option>
-                    {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
-                    <option value={OTRA}>Otra</option>
-                  </select>
-                  {valorSelectAseguradora === OTRA && (
-                    <input type="text" value={aseguradora.nombre}
-                      onChange={e => campoAseguradora('nombre', e.target.value)}
-                      aria-label="Nombre de la aseguradora"
-                      placeholder="Nombre de la aseguradora" className="sp-input" />
-                  )}
-                </div>
-                <div className="sp-doc-field">
-                  <label htmlFor="honorarios-poliza" className="sp-label-field">Número de póliza</label>
-                  <input id="honorarios-poliza" type="text" value={aseguradora.poliza}
-                    onChange={e => campoAseguradora('poliza', e.target.value)}
-                    placeholder="Ej: POL-123456" className="sp-input" />
-                </div>
-                <div className="sp-doc-field">
-                  <label htmlFor="honorarios-cobertura" className="sp-label-field">Cobertura</label>
-                  <input id="honorarios-cobertura" type="text" value={aseguradora.cobertura}
-                    onChange={e => campoAseguradora('cobertura', e.target.value)}
-                    placeholder="Ej: 80%" className="sp-input" />
-                </div>
+          <p id="honorarios-folio-nota" className="sp-hon-nota">
+            {pacienteInicial && 'Paciente de la ficha · editable. '}
+            Folio: lo genera la base · prefijo {esCotizacion ? 'COT' : 'NOH'}
+          </p>
+          {esCotizacion && (
+            <div className="sp-int-blo">
+              <span className="sp-int-rot" aria-hidden="true">Vigencia</span>
+              <div className="sp-hon-vig">
+                <OpcionesRapidas id="honorarios-vigencia" nombre="Vigencia de la cotización" obligatoria
+                  opciones={VIGENCIAS.map(d => ({ valor: String(d), etiqueta: `${d} días` }))}
+                  valor={String(vigenciaDias)} onCambio={v => setVigencia(Number(v))} />
+                <span className="sp-hon-nota">{vigenciaDias} días · hasta {fechaLarga(vigenciaHasta)}</span>
               </div>
             </div>
           )}
-        </section>
-      )}
+        </div>
+      </section>
 
-      {/* ── Conceptos ─────────────────────────────────────────────────────── */}
-      <section className="sp-card sp-doc-card">
+      {/* ── Conceptos: un cobro por línea ─────────────────────────────────── */}
+      <section className="sp-card sp-doc-card sp-hon">
         <div className="sp-doc-cardhead">
-          <div className="sp-icobox sp-icobox--sm"><Receipt /></div>
           <h2 className="sp-label">
             Conceptos <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
             <span className="sr-only">obligatorio</span>
           </h2>
-          <button type="button" onClick={agregarLinea} aria-label="Agregar"
-            className="sp-btn sp-btn--compact sp-doc-add">
-            <Plus size={17} /><span className="sp-doc-long">Agregar</span>
-          </button>
         </div>
-        <div className="sp-doc-cardbody">
-          <div className="sp-doc-honofilas" data-tipo={tipoDoc}>
-            {/* La cabecera de columnas la enciende el CSS en los trazados de una
-                línea; apilada, cada celda lleva su etiqueta y esta sobra. */}
-            <div className="sp-doc-honofila sp-doc-honocols" aria-hidden="true">
-              <span data-cell="c" className="sp-label">Concepto</span>
-              {esCotizacion && <span data-cell="o" className="sp-label">Origen</span>}
-              <span data-cell="p" className="sp-label">Precio ({divisa})</span>
-              <span data-cell="d" />
-            </div>
-
-            {lineas.map((linea, i) => {
-              const precioInvalido = linea.concepto.trim() !== '' && linea.precio <= 0
-              // El faltante «Conceptos» señala la PRIMERA fila y no las cinco:
-              // es la que el banner enfoca, y cinco campos en ámbar dicen que
-              // hay cinco errores donde hay uno.
-              const faltaConcepto = i === 0 && senalar('honorarios-concepto-0')
-              return (
-                <div key={linea.id} className="sp-doc-honofila">
-                  <div data-cell="c">
-                    <label htmlFor={`honorarios-concepto-${i}`} className="sp-label-field sp-doc-honocell-label">
-                      Concepto
-                    </label>
-                    <input id={`honorarios-concepto-${i}`} type="text" value={linea.concepto}
-                      onChange={e => updateLinea(linea.id, 'concepto', e.target.value)}
-                      placeholder="Ej: Consulta de ortopedia"
-                      aria-invalid={faltaConcepto || undefined}
-                      className={`sp-input ${faltaConcepto ? 'sp-doc-invalid' : ''}`} />
-                  </div>
-
-                  {esCotizacion && (
-                    <div data-cell="o">
-                      <label htmlFor={`honorarios-origen-${i}`} className="sp-label-field sp-doc-honocell-label">
-                        Origen
-                      </label>
-                      <ComboEscribible
-                        id={`honorarios-origen-${i}`}
-                        value={linea.origen}
-                        onChange={val => updateLinea(linea.id, 'origen', val)}
-                        sugerencias={ORIGENES}
-                        placeholder="De quién es el cobro"
-                        pie="Ninguno encaja: escribe el origen y se usa tal cual."
-                      />
-                    </div>
-                  )}
-
-                  <div data-cell="p">
-                    <label htmlFor={`honorarios-precio-${i}`} className="sp-label-field sp-doc-honocell-label">
-                      Precio ({divisa})
-                    </label>
-                    <div className="sp-doc-precio" data-divisa={divisa}>
-                      <span aria-hidden="true" className="sp-doc-precio__sim">{simbolo}</span>
-                      {/* `text` + `inputMode="decimal"`, y no `type="number"`:
-                          en el iPad el numérico abre el teclado completo, y con
-                          una coma dentro el navegador devuelve cadena vacía —el
-                          importe desaparecería sin decir por qué—. */}
-                      <input id={`honorarios-precio-${i}`} type="text" inputMode="decimal"
-                        autoComplete="off"
-                        value={importeVisible(`precio-${linea.id}`, linea.precio)}
-                        onChange={e => escribirImporte(`precio-${linea.id}`, e.target.value,
-                          n => setLineas(prev => prev.map(l => (l.id === linea.id ? { ...l, precio: n } : l))))}
-                        onBlur={() => limpiarImporte(`precio-${linea.id}`)}
-                        placeholder="0.00"
-                        aria-invalid={precioInvalido || undefined}
-                        className={`sp-input ${precioInvalido ? 'sp-doc-invalid' : ''}`} />
-                    </div>
-                    {precioInvalido && (
-                      <p className="sp-hint" style={{ color: 'var(--sp-warn)' }}>El precio debe ser mayor a 0</p>
-                    )}
-                  </div>
-
-                  <button type="button" data-cell="d" onClick={() => eliminarLinea(linea.id)}
-                    disabled={lineas.length === 1}
-                    aria-label={linea.concepto.trim() ? `Eliminar ${linea.concepto.trim()}` : `Eliminar concepto ${i + 1}`}
-                    className="sp-doc-iconbtn">
-                    <Trash2 />
-                  </button>
-                </div>
-              )
-            })}
+        <div className="sp-doc-cardbody sp-hon-cuerpo sp-hon-conceptos" data-tipo={tipoDoc}>
+          <div className="sp-hon-ln sp-hon-cols" aria-hidden="true">
+            <span />
+            <span>Concepto</span>
+            {esCotizacion && <span>De quién es el cobro</span>}
+            <span className="sp-hon-der">Precio ({divisa})</span>
+            <span />
+          </div>
+          {lineas.map((linea, i) => {
+            const precioInvalido = linea.concepto.trim() !== '' && linea.precio <= 0
+            // El faltante «Conceptos» señala la PRIMERA fila y no las cinco:
+            // es la que el banner enfoca, y cinco campos en ámbar dicen que
+            // hay cinco errores donde hay uno.
+            const faltaConcepto = i === 0 && senalar('honorarios-concepto-0')
+            return (
+              <div key={linea.id} className="sp-hon-ln" data-linea={i + 1}>
+                <span className="sp-hon-n" aria-hidden="true">{i + 1}</span>
+                <input id={`honorarios-concepto-${i}`} type="text" value={linea.concepto} autoComplete="off"
+                  onChange={e => updateLinea(linea.id, 'concepto', e.target.value)}
+                  onKeyDown={e => teclaConcepto(e, linea)}
+                  aria-label={`Concepto ${i + 1}`}
+                  placeholder={i === 0 ? 'Ej: Consulta de ortopedia' : 'Siguiente concepto'}
+                  aria-invalid={faltaConcepto || undefined}
+                  className={`sp-hon-fi sp-hon-c${faltaConcepto ? ' sp-hon-fi--falta' : ''}`} />
+                {esCotizacion && (
+                  <CampoSugerido id={`honorarios-origen-${i}`} value={linea.origen}
+                    onChange={val => updateLinea(linea.id, 'origen', val)}
+                    sugerencias={ORIGENES} placeholder="De quién es"
+                    etiqueta={`Origen del cobro ${i + 1}`}
+                    pie="Ninguno encaja: escribe el origen y se usa tal cual."
+                    onSiguiente={() => enfocarLinea(lineas, linea.id, 'precio')}
+                    className="sp-hon-fi sp-hon-o" />
+                )}
+                {/* `text` + `inputMode="decimal"`, y no `type="number"`: en el
+                    iPad el numérico abre el teclado completo, y con una coma
+                    dentro el navegador devuelve cadena vacía —el importe
+                    desaparecería sin decir por qué—. */}
+                <input id={`honorarios-precio-${i}`} type="text" inputMode="decimal" autoComplete="off"
+                  value={importeVisible(`precio-${linea.id}`, linea.precio)}
+                  onChange={e => escribirImporte(`precio-${linea.id}`, e.target.value,
+                    n => setLineas(prev => prev.map(l => (l.id === linea.id ? { ...l, precio: n } : l))))}
+                  onBlur={() => limpiarImporte(`precio-${linea.id}`)}
+                  onKeyDown={e => teclaPrecio(e, linea)}
+                  aria-label={`Precio ${i + 1} (${divisa})`} placeholder="0.00"
+                  aria-invalid={precioInvalido || undefined}
+                  aria-describedby={precioInvalido ? `honorarios-precio-${i}-error` : undefined}
+                  className={`sp-hon-fi sp-hon-p${precioInvalido ? ' sp-hon-fi--falta' : ''}`} />
+                <button type="button" tabIndex={-1} onClick={() => eliminarLinea(linea.id)}
+                  disabled={lineas.length === 1}
+                  aria-label={linea.concepto.trim() ? `Eliminar ${linea.concepto.trim()}` : `Eliminar concepto ${i + 1}`}
+                  className="k-b k-b-icono sp-hon-x">
+                  <X aria-hidden="true" />
+                </button>
+                {precioInvalido && (
+                  <p id={`honorarios-precio-${i}-error`} className="sp-hon-err">El precio debe ser mayor a 0</p>
+                )}
+              </div>
+            )
+          })}
+          <div>
+            <button type="button" onClick={agregarLinea} className="k-b k-b-texto">
+              <Plus aria-hidden="true" size={16} /> Agregar concepto
+            </button>
           </div>
 
           {/* Bloque de cierre — SIEMPRE visible, también con total en cero. */}
-          <div className="sp-doc-cierre">
+          <div className="sp-hon-tot">
             {esCotizacion ? (
               <>
                 {subtotales.map(s => (
-                  <div key={s.origen} className="sp-doc-cierrefila">
-                    <span className="sp-doc-cierrelabel" title={s.origen}>Subtotal · {s.origen}</span>
-                    <span className="sp-doc-cierrecifra">{fmt(s.total, divisa)}</span>
+                  <div key={s.origen} className="sp-hon-tf">
+                    <span className="sp-hon-tl" title={s.origen}>Subtotal · {s.origen}</span>
+                    <span className="sp-hon-cifra">{fmt(s.total, divisa)}</span>
                   </div>
                 ))}
-                <div className="sp-doc-cierrefila sp-doc-cierrefila--final">
-                  <span className="sp-doc-cierrelabel">Total cotizado</span>
-                  <span className="sp-doc-cierrecifra">{fmt(total, divisa)}</span>
+                <div className="sp-hon-tf sp-hon-tf--fin">
+                  <span className="sp-hon-tl">Total cotizado</span>
+                  <span className="sp-hon-cifra">{fmt(total, divisa)}</span>
                 </div>
               </>
             ) : (
               <>
-                <div className="sp-doc-cierrefila">
-                  <span className="sp-doc-cierrelabel">Total</span>
-                  <span className="sp-doc-cierrecifra">{fmt(total, divisa)}</span>
+                <div className="sp-hon-tf">
+                  <span className="sp-hon-tl">Total</span>
+                  <span className="sp-hon-cifra">{fmt(total, divisa)}</span>
                 </div>
-                <div className="sp-doc-cierrefila">
-                  <label htmlFor="honorarios-anticipo" className="sp-doc-cierrelabel">Anticipo recibido</label>
-                  <div className="sp-doc-precio sp-doc-anticipo" data-divisa={divisa}>
-                    <span aria-hidden="true" className="sp-doc-precio__sim">{simbolo}</span>
-                    <input id="honorarios-anticipo" type="text" inputMode="decimal"
-                      autoComplete="off"
-                      value={importeVisible('anticipo', anticipo)}
-                      onChange={e => escribirImporte('anticipo', e.target.value, setAnticipo)}
-                      onBlur={() => limpiarImporte('anticipo')}
-                      placeholder="0.00" className="sp-input" />
-                  </div>
+                <div className="sp-hon-tf">
+                  <label htmlFor="honorarios-anticipo" className="sp-hon-tl">Anticipo recibido</label>
+                  <input id="honorarios-anticipo" type="text" inputMode="decimal" autoComplete="off"
+                    value={importeVisible('anticipo', anticipo)}
+                    onChange={e => escribirImporte('anticipo', e.target.value, setAnticipo)}
+                    onBlur={() => limpiarImporte('anticipo')}
+                    placeholder="0.00" className="sp-hon-fi sp-hon-p sp-hon-anticipo" />
                 </div>
-                <div className="sp-doc-cierrefila sp-doc-cierrefila--final">
-                  <span className="sp-doc-cierrelabel">Saldo pendiente</span>
-                  <span className="sp-doc-cierrecifra">{fmt(saldo, divisa)}</span>
+                <div className="sp-hon-tf sp-hon-tf--fin">
+                  <span className="sp-hon-tl">Saldo pendiente</span>
+                  <span className="sp-hon-cifra">{fmt(saldo, divisa)}</span>
                 </div>
                 {/* NO bloquea la emisión: puede haber saldo a favor legítimo y el
                     médico sabe mejor que el sistema (§4.4). */}
@@ -991,40 +955,87 @@ export default function NotaHonorariosForm({
         </div>
       </section>
 
+      {/* ── Seguro de gastos médicos — solo cotización y sólo si se agrega ── */}
+      {conSeguro && aseguradora && (
+        <section className="sp-card sp-doc-card sp-hon">
+          <div className="sp-doc-cardhead">
+            <h2 className="sp-label">Seguro de gastos médicos</h2>
+            <button type="button" onClick={quitarSeguro} aria-label="Quitar el seguro"
+              className="k-b k-b-icono sp-hon-quitarseg">
+              <X aria-hidden="true" />
+            </button>
+          </div>
+          <div className="sp-doc-cardbody sp-hon-cuerpo">
+            <div className="sp-hon-seguro">
+              <div className="sp-rx-campo">
+                <label htmlFor="honorarios-aseguradora" className="sp-rx-rot">Aseguradora</label>
+                <CampoSugerido id="honorarios-aseguradora" value={aseguradora.nombre}
+                  onChange={v => campoAseguradora('nombre', v)} sugerencias={ASEGURADORAS}
+                  placeholder="Busca la aseguradora" etiqueta="Aseguradora"
+                  pie="¿Otra? Escribe su nombre y se usa tal cual."
+                  onSiguiente={() => document.getElementById('honorarios-poliza')?.focus()}
+                  className="sp-rx-fi" />
+              </div>
+              <div className="sp-rx-campo">
+                <label htmlFor="honorarios-poliza" className="sp-rx-rot">Póliza</label>
+                <input id="honorarios-poliza" type="text" value={aseguradora.poliza} autoComplete="off"
+                  onChange={e => campoAseguradora('poliza', e.target.value)} aria-label="Número de póliza"
+                  placeholder="Ej: POL-123456" className="sp-rx-fi" />
+              </div>
+              <div className="sp-rx-campo">
+                <label htmlFor="honorarios-cobertura" className="sp-rx-rot">Cobertura</label>
+                <input id="honorarios-cobertura" type="text" value={aseguradora.cobertura} autoComplete="off"
+                  onChange={e => campoAseguradora('cobertura', e.target.value)}
+                  placeholder="Ej: 80%" className="sp-rx-fi" />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Pago (recibo) / Condiciones (cotización) ──────────────────────── */}
-      <section className="sp-card sp-doc-card">
+      <section className="sp-card sp-doc-card sp-hon">
         <div className="sp-doc-cardhead">
           <h2 className="sp-label">{esCotizacion ? 'Condiciones' : 'Pago'}</h2>
         </div>
-        <div className="sp-doc-cardbody">
-          <div className="sp-doc-grid" data-cols="2">
-            {!esCotizacion && (
-              <div className="sp-doc-field">
-                <label htmlFor="honorarios-formapago" className="sp-label-field">Forma de pago</label>
-                <select id="honorarios-formapago" value={formaPago}
-                  onChange={e => setFormaPago(e.target.value)} className="sp-input">
-                  {FORMAS_PAGO.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-              </div>
-            )}
-            <div className="sp-doc-field">
-              <span className="sp-label-field" id="honorarios-divisa">Divisa</span>
-              <div className="sp-doc-segmented sp-doc-segmented--field" role="group" aria-labelledby="honorarios-divisa">
-                {(['MXN', 'USD'] as Divisa[]).map(d => (
-                  <button key={d} type="button" aria-pressed={divisa === d}
-                    onClick={() => setDivisa(d)} className="sp-doc-segmented__opt">
-                    {d}
-                  </button>
-                ))}
-              </div>
+        <div className="sp-doc-cardbody sp-hon-cuerpo">
+          {!esCotizacion && (
+            <div className="sp-int-blo">
+              <span className="sp-int-rot" aria-hidden="true">Forma de pago</span>
+              <OpcionesRapidas id="honorarios-formapago" nombre="Forma de pago" obligatoria
+                opciones={FORMAS_PAGO.map(f => ({ valor: f, etiqueta: f }))}
+                valor={formaPago} onCambio={setFormaPago} />
             </div>
-            <div className="sp-doc-field sp-doc-span-all">
-              <label htmlFor="honorarios-notas" className="sp-label-field">Notas y consideraciones</label>
-              <textarea id="honorarios-notas" value={notas} onChange={e => setNotas(e.target.value)}
-                placeholder="Observaciones adicionales, indicaciones especiales…"
-                className="sp-textarea" />
-            </div>
+          )}
+          <div className="sp-int-blo">
+            <span className="sp-int-rot" aria-hidden="true">Divisa</span>
+            <OpcionesRapidas id="honorarios-divisa" nombre="Divisa" obligatoria
+              opciones={[{ valor: 'MXN', etiqueta: 'MXN' }, { valor: 'USD', etiqueta: 'USD' }]}
+              valor={divisa} onCambio={v => setDivisa(v === 'USD' ? 'USD' : 'MXN')} />
           </div>
+          {notasVisibles && (
+            <div className="sp-rx-campo sp-rx-campo--texto">
+              <label htmlFor="honorarios-notas" className="sp-rx-rot">Notas</label>
+              <textarea id="honorarios-notas" rows={2} value={notas} onChange={e => setNotas(e.target.value)}
+                aria-label="Notas y consideraciones"
+                placeholder="Observaciones adicionales, indicaciones especiales…"
+                className="sp-rx-fi sp-hon-notas" />
+            </div>
+          )}
+          {((esCotizacion && aseguradora === null) || !notasVisibles) && (
+            <div className="sp-hon-mas">
+              {esCotizacion && aseguradora === null && (
+                <button type="button" id="honorarios-mas-seguro" onClick={abrirSeguro} className="k-b k-b-texto">
+                  <Plus aria-hidden="true" size={16} /> Seguro de gastos médicos
+                </button>
+              )}
+              {!notasVisibles && (
+                <button type="button" onClick={abrirNotas} className="k-b k-b-texto">
+                  <Plus aria-hidden="true" size={16} /> Notas
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -1036,7 +1047,25 @@ export default function NotaHonorariosForm({
         </p>
       )}
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">

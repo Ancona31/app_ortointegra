@@ -1,0 +1,54 @@
+### distinto function public.aviso_clinica_de_confirmacion()
+  − Tanda L (punto 13): ┃ (índice de I5).
+  + Agenda v2: ┃ (avisos_clinica_pendiente_key).
+### distinto function public.cita_nombre_saludo(pg_catalog.uuid,pg_catalog.uuid)
+  − v2 (integración M):
+  + v2:
+### distinto function public.cita_proteger_atendida()
+  − Agenda (tanda H punto 22; tanda I punto 1):
+  + Agenda:
+### distinto function public.cita_proteger_bloqueo()
+  − Agenda (tanda L, punto 6): ┃ hoy) ┃ queda (K punto 5).
+  + Agenda: ┃ siempre) ┃ queda.
+### distinto function public.cita_proteger_borrado()
+  − v2 (corrección de seguridad, punto 3): ┃ cancela (B3/D6).
+  + v2: ┃ cancela.
+### distinto function public.cita_proteger_cierre()
+  − v2 (tanda I, punto 12; tanda L, punto 9):
+  + v2:
+### distinto function public.cita_proteger_eleccion()
+  − Agenda (tanda I, punto 9): ┃ (Google ┃ restablece, C5).
+  + Agenda: ┃ (la sincronización con Google ┃ el cambio ┃ restablece el evento).
+### distinto function public.cita_proteger_reserva()
+  − v2 (corrección de seguridad, punto 4):
+  + v2:
+### distinto function public.cita_reagendar_clinica(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)
+  − (tanda I, punto 9):
+  + v2:
+### distinto function public.cita_reagendar_oferta(pg_catalog.uuid,pg_catalog.text)
+  − E6:
+  + v2:
+### distinto function public.cita_tiene_nota_ligada(pg_catalog.uuid,pg_catalog.uuid)
+  − Agenda (tanda H, punto 22):
+  + Agenda:
+### distinto function public.reagendar_por_enlace(pg_catalog.text,pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)
+  − E6: ┃ (D3)
+  + v2:
+### distinto table column public.appointments.cerrada_en
+  − horario (tanda I, punto 12). ┃ cita» (tanda L, punto 9).
+  + horario. ┃ cita».
+### distinto table column public.appointments.sustituida_por
+  − v2 (tanda I, punto 12):
+  + v2:
+### distinto table public.avisos_clinica
+  − Tanda I (punto 19): ┃ enlace, cancelación ┃ paciente, ┃ asignar,
+  + Agenda v2: ┃ enlace; cancelación, confirmación ┃ paciente; ┃ asignar; ┃ Google; movimiento rechazado de
+### distinto table public.cita_confirmaciones
+  − Enlace ┃ paciente (agenda E1). ┃ CONVENIO (dimensión 16):
+  + Agenda v2: enlace ┃ paciente. ┃ CONVENIO:
+### distinto table public.cita_correos
+  − Envíos ┃ cita (agenda E4 y G3): ┃ CONVENIO (dimensión 16):
+  + Agenda v2: envíos ┃ cita: ┃ CONVENIO:
+### distinto table public.cita_reagendos
+  − Reagendados ┃ enlace (agenda E6):
+  + Agenda v2: reagendados ┃ enlace:

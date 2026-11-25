@@ -1,4 +1,5 @@
-import { Pill } from 'lucide-react'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 
 const SUPLEMENTOS = [
   { nombre: 'Vitamina D3 + K2', fn: 'Mineralización ósea y prevención de calcificación de tejidos blandos', lab: 'Vitamina D < 40 ng/mL', prioridad: 'alta' },
@@ -10,49 +11,73 @@ const SUPLEMENTOS = [
   { nombre: 'HMB', fn: 'Previene degradación muscular en reposo/inmovilización', lab: 'Inmovilización / reposo prolongado', prioridad: 'alta' },
 ]
 
+/* Etiqueta de prioridad (CALMA §11, `.k-etq`): punto + texto en el tono de la
+   prioridad. Los textos son los de siempre. */
 const colors: Record<string, string> = {
-  alta: 'bg-red-100 text-red-700',
-  media: 'bg-amber-100 text-amber-700',
-  baja: 'bg-slate-100 text-slate-600',
+  alta: 'k-etq-mal',
+  media: 'k-etq-aviso',
+  baja: 'k-etq-tonal',
+}
+
+/* «Indicado cuando:» con dos criterios alternativos se dibuja como dos píldoras
+   unidas por «o» (maqueta `lectura`, vista 3). Es el mismo texto partido por su
+   « o »: se lee igual. */
+function Criterios({ lab }: { lab: string }) {
+  const partes = lab.split(' o ')
+  return (
+    <ul className="flex flex-wrap items-center gap-1.5">
+      {partes.map((p, i) => (
+        <li key={p} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-[12px] leading-4 text-tinta2">o</span>}
+          <span className="k-num rounded-[10px] bg-fondo px-2.5 py-1 text-[12px] leading-4 font-semibold text-tinta">{p}</span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 export default function SuplementacionPage() {
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#1a3a5c] flex items-center gap-2">
-          <Pill size={24} /> Protocolo de Suplementación
-        </h1>
-        <p className="text-slate-500 text-sm mt-1">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
+    <div className="mx-auto w-full max-w-[1000px]">
+      <div className="mb-5">
+        {/* «‹ Expediente» como sus pantallas hermanas (CALMA §6, §20): se llega
+            desde el enlace «Suplementación» de la cabecera de `/expediente`. */}
+        <Link href="/expediente" prefetch={false} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
+          <ChevronLeft size={16} aria-hidden="true" />
+          Expediente
+        </Link>
+        <h1 className="k-t-pantalla mt-1">Protocolo de Suplementación</h1>
+        <p className="k-t-sec mt-0.5">Stack de suplementación osteomuscular — enfoque en densidad mineral, inflamación y tejidos blandos</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 ih:grid-cols-2 ih:gap-3.5 iv:grid-cols-2 iv:gap-3.5 esc:grid-cols-2 esc:gap-4">
         {SUPLEMENTOS.map(s => (
-          <div key={s.nombre} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <h3 className="font-semibold text-slate-800">{s.nombre}</h3>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${colors[s.prioridad]}`}>
+          <section key={s.nombre} className="k-tarjeta flex min-w-0 flex-col gap-2">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="k-t-tarjeta min-w-0 flex-1">{s.nombre}</h2>
+              <span className={`k-etq ${colors[s.prioridad]}`}>
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
                 {s.prioridad === 'alta' ? 'Alta prioridad' : s.prioridad === 'media' ? 'Media' : 'Complementario'}
               </span>
             </div>
-            <p className="text-sm text-slate-600 mb-2">{s.fn}</p>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-400">Indicado cuando:</span>
-              <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{s.lab}</span>
+            <p className="text-[15px] leading-[22px] text-tinta esc:text-[14px] esc:leading-5">{s.fn}</p>
+            <div className="mt-auto flex flex-col gap-1.5 pt-1">
+              <span className="text-[13px] leading-[18px] font-semibold text-tinta2">Indicado cuando:</span>
+              <Criterios lab={s.lab} />
             </div>
-          </div>
+          </section>
         ))}
-      </div>
 
-      {/* Notas clínicas */}
-      <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5">
-        <h3 className="font-semibold text-amber-800 mb-3">Notas clínicas clave</h3>
-        <ul className="space-y-2 text-sm text-amber-900">
-          <li>• <strong>Albúmina baja</strong>: Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</li>
-          <li>• <strong>TSH fuera del rango óptimo (1.0–2.5)</strong>: Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</li>
-          <li>• <strong>Cistatina C {">"} 0.9</strong>: Función renal comprometida — precaución con AINEs prolongados</li>
-          <li>• <strong>Insulina {">"} 8 + HbA1c {">"} 5.3%</strong>: Resistencia a insulina activa — glicación de colágeno comprometida</li>
-        </ul>
+        {/* Notas clínicas */}
+        <section className="k-tarjeta flex min-w-0 flex-col gap-2.5 self-start bg-aviso-fondo">
+          <h2 className="k-t-tarjeta text-aviso-tinta">Notas clínicas clave</h2>
+          <ul className="flex flex-col gap-2.5 text-tinta">
+            <li className="flex flex-col border-l-[3px] border-aviso-punto pl-3 text-[14px] leading-5"><strong className="text-[15px] font-semibold">Albúmina baja:</strong> Riesgo de infección quirúrgica y no-unión ósea — optimizar antes de cualquier procedimiento</li>
+            <li className="flex flex-col border-l-[3px] border-aviso-punto pl-3 text-[14px] leading-5"><strong className="text-[15px] font-semibold">TSH fuera del rango óptimo (1.0–2.5):</strong> Investigar hipotiroidismo subclínico como causa de síntomas osteomusculares</li>
+            <li className="flex flex-col border-l-[3px] border-aviso-punto pl-3 text-[14px] leading-5"><strong className="text-[15px] font-semibold">Cistatina C {">"} 0.9:</strong> Función renal comprometida — precaución con AINEs prolongados</li>
+            <li className="flex flex-col border-l-[3px] border-aviso-punto pl-3 text-[14px] leading-5"><strong className="text-[15px] font-semibold">Insulina {">"} 8 + HbA1c {">"} 5.3%:</strong> Resistencia a insulina activa — glicación de colágeno comprometida</li>
+          </ul>
+        </section>
       </div>
     </div>
   )

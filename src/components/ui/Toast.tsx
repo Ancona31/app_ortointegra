@@ -1,10 +1,10 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react'
-import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react'
+import { createContext, useContext, useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { Check, Info, AlertTriangle, X } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
-type ToastItem = { id: number; message: string; type: ToastType }
+type ToastItem = { id: number; message: string; type: ToastType; sale: boolean }
 
 type ToastFn = {
   success: (msg: string) => void
@@ -15,18 +15,54 @@ type ToastFn = {
 
 const ToastContext = createContext<ToastFn>({ success: () => {}, error: () => {}, info: () => {}, warning: () => {} })
 
+/* Duración de cada aviso. La advertencia (PLAN B3) y el error (decisión del
+   dueño, ajustes del rediseño) se quedan 8 s: un error hay que poder leerlo
+   entero. Éxito e información, 4 s, como siempre. */
+const DURACION: Record<ToastType, number> = { success: 4000, info: 4000, error: 8000, warning: 8000 }
+
+/* Lo que tarda la salida (`--dur-sale`). El aviso sigue montado ese rato para
+   que se vea salir por donde entró; luego se quita del estado. */
+const SALIDA_MS = 240
+
+/* Al reanudar tras una pausa, nunca menos de 1 s: si el puntero se va justo al
+   final, el aviso no desaparece en seco. */
+const MINIMO_TRAS_PAUSA = 1000
+
+/* ⚠️ LOS COLORES SON LOS SEMÁNTICOS FIJOS DEL KIT, NO LOS DE LA MARCA. Antes eran
+   clases de Tailwind a propósito: con `--sp-primary-*` el aviso de «info»
+   tomaba el COLOR DE MARCA de la clínica, y en una paleta verde «info» y «éxito»
+   salían los dos verdes. Un aviso de sistema no puede depender del color que el
+   médico eligió. Por eso «info» NO usa `--tonal` (que deriva de la marca, PLAN
+   §2.2) sino el neutro `--sup2`/`--tinta2`. `--ok-*`, `--mal-*` y `--aviso-*`
+   tienen su oscuro en `sistema.css`. */
+const TINTA_ICONO: Record<ToastType, string> = {
+  success: 'bg-ok-fondo text-ok-tinta',
+  error:   'bg-mal-fondo text-mal-tinta',
+  info:    'bg-sup2 text-tinta2',
+  warning: 'bg-aviso-fondo text-aviso-tinta',
+}
+const ICONO: Record<ToastType, React.ReactNode> = {
+  success: <Check         size={16} strokeWidth={2.5} aria-hidden="true" />,
+  error:   <X             size={16} strokeWidth={2.5} aria-hidden="true" />,
+  info:    <Info          size={16} strokeWidth={2.5} aria-hidden="true" />,
+  warning: <AlertTriangle size={16} strokeWidth={2.5} aria-hidden="true" />,
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const counter = useRef(0)
 
   const add = useCallback((message: string, type: ToastType) => {
     const id = ++counter.current
-    setToasts(prev => [...prev, { id, message, type }])
-    const duration = type === 'warning' ? 8000 : 4000
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration)
+    setToasts(prev => [...prev, { id, message, type, sale: false }])
   }, [])
 
-  const dismiss = (id: number) => setToasts(prev => prev.filter(t => t.id !== id))
+  /* Cerrar = marcar la salida y, cuando acaba, quitarlo. Dos cierres seguidos
+     (el reloj y la X a la vez) no hacen daño: el segundo no encuentra nada. */
+  const cerrar = useCallback((id: number) => {
+    setToasts(prev => prev.map(t => (t.id === id ? { ...t, sale: true } : t)))
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), SALIDA_MS)
+  }, [])
 
   // Memoizado: sin esto el objeto cambia de identidad en cada toast que entra
   // o sale, y re-renderiza todo el arbol bajo el provider.
@@ -37,62 +73,128 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     warning: (msg: string) => add(msg, 'warning'),
   }), [add])
 
-  /* ⚠️⚠️ ESTAS CLASES SON DE TAILWIND A PROPÓSITO, Y NO SE PASAN A TOKENS
-     `--sp-*`. Se probó y se revirtió, así que conviene saber por qué antes de
-     repetirlo: con `--sp-primary-*` el aviso de «info» tomaba el COLOR DE MARCA
-     de la clínica, y en una paleta verde «info» y «éxito» salían los dos verdes.
-     Un aviso de sistema no puede depender del color que el médico eligió.
-     ⚠️ Y EL DEFECTO DE OSCURO YA NO ESTÁ AQUÍ: se arregló en la hoja de
-     traducción. El escalón 800 del texto no se repintaba —quedaba tinta oscura
-     sobre relleno oscuro, 1.83-2.08:1— y ahora `html.dark .text-*-700/800/900`
-     lo lleva al nivel 300 de la familia (ver la ampliación en `globals.css`).
-     El fondo y el borde ya los cubría `ThemeProvider`. Resultado: en claro esto
-     es exactamente lo de siempre y en oscuro da 8.62-10.25:1.
-     ⚠️ SI ALGÚN DÍA HACE FALTA TOCAR EL COLOR DE UN AVISO, se toca la hoja, no
-     este archivo. */
-  const styles: Record<ToastType, string> = {
-    success: 'bg-emerald-50 border-emerald-200 text-emerald-800',
-    error:   'bg-red-50 border-red-200 text-red-800',
-    info:    'bg-blue-50 border-blue-200 text-blue-800',
-    warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  }
-  const icons: Record<ToastType, React.ReactNode> = {
-    success: <CheckCircle    size={16} className="text-emerald-500 flex-shrink-0" />,
-    error:   <XCircle        size={16} className="text-red-500 flex-shrink-0" />,
-    info:    <Info           size={16} className="text-blue-500 flex-shrink-0" />,
-    warning: <AlertTriangle  size={16} className="text-amber-500 flex-shrink-0" />,
-  }
-
   return (
     <ToastContext.Provider value={toast}>
       {children}
-      {/* ⚠️ EL `bottom` LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 · paso 10).
-          Con `viewport-fit=cover` los 20 px de `bottom-5` se miden desde el
-          borde FÍSICO de la pantalla y la barra de gestos mide ~34, así que el
-          aviso salía por debajo de ella. El 20 de diseño no se toca: se suma, y
-          donde el sistema no se superpone `env()` vale 0.
-          ⚠️ ES EL MENOS GRAVE DE LA TANDA y aun así se arregla: el aviso es
-          `pointer-events-none` y se va solo, o sea que nadie se queda sin poder
-          pulsar nada — pero es donde la app dice «guardado» o «falló», y medio
-          tapado por el indicador del sistema se lee mal justo cuando importa. */}
-      <div className="fixed bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))] right-5 z-[9999] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(t => (
-          <div
-            key={t.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg text-sm font-medium
-              pointer-events-auto max-w-sm
-              animate-[slideInRight_0.25s_ease-out]
-              ${styles[t.type]}`}
-          >
-            {icons[t.type]}
-            <span className="flex-1">{t.message}</span>
-            <button onClick={() => dismiss(t.id)} className="opacity-50 hover:opacity-100 ml-1">
-              <X size={14} />
-            </button>
-          </div>
-        ))}
-      </div>
+      <ZonaAvisos>
+        {toasts.map(t => <AvisoBreve key={t.id} aviso={t} onCerrar={cerrar} />)}
+      </ZonaAvisos>
     </ToastContext.Provider>
+  )
+}
+
+/* La zona de los avisos: ARRIBA Y CENTRADA EN EL ÁREA DE CONTENIDO (CALMA §25,
+   maqueta `capas-b/vista-1-aviso`), nunca abajo a la derecha ni bajo la
+   navegación o una franja del sistema.
+   ⚠️ SIN NÚMEROS DE LA NAVEGACIÓN AQUÍ: los bordes son los de las capas
+   (`--capa-izq`/`--capa-der`, que leen los `--cromo-*` de `globals.css` y se
+   espejan con la franja a la izquierda) y la altura, `--capa-aviso-arr`
+   (`sistema.css`: bajo el encabezado fundido en `tel`/`iv`). Sin navegación
+   —el lanzador `/inicio`— el cromo mide 0 y el aviso queda centrado de verdad.
+   ⚠️ `--z-aviso` (10000): el aviso va por encima de TODO, también de la alerta
+   «Sin conexión» y de ⌘K (escala en `sistema.css`). */
+function ZonaAvisos({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      aria-live="polite"
+      className={[
+        /* `flex-col-reverse`: el más nuevo, arriba (maqueta, «Cola»). */
+        'pointer-events-none fixed z-[var(--z-aviso)] flex flex-col-reverse items-center gap-2',
+        'top-[var(--capa-aviso-arr)] left-[var(--capa-izq)] right-[var(--capa-der)]',
+      ].join(' ')}
+    >
+      {children}
+    </div>
+  )
+}
+
+/* El reloj de un aviso, con pausa: se detiene mientras el puntero está encima o
+   el foco está dentro, y al soltar sigue con lo que le quedaba (mínimo 1 s). */
+function useRelojAviso(duracion: number, alAcabar: () => void) {
+  const restante = useRef(duracion)
+  const inicio = useRef(0)
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pausas = useRef(0)
+  const acabar = useRef(alAcabar)
+  useEffect(() => { acabar.current = alAcabar })
+
+  const correr = useCallback(() => {
+    inicio.current = Date.now()
+    temporizador.current = setTimeout(() => acabar.current(), restante.current)
+  }, [])
+
+  useEffect(() => {
+    correr()
+    return () => { if (temporizador.current) clearTimeout(temporizador.current) }
+  }, [correr])
+
+  const pausar = useCallback(() => {
+    pausas.current += 1
+    if (pausas.current > 1 || !temporizador.current) return
+    clearTimeout(temporizador.current)
+    temporizador.current = null
+    restante.current = Math.max(MINIMO_TRAS_PAUSA, restante.current - (Date.now() - inicio.current))
+  }, [])
+
+  const seguir = useCallback(() => {
+    pausas.current = Math.max(0, pausas.current - 1)
+    if (pausas.current === 0 && !temporizador.current) correr()
+  }, [correr])
+
+  return { pausar, seguir }
+}
+
+/* Un aviso. Entra desde arriba (−60 % de su alto y opacidad 0) con
+   `@starting-style` y sale por el MISMO camino, más rápido. Son transiciones,
+   no `@keyframes`: si se cierra a medio entrar, se invierte desde donde está.
+   Con movimiento reducido, sólo fundido. Sólo `translate` (transform) y
+   `opacity`: en Tailwind 4 `translate-y-*` escribe la propiedad `translate`.
+   ⚠️ EL ROL VA EN CADA AVISO: `status` para éxito e información, `alert` para
+   error y advertencia. Las e2e localizan el aviso por su TEXTO
+   (`toastConTexto` en `e2e/ayudas.ts`): no dupliques el mensaje en otro nodo
+   (p. ej. un texto oculto para lectores), o esa búsqueda deja de ser única. */
+function AvisoBreve({ aviso, onCerrar }: { aviso: ToastItem; onCerrar: (id: number) => void }) {
+  const { id, type, message, sale } = aviso
+  const cerrarEste = useCallback(() => onCerrar(id), [onCerrar, id])
+  const { pausar, seguir } = useRelojAviso(DURACION[type], cerrarEste)
+
+  return (
+    <div
+      role={type === 'success' || type === 'info' ? 'status' : 'alert'}
+      data-tipo={type}
+      data-sale={sale ? '' : undefined}
+      onPointerEnter={pausar}
+      onPointerLeave={seguir}
+      onFocus={pausar}
+      onBlur={seguir}
+      onKeyDown={e => { if (e.key === 'Escape') cerrarEste() }}
+      className={[
+        'pointer-events-auto relative flex w-full max-w-[400px] items-start gap-2.5',
+        'rounded-[14px] bg-sup py-2.5 pl-2.5 pr-1.5 ih:pr-2 esc:pr-2 shadow-[var(--sombra-capa)]',
+        'transition-[translate,opacity] duration-[var(--dur-entra)] ease-[var(--resorte-entra)]',
+        /* El recorrido va en una variable para que el movimiento reducido lo
+           anule sin pelear con el orden de las variantes. */
+        '[--recorrido:-60%] motion-reduce:[--recorrido:0px] motion-reduce:duration-[var(--dur-sale)]',
+        'starting:translate-y-[var(--recorrido)] starting:opacity-0',
+        'data-[sale]:translate-y-[var(--recorrido)] data-[sale]:opacity-0',
+        'data-[sale]:duration-[var(--dur-sale)] data-[sale]:ease-[var(--resorte-sale)]',
+      ].join(' ')}
+    >
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${TINTA_ICONO[type]}`}>
+        {ICONO[type]}
+      </span>
+      <span className="min-w-0 flex-1 pt-1 text-[14px] leading-5 font-semibold text-tinta [overflow-wrap:anywhere]">
+        {message}
+      </span>
+      <button
+        type="button"
+        onClick={cerrarEste}
+        aria-label="Cerrar aviso"
+        className="-my-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tinta3 hover:bg-sup2 hover:text-tinta focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-enlace ih:-my-1 ih:h-9 ih:w-9 esc:-my-1 esc:h-9 esc:w-9"
+      >
+        <X size={16} aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 

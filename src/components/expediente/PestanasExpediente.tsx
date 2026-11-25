@@ -38,63 +38,40 @@ export default function PestanasExpediente({ activa, conteos, onCambiar }: {
   onCambiar: (clave: ClavePestana) => void
 }) {
   return (
-    <div
-      role="tablist"
-      aria-label="Secciones del expediente"
-      /* ⚠️ EL DESPLAZAMIENTO ES SÓLO DE MÓVIL (`max-lg:`), Y ANTES NO LO ERA.
-         Con `overflow-x: auto` suelto salía una barra de scroll en escritorio
-         con las cuatro pestañas cabiendo de sobra —ocupan ~560 px de los 960
-         útiles—, y el motivo no era el ancho: cuando un eje del overflow es
-         `visible` y el otro no, el `visible` COMPUTA A `auto`. O sea que
-         `overflow-x: auto` traía de regalo `overflow-y: auto`, y el
-         `margin-bottom: -1px` que llevaba cada pestaña la sacaba 1 px por
-         debajo de la caja: 1 px de desbordamiento vertical, barra vertical en
-         cuanto el sistema pinta barras clásicas, y la barra comiéndose ancho.
-         Se arregla por los dos lados: aquí, no creando contenedor de scroll
-         donde no hace falta; y abajo, quitando el margen negativo que lo
-         provocaba.
-         En móvil sí se desliza, y de ahí el relleno final que le deja aire al
-         borde para no recortar la última pestaña.
-         ⚠️ EL FILETE INFERIOR VA COMO SOMBRA INTERIOR, no como `border-b`. Es
-         lo que permite que la pestaña activa apoye su subrayado encima sin
-         necesitar el margen negativo: la sombra se pinta DENTRO de la caja, en
-         el mismo borde donde termina la pestaña. */
-      className="flex items-stretch gap-[var(--sp-1)] max-lg:overflow-x-auto pr-[var(--sp-4)] lg:pr-0"
-      style={{ boxShadow: 'inset 0 -1px 0 var(--sp-line-card)' }}
-    >
+    /* Pestañas del kit (CALMA §6): subrayado de 2 en la activa, el conteo como
+       número plano (`<i>`, sin píldora). Si no caben, `.k-tabs` las desplaza en
+       horizontal; nunca encoge la letra.
+       ⚠️ «MEDICIONES Y ARCHIVOS» SÓLO EN `esc`. En los formatos estrechos la
+       cuarta pestaña se rotula «Mediciones» (maqueta `final-expediente`) y su
+       nombre accesible sigue siendo el completo. Las dos variantes van con CSS,
+       nunca con el formato leído en JS (hidratación). En `ext` el hueco mínimo
+       baja a 4: con 8 la fila medía 292 en 290 y «Mediciones» quedaba cortada
+       sin indicio (auditoría H6). */
+    <div role="tablist" aria-label="Secciones del expediente" className="k-tabs ext:gap-1">
       {PESTANAS.map(p => {
         const esActiva = p.clave === activa
         const conteo = conteos[p.clave]
+        const corto = p.clave === 'mediciones'
         return (
           <button
             key={p.clave}
             type="button"
             role="tab"
             aria-selected={esActiva}
+            aria-label={corto ? p.rotulo : undefined}
             onClick={() => onCambiar(p.clave)}
-            className="shrink-0 flex items-center gap-[var(--sp-2)] whitespace-nowrap px-[var(--sp-4)] py-[var(--sp-3)] text-[length:var(--sp-fs-body-sm)] transition-colors"
-            style={{
-              /* El subrayado de 2.5 px es el marcador de la activa. Va como
-                 borde inferior para que se apoye en el filete de la barra, que
-                 ahora es la sombra interior del contenedor: por eso ya NO lleva
-                 `marginBottom: -1px`. Ese margen era el que desbordaba la caja
-                 y sacaba la barra de scroll. No lo devuelvas. */
-              borderBottom: `2.5px solid ${esActiva ? 'var(--sp-primary)' : 'transparent'}`,
-              color: esActiva ? 'var(--sp-ink-800)' : 'var(--sp-ink-500)',
-              fontWeight: esActiva ? 'var(--sp-fw-bold)' : 'var(--sp-fw-semi)',
-            }}
+            className="k-tab"
           >
-            {p.rotulo}
-            {conteo !== undefined && (
-              <span
-                className="rounded-[var(--sp-r-pill)] px-[7px] py-px text-[length:var(--sp-fs-legal)] font-bold tabular-nums"
-                style={esActiva
-                  ? { background: 'var(--sp-primary-bg)', color: 'var(--sp-primary-ink)' }
-                  : { background: 'var(--sp-surface-muted)', color: 'var(--sp-ink-500)' }}
-              >
-                {conteo}
-              </span>
-            )}
+            <span className="flex items-baseline gap-1">
+              {corto ? (
+                <>
+                  <span className="esc:hidden">Mediciones</span>
+                  <span className="hidden esc:inline">{p.rotulo}</span>
+                </>
+              ) : p.rotulo}
+              {/* En ext no caben los cuatro rótulos con su número (maqueta): sin él. */}
+              {conteo !== undefined && <i className="ext:hidden">{conteo}</i>}
+            </span>
           </button>
         )
       })}

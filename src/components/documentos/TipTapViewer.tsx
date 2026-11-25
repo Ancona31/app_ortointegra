@@ -12,8 +12,10 @@ interface Props {
   className?: string
 }
 
-const ALLOWED_TAGS = ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h1', 'h2', 'h3', 'div', 'span', 'hr', 'ul', 'ol', 'li']
-const ALLOWED_ATTR = ['style', 'class']
+// `blockquote` y `start` entran con el rediseño del escrito: sin ellos la cita
+// llegaba como párrafos sueltos y una numeración que empieza en 3 salía desde 1.
+const ALLOWED_TAGS = ['p', 'br', 'b', 'strong', 'i', 'em', 'u', 'h1', 'h2', 'h3', 'div', 'span', 'hr', 'ul', 'ol', 'li', 'blockquote']
+const ALLOWED_ATTR = ['style', 'class', 'start']
 
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, { ALLOWED_TAGS, ALLOWED_ATTR })

@@ -1,0 +1,1385 @@
+=== 20261111120000_agenda_a18_indices_rango.sql
+BEGIN
+SET
+DO
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMIT
+ n |                           comprobacion                            |                         valor                          |                        esperado                        | estado 
+---+-------------------------------------------------------------------+--------------------------------------------------------+--------------------------------------------------------+--------
+ 1 | idx_appointments_clinica_inicio: columnas / válido / listo        | clinica_id,start_time,end_time / true / true           | clinica_id,start_time,end_time / true / true           | OK
+ 2 | idx_appointments_clinica_medico_inicio: columnas / válido / listo | clinica_id,medico_id,start_time,end_time / true / true | clinica_id,medico_id,start_time,end_time / true / true | OK
+ 3 | índices de appointments que NO son válidos                        | 0                                                      | 0                                                      | OK
+ 4 | los tres índices sueltos siguen ahí                               | 3                                                      | 3                                                      | OK
+ 5 | las 5 policies de appointments, intactas                          | 5                                                      | 5                                                      | OK
+(5 rows)
+
+=== 20261112120000_agenda_b0_auditoria_citas.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE TRIGGER
+CREATE TRIGGER
+COMMIT
+ n |                              comprobacion                              |           valor            |          esperado          | estado 
+---+------------------------------------------------------------------------+----------------------------+----------------------------+--------
+ 1 | log_cita_change: security definer / search_path                        | true / search_path=""      | true / search_path=""      | OK
+ 2 | disparadores audit_appointments* activos y apuntando a log_cita_change | 2                          | 2                          | OK
+ 3 | EXECUTE: PUBLIC / anon / authenticated / service_role                  | false / true / true / true | false / true / true / true | OK
+ 4 | appointments sin log_tabla_change (sin filas duplicadas)               | 0                          | 0                          | OK
+ 5 | las 5 policies de appointments, intactas                               | 5                          | 5                          | OK
+(5 rows)
+
+=== 20261112130000_agenda_b1_ajustes_interruptor.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+ALTER TABLE
+REVOKE
+REVOKE
+psql:<stdin>:183: NOTICE:  policy "agenda_ajustes_select" for relation "public.agenda_ajustes" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:186: NOTICE:  policy "agenda_ajustes_insert" for relation "public.agenda_ajustes" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:189: NOTICE:  policy "agenda_ajustes_update" for relation "public.agenda_ajustes" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+CREATE TRIGGER
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                                   comprobacion                                    |                                                                                                         valor                                                                                                         |                                                                                                       esperado                                                                                                        | estado 
+---+-----------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | agenda_ajustes existe / RLS activa                                                | sí / true                                                                                                                                                                                                             | sí / true                                                                                                                                                                                                             | OK
+ 2 | policies (ninguna de DELETE)                                                      | INSERT,SELECT,UPDATE                                                                                                                                                                                                  | INSERT,SELECT,UPDATE                                                                                                                                                                                                  | OK
+ 3 | valores de fábrica (§2), candado e interruptor                                    | agenda_v2_encendida=false,anticipacion_min_horas=2,candado_cancelaciones=3,candado_citas_activas=1,candado_reagendados=2,candado_ventana_dias=60,horizonte_dias=60,recordatorio_horas=24,vigencia_enlace_unico_dias=7 | agenda_v2_encendida=false,anticipacion_min_horas=2,candado_cancelaciones=3,candado_citas_activas=1,candado_reagendados=2,candado_ventana_dias=60,horizonte_dias=60,recordatorio_horas=24,vigencia_enlace_unico_dias=7 | OK
+ 4 | FK a clinicas es RESTRICT                                                         | r                                                                                                                                                                                                                     | r                                                                                                                                                                                                                     | OK
+ 5 | CHECK de rangos                                                                   | 5                                                                                                                                                                                                                     | 5                                                                                                                                                                                                                     | OK
+ 6 | disparadores                                                                      | audit_agenda_ajustes→log_tabla_change,trg_agenda_ajustes_proteger→proteger_agenda_ajustes                                                                                                                             | audit_agenda_ajustes→log_tabla_change,trg_agenda_ajustes_proteger→proteger_agenda_ajustes                                                                                                                             | OK
+ 7 | proteger_agenda_ajustes: definer / EXECUTE PUBLIC,anon,authenticated,service_role | false / false,true,true,true                                                                                                                                                                                          | false / false,true,true,true                                                                                                                                                                                          | OK
+ 8 | privilegios de tabla: anon / authenticated                                        | - / INSERT,SELECT,UPDATE                                                                                                                                                                                              | - / INSERT,SELECT,UPDATE                                                                                                                                                                                              | OK
+ 9 | filas (clínicas con ajustes propios)                                              | 0                                                                                                                                                                                                                     |                                                                                                                                                                                                                       | INFO
+(9 rows)
+
+=== 20261112140000_agenda_b5_horario_propio.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+COMMENT
+COMMIT
+ n |                                    comprobacion                                    |                                         valor                                         |                                       esperado                                        | estado 
+---+------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------+--------
+ 1 | horario_propio: tipo / not null / default                                          | boolean / true / false                                                                | boolean / true / false                                                                | OK
+ 2 | consultorios con algún día activo en horario (censo; hoy heredan el de la clínica) | 0                                                                                     |                                                                                       | INFO
+ 3 | consultorios con horario_propio = true                                             | 0                                                                                     |                                                                                       | INFO
+ 4 | policies de consultorios, intactas (gates_insert, insert, select, update)          | consultorios_gates_insert,consultorios_insert,consultorios_select,consultorios_update | consultorios_gates_insert,consultorios_insert,consultorios_select,consultorios_update | OK
+ 5 | COMMENT del convenio presente                                                      | true                                                                                  | true                                                                                  | OK
+(5 rows)
+
+=== 20261112150000_agenda_b6_tipos_cita.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+REVOKE
+psql:<stdin>:249: NOTICE:  policy "tipos_cita_select" for relation "public.tipos_cita" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:254: NOTICE:  policy "tipos_cita_insert" for relation "public.tipos_cita" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:257: NOTICE:  policy "tipos_cita_update" for relation "public.tipos_cita" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+DO
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n  |                              comprobacion                              |                                                                  valor                                                                  |                                                                esperado                                                                 | estado 
+----+------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------+--------
+  1 | tipos_cita existe / RLS activa                                         | sí / true                                                                                                                               | sí / true                                                                                                                               | OK
+  2 | policies de tipos_cita (ninguna de DELETE)                             | INSERT,SELECT,UPDATE                                                                                                                    | INSERT,SELECT,UPDATE                                                                                                                    | OK
+  3 | FKs de tipos_cita (clinicas, profiles) en RESTRICT                     | tipos_cita_clinica_id_fkey=r,tipos_cita_medico_id_fkey=r                                                                                | tipos_cita_clinica_id_fkey=r,tipos_cita_medico_id_fkey=r                                                                                | OK
+  4 | appointments_tipo_cita_fkey: destino / RESTRICT / columnas             | tipos_cita / r / tipo_cita_id,clinica_id                                                                                                | tipos_cita / r / tipo_cita_id,clinica_id                                                                                                | OK
+  5 | CHECK de tipos_cita / fórmula del CHECK de instantánea en appointments | 3 / CHECK (((tipo_cita_id IS NULL) = (tipo_cita_nombre IS NULL)))                                                                       | 3 / CHECK (((tipo_cita_id IS NULL) = (tipo_cita_nombre IS NULL)))                                                                       | OK
+  6 | funciones: definer / EXECUTE PUBLIC,anon,authenticated,service_role    | update_tipos_cita_updated_at=false / false,true,true,true ; validar_tipo_cita_medico=false / false,true,true,true                       | update_tipos_cita_updated_at=false / false,true,true,true ; validar_tipo_cita_medico=false / false,true,true,true                       | OK
+  7 | disparadores de tipos_cita                                             | audit_tipos_cita→log_tabla_change,trg_tipos_cita_medico→validar_tipo_cita_medico,trg_tipos_cita_updated_at→update_tipos_cita_updated_at | audit_tipos_cita→log_tabla_change,trg_tipos_cita_medico→validar_tipo_cita_medico,trg_tipos_cita_updated_at→update_tipos_cita_updated_at | OK
+  8 | privilegios de tipos_cita: anon / authenticated                        | - / INSERT,SELECT,UPDATE                                                                                                                | - / INSERT,SELECT,UPDATE                                                                                                                | OK
+  9 | las 5 policies de appointments, intactas                               | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                               | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                               | OK
+ 10 | appointments.tipo_cita_id / tipo_cita_nombre: tipos                    | tipo_cita_id=uuid,tipo_cita_nombre=text                                                                                                 | tipo_cita_id=uuid,tipo_cita_nombre=text                                                                                                 | OK
+ 11 | citas con tipo / tipos de cita (censo)                                 | 0 / 0                                                                                                                                   |                                                                                                                                         | INFO
+(11 rows)
+
+=== 20261113120000_agenda_c1_gcal_sync_estado.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+ALTER TABLE
+REVOKE
+REVOKE
+GRANT
+COMMENT
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+DO
+COMMIT
+ n  |                                 comprobacion                                 |            valor             |           esperado           | estado 
+----+------------------------------------------------------------------------------+------------------------------+------------------------------+--------
+  1 | gcal_sync_estado existe / RLS activa                                         | sí / true                    | sí / true                    | OK
+  2 | policies (ninguna)                                                           | 0                            | 0                            | OK
+  3 | privilegios anon / authenticated / service_role                              | - / - / INSERT,SELECT,UPDATE | - / - / INSERT,SELECT,UPDATE | OK
+  4 | FK a clinicas es RESTRICT                                                    | r                            | r                            | OK
+  5 | CHECK                                                                        | 5                            | 5                            | OK
+  6 | funciones INVOKER con search_path vacío (de 6)                               | 6                            | 6                            | OK
+  7 | EXECUTE sólo service_role (PUBLIC, anon, authenticated sin) (de 6)           | 6                            | 6                            | OK
+  8 | service_role con BYPASSRLS                                                   | true                         | true                         | OK
+  9 | clinica_tiene_acceso / clinica_no_suspendida: siguen DEFINER (no se tocaron) | true / true                  | true / true                  | OK
+ 10 | filas (clínicas con estado)                                                  | 0                            |                              | INFO
+(10 rows)
+
+=== 20261113130000_agenda_c2_gcal_aplicar.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                             comprobacion                             |            valor             |           esperado           | estado 
+---+----------------------------------------------------------------------+------------------------------+------------------------------+--------
+ 1 | tres RPC INVOKER con search_path vacío                               | 3                            | 3                            | OK
+ 2 | EXECUTE sólo service_role (de 3)                                     | 3                            | 3                            | OK
+ 3 | log_cita_change: definer / search_path / lleva spinus.via            | true / search_path="" / true | true / search_path="" / true | OK
+ 4 | log_cita_change EXECUTE PUBLIC / anon / authenticated / service_role | false / true / true / true   | false / true / true / true   | OK
+ 5 | disparadores audit_appointments* activos                             | 2                            | 2                            | OK
+ 6 | las 5 policies de appointments, intactas                             | 5                            | 5                            | OK
+(6 rows)
+
+=== 20261114120000_agenda_d1_enlaces_reserva.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+ALTER TABLE
+REVOKE
+GRANT
+psql:<stdin>:236: NOTICE:  policy "reserva_avisos_select" for relation "public.reserva_avisos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+REVOKE
+REVOKE
+psql:<stdin>:286: NOTICE:  policy "reserva_enlaces_select" for relation "public.reserva_enlaces" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:290: NOTICE:  policy "reserva_enlaces_insert" for relation "public.reserva_enlaces" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:294: NOTICE:  policy "reserva_enlaces_update" for relation "public.reserva_enlaces" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DO
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n  |                            comprobacion                            |                                                                                   valor                                                                                    |                                                                                  esperado                                                                                  | estado 
+----+--------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+  1 | reserva_enlaces / reserva_avisos: RLS                              | true / true                                                                                                                                                                | true / true                                                                                                                                                                | OK
+  2 | policies reserva_enlaces (sin DELETE) / reserva_avisos             | INSERT,SELECT,UPDATE / SELECT                                                                                                                                              | INSERT,SELECT,UPDATE / SELECT                                                                                                                                              | OK
+  3 | FKs de reserva_enlaces                                             | reserva_enlaces_clinica_id_fkey=r,reserva_enlaces_created_by_fkey=n,reserva_enlaces_medico_id_fkey=r,reserva_enlaces_revocado_por_fkey=n,reserva_enlaces_usado_cita_fkey=r | reserva_enlaces_clinica_id_fkey=r,reserva_enlaces_created_by_fkey=n,reserva_enlaces_medico_id_fkey=r,reserva_enlaces_revocado_por_fkey=n,reserva_enlaces_usado_cita_fkey=r | OK
+  4 | appointments: FKs y CHECK de la reserva                            | appointments_reserva_aviso_fkey=fr,appointments_reserva_check=c ,appointments_reserva_enlace_fkey=fr,appointments_reserva_reagendados_check=c                              | appointments_reserva_aviso_fkey=fr,appointments_reserva_check=c ,appointments_reserva_enlace_fkey=fr,appointments_reserva_reagendados_check=c                              | OK
+  5 | appointments: las 11 columnas reserva_*                            | 11                                                                                                                                                                         | 11                                                                                                                                                                         | OK
+  6 | índices parciales del candado y del fijo vigente                   | idx_appointments_reserva_correo,idx_appointments_reserva_enlace,idx_appointments_reserva_tel,reserva_enlaces_fijo_vigente                                                  | idx_appointments_reserva_correo,idx_appointments_reserva_enlace,idx_appointments_reserva_tel,reserva_enlaces_fijo_vigente                                                  | OK
+  7 | funciones: definer / EXECUTE anon,authenticated,service_role       | proteger_reserva_enlaces=false/true,true,true ; reserva_enlace_regenerar_fijo=false/false,true,true                                                                        | proteger_reserva_enlaces=false/true,true,true ; reserva_enlace_regenerar_fijo=false/false,true,true                                                                        | OK
+  8 | disparadores de reserva_enlaces                                    | audit_reserva_enlaces,trg_reserva_enlaces_proteger                                                                                                                         | audit_reserva_enlaces,trg_reserva_enlaces_proteger                                                                                                                         | OK
+  9 | privilegios anon / authenticated / service_role en reserva_enlaces | - / INSERT,SELECT,UPDATE / INSERT,REFERENCES,SELECT,TRIGGER,UPDATE                                                                                                         | - / INSERT,SELECT,UPDATE / INSERT,REFERENCES,SELECT,TRIGGER,UPDATE                                                                                                         | OK
+ 10 | las 5 policies de appointments, intactas                           | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                  | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                  | OK
+ 11 | censo: citas por enlace / enlaces / avisos aprobados               | 0 / 0 / 0                                                                                                                                                                  |                                                                                                                                                                            | INFO
+ 12 | fórmula de appointments_reserva_check (md5, sin «public.»)         | 12f5eb0a7cae5d1b7813634001f9c5c4                                                                                                                                           | 12f5eb0a7cae5d1b7813634001f9c5c4                                                                                                                                           | OK
+(12 rows)
+
+=== 20261114130000_agenda_d2_candado_reserva.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+REVOKE
+REVOKE
+GRANT
+psql:<stdin>:182: NOTICE:  policy "reserva_incidencias_select" for relation "public.reserva_incidencias" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:186: NOTICE:  policy "reserva_contactos_select" for relation "public.reserva_contactos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:190: NOTICE:  policy "reserva_contactos_insert" for relation "public.reserva_contactos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:194: NOTICE:  policy "reserva_contactos_update" for relation "public.reserva_contactos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+COMMENT
+COMMENT
+COMMIT
+ n |                         comprobacion                         |                                                                                                                           valor                                                                                                                           |                                                                                                                         esperado                                                                                                                          | estado 
+---+--------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | RLS incidencias / contactos                                  | true / true                                                                                                                                                                                                                                               | true / true                                                                                                                                                                                                                                               | OK
+ 2 | policies incidencias / contactos                             | SELECT / INSERT,SELECT,UPDATE                                                                                                                                                                                                                             | SELECT / INSERT,SELECT,UPDATE                                                                                                                                                                                                                             | OK
+ 3 | disparador de incidencias en appointments                    | reserva_registrar_incidencia/O                                                                                                                                                                                                                            | reserva_registrar_incidencia/O                                                                                                                                                                                                                            | OK
+ 4 | funciones: definer / EXECUTE anon,authenticated,service_role | proteger_reserva_contactos=false/true,true,true ; reserva_contacto_estado=false/false,true,true ; reserva_contacto_marcar=false/false,true,false ; reserva_contactos_bloqueados=false/false,true,false ; reserva_registrar_incidencia=true/true,true,true | proteger_reserva_contactos=false/true,true,true ; reserva_contacto_estado=false/false,true,true ; reserva_contacto_marcar=false/false,true,false ; reserva_contactos_bloqueados=false/false,true,false ; reserva_registrar_incidencia=true/true,true,true | OK
+ 5 | FKs de incidencias en RESTRICT                               | reserva_incidencias_cita_fkey=r,reserva_incidencias_clinica_fkey=r,reserva_incidencias_medico_fkey=r                                                                                                                                                      | reserva_incidencias_cita_fkey=r,reserva_incidencias_clinica_fkey=r,reserva_incidencias_medico_fkey=r                                                                                                                                                      | OK
+ 6 | las 5 policies de appointments, intactas                     | 5                                                                                                                                                                                                                                                         | 5                                                                                                                                                                                                                                                         | OK
+ 7 | censo incidencias / contactos                                | 0 / 0                                                                                                                                                                                                                                                     |                                                                                                                                                                                                                                                           | INFO
+(7 rows)
+
+=== 20261114140000_agenda_d3_reservar.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                     comprobacion                     |                                                                                                              valor                                                                                                               |                                                                                                             esperado                                                                                                             | estado 
+---+------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | reserva_verificaciones: RLS / policies               | true / 0                                                                                                                                                                                                                         | true / 0                                                                                                                                                                                                                         | OK
+ 2 | privilegios anon / authenticated / service_role      | - / - / INSERT,SELECT,UPDATE                                                                                                                                                                                                     | - / - / INSERT,SELECT,UPDATE                                                                                                                                                                                                     | OK
+ 3 | las 5 funciones: invoker y EXECUTE sólo service_role | reserva_codigo_emitir=false/false,false,true ; reserva_codigo_verificar=false/false,false,true ; reserva_contexto=false/false,false,true ; reserva_ocupacion=false/false,false,true ; reservar_por_enlace=false/false,false,true | reserva_codigo_emitir=false/false,false,true ; reserva_codigo_verificar=false/false,false,true ; reserva_contexto=false/false,false,true ; reserva_ocupacion=false/false,false,true ; reservar_por_enlace=false/false,false,true | OK
+ 4 | puerta S3 presente / service_role BYPASSRLS          | true / true                                                                                                                                                                                                                      | true / true                                                                                                                                                                                                                      | OK
+ 5 | ninguna SECURITY DEFINER escribe agenda_ajustes      | 0                                                                                                                                                                                                                                | 0                                                                                                                                                                                                                                | OK
+ 6 | las 5 policies de appointments, intactas             | 5                                                                                                                                                                                                                                | 5                                                                                                                                                                                                                                | OK
+(6 rows)
+
+=== 20261114150000_agenda_d4_gcal_por_ligar.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                             comprobacion                             |                      valor                      |                    esperado                     | estado 
+---+----------------------------------------------------------------------+-------------------------------------------------+-------------------------------------------------+--------
+ 1 | gcal_aplicar_evento: cuerpo D4 (md5) / invoker / search_path vacío   | 5ac551e4085881a13f10bf08cafa26e3 / false / true | 5ac551e4085881a13f10bf08cafa26e3 / false / true | OK
+ 2 | gcal_citas_por_evento: cuerpo D4 (md5) / invoker / search_path vacío | 66feb69a15e35a46bf9d4dad1443848d / false / true | 66feb69a15e35a46bf9d4dad1443848d / false / true | OK
+ 3 | EXECUTE sólo service_role (de 2), sin PUBLIC                         | 2                                               | 2                                               | OK
+ 4 | COMMENT del convenio en las dos funciones y en reserva_nombre        | true                                            | true                                            | OK
+ 5 | las 5 policies de appointments, intactas                             | 5                                               | 5                                               | OK
+(5 rows)
+
+=== 20261115120000_agenda_e1_confirmacion_enlace.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+psql:<stdin>:358: NOTICE:  policy "cita_confirmaciones_select" for relation "public.cita_confirmaciones" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n  |                                            comprobacion                                             |                                                                                                                                            valor                                                                                                                                            |                                                                                                                                          esperado                                                                                                                                           | estado 
+----+-----------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+  1 | cita_confirmaciones: RLS / policies                                                                 | true / SELECT                                                                                                                                                                                                                                                                               | true / SELECT                                                                                                                                                                                                                                                                               | OK
+  2 | privilegios de TABLA anon / authenticated / service_role                                            | - / - / INSERT,SELECT,UPDATE                                                                                                                                                                                                                                                                | - / - / INSERT,SELECT,UPDATE                                                                                                                                                                                                                                                                | OK
+  3 | columnas que authenticated puede leer                                                               | appointment_id,clinica_id,created_at,id,respondido_en,respuesta,revocado_en                                                                                                                                                                                                                 | appointment_id,clinica_id,created_at,id,respondido_en,respuesta,revocado_en                                                                                                                                                                                                                 | OK
+  4 | FKs (sin CASCADE) / huella de constraints e índices                                                 | cita_confirmaciones_cita_fkey=r,cita_confirmaciones_clinica_fkey=r,cita_confirmaciones_creado_por_fkey=n / 223dd96f1328cfbfe5139534d7631100                                                                                                                                                 | cita_confirmaciones_cita_fkey=r,cita_confirmaciones_clinica_fkey=r,cita_confirmaciones_creado_por_fkey=n / 223dd96f1328cfbfe5139534d7631100                                                                                                                                                 | OK
+  5 | funciones: definer / EXECUTE anon,authenticated,service_role / PUBLIC                               | cita_confirmacion_coincide=false/true,true,true/false ; cita_confirmacion_contexto=false/false,false,true/false ; cita_confirmacion_emitir=false/false,false,true/false ; cita_confirmacion_responder=false/false,false,true/false ; cita_confirmacion_revocar=false/false,false,true/false | cita_confirmacion_coincide=false/true,true,true/false ; cita_confirmacion_contexto=false/false,false,true/false ; cita_confirmacion_emitir=false/false,false,true/false ; cita_confirmacion_responder=false/false,false,true/false ; cita_confirmacion_revocar=false/false,false,true/false | OK
+  6 | log_cita_change: definer / search_path / md5 de E1 / EXECUTE PUBLIC,anon,authenticated,service_role | true / search_path="" / true / false,true,true,true                                                                                                                                                                                                                                         | true / search_path="" / true / false,true,true,true                                                                                                                                                                                                                                         | OK
+  7 | disparadores: audit_cita_confirmaciones / audit_appointments*                                       | 1 / 2                                                                                                                                                                                                                                                                                       | 1 / 2                                                                                                                                                                                                                                                                                       | OK
+  8 | las 5 policies de appointments, intactas                                                            | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                                                                                                   | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                                                                                                   | OK
+  9 | contexto / responder: md5 del cuerpo con el cierre de la suspendida (hallazgo 1)                    | cita_confirmacion_contexto=2fca66ffb8ea3b15eb7d0224c90a4f1a,cita_confirmacion_responder=7961e24a4f9f7bda0ce2df744f5b46aa                                                                                                                                                                    | cita_confirmacion_contexto=2fca66ffb8ea3b15eb7d0224c90a4f1a,cita_confirmacion_responder=7961e24a4f9f7bda0ce2df744f5b46aa                                                                                                                                                                    | OK
+ 10 | censo: enlaces / vigentes / con respuesta                                                           | 0 / 0 / 0                                                                                                                                                                                                                                                                                   |                                                                                                                                                                                                                                                                                             | INFO
+(10 rows)
+
+=== 20261115130000_agenda_e6_reagendar.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+psql:<stdin>:250: NOTICE:  policy "cita_reagendos_select" for relation "public.cita_reagendos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                                comprobacion                                 |                                                                                  valor                                                                                   |                                                                                 esperado                                                                                 | estado 
+---+-----------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | cita_reagendos: RLS / policies                                              | true / SELECT                                                                                                                                                            | true / SELECT                                                                                                                                                            | OK
+ 2 | privilegios de TABLA anon / authenticated / service_role                    | - / - / INSERT,SELECT                                                                                                                                                    | - / - / INSERT,SELECT                                                                                                                                                    | OK
+ 3 | columnas que authenticated puede leer                                       | cita_nueva_id,cita_origen_id,clinica_id,created_at,id,numero                                                                                                             | cita_nueva_id,cita_origen_id,clinica_id,created_at,id,numero                                                                                                             | OK
+ 4 | FKs (todas RESTRICT) / huella de constraints e índices                      | cita_reagendos_clinica_fkey=r,cita_reagendos_confirmacion_fkey=r,cita_reagendos_nueva_fkey=r,cita_reagendos_origen_fkey=r / 6d6680fe701e853eb3a15b04d9d9885a             | cita_reagendos_clinica_fkey=r,cita_reagendos_confirmacion_fkey=r,cita_reagendos_nueva_fkey=r,cita_reagendos_origen_fkey=r / 6d6680fe701e853eb3a15b04d9d9885a             | OK
+ 5 | funciones: definer / EXECUTE anon,authenticated,service_role / PUBLIC / md5 | cita_reagendar_oferta=false/false,false,true/false/4bcf4c7ef84526c6b2ecefecade8a18f ; reagendar_por_enlace=false/false,false,true/false/a05266ad00e3ecc1cdcdcd3d5600b533 | cita_reagendar_oferta=false/false,false,true/false/4bcf4c7ef84526c6b2ecefecade8a18f ; reagendar_por_enlace=false/false,false,true/false/a05266ad00e3ecc1cdcdcd3d5600b533 | OK
+ 6 | disparador audit_cita_reagendos / las 5 policies de appointments, intactas  | 1 / appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                            | 1 / appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                            | OK
+ 7 | censo: reagendados                                                          | 0                                                                                                                                                                        |                                                                                                                                                                          | INFO
+(7 rows)
+
+=== 20261115140000_agenda_e4_correos_cita.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+psql:<stdin>:260: NOTICE:  policy "cita_correos_select" for relation "public.cita_correos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                             comprobacion                              |                                                                          valor                                                                          |                                                                        esperado                                                                         | estado 
+---+-----------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | cita_correos: RLS / policies                                          | true / SELECT                                                                                                                                           | true / SELECT                                                                                                                                           | OK
+ 2 | privilegios de TABLA anon / authenticated / service_role              | - / - / INSERT,SELECT,UPDATE                                                                                                                            | - / - / INSERT,SELECT,UPDATE                                                                                                                            | OK
+ 3 | columnas que authenticated puede leer                                 | appointment_id,clinica_id,enviado_en,estado,id,inicio_cita,tipo                                                                                         | appointment_id,clinica_id,enviado_en,estado,id,inicio_cita,tipo                                                                                         | OK
+ 4 | FKs (sin CASCADE) / huella de constraints e índices                   | cita_correos_cita_fkey=r,cita_correos_clinica_fkey=r / 93981fdfca374c88486803d4cea04db2                                                                 | cita_correos_cita_fkey=r,cita_correos_clinica_fkey=r / 93981fdfca374c88486803d4cea04db2                                                                 | OK
+ 5 | funciones: definer / EXECUTE anon,authenticated,service_role / PUBLIC | cita_correo_marcar=false/false,false,true/false ; cita_correo_tomar=false/false,false,true/false ; cita_correos_pendientes=false/false,false,true/false | cita_correo_marcar=false/false,false,true/false ; cita_correo_tomar=false/false,false,true/false ; cita_correos_pendientes=false/false,false,true/false | OK
+ 6 | disparador de auditoría / índice de appointments que usa el listado   | 1 / true                                                                                                                                                | 1 / true                                                                                                                                                | OK
+ 7 | ninguna SECURITY DEFINER escribe agenda_ajustes                       | 0                                                                                                                                                       | 0                                                                                                                                                       | OK
+ 8 | las 5 policies de appointments, intactas                              | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                               | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                               | OK
+ 9 | censo: envíos por estado                                              | -                                                                                                                                                       |                                                                                                                                                         | INFO
+(9 rows)
+
+=== 20261115160000_agenda_e9_rsvp_google.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                                 comprobacion                                 |                                                   valor                                                   |                                                 esperado                                                  | estado 
+---+------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+--------
+ 1 | cita_rsvp_google: definer / EXECUTE anon,authenticated,service_role / PUBLIC | false/false,false,true/false                                                                              | false/false,false,true/false                                                                              | OK
+ 2 | search_path de la función                                                    | search_path=""                                                                                            | search_path=""                                                                                            | OK
+ 3 | log_cita_change con google_rsvp                                              | true                                                                                                      | true                                                                                                      | OK
+ 4 | las 5 policies de appointments, intactas                                     | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update | OK
+ 5 | ninguna SECURITY DEFINER escribe agenda_ajustes                              | 0                                                                                                         | 0                                                                                                         | OK
+(5 rows)
+
+=== 20261116120000_agenda_d11_sync_antes_de_reservar.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+psql:<stdin>:200: NOTICE:  policy "reserva_empalmes_google_select" for relation "public.reserva_empalmes_google" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMIT
+ n |                   comprobacion                    |                 valor                  |                esperado                | estado 
+---+---------------------------------------------------+----------------------------------------+----------------------------------------+--------
+ 1 | reserva_empalmes_google existe / RLS activa       | sí / true                              | sí / true                              | OK
+ 2 | privilegios anon / authenticated / service_role   | - / SELECT / INSERT,SELECT             | - / SELECT / INSERT,SELECT             | OK
+ 3 | policies (sólo la de SELECT)                      | reserva_empalmes_google_select:SELECT  | reserva_empalmes_google_select:SELECT  | OK
+ 4 | FK a clinicas es RESTRICT                         | r                                      | r                                      | OK
+ 5 | funciones INVOKER con search_path vacío (de 2)    | 2                                      | 2                                      | OK
+ 6 | EXECUTE sólo service_role (de 2)                  | 2                                      | 2                                      | OK
+ 7 | UNIQUE del par (lo usa ON CONFLICT ON CONSTRAINT) | UNIQUE (cita_reserva_id, cita_otra_id) | UNIQUE (cita_reserva_id, cita_otra_id) | OK
+(7 rows)
+
+=== 20261117120000_agenda_seg_borrado_cita.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+COMMENT
+COMMIT
+ n |                      comprobacion                       |                                                                    valor                                                                    |                                                                  esperado                                                                   | estado 
+---+---------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | disparador BEFORE DELETE en appointments                | CREATE TRIGGER trg_appointments_proteger_borrado BEFORE DELETE ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_borrado() | CREATE TRIGGER trg_appointments_proteger_borrado BEFORE DELETE ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_borrado() | OK
+ 2 | función INVOKER con search_path vacío                   | true / true                                                                                                                                 | true / true                                                                                                                                 | OK
+ 3 | EXECUTE anon,authenticated,service_role / PUBLIC        | true,true,true / false                                                                                                                      | true,true,true / false                                                                                                                      | OK
+ 4 | la función no nombra appointments (sin autorreferencia) | true                                                                                                                                        | true                                                                                                                                        | OK
+ 5 | las 5 policies de appointments, intactas                | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                   | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                   | OK
+(5 rows)
+
+=== 20261117121000_agenda_seg_columnas_reserva.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+COMMENT
+COMMIT
+ n |                    comprobacion                    |                                                                                                   valor                                                                                                    |                                                                                                  esperado                                                                                                  | estado 
+---+----------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | disparador BEFORE INSERT OR UPDATE en appointments | CREATE TRIGGER trg_appointments_proteger_reserva BEFORE INSERT OR UPDATE ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_reserva()                                                      | CREATE TRIGGER trg_appointments_proteger_reserva BEFORE INSERT OR UPDATE ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_reserva()                                                      | OK
+ 2 | función INVOKER con search_path vacío              | true / true                                                                                                                                                                                                | true / true                                                                                                                                                                                                | OK
+ 3 | EXECUTE anon,authenticated,service_role / PUBLIC   | true,true,true / false                                                                                                                                                                                     | true,true,true / false                                                                                                                                                                                     | OK
+ 4 | columnas reserva_* que cubre (desde el catálogo)   | reserva_aceptado_en,reserva_aviso_version,reserva_canal,reserva_correo,reserva_correo_hmac,reserva_enlace_id,reserva_historial_previo,reserva_nombre,reserva_reagendados,reserva_tel_hmac,reserva_telefono | reserva_aceptado_en,reserva_aviso_version,reserva_canal,reserva_correo,reserva_correo_hmac,reserva_enlace_id,reserva_historial_previo,reserva_nombre,reserva_reagendados,reserva_tel_hmac,reserva_telefono | OK
+ 5 | las 5 policies de appointments, intactas           | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                  | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                  | OK
+(5 rows)
+
+=== 20261117122000_agenda_seg_emision_enlaces.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMIT
+ n |                                 comprobacion                                  |                                           valor                                           |                                         esperado                                          | estado 
+---+-------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------+--------
+ 1 | proteger_reserva_enlaces: cuerpo nuevo (md5) / invoker                        | acd4128b5f25df54f6b4fd95391cf1dc / true                                                   | acd4128b5f25df54f6b4fd95391cf1dc / true                                                   | OK
+ 2 | EXECUTE de reserva_enlace_emitir: anon,authenticated,service_role / PUBLIC    | false,false,true / false                                                                  | false,false,true / false                                                                  | OK
+ 3 | reserva_enlace_emitir INVOKER con search_path vacío                           | true / true                                                                               | true / true                                                                               | OK
+ 4 | EXECUTE de proteger_reserva_enlaces: anon,authenticated,service_role / PUBLIC | true,true,true / false                                                                    | true,true,true / false                                                                    | OK
+ 5 | policies de reserva_enlaces, intactas                                         | reserva_enlaces_insert:INSERT,reserva_enlaces_select:SELECT,reserva_enlaces_update:UPDATE | reserva_enlaces_insert:INSERT,reserva_enlaces_select:SELECT,reserva_enlaces_update:UPDATE | OK
+ 6 | sin sobrecargas de reserva_enlace_emitir                                      | 1                                                                                         | 1                                                                                         | OK
+(6 rows)
+
+=== 20261117130000_agenda_seg1_candado_correo.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                                              comprobacion                                               |                                                                 valor                                                                 |                                                               esperado                                                                | estado 
+---+---------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | reserva_contacto_estado: cuerpo seg1 (md5) / invoker / search_path vacío / STABLE                       | 52ca884f922f5f518da44720f237d947 / false / true / s                                                                                   | 52ca884f922f5f518da44720f237d947 / false / true / s                                                                                   | OK
+ 2 | reserva_ocupacion: cuerpo seg1 (md5) / invoker / search_path vacío / STABLE                             | 50a89d8589d84b57de04571ee1aa3da2 / false / true / s                                                                                   | 50a89d8589d84b57de04571ee1aa3da2 / false / true / s                                                                                   | OK
+ 3 | reservar_por_enlace: cuerpo seg1 (md5) / invoker / search_path vacío / VOLATILE                         | d3ddd46b556be508622917070d798872 / false / true / v                                                                                   | d3ddd46b556be508622917070d798872 / false / true / v                                                                                   | OK
+ 4 | la garantía atómica sigue en el cuerpo: FOR UPDATE del enlace, candado 1790, READ COMMITTED             | true                                                                                                                                  | true                                                                                                                                  | OK
+ 5 | EXECUTE: estado authenticated+service_role; ocupación y reserva sólo service_role; nunca anon ni PUBLIC | reserva_contacto_estado=false,true,true,false ; reserva_ocupacion=false,false,true,false ; reservar_por_enlace=false,false,true,false | reserva_contacto_estado=false,true,true,false ; reserva_ocupacion=false,false,true,false ; reservar_por_enlace=false,false,true,false | OK
+ 6 | COMMENT de seg1 en las tres funciones y en reserva_incidencias                                          | true                                                                                                                                  | true                                                                                                                                  | OK
+(6 rows)
+
+=== 20261119120000_agenda_g2_duracion_consulta.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+ALTER TABLE
+DO
+psql:<stdin>:223: NOTICE:  constraint "tipos_cita_principal_check" of relation "tipos_cita" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:225: NOTICE:  constraint "tipos_cita_consultorio_check" of relation "tipos_cita" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+DROP INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TRIGGER
+DROP POLICY
+CREATE POLICY
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                            comprobacion                             |                                                                                                                                                                                                       valor                                                                                                                                                                                                        |                                                                                                                                                                                                      esperado                                                                                                                                                                                                      | estado 
+---+---------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | tipos_cita.consultorio_id / principal                               | consultorio_id=uuid/false/-,principal=boolean/true/false                                                                                                                                                                                                                                                                                                                                                           | consultorio_id=uuid/false/-,principal=boolean/true/false                                                                                                                                                                                                                                                                                                                                                           | OK
+ 2 | FK consultorio → consultorios RESTRICT                              | consultorios / r                                                                                                                                                                                                                                                                                                                                                                                                   | consultorios / r                                                                                                                                                                                                                                                                                                                                                                                                   | OK
+ 3 | CHECK principal / consultorio                                       | CHECK (((consultorio_id IS NULL) OR principal)) ; CHECK (((NOT principal) OR (medico_id IS NOT NULL)))                                                                                                                                                                                                                                                                                                             | CHECK (((consultorio_id IS NULL) OR principal)) ; CHECK (((NOT principal) OR (medico_id IS NOT NULL)))                                                                                                                                                                                                                                                                                                             | OK
+ 4 | índices únicos de nombre y de principal                             | tipos_cita_nombre_activo_unico: WHERE (activo AND (consultorio_id IS NULL)) ; tipos_cita_principal_unico: WHERE (activo AND principal)                                                                                                                                                                                                                                                                             | tipos_cita_nombre_activo_unico: WHERE (activo AND (consultorio_id IS NULL)) ; tipos_cita_principal_unico: WHERE (activo AND principal)                                                                                                                                                                                                                                                                             | OK
+ 5 | policies de tipos_cita (INSERT nueva; SELECT y UPDATE de B6)        | tipos_cita_insert=((clinica_id = get_clinica_id()) AND (soy_admin_de_clinica() OR ((medico_id = auth.uid()) AND (get_my_role() = 'medico'::text)))) ; tipos_cita_select=((clinica_id = get_clinica_id()) AND ((medico_id IS NULL) OR (medico_id = auth.uid()) OR soy_admin_de_clinica() OR (get_my_role() = 'secretaria'::text))) ; tipos_cita_update=(soy_admin_de_clinica() AND (clinica_id = get_clinica_id())) | tipos_cita_insert=((clinica_id = get_clinica_id()) AND (soy_admin_de_clinica() OR ((medico_id = auth.uid()) AND (get_my_role() = 'medico'::text)))) ; tipos_cita_select=((clinica_id = get_clinica_id()) AND ((medico_id IS NULL) OR (medico_id = auth.uid()) OR soy_admin_de_clinica() OR (get_my_role() = 'secretaria'::text))) ; tipos_cita_update=(soy_admin_de_clinica() AND (clinica_id = get_clinica_id())) | OK
+ 6 | disparadores de tipos_cita                                          | audit_tipos_cita→log_tabla_change,trg_tipos_cita_consultorio→validar_tipo_cita_consultorio,trg_tipos_cita_medico→validar_tipo_cita_medico,trg_tipos_cita_updated_at→update_tipos_cita_updated_at                                                                                                                                                                                                                   | audit_tipos_cita→log_tabla_change,trg_tipos_cita_consultorio→validar_tipo_cita_consultorio,trg_tipos_cita_medico→validar_tipo_cita_medico,trg_tipos_cita_updated_at→update_tipos_cita_updated_at                                                                                                                                                                                                                   | OK
+ 7 | funciones: definer / EXECUTE PUBLIC,anon,authenticated,service_role | reserva_contexto=false / false,false,false,true ; validar_tipo_cita_consultorio=false / false,true,true,true                                                                                                                                                                                                                                                                                                       | reserva_contexto=false / false,false,false,true ; validar_tipo_cita_consultorio=false / false,true,true,true                                                                                                                                                                                                                                                                                                       | OK
+ 8 | md5 de reserva_contexto (el de G2)                                  | 8d81bc662a7312256fefea8494458f4f                                                                                                                                                                                                                                                                                                                                                                                   | 8d81bc662a7312256fefea8494458f4f                                                                                                                                                                                                                                                                                                                                                                                   | OK
+ 9 | tipos principales / por consultorio / total (censo)                 | 0 / 0 / 0                                                                                                                                                                                                                                                                                                                                                                                                          |                                                                                                                                                                                                                                                                                                                                                                                                                    | INFO
+(9 rows)
+
+=== 20261119121000_agenda_g2_tipos_cita_update.sql
+BEGIN
+SET
+DO
+DROP POLICY
+CREATE POLICY
+COMMIT
+ n |                   comprobacion                   |                                                                  valor                                                                   |                                                                 esperado                                                                 | estado 
+---+--------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | tipos_cita_update: USING = WITH CHECK = la nueva | true / ((clinica_id = get_clinica_id()) AND (soy_admin_de_clinica() OR ((medico_id = auth.uid()) AND (get_my_role() = 'medico'::text)))) | true / ((clinica_id = get_clinica_id()) AND (soy_admin_de_clinica() OR ((medico_id = auth.uid()) AND (get_my_role() = 'medico'::text)))) | OK
+ 2 | policies de tipos_cita (sin DELETE)              | tipos_cita_insert:a,tipos_cita_select:r,tipos_cita_update:w                                                                              | tipos_cita_insert:a,tipos_cita_select:r,tipos_cita_update:w                                                                              | OK
+ 3 | privilegios de authenticated sobre tipos_cita    | INSERT,SELECT,UPDATE                                                                                                                     | INSERT,SELECT,UPDATE                                                                                                                     | OK
+ 4 | tipos de cita (censo)                            | 0                                                                                                                                        |                                                                                                                                          | INFO
+(4 rows)
+
+=== 20261119130000_agenda_g4_herencia_horario_consultorios.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+ALTER TABLE
+REVOKE
+COMMENT
+INSERT 0 0
+UPDATE 0
+COMMENT
+COMMIT
+ n |                                     comprobacion                                      |                                         valor                                         |                                       esperado                                        | estado 
+---+---------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------+--------
+ 1 | consultorios con horario_propio = false (deben quedar 0)                              | 0                                                                                     | 0                                                                                     | OK
+ 2 | consultorios respaldados (los que heredaron, en esta pasada o en una anterior)        | 0                                                                                     |                                                                                       | INFO
+ 3 | heredados sin editar desde la copia cuyo horario NO es el de su clínica (deben ser 0) | 0                                                                                     | 0                                                                                     | OK
+ 4 | heredados sin fila UPDATE de la copia en audit_log (deben ser 0)                      | 0                                                                                     | 0                                                                                     | OK
+ 5 | respaldo: privilegios de anon / authenticated / service_role, y RLS                   | false / false / false / true                                                          | false / false / false / true                                                          | OK
+ 6 | clinicas.horario_consulta sigue ahí (jsonb NOT NULL)                                  | jsonb / true                                                                          | jsonb / true                                                                          | OK
+ 7 | policies de consultorios, intactas                                                    | consultorios_gates_insert,consultorios_insert,consultorios_select,consultorios_update | consultorios_gates_insert,consultorios_insert,consultorios_select,consultorios_update | OK
+ 8 | COMMENT nuevo de horario_propio presente                                              | true                                                                                  | true                                                                                  | OK
+(8 rows)
+
+=== 20261119140000_agenda_g3_correo_confirmacion.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                   comprobacion                    |                                                         valor                                                          |                                                        esperado                                                        | estado 
+---+---------------------------------------------------+------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | CHECK de tipo con confirmacion                    | CHECK (((tipo IS NOT NULL) AND (tipo = ANY (ARRAY['comprobante'::text, 'recordatorio'::text, 'confirmacion'::text])))) | CHECK (((tipo IS NOT NULL) AND (tipo = ANY (ARRAY['comprobante'::text, 'recordatorio'::text, 'confirmacion'::text])))) | OK
+ 2 | cita_correo_tomar: cuerpo de esta migración (md5) | 5d0ce8dbadf8e0533893dfd4b7b3c099                                                                                       | 5d0ce8dbadf8e0533893dfd4b7b3c099                                                                                       | OK
+ 3 | cita_correo_tomar INVOKER con search_path vacío   | true / true                                                                                                            | true / true                                                                                                            | OK
+ 4 | EXECUTE anon,authenticated,service_role / PUBLIC  | false,false,true / false                                                                                               | false,false,true / false                                                                                               | OK
+ 5 | policies de cita_correos, intactas                | cita_correos_select                                                                                                    | cita_correos_select                                                                                                    | OK
+ 6 | filas por tipo fuera de la lista                  | 0                                                                                                                      | 0                                                                                                                      | OK
+(6 rows)
+
+=== 20261120120000_agenda_h2_recordatorio_interruptor.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                            comprobacion                             |                               valor                               |                             esperado                              | estado 
+---+---------------------------------------------------------------------+-------------------------------------------------------------------+-------------------------------------------------------------------+--------
+ 1 | columna recordatorio_encendido: tipo / NOT NULL / default           | boolean / true / false                                            | boolean / true / false                                            | OK
+ 2 | cita_recordatorios_pendientes: cuerpo de esta migración (md5)       | be18fa7735f7bf072bdc8178125694d0                                  | be18fa7735f7bf072bdc8178125694d0                                  | OK
+ 3 | cita_recordatorios_pendientes: INVOKER / search_path vacío / STABLE | true / true / s                                                   | true / true / s                                                   | OK
+ 4 | EXECUTE anon,authenticated,service_role / PUBLIC                    | false,false,true / false                                          | false,false,true / false                                          | OK
+ 5 | cita_correos_pendientes (E4) intacta (md5)                          | a8b08c15c9f44c50a8a2f8d4aeff08ee                                  | a8b08c15c9f44c50a8a2f8d4aeff08ee                                  | OK
+ 6 | policies de agenda_ajustes, intactas                                | agenda_ajustes_insert,agenda_ajustes_select,agenda_ajustes_update | agenda_ajustes_insert,agenda_ajustes_select,agenda_ajustes_update | OK
+ 7 | clínicas con el recordatorio encendido                              | 0                                                                 |                                                                   | INFO
+(7 rows)
+
+=== 20261120121000_agenda_h2_restablecer_configuracion.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                                   comprobacion                                   |                                                                                                                                                                                                                                valor                                                                                                                                                                                                                                 |                                                                                                                                                                                                                               esperado                                                                                                                                                                                                                               | estado 
+---+----------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | agenda_restablecer_configuracion: cuerpo de esta migración (md5)                 | 6c99e553177ba42d0f3723468b39f241                                                                                                                                                                                                                                                                                                                                                                                                                                     | 6c99e553177ba42d0f3723468b39f241                                                                                                                                                                                                                                                                                                                                                                                                                                     | OK
+ 2 | INVOKER / search_path vacío / VOLATILE                                           | true / true / v                                                                                                                                                                                                                                                                                                                                                                                                                                                      | true / true / v                                                                                                                                                                                                                                                                                                                                                                                                                                                      | OK
+ 3 | EXECUTE anon,authenticated,service_role / PUBLIC                                 | false,false,true / false                                                                                                                                                                                                                                                                                                                                                                                                                                             | false,false,true / false                                                                                                                                                                                                                                                                                                                                                                                                                                             | OK
+ 4 | policies de agenda_ajustes, consultorios, reserva_enlaces y tipos_cita, intactas | agenda_ajustes.agenda_ajustes_insert,agenda_ajustes.agenda_ajustes_select,agenda_ajustes.agenda_ajustes_update,consultorios.consultorios_gates_insert,consultorios.consultorios_insert,consultorios.consultorios_select,consultorios.consultorios_update,reserva_enlaces.reserva_enlaces_insert,reserva_enlaces.reserva_enlaces_select,reserva_enlaces.reserva_enlaces_update,tipos_cita.tipos_cita_insert,tipos_cita.tipos_cita_select,tipos_cita.tipos_cita_update | agenda_ajustes.agenda_ajustes_insert,agenda_ajustes.agenda_ajustes_select,agenda_ajustes.agenda_ajustes_update,consultorios.consultorios_gates_insert,consultorios.consultorios_insert,consultorios.consultorios_select,consultorios.consultorios_update,reserva_enlaces.reserva_enlaces_insert,reserva_enlaces.reserva_enlaces_select,reserva_enlaces.reserva_enlaces_update,tipos_cita.tipos_cita_insert,tipos_cita.tipos_cita_select,tipos_cita.tipos_cita_update | OK
+ 5 | ninguna SECURITY DEFINER nueva escribe agenda_ajustes                            | 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | 0                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | OK
+(5 rows)
+
+=== 20261120130000_agenda_h5_atendida_con_nota.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE TRIGGER
+COMMIT
+ n |                              comprobacion                               |                                                                                                                                            valor                                                                                                                                             |                                                                                                                                           esperado                                                                                                                                           | estado 
+---+-------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | disparador BEFORE UPDATE OF … OR DELETE en appointments                 | CREATE TRIGGER trg_appointments_proteger_atendida BEFORE DELETE OR UPDATE OF status, start_time, end_time, all_day ON public.appointments FOR EACH ROW WHEN ((old.status = 'attended'::text)) EXECUTE FUNCTION cita_proteger_atendida()                                                      | CREATE TRIGGER trg_appointments_proteger_atendida BEFORE DELETE OR UPDATE OF status, start_time, end_time, all_day ON public.appointments FOR EACH ROW WHEN ((old.status = 'attended'::text)) EXECUTE FUNCTION cita_proteger_atendida()                                                      | OK
+ 2 | disparador: INVOKER con search_path vacío                               | true / true                                                                                                                                                                                                                                                                                  | true / true                                                                                                                                                                                                                                                                                  | OK
+ 3 | comprobación: DEFINER, search_path vacío, boolean, dueño con BYPASSRLS  | true / true / boolean / true                                                                                                                                                                                                                                                                 | true / true / boolean / true                                                                                                                                                                                                                                                                 | OK
+ 4 | EXECUTE del disparador anon,authenticated,service_role / PUBLIC         | true,true,true / false                                                                                                                                                                                                                                                                       | true,true,true / false                                                                                                                                                                                                                                                                       | OK
+ 5 | EXECUTE de la comprobación anon,authenticated,service_role / PUBLIC     | false,true,true / false                                                                                                                                                                                                                                                                      | false,true,true / false                                                                                                                                                                                                                                                                      | OK
+ 6 | ninguna de las dos nombra appointments (sin autorreferencia)            | true (2)                                                                                                                                                                                                                                                                                     | true (2)                                                                                                                                                                                                                                                                                     | OK
+ 7 | las 5 policies de appointments y las 4 de consultas, intactas (nombres) | appointments.appointments_delete,appointments.appointments_gates_insert,appointments.appointments_insert,appointments.appointments_select,appointments.appointments_update,consultas.consultas_gates_insert,consultas.consultas_insert,consultas.consultas_select,consultas.consultas_update | appointments.appointments_delete,appointments.appointments_gates_insert,appointments.appointments_insert,appointments.appointments_select,appointments.appointments_update,consultas.consultas_gates_insert,consultas.consultas_insert,consultas.consultas_select,consultas.consultas_update | OK
+ 8 | los disparadores de seg2 siguen (borrado y reserva)                     | 2                                                                                                                                                                                                                                                                                            | 2                                                                                                                                                                                                                                                                                            | OK
+(8 rows)
+
+=== 20261121120000_agenda_i2_unico_sin_correo.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                                           comprobacion                                           |                        valor                        |                      esperado                       | estado 
+---+--------------------------------------------------------------------------------------------------+-----------------------------------------------------+-----------------------------------------------------+--------
+ 1 | reservar_por_enlace: cuerpo i2 (md5) / invoker / search_path vacío / VOLATILE                    | 600fc445419b26946166132d7caa441b / false / true / v | 600fc445419b26946166132d7caa441b / false / true / v | OK
+ 2 | la garantía atómica sigue en el cuerpo: FOR UPDATE del enlace, candado 1790, READ COMMITTED      | true                                                | true                                                | OK
+ 3 | EXECUTE anon,authenticated,service_role / PUBLIC                                                 | false,false,true / false                            | false,false,true / false                            | OK
+ 4 | COMMENT de i2 (seudónimo propio de la reserva sin correo)                                        | true                                                | true                                                | OK
+ 5 | restricciones intactas: CHECK de reserva_* (D1), incidencias (D2) y vínculo de confirmación (E1) | 3                                                   | 3                                                   | OK
+(5 rows)
+
+=== 20261121121000_agenda_i2_candado_eleccion.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                             comprobacion                             |                                                                                                                      valor                                                                                                                       |                                                                                                                     esperado                                                                                                                     | estado 
+---+----------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | disparador BEFORE UPDATE OF … en appointments, sólo citas por enlace | CREATE TRIGGER trg_appointments_proteger_eleccion BEFORE UPDATE OF medico_id, consultorio_id, start_time, end_time, all_day ON public.appointments FOR EACH ROW WHEN ((old.reserva_canal IS NOT NULL)) EXECUTE FUNCTION cita_proteger_eleccion() | CREATE TRIGGER trg_appointments_proteger_eleccion BEFORE UPDATE OF medico_id, consultorio_id, start_time, end_time, all_day ON public.appointments FOR EACH ROW WHEN ((old.reserva_canal IS NOT NULL)) EXECUTE FUNCTION cita_proteger_eleccion() | OK
+ 2 | las dos funciones: INVOKER con search_path vacío                     | cita_proteger_eleccion=true/true ; cita_reagendar_clinica=true/true                                                                                                                                                                              | cita_proteger_eleccion=true/true ; cita_reagendar_clinica=true/true                                                                                                                                                                              | OK
+ 3 | EXECUTE anon,authenticated,service_role,PUBLIC                       | cita_proteger_eleccion=true,true,true,false ; cita_reagendar_clinica=false,false,true,false                                                                                                                                                      | cita_proteger_eleccion=true,true,true,false ; cita_reagendar_clinica=false,false,true,false                                                                                                                                                      | OK
+ 4 | el disparador no nombra appointments (sin autorreferencia)           | true                                                                                                                                                                                                                                             | true                                                                                                                                                                                                                                             | OK
+ 5 | las 5 policies de appointments, intactas (nombres)                   | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                                                        | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                                                        | OK
+ 6 | los disparadores de seg2 y H5 siguen (borrado, reserva, atendida)    | 3                                                                                                                                                                                                                                                | 3                                                                                                                                                                                                                                                | OK
+(6 rows)
+
+=== 20261121130000_agenda_i3_por_asignar_google.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+DO
+ALTER TABLE
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE TRIGGER
+COMMIT
+ n |                                comprobacion                                |                                                                                    valor                                                                                     |                                                                                   esperado                                                                                   | estado 
+---+----------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | columna google_asignacion text, sin DEFAULT, admite NULL                   | text / false / true                                                                                                                                                          | text / false / true                                                                                                                                                          | OK
+ 2 | CHECK validado con su fórmula                                              | true / CHECK (((google_asignacion IS NULL) OR ((origen = 'google'::text) AND (google_asignacion = ANY (ARRAY['por_asignar'::text, 'evento'::text])))))                       | true / CHECK (((google_asignacion IS NULL) OR ((origen = 'google'::text) AND (google_asignacion = ANY (ARRAY['por_asignar'::text, 'evento'::text])))))                       | OK
+ 3 | disparador BEFORE INSERT OR UPDATE OF google_asignacion                    | CREATE TRIGGER trg_appointments_asignacion_google BEFORE INSERT OR UPDATE OF google_asignacion ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_asignacion_google() | CREATE TRIGGER trg_appointments_asignacion_google BEFORE INSERT OR UPDATE OF google_asignacion ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_asignacion_google() | OK
+ 4 | función: INVOKER, search_path vacío, no nombra tablas                      | true / true / true                                                                                                                                                           | true / true / true                                                                                                                                                           | OK
+ 5 | EXECUTE anon,authenticated,service_role / PUBLIC                           | true,true,true / false                                                                                                                                                       | true,true,true / false                                                                                                                                                       | OK
+ 6 | gcal_importar_evento sigue marcando spinus.via = google antes de su INSERT | true                                                                                                                                                                         | true                                                                                                                                                                         | OK
+ 7 | las 5 policies de appointments, intactas (nombres)                         | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                    | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                    | OK
+ 8 | los disparadores de seg2 y H5 siguen                                       | 3                                                                                                                                                                            | 3                                                                                                                                                                            | OK
+(8 rows)
+
+=== 20261121140000_agenda_i4_atendida_no_se_mueve.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                              comprobacion                               |                                                                                                                  valor                                                                                                                  |                                                                                                                esperado                                                                                                                 | estado 
+---+-------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | cita_proteger_atendida: cuerpo de esta migración (md5)                  | cfc4fcd74f849868e18f6d27ca8f2969                                                                                                                                                                                                        | cfc4fcd74f849868e18f6d27ca8f2969                                                                                                                                                                                                        | OK
+ 2 | INVOKER con search_path vacío; ya no lee agenda_ajustes ni appointments | true / true / true / true                                                                                                                                                                                                               | true / true / true / true                                                                                                                                                                                                               | OK
+ 3 | EXECUTE anon,authenticated,service_role / PUBLIC                        | true,true,true / false                                                                                                                                                                                                                  | true,true,true / false                                                                                                                                                                                                                  | OK
+ 4 | el disparador sigue igual                                               | CREATE TRIGGER trg_appointments_proteger_atendida BEFORE DELETE OR UPDATE OF status, start_time, end_time, all_day ON public.appointments FOR EACH ROW WHEN ((old.status = 'attended'::text)) EXECUTE FUNCTION cita_proteger_atendida() | CREATE TRIGGER trg_appointments_proteger_atendida BEFORE DELETE OR UPDATE OF status, start_time, end_time, all_day ON public.appointments FOR EACH ROW WHEN ((old.status = 'attended'::text)) EXECUTE FUNCTION cita_proteger_atendida() | OK
+ 5 | cita_tiene_nota_ligada sin cambio (md5)                                 | 39f40c71d0fa9287e3caa522f6fa80fe                                                                                                                                                                                                        | 39f40c71d0fa9287e3caa522f6fa80fe                                                                                                                                                                                                        | OK
+ 6 | las 5 policies de appointments, intactas (nombres)                      | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                                               | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                                                               | OK
+(6 rows)
+
+=== 20261121141000_agenda_i4_horario_revisado.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                           comprobacion                           |                                         valor                                         |                                       esperado                                        | estado 
+---+------------------------------------------------------------------+---------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------+--------
+ 1 | consultorios.horario_revisado_en: timestamptz, NULL, sin DEFAULT | timestamp with time zone / true / true                                                | timestamp with time zone / true / true                                                | OK
+ 2 | agenda_restablecer_configuracion: cuerpo de esta migración (md5) | 1c3906443dc060471fce5067344b0157                                                      | 1c3906443dc060471fce5067344b0157                                                      | OK
+ 3 | INVOKER / search_path vacío / VOLATILE                           | true / true / v                                                                       | true / true / v                                                                       | OK
+ 4 | EXECUTE anon,authenticated,service_role / PUBLIC                 | false,false,true / false                                                              | false,false,true / false                                                              | OK
+ 5 | policies de consultorios, intactas (nombres)                     | consultorios_gates_insert,consultorios_insert,consultorios_select,consultorios_update | consultorios_gates_insert,consultorios_insert,consultorios_select,consultorios_update | OK
+ 6 | la auditoría de consultorios sigue (audit_consultorios)          | 1                                                                                     | 1                                                                                     | OK
+(6 rows)
+
+=== 20261121142000_agenda_i4_cancelada_cerrada.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+DO
+CREATE INDEX
+COMMENT
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE TRIGGER
+COMMIT
+ n  |                       comprobacion                       |                                                                                           valor                                                                                           |                                                                                         esperado                                                                                          | estado 
+----+----------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+  1 | columnas nuevas: tipo, NULL, sin DEFAULT                 | cerrada_en timestamp with time zone true true, sustituida_por uuid true true                                                                                                              | cerrada_en timestamp with time zone true true, sustituida_por uuid true true                                                                                                              | OK
+  2 | FK sustituida_por → appointments(id) ON DELETE RESTRICT  | FOREIGN KEY (sustituida_por) REFERENCES appointments(id) ON DELETE RESTRICT                                                                                                               | FOREIGN KEY (sustituida_por) REFERENCES appointments(id) ON DELETE RESTRICT                                                                                                               | OK
+  3 | CHECK del cierre, validado                               | true                                                                                                                                                                                      | true                                                                                                                                                                                      | OK
+  4 | índice parcial de sustituida_por                         | CREATE INDEX idx_appointments_sustituida_por ON public.appointments USING btree (sustituida_por) WHERE (sustituida_por IS NOT NULL)                                                       | CREATE INDEX idx_appointments_sustituida_por ON public.appointments USING btree (sustituida_por) WHERE (sustituida_por IS NOT NULL)                                                       | OK
+  5 | disparador BEFORE INSERT OR UPDATE OF … en appointments  | CREATE TRIGGER trg_appointments_proteger_cierre BEFORE INSERT OR UPDATE OF status, cerrada_en, sustituida_por ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_cierre() | CREATE TRIGGER trg_appointments_proteger_cierre BEFORE INSERT OR UPDATE OF status, cerrada_en, sustituida_por ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_cierre() | OK
+  6 | función: INVOKER / search_path vacío                     | true / true                                                                                                                                                                               | true / true                                                                                                                                                                               | OK
+  7 | EXECUTE anon,authenticated,service_role / PUBLIC         | true,true,true / false                                                                                                                                                                    | true,true,true / false                                                                                                                                                                    | OK
+  8 | ninguna cita con una sola de las dos columnas del cierre | 0                                                                                                                                                                                         | 0                                                                                                                                                                                         | OK
+  9 | las 5 policies de appointments, intactas (nombres)       | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                 | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                 | OK
+ 10 | los disparadores de seg2 y H5 siguen                     | 3                                                                                                                                                                                         | 3                                                                                                                                                                                         | OK
+(10 rows)
+
+=== 20261121150000_agenda_i5_avisos_clinica.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+psql:<stdin>:254: NOTICE:  policy "avisos_clinica_select" for relation "public.avisos_clinica" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:259: NOTICE:  policy "avisos_clinica_update" for relation "public.avisos_clinica" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+INSERT 0 0
+INSERT 0 0
+COMMIT
+ n  |                                    comprobacion                                    |                                                                                          valor                                                                                           |                                                                                         esperado                                                                                         | estado 
+----+------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+  1 | correo_reserva_clinica: tipo / NOT NULL / default                                  | boolean / true / false                                                                                                                                                                   | boolean / true / false                                                                                                                                                                   | OK
+  2 | avisos_clinica existe / RLS activa                                                 | sí / true                                                                                                                                                                                | sí / true                                                                                                                                                                                | OK
+  3 | privilegios de tabla anon / authenticated / service_role                           | - / SELECT / -                                                                                                                                                                           | - / SELECT / -                                                                                                                                                                           | OK
+  4 | UPDATE de columna de authenticated                                                 | revisado_en,revisado_por                                                                                                                                                                 | revisado_en,revisado_por                                                                                                                                                                 | OK
+  5 | policies                                                                           | avisos_clinica_select:SELECT,avisos_clinica_update:UPDATE                                                                                                                                | avisos_clinica_select:SELECT,avisos_clinica_update:UPDATE                                                                                                                                | OK
+  6 | FK a clinicas RESTRICT (y ninguna otra FK)                                         | avisos_clinica_clinica_id_fkey:r                                                                                                                                                         | avisos_clinica_clinica_id_fkey:r                                                                                                                                                         | OK
+  7 | funciones nuevas: DEFINER (de 4 escritores) / INVOKER (revisar), search_path vacío | 4 / 1                                                                                                                                                                                    | 4 / 1                                                                                                                                                                                    | OK
+  8 | ninguna de las 5 con EXECUTE a PUBLIC                                              | 5                                                                                                                                                                                        | 5                                                                                                                                                                                        | OK
+  9 | disparadores nuevos                                                                | audit_avisos_clinica,trg_appointments_aviso_clinica,trg_avisos_clinica_revisar,trg_cita_confirmaciones_aviso_clinica,trg_cita_reagendos_aviso_clinica,trg_reserva_empalmes_aviso_clinica | audit_avisos_clinica,trg_appointments_aviso_clinica,trg_avisos_clinica_revisar,trg_cita_confirmaciones_aviso_clinica,trg_cita_reagendos_aviso_clinica,trg_reserva_empalmes_aviso_clinica | OK
+ 10 | policies de agenda_ajustes, intactas                                               | agenda_ajustes_insert,agenda_ajustes_select,agenda_ajustes_update                                                                                                                        | agenda_ajustes_insert,agenda_ajustes_select,agenda_ajustes_update                                                                                                                        | OK
+ 11 | avisos sin revisar (arrastre incluido)                                             | 0                                                                                                                                                                                        |                                                                                                                                                                                          | INFO
+(11 rows)
+
+=== 20261122120000_agenda_j2_unico_tope_correo.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+psql:<stdin>:191: NOTICE:  constraint "reserva_enlaces_correo_check" of relation "reserva_enlaces" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:196: NOTICE:  constraint "reserva_enlaces_intentos_check" of relation "reserva_enlaces" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+psql:<stdin>:235: NOTICE:  trigger "trg_reserva_enlaces_unico" for relation "public.reserva_enlaces" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+ n |                                                      comprobacion                                                       |                                                                                                                  valor                                                                                                                  |                                                                                                                esperado                                                                                                                 | estado 
+---+-------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | reservar_por_enlace: cuerpo j2 (md5) / invoker / search_path vacío / VOLATILE                                           | 5d8c6c55d852222bdb2f779b1f4afb76 / false / true / v                                                                                                                                                                                     | 5d8c6c55d852222bdb2f779b1f4afb76 / false / true / v                                                                                                                                                                                     | OK
+ 2 | la garantía atómica sigue en el cuerpo: FOR UPDATE del enlace, candado 1790, READ COMMITTED                             | true                                                                                                                                                                                                                                    | true                                                                                                                                                                                                                                    | OK
+ 3 | reserva_contexto: cuerpo j2 (md5) / invoker                                                                             | a39a4dadaacb1a625d966a832f67575b / false                                                                                                                                                                                                | a39a4dadaacb1a625d966a832f67575b / false                                                                                                                                                                                                | OK
+ 4 | reserva_enlace_emitir: la de 7 args, cuerpo de seg (md5 corto) / la de 9, invoker                                       | dae88a95 / false                                                                                                                                                                                                                        | dae88a95 / false                                                                                                                                                                                                                        | OK
+ 5 | EXECUTE anon,authenticated,service_role / PUBLIC: reservar, contexto, emitir (sólo service_role); disparador (los tres) | proteger_reserva_enlace_unico=true,true,true/false ; reserva_contexto=false,false,true/false ; reserva_enlace_emitir=false,false,true/false ; reserva_enlace_emitir=false,false,true/false ; reservar_por_enlace=false,false,true/false | proteger_reserva_enlace_unico=true,true,true/false ; reserva_contexto=false,false,true/false ; reserva_enlace_emitir=false,false,true/false ; reserva_enlace_emitir=false,false,true/false ; reservar_por_enlace=false,false,true/false | OK
+ 6 | columnas nuevas de reserva_enlaces (tipo / NOT NULL / DEFAULT)                                                          | agotado_en=timestamp with time zone/false/-,correo=text/false/-,correo_hmac=text/false/-,intentos=integer/true/0                                                                                                                        | agotado_en=timestamp with time zone/false/-,correo=text/false/-,correo_hmac=text/false/-,intentos=integer/true/0                                                                                                                        | OK
+ 7 | CHECK nuevos validados y disparador del único habilitado                                                                | 2 / O 23                                                                                                                                                                                                                                | 2 / O 23                                                                                                                                                                                                                                | OK
+ 8 | lo que no se toca: proteger_reserva_enlaces (md5 de 7a) y sus policies (3)                                              | acd4128b / 3                                                                                                                                                                                                                            | acd4128b / 3                                                                                                                                                                                                                            | OK
+(8 rows)
+
+=== 20261122120100_agenda_j2_unico_carrera_client_id.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n |                                              comprobacion                                              |                        valor                        |                      esperado                       | estado 
+---+--------------------------------------------------------------------------------------------------------+-----------------------------------------------------+-----------------------------------------------------+--------
+ 1 | reservar_por_enlace: cuerpo j2-b (md5) / invoker / search_path vacío / VOLATILE                        | 1a448df0732e62754fb428b1892d45e8 / false / true / v | 1a448df0732e62754fb428b1892d45e8 / false / true / v | OK
+ 2 | la garantía atómica sigue: FOR UPDATE del enlace, candado 1790, READ COMMITTED; y el bloque del INSERT | true                                                | true                                                | OK
+ 3 | EXECUTE anon / authenticated / service_role / PUBLIC                                                   | false / false / true / false                        | false / false / true / false                        | OK
+(3 rows)
+
+=== 20261122140000_agenda_j4_aviso_google_reserva.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE TRIGGER
+COMMIT
+ n  |                          comprobacion                          |                     valor                     |                   esperado                    | estado 
+----+----------------------------------------------------------------+-----------------------------------------------+-----------------------------------------------+--------
+  1 | avisos_clinica_tipo_check admite el tipo nuevo                 | true                                          | true                                          | OK
+  2 | gcal_movimientos_rechazados existe / RLS activa / sin policies | sí / true / 0                                 | sí / true / 0                                 | OK
+  3 | privilegios de tabla anon / authenticated / service_role       | - / - / INSERT,SELECT                         | - / - / INSERT,SELECT                         | OK
+  4 | FK a clinicas RESTRICT (y ninguna otra FK)                     | gcal_movimientos_rechazados_clinica_id_fkey:r | gcal_movimientos_rechazados_clinica_id_fkey:r | OK
+  5 | funciones: RPC INVOKER / disparador DEFINER, search_path vacío | true / true                                   | true / true                                   | OK
+  6 | EXECUTE de la RPC: anon / authenticated / service_role         | false / false / true                          | false / false / true                          | OK
+  7 | ninguna de las 2 con EXECUTE a PUBLIC                          | 2                                             | 2                                             | OK
+  8 | disparador nuevo                                               | trg_gcal_movimientos_aviso_clinica            | trg_gcal_movimientos_aviso_clinica            | OK
+  9 | policies de avisos_clinica, intactas                           | avisos_clinica_select,avisos_clinica_update   | avisos_clinica_select,avisos_clinica_update   | OK
+ 10 | intentos registrados                                           | 0                                             |                                               | INFO
+(10 rows)
+
+=== 20261123120000_agenda_k1_bloqueos.sql
+BEGIN
+SET
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+psql:<stdin>:294: NOTICE:  policy "agenda_bloqueos_select" for relation "public.agenda_bloqueos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:298: NOTICE:  policy "agenda_bloqueos_delete" for relation "public.agenda_bloqueos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:304: NOTICE:  policy "agenda_bloqueos_insert" for relation "public.agenda_bloqueos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:311: NOTICE:  policy "agenda_bloqueos_update" for relation "public.agenda_bloqueos" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+COMMENT
+CREATE FUNCTION
+REVOKE
+GRANT
+psql:<stdin>:355: NOTICE:  trigger "trg_agenda_bloqueos_preparar" for relation "public.agenda_bloqueos" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:<stdin>:358: NOTICE:  trigger "audit_agenda_bloqueos" for relation "public.agenda_bloqueos" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMENT
+COMMENT
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMIT
+ n  |                                                       comprobacion                                                        |                                                                                valor                                                                                |                                                                              esperado                                                                               | estado 
+----+---------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+  1 | reservar_por_enlace: cuerpo k1 (md5; con K3 ya aplicada, REVISAR es lo esperado) / invoker / search_path vacío / VOLATILE | true / false / true / v                                                                                                                                             | true / false / true / v                                                                                                                                             | OK
+  2 | reserva_ocupacion: cuerpo k1 (md5; con K3 ya aplicada, REVISAR es lo esperado) / invoker / search_path vacío / STABLE     | true / false / true / s                                                                                                                                             | true / false / true / s                                                                                                                                             | OK
+  3 | la garantía atómica sigue: FOR UPDATE del enlace, candado 1790, READ COMMITTED; bloque del INSERT                         | true                                                                                                                                                                | true                                                                                                                                                                | OK
+  4 | el orden sigue: contador del único → fuera_de_ventana → ocupado (con bloqueos) → ficha del fijo → candado de persona      | true                                                                                                                                                                | true                                                                                                                                                                | OK
+  5 | EXECUTE anon / authenticated / service_role / PUBLIC (reservar, ocupación, gcal_bloqueo_aplicar)                          | false / false / true / false | false / false / true / false | false / false / true / false                                                                          | false / false / true / false | false / false / true / false | false / false / true / false                                                                          | OK
+  6 | agenda_bloqueo_preparar: invoker / search_path vacío / sin PUBLIC / anon,authenticated,service_role                       | false / true / false / true                                                                                                                                         | false / true / false / true                                                                                                                                         | OK
+  7 | agenda_bloqueos: RLS / privilegios anon / authenticated / service_role                                                    | true / - / DELETE,SELECT / DELETE,INSERT,SELECT,UPDATE                                                                                                              | true / - / DELETE,SELECT / DELETE,INSERT,SELECT,UPDATE                                                                                                              | OK
+  8 | columnas que authenticated escribe (INSERT | UPDATE)                                                                      | clinica_id,fin,inicio,medico_id,motivo,todo_el_dia,zona | fin,inicio,motivo,todo_el_dia,zona                                                                        | clinica_id,fin,inicio,medico_id,motivo,todo_el_dia,zona | fin,inicio,motivo,todo_el_dia,zona                                                                        | OK
+  9 | policies (todas PERMISSIVE)                                                                                               | agenda_bloqueos_delete:DELETE:PERMISSIVE,agenda_bloqueos_insert:INSERT:PERMISSIVE,agenda_bloqueos_select:SELECT:PERMISSIVE,agenda_bloqueos_update:UPDATE:PERMISSIVE | agenda_bloqueos_delete:DELETE:PERMISSIVE,agenda_bloqueos_insert:INSERT:PERMISSIVE,agenda_bloqueos_select:SELECT:PERMISSIVE,agenda_bloqueos_update:UPDATE:PERMISSIVE | OK
+ 10 | FK RESTRICT (clinicas, profiles) y ninguna otra                                                                           | agenda_bloqueos_clinica_id_fkey:r,agenda_bloqueos_medico_id_fkey:r                                                                                                  | agenda_bloqueos_clinica_id_fkey:r,agenda_bloqueos_medico_id_fkey:r                                                                                                  | OK
+ 11 | disparadores de agenda_bloqueos                                                                                           | audit_agenda_bloqueos,trg_agenda_bloqueos_preparar                                                                                                                  | audit_agenda_bloqueos,trg_agenda_bloqueos_preparar                                                                                                                  | OK
+ 12 | policies de appointments, intactas (nombres)                                                                              | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                           | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                           | OK
+ 13 | clinica_no_suspendida / clinica_tiene_acceso intactas (md5)                                                               | a2dcfa8f2cfda91bc9c7a7ff7b642e1e / 2efd7734772dd4c7bea262e43a3779b5                                                                                                 | a2dcfa8f2cfda91bc9c7a7ff7b642e1e / 2efd7734772dd4c7bea262e43a3779b5                                                                                                 | OK
+(13 rows)
+
+=== 20261123130000_agenda_k2_espera_codigo.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+COMMIT
+ n  |                                             comprobacion                                             |              valor               |             esperado             | estado 
+----+------------------------------------------------------------------------------------------------------+----------------------------------+----------------------------------+--------
+  1 | rate_limit_espera: INVOKER / STABLE / search_path vacío                                              | true / true / true               | true / true / true               | OK
+  2 | EXECUTE de rate_limit_espera: anon / authenticated / service_role                                    | false / false / true             | false / false / true             | OK
+  3 | reserva_codigo_verificar: md5 de prosrc (el de esta migración)                                       | c3deded3c0d558fdc5ea6740a18964dd | c3deded3c0d558fdc5ea6740a18964dd | OK
+  4 | EXECUTE de reserva_codigo_verificar: anon / authenticated / service_role; INVOKER                    | false / false / true; true       | false / false / true; true       | OK
+  5 | ninguna de las 3 con EXECUTE a PUBLIC                                                                | 3                                | 3                                | OK
+  6 | rate_limit_intento, intacta (md5 de prosrc)                                                          | f931c333c05d036bf683759f7a0aaa32 | f931c333c05d036bf683759f7a0aaa32 | OK
+  7 | reserva_codigo_emitir: la de D3 (o ya con «no pausado» de K3, 20261123140000, en una segunda pasada) | true                             | true                             | OK
+  8 | reserva_espera_reenvio: INVOKER / STABLE / search_path vacío                                         | true / true / true               | true / true / true               | OK
+  9 | EXECUTE de reserva_espera_reenvio: anon / authenticated / service_role                               | false / false / true             | false / false / true             | OK
+ 10 | reserva_espera_reenvio: md5 de prosrc (el de esta migración)                                         | ed76045debb85b01643cb5ae78c1687d | ed76045debb85b01643cb5ae78c1687d | OK
+ 11 | rate_limit_espera: md5 de prosrc (el de esta migración)                                              | 621e753f4f6665766aba699fdb684f9d | 621e753f4f6665766aba699fdb684f9d | OK
+(11 rows)
+
+=== 20261123140000_agenda_k3_huso_clinica_pausa_enlace.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+COMMENT
+ALTER TABLE
+DO
+COMMENT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+DO
+COMMIT
+ n |                                                                                                    comprobacion                                                                                                     |                                             valor                                             |                                           esperado                                            | estado 
+---+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------+--------
+ 1 | clinicas.timezone: tipo / nulo / default                                                                                                                                                                            | text / YES / -                                                                                | text / YES / -                                                                                | OK
+ 2 | reserva_enlaces.pausado_en: tipo / nulo / default; y su CHECK                                                                                                                                                       | timestamp with time zone / YES / - / CHECK (((pausado_en IS NULL) OR (clase = 'fijo'::text))) | timestamp with time zone / YES / - / CHECK (((pausado_en IS NULL) OR (clase = 'fijo'::text))) | OK
+ 3 | public.reserva_contexto(text, text, text): cuerpo de esta (md5) con «pausado» / invoker / anon authenticated service_role PUBLIC                                                                                    | true / false / false false true false                                                         | true / false / false false true false                                                         | OK
+ 4 | public.reservar_por_enlace(uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid): cuerpo de esta (md5) con «pausado» / invoker / anon authenticated service_role PUBLIC        | true / false / false false true false                                                         | true / false / false false true false                                                         | OK
+ 5 | public.reagendar_por_enlace(text, uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid): cuerpo de esta (md5) con «pausado» / invoker / anon authenticated service_role PUBLIC | true / false / false false true false                                                         | true / false / false false true false                                                         | OK
+ 6 | public.cita_reagendar_oferta(uuid, text): cuerpo de esta (md5) con «pausado» / invoker / anon authenticated service_role PUBLIC                                                                                     | true / false / false false true false                                                         | true / false / false false true false                                                         | OK
+ 7 | public.reserva_ocupacion(uuid, uuid, timestamptz, timestamptz): cuerpo de esta (md5) con «pausado» / invoker / anon authenticated service_role PUBLIC                                                               | true / false / false false true false                                                         | true / false / false false true false                                                         | OK
+ 8 | public.reserva_codigo_emitir(uuid, uuid, text, text): cuerpo de esta (md5) con «pausado» / invoker / anon authenticated service_role PUBLIC                                                                         | true / false / false false true false                                                         | true / false / false false true false                                                         | OK
+ 9 | proteger_reserva_enlaces() intacto (md5 de prosrc)                                                                                                                                                                  | acd4128b5f25df54f6b4fd95391cf1dc                                                              | acd4128b5f25df54f6b4fd95391cf1dc                                                              | OK
+(9 rows)
+
+=== 20261124120000_agenda_l1_bloqueo_total.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+psql:<stdin>:211: NOTICE:  trigger "trg_appointments_horario_bloqueado" for relation "public.appointments" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+COMMIT
+ n |                     comprobacion                      |                                                                                           valor                                                                                           |                                                                                         esperado                                                                                          | estado 
+---+-------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | cita_proteger_bloqueo: cuerpo de esta migración (md5) | d084da26524c8edd79243c3d258c156f                                                                                                                                                          | d084da26524c8edd79243c3d258c156f                                                                                                                                                          | OK
+ 2 | INVOKER, search_path vacío, devuelve trigger          | true / true / true                                                                                                                                                                        | true / true / true                                                                                                                                                                        | OK
+ 3 | EXECUTE anon,authenticated,service_role / PUBLIC      | true,true,true / false                                                                                                                                                                    | true,true,true / false                                                                                                                                                                    | OK
+ 4 | el disparador, activo                                 | CREATE TRIGGER trg_appointments_horario_bloqueado BEFORE INSERT OR UPDATE OF start_time, end_time, medico_id ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_bloqueo() | CREATE TRIGGER trg_appointments_horario_bloqueado BEFORE INSERT OR UPDATE OF start_time, end_time, medico_id ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_bloqueo() | OK
+ 5 | las 5 policies de appointments, intactas (nombres)    | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                 | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                 | OK
+ 6 | las 4 policies de agenda_bloqueos, intactas (nombres) | agenda_bloqueos_delete,agenda_bloqueos_insert,agenda_bloqueos_select,agenda_bloqueos_update                                                                                               | agenda_bloqueos_delete,agenda_bloqueos_insert,agenda_bloqueos_select,agenda_bloqueos_update                                                                                               | OK
+(6 rows)
+
+=== 20261124130000_agenda_l2_eliminar_cancelada.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+COMMENT
+COMMIT
+ n |                            comprobacion                             |                                                                                            valor                                                                                             |                                                                                           esperado                                                                                           | estado 
+---+---------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------
+ 1 | CHECK del cierre (nuevo), validado                                  | CHECK ((((cerrada_en IS NULL) AND (sustituida_por IS NULL)) OR ((cerrada_en IS NOT NULL) AND (status = 'cancelled'::text) AND ((sustituida_por IS NULL) OR (sustituida_por <> id))))) / true | CHECK ((((cerrada_en IS NULL) AND (sustituida_por IS NULL)) OR ((cerrada_en IS NOT NULL) AND (status = 'cancelled'::text) AND ((sustituida_por IS NULL) OR (sustituida_por <> id))))) / true | OK
+ 2 | la función acepta cerrar sin sustituta (texto)                      | true                                                                                                                                                                                         | true                                                                                                                                                                                         | OK
+ 3 | función: INVOKER / search_path vacío                                | true / true                                                                                                                                                                                  | true / true                                                                                                                                                                                  | OK
+ 4 | EXECUTE anon,authenticated,service_role / PUBLIC                    | true,true,true / false                                                                                                                                                                       | true,true,true / false                                                                                                                                                                       | OK
+ 5 | el disparador del cierre, igual (BEFORE INSERT OR UPDATE OF …)      | CREATE TRIGGER trg_appointments_proteger_cierre BEFORE INSERT OR UPDATE OF status, cerrada_en, sustituida_por ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_cierre()    | CREATE TRIGGER trg_appointments_proteger_cierre BEFORE INSERT OR UPDATE OF status, cerrada_en, sustituida_por ON public.appointments FOR EACH ROW EXECUTE FUNCTION cita_proteger_cierre()    | OK
+ 6 | ninguna sustituta sin cierre; ninguna cerrada que no esté cancelada | 0                                                                                                                                                                                            | 0                                                                                                                                                                                            | OK
+ 7 | las 5 policies de appointments, intactas (nombres)                  | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                    | appointments_delete,appointments_gates_insert,appointments_insert,appointments_select,appointments_update                                                                                    | OK
+ 8 | los disparadores de seg2 (borrado, reserva) y H5 siguen             | 3                                                                                                                                                                                            | 3                                                                                                                                                                                            | OK
+(8 rows)
+
+=== 20261124160000_agenda_l5_aviso_confirmacion_paciente.sql
+BEGIN
+SET
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMENT
+CREATE TRIGGER
+COMMIT
+ n |                       comprobacion                       |                     valor                      |                    esperado                    | estado 
+---+----------------------------------------------------------+------------------------------------------------+------------------------------------------------+--------
+ 1 | avisos_clinica_tipo_check admite el tipo nuevo (7 tipos) | true / 7                                       | true / 7                                       | OK
+ 2 | función: DEFINER / search_path vacío / dueño             | true / true / postgres                         | true / true / postgres                         | OK
+ 3 | EXECUTE: PUBLIC / anon / authenticated / service_role    | false / true / true / true                     | false / true / true / true                     | OK
+ 4 | disparador nuevo (AFTER UPDATE, por fila, habilitado)    | trg_cita_confirmaciones_aviso_confirmacion / O | trg_cita_confirmaciones_aviso_confirmacion / O | OK
+ 5 | el disparador de cancelación de I5, intacto              | trg_cita_confirmaciones_aviso_clinica          | trg_cita_confirmaciones_aviso_clinica          | OK
+ 6 | policies de avisos_clinica, intactas                     | avisos_clinica_select,avisos_clinica_update    | avisos_clinica_select,avisos_clinica_update    | OK
+ 7 | policies de cita_confirmaciones, intactas                | cita_confirmaciones_select                     | cita_confirmaciones_select                     | OK
+ 8 | avisos de confirmación sin revisar                       | 0                                              |                                                | INFO
+(8 rows)
+
+=== 20261125180000_agenda_m_saludo_recordatorio.sql
+BEGIN
+SET
+DO
+CREATE FUNCTION
+COMMENT
+REVOKE
+GRANT
+DO
+ fila |                          que                          | veredicto 
+------+-------------------------------------------------------+-----------
+    1 | la función existe, STABLE, INVOKER, search_path vacío | OK
+    2 | anon y authenticated sin EXECUTE                      | OK
+    3 | service_role con EXECUTE                              | OK
+    4 | PUBLIC sin EXECUTE                                    | OK
+(4 rows)
+
+COMMIT

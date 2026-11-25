@@ -1,6 +1,7 @@
 'use client'
 
-import useSWR from 'swr'
+import { useEffect } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
 import { secureStorage } from '@/lib/secureStorage'
 import {
   CACHE_CLINICA,
@@ -8,6 +9,9 @@ import {
   CONFIG_DEDUPE_MS,
   esErrorDeSesion,
   fetcherConfig,
+  persistirConfigCifrada,
+  revalidarConfigAlMontar,
+  semillaConfig,
   type ClinicaConfig,
   type ConfigApp,
   type ErrorConfig,
@@ -22,14 +26,23 @@ export function useClinica() {
   // La clave ya no es `/api/me/clinica` sino el agregado de configuración,
   // que trae la clínica junto con consultorios, horario y médicos en una
   // sola petición. Lo que este hook devuelve no cambia (ver src/lib/configApp.ts).
+  const swr = useSWRConfig()
   const { data, error } = useSWR<ConfigApp>(
     CLAVE_CONFIG,
     fetcherConfig,
     {
       // revalidateOnFocus se hereda del <SWRConfig> de (app), ya con throttle.
       dedupingInterval: CONFIG_DEDUPE_MS,
+      // La semilla del layout no se vuelve a pedir al montar (A1.6).
+      revalidateOnMount: revalidarConfigAlMontar(swr),
     },
   )
+
+  // La semilla no pasa por el fetcher: su respaldo cifrado se escribe aquí.
+  const semilla = semillaConfig(swr)
+  useEffect(() => {
+    if (data && data === semilla) persistirConfigCifrada(data)
+  }, [data, semilla])
 
   // Fallback offline. NO se activa ante 401/403: ver `esErrorDeSesion` en
   // src/lib/configApp.ts — el cache cifrado respalda una red caída, nunca una

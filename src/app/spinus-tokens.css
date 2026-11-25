@@ -228,13 +228,21 @@
   /* ---------------------------------------------------------------------
      3. COLOR — NEUTRALES (escala única, rol fijo por token)
      --------------------------------------------------------------------- */
-  --sp-ink-900:            #14345c;  /* títulos de nivel documento (H1 de lienzo) */
-  --sp-ink-800:            #173156;  /* TÍTULO: modal, card, sección, valor de campo */
+  /* ⚠️ B1 DEL REDISEÑO: LOS NEUTROS CON PAR EN EL KIT SON ALIAS. Superficie,
+     fondo, sección, título, secundario, etiqueta y las tres líneas finas apuntan
+     a `sistema.css` (--sup, --fondo, --sup2, --tinta, --tinta2, --tinta3,
+     --borde, --linea), en claro y en oscuro. Lo no migrado se acerca así al
+     aspecto nuevo sin tocar sus archivos (PLAN §2.1.2); en B15 se borran los que
+     se queden sin consumidores. Los demás escalones (700, 600, 400…, los bordes
+     de control, la superficie hundida) siguen siendo literales a propósito:
+     `--sp-line-control` está medido a 3:1 y no tiene par en el kit. */
+  --sp-ink-900:            var(--tinta);  /* B1: alias del kit (antes #14345c) */  /* títulos de nivel documento (H1 de lienzo) */
+  --sp-ink-800:            var(--tinta);  /* B1: alias del kit (antes #173156) */  /* TÍTULO: modal, card, sección, valor de campo */
   --sp-ink-700:            #3b4a5c;  /* CUERPO: párrafos, valores, texto de nota */
   --sp-ink-600:            #4b5b6e;  /* cuerpo sobre fondo gris (chip de contexto) */
-  --sp-ink-500:            #5a6b81;  /* SECUNDARIO: subtítulos de página, botón secundario */
+  --sp-ink-500:            var(--tinta2); /* B1: alias del kit (antes #5a6b81) */  /* SECUNDARIO: subtítulos de página, botón secundario */
   --sp-ink-400:            #6b7b8f;  /* TERCIARIO: links ghost, "Cerrar", botón texto */
-  --sp-ink-350:            #8a99ac;  /* ETIQUETAS y meta: labels mayúsculas, subtítulo modal */
+  --sp-ink-350:            var(--tinta3); /* B1: alias del kit (antes #8a99ac) */  /* ETIQUETAS y meta: labels mayúsculas, subtítulo modal */
   --sp-ink-300:            #9aa7b6;  /* HINT: microcopy bajo un control */
   --sp-ink-250:            #94a3b8;  /* texto de elemento diferido (slot de voz) */
   --sp-ink-200:            #aab6c4;  /* PLACEHOLDER de input/textarea */
@@ -267,13 +275,13 @@
   --sp-line-dash:          #b9c4d2;  /* borde punteado (slot diferido, underline de link) */
   --sp-line-input:         #d5deea;  /* BORDE DE CONTROL: input, textarea, botón secundario */
   --sp-line-chip:          #d7e0ec;  /* borde de chip inactivo */
-  --sp-line-soft:          #e2e8f0;  /* borde de card interna / botón terciario */
-  --sp-line-card:          #e6ebf2;  /* BORDE DE CARD contenedora */
-  --sp-line-divider:       #eef1f6;  /* DIVISOR dentro del modal (header/footer) */
+  --sp-line-soft:          var(--borde);  /* B1: alias del kit (antes #e2e8f0) */  /* borde de card interna / botón terciario */
+  --sp-line-card:          var(--borde);  /* B1: alias del kit (antes #e6ebf2) */  /* BORDE DE CARD contenedora */
+  --sp-line-divider:       var(--linea);  /* B1: alias del kit (antes #eef1f6) */  /* DIVISOR dentro del modal (header/footer) */
   --sp-line-frame:         #dbe3ee;  /* borde del viewport/frame */
   --sp-line-capture:       color-mix(in srgb, var(--cs, #1e5fa8) 20%, #fff);  /* borde de la Card Captura (protagonista) */
 
-  --sp-surface:            #ffffff;  /* superficie de card y modal */
+  --sp-surface:            var(--sup);    /* B1: alias del kit (antes #ffffff) */  /* superficie de card y modal */
   /* EL PANEL DE UN MODAL LEGACY — translúcido y con desenfoque detrás.
      ⚠️ EXISTE PARA ESQUIVAR UN AGUJERO DE LA HOJA DE TRADUCCIÓN, y sin ese dato
      no se entiende por qué hay dos tokens de superficie de modal. Estos paneles
@@ -289,10 +297,10 @@
      el del viejo. */
   --sp-surface-glass:      rgba(255,255,255,.95);
   --sp-surface-sunken:     #fbfcfe;  /* fondo de input/textarea y card interna */
-  --sp-surface-muted:      #eef2f7;  /* fondo de sección/chip neutro/nota al pie */
+  --sp-surface-muted:      var(--sup2);   /* B1: alias del kit (antes #eef2f7) */  /* fondo de sección/chip neutro/nota al pie */
   --sp-surface-empty:      #f1f4f8;  /* fondo de ícono en estado vacío */
   --sp-surface-slot:       #f4f7fb;  /* fondo de control diferido */
-  --sp-app-bg:             #f5f8fc;  /* fondo de la aplicación */
+  --sp-app-bg:             var(--fondo);  /* B1: alias del kit (antes #f5f8fc) */  /* fondo de la aplicación */
   --sp-canvas-bg:          #e9edf3;  /* fondo del lienzo de mockups (no va a la app) */
   --sp-bezel:              #0f1e30;  /* bisel de teléfono (solo mockups) */
 
@@ -476,34 +484,38 @@
   --sp-ease-spring: cubic-bezier(.34, 1.32, .64, 1);/* aparición del check */
 }
 
-
 /* ============================================================================
    MODO OSCURO — override de TOKENS, no de clases.
    Paleta DERIVADA de las 76 reglas html.dark de ThemeProvider.tsx (Material
    Dark ya en producción). Ningún valor es inventado: cada token cita su origen.
    Va FUERA de @layer components, junto a :root: solo declara custom properties.
    Gana a :root por especificidad (0,1,1) vs (0,1,0), no por orden de fuente.
+   ⚠️ B1 DEL REDISEÑO: YA NO ES GRIS MATERIAL. Las superficies, las tintas de
+   título/secundario/etiqueta y las líneas finas apuntan al oscuro navy del kit
+   (`sistema.css`, html.dark); las demás tintas siguen en blanco con alfa, que
+   sobre navy lee igual. Los `TP:` de abajo citan el ORIGEN del rol, no el
+   valor de hoy.
    ========================================================================== */
 html.dark {
   /* — SUPERFICIES (elevación Material) — */
-  --sp-app-bg:           #121212;              /* TP:110,114 */
-  --sp-surface:          #1e1e1e;              /* TP:117  .bg-white (dp1) */
-  --sp-surface-glass:    rgba(30,30,30,.95);   /* = --sp-surface al 95 % */
-  --sp-surface-sunken:   #242424;              /* TP:118,160  input/textarea */
-  --sp-surface-muted:    #2c2c2c;              /* TP:119,169 (dp4) */
-  --sp-surface-empty:    #242424;              /* TP:118 */
-  --sp-surface-slot:     #242424;              /* TP:118 */
+  --sp-app-bg:           var(--fondo);         /* TP:110,114 */
+  --sp-surface:          var(--sup);           /* TP:117  .bg-white (dp1) */
+  --sp-surface-glass:    color-mix(in srgb, var(--sup) 95%, transparent); /* = --sp-surface al 95 % */
+  --sp-surface-sunken:   var(--sup2);          /* TP:118,160  input/textarea */
+  --sp-surface-muted:    color-mix(in srgb, var(--sup2) 92%, #fff); /* TP:119,169 (dp4) */
+  --sp-surface-empty:    var(--sup2);          /* TP:118 */
+  --sp-surface-slot:     var(--sup2);          /* TP:118 */
   --sp-backdrop:         rgba(0,0,0,.8);       /* TP:223 */
 
   /* — TINTA — el dark desplegado tiene 6 escalones; los 13 niveles colapsan
        a ellos. Las pérdidas caen en el extremo bajo (hints, placeholders). */
-  --sp-ink-900:  rgba(255,255,255,.87);        /* TP:136 */
-  --sp-ink-800:  rgba(255,255,255,.87);        /* TP:132,137 */
+  --sp-ink-900:  var(--tinta);                 /* TP:136 */
+  --sp-ink-800:  var(--tinta);                 /* TP:132,137 */
   --sp-ink-700:  rgba(255,255,255,.75);        /* TP:138,186 */
   --sp-ink-600:  rgba(255,255,255,.60);        /* TP:134,139 */
-  --sp-ink-500:  rgba(255,255,255,.50);        /* TP:140 */
-  --sp-ink-400:  rgba(255,255,255,.50);        /* TP:140 — colapso */
-  --sp-ink-350:  rgba(255,255,255,.38);        /* TP:141 */
+  --sp-ink-500:  var(--tinta2);                /* TP:140 */
+  --sp-ink-400:  var(--tinta2);                /* TP:140 — colapso */
+  --sp-ink-350:  var(--tinta3);                /* TP:141 */
   --sp-ink-300:  rgba(255,255,255,.38);        /* TP:141 — colapso */
   --sp-ink-250:  rgba(255,255,255,.38);        /* TP:141 — colapso */
   --sp-ink-200:  rgba(255,255,255,.38);        /* TP:165 placeholder */
@@ -518,9 +530,9 @@ html.dark {
      3.18 sobre la hundida, 3.07 sobre la de sección y 3.21 sobre el fondo de la
      app — el peor caso es la de sección, que es la más clara. */
   --sp-line-control: rgba(255,255,255,.35);
-  --sp-line-divider: rgba(255,255,255,.08);    /* TP:125,128 */
-  --sp-line-soft:    rgba(255,255,255,.08);    /* TP:125 */
-  --sp-line-card:    rgba(255,255,255,.12);    /* TP:124 */
+  --sp-line-divider: var(--linea);             /* TP:125,128 */
+  --sp-line-soft:    var(--linea);             /* TP:125 */
+  --sp-line-card:    var(--borde);             /* TP:124 */
   --sp-line-input:   rgba(255,255,255,.12);    /* TP:163 */
   --sp-line-chip:    rgba(255,255,255,.12);    /* TP:124 */
   --sp-line-frame:   rgba(255,255,255,.12);    /* TP:124 */
@@ -695,7 +707,6 @@ html.dark {
   --sp-shadow-frame:         0 20px 40px rgba(0,0,0,.8);/* TP:175-177 */
 }
 
-
 /* ============================================================================
    MODO OSCURO · LA MARCA — `MODO_OSCURO_APP.md` §3
    ----------------------------------------------------------------------------
@@ -818,7 +829,6 @@ html.dark {
   }
 }
 
-
 /* ============================================================================
    COMPONENTES
    ----------------------------------------------------------------------------
@@ -845,12 +855,9 @@ a { color: var(--sp-primary); text-decoration: none; }
 a:hover { color: var(--sp-primary-active); }
 */
 
-
 /* --- 2. TIPOGRAFÍA POR ROL ---------------------------------------------- */
 .sp-title-page   { font-size: var(--sp-fs-page);    font-weight: var(--sp-fw-black); line-height: var(--sp-lh-tight); letter-spacing: var(--sp-ls-tight); color: var(--sp-ink-800); margin: 0; }
 .sp-title-state  { font-size: var(--sp-fs-success); font-weight: var(--sp-fw-black); line-height: var(--sp-lh-tight); letter-spacing: var(--sp-ls-tight); color: var(--sp-ink-800); }
-.sp-title-modal  { font-size: var(--sp-fs-modal);   font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title); color: var(--sp-ink-800); }
-.sp-sub-modal    { font-size: var(--sp-fs-meta);    font-weight: var(--sp-fw-regular); line-height: var(--sp-lh-legal); color: var(--sp-ink-350); margin-top: 1px; }
 .sp-title-card   { font-size: var(--sp-fs-card);    font-weight: var(--sp-fw-black); line-height: var(--sp-lh-title); color: var(--sp-ink-800); }
 .sp-title-sec    { font-size: var(--sp-fs-body);    font-weight: var(--sp-fw-bold);  color: var(--sp-ink-800); }
 .sp-label        { font-size: var(--sp-fs-label);   font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label); color: var(--sp-ink-350); text-transform: uppercase; }
@@ -858,64 +865,54 @@ a:hover { color: var(--sp-primary-active); }
 .sp-label-eyebrow{ font-size: var(--sp-fs-label-sm);font-weight: var(--sp-fw-bold); letter-spacing: var(--sp-ls-label-w); color: var(--sp-primary-text); text-transform: uppercase; }
 .sp-body         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-snug);  color: var(--sp-ink-700); }
 .sp-note         { font-size: var(--sp-fs-body);    line-height: var(--sp-lh-note);  color: var(--sp-ink-700); }
-.sp-secondary    { font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-body);  color: var(--sp-ink-500); }
 .sp-hint         { font-size: var(--sp-fs-hint);    line-height: var(--sp-lh-body);  color: var(--sp-ink-300); }
 .sp-legal        { font-size: var(--sp-fs-legal);   line-height: var(--sp-lh-legal); color: var(--sp-ink-350); }
 
-
 /* --- 3. BOTONES --------------------------------------------------------- */
+/* ⚠️ B2 DEL REDISEÑO: RE-PIEL, NO REDISEÑO. Cambian color, radio, sombra y la
+   respuesta al toque (escala .97 en pointer-down, CALMA §2 y skill apple-design
+   §1); NO cambian alto, relleno, letra ni ANCHO DE BORDE, porque 31 archivos
+   sin migrar dependen de esas medidas. Por eso los botones de contorno conservan
+   su `border` de 1 px aunque el kit no lleve borde: pasa a ser del color del
+   relleno (`transparent`), no a desaparecer. Medido antes/después en /perfil,
+   nueva nota, dashboard, expediente y receta: ninguna caja se movió.
+   Colores del kit: primario `--accion` sin sombra (CALMA §3), secundario y
+   terciario «quietos» (`--sup2`), compacto tonal, ghost en `--tinta2`. */
 .sp-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-gap-item);
   min-height: var(--sp-tap);
   font-family: inherit; font-weight: var(--sp-fw-bold);
-  border-radius: var(--sp-r-btn); border: none; cursor: pointer;
+  border-radius: var(--r-control); border: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              box-shadow var(--sp-dur-micro) var(--sp-ease-out),
-              transform var(--sp-dur-micro) var(--sp-ease-out);
+              color var(--sp-dur-micro) var(--sp-ease-out),
+              transform var(--dur-toque) ease-out;
 }
+.sp-btn:active:not(:disabled) { transform: scale(.97); }
+.sp-btn:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
 .sp-btn--primary {
-  background: var(--sp-primary); color: #fff;
+  background: var(--accion); color: var(--sobre-accion);
   font-size: var(--sp-fs-btn-md); padding: 13px 26px;
-  box-shadow: var(--sp-shadow-btn);
+  box-shadow: none;
 }
-.sp-btn--primary:hover  { background: var(--sp-primary-hover); }
-.sp-btn--primary:active { background: var(--sp-primary-active); transform: translateY(1px); box-shadow: var(--sp-primary-shadow-press); }
-.sp-btn--primary:disabled { background: #b6c6da; box-shadow: none; cursor: not-allowed; }
+.sp-btn--primary:hover  { background: color-mix(in srgb, var(--accion) 88%, #000); }
+.sp-btn--primary:active { background: color-mix(in srgb, var(--accion) 80%, #000); }
+.sp-btn--primary:disabled { background: var(--sup2); color: var(--tinta3); box-shadow: none; cursor: not-allowed; }
 
 /* Full-width: único primario de la pantalla (captura, CTA de éxito, móvil) */
 .sp-btn--primary-block {
   width: 100%; font-size: var(--sp-fs-btn); padding: 16px;
-  border-radius: var(--sp-r-cta); box-shadow: var(--sp-shadow-btn);
+  border-radius: var(--r-control); box-shadow: none;
 }
-.sp-btn--reward { box-shadow: var(--sp-shadow-btn-lg); } /* CTA de recompensa (receta) */
+/* CTA de recompensa (receta). B2: sin sombra (CALMA §3, ningún botón lleva);
+   la clase se queda porque la usan dos archivos. */
 
 .sp-btn--secondary {
-  background: var(--sp-surface); color: var(--sp-ink-500);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
+  background: var(--sup2); color: var(--tinta);
+  border: var(--sp-bw-hair) solid transparent;
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 24px;
 }
-.sp-btn--secondary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-700); }
-
-/* Terciario: rejilla de acciones post-guardado */
-.sp-btn--tertiary {
-  background: var(--sp-surface); color: var(--sp-ink-700);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
-  font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-body-sm); padding: 13px;
-}
-/* ⚠️ EL HOVER CAMBIA FONDO Y TINTA, NO EL BORDE, y es una consecuencia de que el
-   contorno subiera a `--sp-line-control`. Antes el reposo iba en
-   `--sp-line-soft` y el hover en `--sp-line-input`, o sea que el hover era un
-   ESCALON DE BORDE; desde que el reposo usa el token de contorno de control
-   —el mas fuerte de la familia de lineas— no queda escalon por encima, y el
-   hover se habia quedado repitiendo el mismo borde: invisible.
-   Se resuelve con el mismo patron que ya usa `.sp-btn--secondary:hover`, que es
-   fondo hundido mas tinta un escalon mas oscura. Medido: la superficie da
-   ΔE2000 3.88 en claro y 4.42 en oscuro, y la tinta 10.61 y 6.34 — juntos, muy
-   por encima del ΔE 5.31 que se fijo como liston del hover del primario.
-   ⚠️ NO LE DEVUELVAS UN BORDE PROPIO sin crear antes un token para el: el unico
-   mas fuerte que `--sp-line-control` no existe, y `--sp-line-strong` es MAS
-   DEBIL (1.48:1 en claro) pese al nombre. */
-.sp-btn--tertiary:hover { background: var(--sp-surface-muted); color: var(--sp-ink-800); }
+.sp-btn--secondary:hover { background: color-mix(in srgb, var(--sup2) 92%, var(--tinta)); color: var(--tinta); }
 
 /* Compacto: acción inline dentro de una card interna ("Editar", "Regenerar") */
 /* ⚠️ LA TINTA VA EN `--sp-primary-text` Y NO EN `--sp-primary`. Éste es un botón
@@ -924,20 +921,23 @@ a:hover { color: var(--sp-primary-active); }
    oscuro las seis paletas quedaban entre 3.03 y 3.63:1 —por debajo de AA para
    texto—; con el token de tinta van de 5.73 a 6.52:1. En claro los dos tokens
    valen lo mismo, así que ahí no cambia nada. */
+/* B2: pasa a TONAL (`--tonal`/`--tonal-tinta`, CALMA §11 «botón tonal pequeño»).
+   La nota de arriba sigue valiendo en espíritu: la tinta es la del par tonal,
+   calibrada para ir sobre su fondo en claro y en oscuro. */
 .sp-btn--compact {
-  background: var(--sp-surface); color: var(--sp-primary-text);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
+  background: var(--tonal); color: var(--tonal-tinta);
+  border: var(--sp-bw-hair) solid transparent;
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-meta);
-  padding: 7px 13px; border-radius: var(--sp-r-btn-xs); min-height: 34px;
+  padding: 7px 13px; border-radius: var(--r-control); min-height: 34px;
 }
-.sp-btn--compact:hover { background: var(--sp-primary-bg); border-color: var(--sp-primary-track); }
+.sp-btn--compact:hover { background: color-mix(in srgb, var(--tonal) 88%, var(--tonal-tinta)); border-color: transparent; }
 
 /* Ghost / texto: "Cancelar", "Cerrar" — sin borde, jamás compite */
 .sp-btn--ghost {
-  background: transparent; border: none; color: var(--sp-ink-350);
+  background: transparent; border: none; color: var(--tinta2);
   font-weight: var(--sp-fw-semi); font-size: var(--sp-fs-btn-sm); padding: 13px 6px;
 }
-.sp-btn--ghost:hover { color: var(--sp-ink-500); }
+.sp-btn--ghost:hover { color: var(--tinta); }
 
 /* Link con subrayado punteado: vía alterna ("Prefiero escribirla yo") */
 .sp-link-alt {
@@ -950,21 +950,29 @@ a:hover { color: var(--sp-primary-active); }
    IZQUIERDA salvo "Siguiente" (chevron a la derecha = avance). */
 .sp-btn svg { flex: 0 0 auto; }
 
-
 /* --- 4. CHIPS ----------------------------------------------------------- */
+/* B2: re-piel (color y toque; medidas y ancho de borde intactos, ver BOTONES).
+   El borde de 1 px pasa a `--borde` del kit; el elegido, relleno `--accion`. */
 .sp-chip {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   min-height: var(--sp-tap);
   padding: 0 18px;
-  background: var(--sp-surface); border: var(--sp-bw-hair) solid var(--sp-line-chip);
-  color: var(--sp-primary-ink); font-size: var(--sp-fs-chip); font-weight: var(--sp-fw-semi);
+  background: var(--sup); border: var(--sp-bw-hair) solid var(--borde);
+  color: var(--tonal-tinta); font-size: var(--sp-fs-chip); font-weight: var(--sp-fw-semi);
   border-radius: var(--sp-r-pill); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              border-color var(--sp-dur-micro) var(--sp-ease-out);
+              border-color var(--sp-dur-micro) var(--sp-ease-out),
+              transform var(--dur-toque) ease-out;
 }
-.sp-chip:hover { border-color: var(--sp-primary-track); background: var(--sp-primary-bg-faint); }
-.sp-chip[aria-pressed="true"], .sp-chip--selected {
-  background: var(--sp-primary); border-color: var(--sp-primary); color: #fff;
+.sp-chip:active { transform: scale(.97); }
+.sp-chip:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+/* B12: el hover no toca al elegido. Con más especificidad que `--selected`, le
+   ponía el fondo tonal con la letra blanca: el chip recién pulsado (el puntero
+   sigue encima) se quedaba sin texto legible (entrevista de nueva nota). */
+.sp-chip:hover:not(.sp-chip--selected, [aria-pressed="true"]) { border-color: color-mix(in srgb, var(--accion) 30%, var(--borde)); background: var(--tonal); }
+.sp-chip[aria-pressed="true"] {
+  background: var(--accion); border-color: var(--accion); color: var(--sobre-accion);
 }
 /* Chip de medicamento: lleva ✕, padding derecho reducido para el botón */
 .sp-chip--removable { padding: 9px 12px 9px 15px; }
@@ -974,46 +982,32 @@ a:hover { color: var(--sp-primary-active); }
   padding: 10px; box-sizing: content-box;
   color: var(--sp-ink-icon); background: none; border: none; cursor: pointer;
 }
-.sp-chip__remove:hover { color: var(--sp-danger); }
+.sp-chip__remove:hover { color: var(--mal-tinta); }
 .sp-chip__remove svg { width: 14px; height: 14px; stroke-width: 2.2; }
-/* Chip neutro de contexto (edad, sexo): sin borde, fondo gris */
-.sp-chip--meta {
-  background: var(--sp-surface-muted); border: none; color: var(--sp-ink-600);
-  font-size: var(--sp-fs-body-sm); padding: 5px 12px; min-height: 0;
-}
-
 
 /* --- 5. CARDS ----------------------------------------------------------- */
+/* B2: re-piel. CALMA §3: tarjetas `--sup` SIN borde ni sombra. El borde se
+   queda con su ancho y pasa a `transparent` (medidas intactas, ver BOTONES).
+   La protagonista y el ancla conservan su contorno de acento, sin elevación. */
 .sp-card {                       /* contenedora de la página */
-  background: var(--sp-surface);
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card);
+  background: var(--sup);
+  border: var(--sp-bw-hair) solid transparent;
+  border-radius: var(--r-tarjeta);
   padding: var(--sp-pad-card);
-  box-shadow: var(--sp-shadow-flat);
+  box-shadow: none;
 }
-.sp-card--hero {                 /* protagonista: la única con elevación azul */
-  border-width: var(--sp-bw-accent); border-color: var(--sp-line-capture);
+.sp-card--hero {                 /* protagonista: contorno de acción, sin sombra */
+  border-width: var(--sp-bw-accent); border-color: color-mix(in srgb, var(--accion) 28%, var(--sup));
   padding: var(--sp-pad-card-hero);
-  box-shadow: var(--sp-shadow-raised);
+  box-shadow: none;
 }
-.sp-card--anchor {               /* Card Ancla: nota ya generada */
-  border-width: var(--sp-bw-accent); border-color: var(--sp-success-card-brd);
-  padding: var(--sp-pad-card-hero);
-  box-shadow: var(--sp-shadow-raised-ok);
-}
-.sp-card-inner {                 /* agrupa una sección DENTRO del modal */
-  background: var(--sp-surface-sunken);
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card-inner);
-  padding: var(--sp-pad-card-inner);
-}
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-card { border-radius: var(--r-tarjeta-ancha); }
 .sp-row {                        /* fila de dato editable (diagnóstico) */
   display: flex; align-items: center; justify-content: space-between;
   border: var(--sp-bw-hair) solid var(--sp-line-soft);
   border-radius: var(--sp-r-field-sm);
   padding: 12px 14px; background: var(--sp-surface);
 }
-
 
 /* --- 7. CONTENEDOR DE ÍCONO -------------------------------------------- */
 .sp-icobox {                     /* cuadrado redondeado: identidad del header */
@@ -1025,56 +1019,33 @@ a:hover { color: var(--sp-primary-active); }
   background: var(--sp-primary-bg); color: var(--sp-primary-text);
 }
 .sp-icobox--sm { width: 38px; height: 38px; }
-.sp-icobox--lg { width: 56px; height: 56px; border-radius: var(--sp-r-icon-lg); }
-.sp-icobox--success { background: var(--sp-success-bg-alt); color: var(--sp-success); }
 .sp-icobox svg { width: 22px; height: 22px; }
 .sp-icobox--sm svg { width: 19px; height: 19px; }
-.sp-icobox--lg svg { width: 28px; height: 28px; }
-
-/* Medallón de éxito: círculo relleno + anillo de halo (2 capas concéntricas) */
-.sp-medal {
-  width: 96px; height: 96px; border-radius: 50%;
-  background: var(--sp-success-bg);           /* anillo = 13px de halo */
-  display: flex; align-items: center; justify-content: center;
-}
-.sp-medal__core {
-  width: 70px; height: 70px; border-radius: 50%;
-  background: var(--sp-success);
-  display: flex; align-items: center; justify-content: center;
-  animation: sp-pop var(--sp-dur-check) var(--sp-ease-spring);
-}
-.sp-medal__core svg { width: 40px; height: 40px; stroke: #fff; stroke-width: 2.6; fill: none;
-  stroke-linecap: round; stroke-linejoin: round; }
-/* Trazo del check dibujándose */
-.sp-medal__core path { stroke-dasharray: 32; stroke-dashoffset: 32;
-  animation: sp-draw var(--sp-dur-check) var(--sp-ease-out) 120ms forwards; }
-
 
 /* --- 8. INPUTS / TEXTAREA ---------------------------------------------- */
+/* B2: re-piel al campo del kit (relleno `--sup2`, sin borde visible, foco de
+   2 px en `--enlace`). El borde de 1 px se queda, transparente, y el foco sigue
+   engordándolo a `--sp-bw-accent` como antes: las medidas no cambian. El foco
+   suma un anillo de 0,5 px para llegar a los 2 px del kit sin mover nada. */
 .sp-input, .sp-textarea {
   width: 100%; box-sizing: border-box;
-  background: var(--sp-surface-sunken);
-  border: var(--sp-bw-hair) solid var(--sp-line-control);
-  border-radius: var(--sp-r-field);
+  background: var(--sup2);
+  border: var(--sp-bw-hair) solid transparent;
+  border-radius: var(--r-control);
   padding: 11px 13px;
   font-family: inherit; font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug);
-  color: var(--sp-ink-700);
+  color: var(--tinta);
   min-height: var(--sp-tap);
   transition: border-color var(--sp-dur-micro) var(--sp-ease-out),
               box-shadow var(--sp-dur-micro) var(--sp-ease-out);
 }
-.sp-input::placeholder, .sp-textarea::placeholder { color: var(--sp-ink-200); }
+.sp-input::placeholder, .sp-textarea::placeholder { color: var(--tinta3); opacity: 1; }
 .sp-input:focus, .sp-textarea:focus {
-  outline: none; background: var(--sp-surface);
-  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
-  box-shadow: var(--sp-focus-ring);
+  outline: none; background: var(--sup2);
+  border-color: var(--enlace); border-width: var(--sp-bw-accent);
+  box-shadow: 0 0 0 .5px var(--enlace);
 }
 .sp-textarea { min-height: 88px; resize: vertical; line-height: var(--sp-lh-body); }
-.sp-textarea--capture {          /* el textarea protagonista de la captura */
-  min-height: 210px; border-radius: var(--sp-r-input);
-  padding: 16px 18px 54px;       /* 54px inferior reserva el slot de voz */
-  font-size: 15px; line-height: 1.6;
-}
 
 /* Campo de fecha nativo, y SOLO él. En Safari iOS/iPadOS el widget nativo
    impone su propio ancho y el `width: 100%` de arriba no lo baja de ahí. La
@@ -1105,41 +1076,30 @@ input[type="date"].sp-input {
   min-width: 0;
 }
 
-
 /* --- 9. BADGES --------------------------------------------------------- */
 .sp-badge {
   display: inline-flex; align-items: center; gap: var(--sp-1-5);
-  /* Mismo criterio que .sp-icobox: el FONDO queda en --sp-primary-bg y solo el
-     TEXTO usa --sp-primary-text. Marca en rol de tinta; en dark se aclara vía
-     C0. Con --sp-primary daba ≈1.9:1 sobre superficie oscura. */
-  background: var(--sp-primary-bg); color: var(--sp-primary-text);
+  /* B2: el par tonal del kit (`--tonal`/`--tonal-tinta`, CALMA §11), que ya
+     trae su oscuro y sigue la marca de la clínica. Radio 8 de etiqueta. */
+  background: var(--tonal); color: var(--tonal-tinta);
   font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
-  padding: 6px 12px; border-radius: var(--sp-r-pill); white-space: nowrap;
+  padding: 6px 12px; border-radius: 8px; white-space: nowrap;
 }
 .sp-badge svg { width: 13px; height: 13px; }
-.sp-badge--warn   { background: var(--sp-warn-bg-badge); color: var(--sp-warn); font-size: var(--sp-fs-label); padding: 6px 14px; }
-.sp-badge--inline {              /* badge DENTRO de un botón primario */
-  background: rgba(255,255,255,.24); color: #fff;
-  font-size: 12.5px; padding: 4px 11px;
-}
-.sp-badge--deferred {            /* elemento de proyecto futuro (voz) */
-  background: var(--sp-surface-muted); color: var(--sp-ink-250);
-  border: 1px dashed var(--sp-line-dash);
-  font-size: 10.5px; letter-spacing: .04em; padding: 4px 9px;
-}
-
 
 /* --- 10. BANNERS ------------------------------------------------------- */
+/* B2: semánticos del kit (`--aviso-*` ámbar, `--mal-*`, `--tonal`), borde de
+   1 px conservado en el color del fondo (medidas intactas, ver BOTONES). */
 .sp-banner {
   display: flex; align-items: center; gap: var(--sp-3);
-  border-radius: var(--sp-r-field); padding: 13px 18px;
+  border-radius: var(--r-control); padding: 13px 18px;
   font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
 }
-.sp-banner--warn   { background: var(--sp-warn-bg);   border: var(--sp-bw-hair) solid var(--sp-warn-border);   color: var(--sp-warn); }
-.sp-banner--danger { background: var(--sp-danger-bg); border: var(--sp-bw-hair) solid var(--sp-danger-border); color: var(--sp-danger-ink);
-                     align-items: flex-start; border-radius: var(--sp-r-card-inner); padding: 14px 16px;
+.sp-banner--warn   { background: var(--aviso-fondo); border: var(--sp-bw-hair) solid transparent; color: var(--aviso-tinta); }
+.sp-banner--danger { background: var(--mal-fondo); border: var(--sp-bw-hair) solid transparent; color: var(--mal-tinta);
+                     align-items: flex-start; border-radius: var(--r-control); padding: 14px 16px;
                      font-weight: var(--sp-fw-regular); font-size: var(--sp-fs-body); line-height: var(--sp-lh-snug); }
-.sp-banner--info   { background: var(--sp-primary-bg-faint); border: none; color: var(--sp-ink-500);
+.sp-banner--info   { background: var(--tonal); border: none; color: var(--tonal-tinta);
                      font-weight: var(--sp-fw-regular); font-size: var(--sp-fs-label); padding: 14px 16px; }
 .sp-banner svg { flex: 0 0 auto; }
 
@@ -1151,98 +1111,160 @@ input[type="date"].sp-input {
   padding: 11px 14px;
 }
 
-
 /* --- 11. PROGRESO SEGMENTADO (Estado 1 · entrevista) ------------------ */
-.sp-progress { display: flex; align-items: center; gap: var(--sp-3); }
-.sp-progress__label {
-  font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-bold);
-  letter-spacing: .03em; color: var(--sp-ink-350); white-space: nowrap;
-}
-.sp-progress__track { flex: 1; display: flex; gap: var(--sp-1-5); }
-.sp-progress__seg {
-  /* Enrutado por token: la mezcla contra #fff literal invertía la lectura del
-     progreso en modo oscuro. */
-  flex: 1; height: 7px; border-radius: 4px; background: var(--sp-primary-track);
-  transition: background var(--sp-dur-base) var(--sp-ease-out);
-}
-.sp-progress__seg--done { background: var(--sp-primary); }
-@media (max-width: 768px) { .sp-progress__seg { height: 6px; } .sp-progress__track { gap: 5px; } }
 
-
-/* --- 12. LISTA DE PASOS (Estado 0 · "Estructurando la nota") ---------- */
-.sp-steps { display: flex; flex-direction: column; gap: 9px; width: 100%; }
+/* --- 12. LISTA DE PASOS (Estado 0 · "Spinus está redactando tu nota") -- */
+/* Rediseño: lista quieta, sin cajas de color. Hecho = palomita `--ok-tinta`;
+   en curso = aro que gira y texto en `--tinta`; pendiente = `--tinta3`. Cada
+   paso entra por opacidad. `.sp-spinner` lo usan también los documentos: sólo
+   cambian sus colores, no su caja. */
+/* Ajuste 2: cada paso lleva su estado en un círculo de 28 (hecho: palomita en
+   `--ok-*`; en curso: aro que gira sobre `--tonal`; pendiente: punto quieto),
+   y la lista va sobre una barra fina de avance por pasos (`.nn-avance`, sólo
+   `transform: scaleX`). */
+.sp-steps { display: flex; flex-direction: column; gap: 6px; width: 100%; margin: 0; padding: 0; list-style: none; }
 .sp-step {
-  display: flex; align-items: center; gap: 11px;
-  padding: 11px 15px; border-radius: var(--sp-r-field-sm);
-  font-size: var(--sp-fs-body-sm);
+  display: flex; align-items: center; gap: 12px; min-height: 40px;
+  font-size: 15px; line-height: 20px; color: var(--tinta2);
+  animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both;
 }
-.sp-step--done    { background: var(--sp-primary-bg-faint); color: var(--sp-ink-700); }
-.sp-step--done svg { stroke: var(--sp-success); stroke-width: 2.4; width: 17px; height: 17px; fill: none; }
-.sp-step--active  { background: var(--sp-primary-bg-soft); border: var(--sp-bw-hair) solid var(--sp-primary-border);
-                    color: var(--sp-ink-800); font-weight: var(--sp-fw-semi); }
-.sp-step--pending { background: transparent; color: var(--sp-ink-200); }
-.sp-step__dot {                  /* aro del paso pendiente */
-  width: 17px; height: 17px; border-radius: 50%;
-  border: 2px solid var(--sp-line-soft); flex: 0 0 17px;
+.sp-step__i {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex: 0 0 28px; border-radius: 50%; background: var(--sup2);
 }
-.sp-spinner {                    /* aro del paso activo */
+.sp-step--done    { color: var(--tinta2); }
+.sp-step--done .sp-step__i { background: var(--ok-fondo); }
+.sp-step--done svg { stroke: var(--ok-tinta); stroke-width: 2.6; width: 16px; height: 16px; fill: none; flex: 0 0 16px; }
+.sp-step--active  { color: var(--tinta); font-weight: 600; }
+.sp-step--active .sp-step__i { background: var(--tonal); }
+.sp-step--pending { color: var(--tinta3); }
+.sp-step__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--tinta3); opacity: .5; flex: 0 0 8px;
+}
+.nn-avance { height: 4px; border-radius: var(--r-pildora); background: var(--sup2); overflow: hidden; }
+.nn-avance > span {
+  display: block; height: 100%; border-radius: inherit; background: var(--enlace);
+  transform-origin: left center;
+  transition: transform var(--dur-entra) var(--resorte-entra);
+}
+/* Marca de Spinus en la espera: un destello que «respira» por opacidad. */
+@keyframes nn-respira { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.nn-marca-viva svg { animation: nn-respira 1.8s ease-in-out infinite; }
+/* Entrevista: pasos del progreso, preguntas en bloque y opciones como chips. */
+.nn-segs { display: flex; gap: 6px; }
+.nn-segs > span { flex: 1; height: 6px; border-radius: var(--r-pildora); background: var(--sup2); position: relative; overflow: hidden; }
+.nn-segs > span::after { content: ""; position: absolute; inset: 0; background: var(--enlace); opacity: 0; transition: opacity var(--dur-entra) linear; }
+.nn-segs > span[data-hecho]::after { opacity: 1; }
+.nn-opcion {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border-radius: var(--r-pildora); border: 1.5px solid var(--borde); background: var(--sup);
+  color: var(--tinta); font: inherit; font-size: 15px; line-height: 20px; font-weight: 500;
+  cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform var(--dur-toque) ease-out;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .nn-opcion { min-height: 40px; }
+.nn-opcion:active { transform: scale(.97); }
+.nn-opcion:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.nn-opcion[aria-pressed="true"] {
+  background: var(--tonal); border-color: var(--enlace); color: var(--tonal-tinta); font-weight: 600;
+}
+.nn-opcion svg { width: 16px; height: 16px; stroke-width: 2.6; flex: none; }
+@media (hover: hover) {
+  .nn-opcion:hover:not([aria-pressed="true"]) { border-color: color-mix(in srgb, var(--enlace) 45%, var(--borde)); }
+}
+.sp-spinner {
   width: 17px; height: 17px; border-radius: 50%; flex: 0 0 17px;
-  border: 2px solid var(--sp-primary-track); border-top-color: var(--sp-primary);
+  border: 2px solid var(--sup2); border-top-color: var(--enlace);
   animation: sp-spin var(--sp-dur-spin) linear infinite;
 }
-.sp-spinner--xl { width: 86px; height: 86px; border-width: 2px; border-radius: 24px; } /* anillo del ícono */
-
-/* Tres puntos indicadores bajo la lista: onda de opacidad, no de escala */
 .sp-dots { display: flex; gap: 7px; }
 .sp-dots span {
-  width: 9px; height: 9px; border-radius: 50%; background: var(--sp-primary);
+  width: 9px; height: 9px; border-radius: 50%; background: var(--enlace);
   animation: sp-wave 1.2s var(--sp-ease-inout) infinite;
 }
 .sp-dots span:nth-child(2) { animation-delay: .16s; }
 .sp-dots span:nth-child(3) { animation-delay: .32s; }
 
+/* Entrada de cada estado del embudo y de los avisos de la nota: opacidad y
+   un desplazamiento corto, con el resorte del kit. Con movimiento reducido,
+   sólo opacidad. Sustituye a los deslizamientos y al «pop» de la medalla. */
+@keyframes sp-nota-entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sp-nota-funde { from { opacity: 0; } to { opacity: 1; } }
+.sp-nota-entra { animation: sp-nota-entra var(--dur-entra) var(--resorte-entra) both; }
+@media (prefers-reduced-motion: reduce) {
+  .sp-nota-entra, .sp-step { animation: sp-nota-funde 200ms linear both; }
+  .nn-segs > span::after, .nn-avance > span { transition: none; }
+  .nn-marca-viva svg { animation: none; }
+}
 
 /* --- 13. ZONA DE EDICIÓN ACTIVA (Estado 2 · edición) ------------------ */
+/* Campo del kit (`--sup2`, sin borde) con el foco de 2 px en `--enlace`. */
 .sp-editzone {
-  border: var(--sp-bw-accent) solid var(--sp-primary);
-  border-radius: var(--sp-r-field);
-  background: var(--sp-surface);
-  padding: 15px 16px;
-  font-size: var(--sp-fs-body-sm); line-height: var(--sp-lh-note); color: var(--sp-ink-700);
-  box-shadow: var(--sp-focus-ring);
+  border: 0; border-radius: var(--r-control, 12px);
+  background: var(--sup2);
+  padding: 14px 16px;
+  font-size: 15px; line-height: 24px; color: var(--tinta);
+  outline: 2px solid var(--enlace); outline-offset: 0; box-shadow: none;
 }
 
-
-/* --- 14. TILE DE SIGNO VITAL (card conservada) ------------------------ */
-.sp-tile {
-  border: var(--sp-bw-hair) solid var(--sp-success-border);
-  border-radius: var(--sp-r-btn); padding: 12px 14px;
+/* --- 14. SIGNOS VITALES (fila plegada + capa; SignosVitalesCard) ------- */
+/* Color del valor por semáforo, en el resumen de la fila y en los campos de la
+   capa. Dentro de `@layer components` con `!important`: así gana a la hoja
+   oscura de ThemeProvider (`html.dark input {color … !important}`, SIN capa),
+   que si no pintaría los seis valores del mismo blanco. */
+.sv-val[data-estado="normal"], .sv-val[data-estado="vacio"] { color: var(--tinta); font-weight: 600; }
+.sv-val[data-estado="vigilar"] { color: var(--aviso-tinta); font-weight: 700; }
+.sv-val[data-estado="fuera"]   { color: var(--mal-tinta); font-weight: 700; }
+/* Banda de cinco celdas (ajuste 2 de la nota: los signos se leían como texto
+   corrido). Valor grande en tabular, unidad pequeña, rótulo corto en versalitas.
+   Estado por color Y por forma: fondo tenue + punto en la celda que no va en
+   rango. En `ext`/`tel`, 3 columnas con la presión a dos (2 + 3 filas). */
+.sv-boton { border-radius: var(--r-control); }
+.sv-boton:focus-visible { outline: 3px solid var(--enlace); outline-offset: 4px; }
+.sv-banda {
+  display: grid; gap: 8px;
+  grid-template-columns: minmax(0, 1.9fr) repeat(4, minmax(0, 1fr));
 }
-.sp-tile--watch { border-color: var(--sp-warn-border); }
-.sp-tile__label {
-  display: flex; align-items: center; gap: var(--sp-1-5);
-  font-size: var(--sp-fs-tile); letter-spacing: var(--sp-ls-label-w); color: var(--sp-ink-350);
+:where([data-formato="ext"], [data-formato="tel"]) .sv-banda { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:where([data-formato="ext"], [data-formato="tel"]) .sv-celda--pa { grid-column: span 2; }
+.sv-celda {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 4px; min-width: 0;
+  min-height: 64px; padding: 9px 12px 10px; border-radius: var(--r-control);
+  background: var(--fondo);
+  transition: opacity var(--dur-toque) ease-out;
 }
-.sp-tile__label::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--sp-success-dot); }
-.sp-tile--watch .sp-tile__label::before { background: var(--sp-warn-dot); }
-.sp-tile__value { margin-top: var(--sp-2); font-size: 24px; font-weight: var(--sp-fw-black); color: var(--sp-success); }
-.sp-tile--watch .sp-tile__value { color: var(--sp-warn-strong); }
-.sp-tile__unit { font-size: var(--sp-fs-badge); font-weight: var(--sp-fw-regular); color: var(--sp-ink-350); }
-.sp-tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--sp-gap-tiles); }
-@media (max-width: 768px) {      /* móvil: strip horizontal, no rejilla */
-  .sp-tiles { display: flex; gap: var(--sp-2); overflow-x: auto; scrollbar-width: none; }
-  .sp-tiles > * { flex: 0 0 auto; padding: 7px 11px; }
-  .sp-tile__value { font-size: 16px; }
+.sv-boton:active .sv-celda { opacity: .75; }
+.sv-celda[data-estado="vigilar"] { background: var(--aviso-fondo); }
+.sv-celda[data-estado="fuera"]   { background: var(--mal-fondo); }
+.sv-celda__rot {
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .3px;
+  color: var(--tinta2); cursor: inherit; text-decoration: none;
 }
-
+.sv-celda[data-estado="vigilar"] .sv-celda__rot { color: var(--aviso-tinta); }
+.sv-celda[data-estado="fuera"] .sv-celda__rot   { color: var(--mal-tinta); }
+.sv-celda__punto { width: 7px; height: 7px; border-radius: 50%; flex: none; background: currentColor; }
+.sv-celda[data-estado="vigilar"] .sv-celda__punto { color: var(--aviso-punto); }
+.sv-celda[data-estado="fuera"] .sv-celda__punto   { color: var(--mal-tinta); }
+.sv-celda__v { display: block; min-width: 0; font-size: 21px; line-height: 26px; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-celda[data-estado="vacio"] .sv-celda__v { color: var(--tinta2); font-weight: 500; } /* --tinta3 daba 2,8:1 (auditoría H8) */
+.sv-celda__u { font-size: 12px; line-height: 16px; color: var(--tinta2); white-space: nowrap; }
+.sv-hoja .sv-in { font-size: 17px; }
+.sv-hoja .sv-in[data-estado]           { color: var(--tinta) !important; }
+.sv-hoja .sv-in[data-estado="vigilar"] { color: var(--aviso-tinta) !important; }
+.sv-hoja .sv-in[data-estado="fuera"]   { color: var(--mal-tinta) !important; }
+.sv-hoja .sv-in::placeholder { color: var(--tinta3) !important; font-weight: 400; }
+.sv-hoja .sv-in { -moz-appearance: textfield; }
+.sv-hoja .sv-in::-webkit-outer-spin-button,
+.sv-hoja .sv-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
 /* --- 15. REJILLAS ------------------------------------------------------ */
 .sp-grid-2   { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }        /* SOAP manual */
 .sp-grid-2-1 { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--sp-3-5); }    /* seguimiento */
-.sp-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }           /* éxito 2×2 */
+.sp-grid-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }            /* éxito 2×2 */
 @media (max-width: 768px) {
   .sp-grid-2, .sp-grid-2-1 { grid-template-columns: 1fr; gap: var(--sp-3); }
-  .sp-grid-actions { grid-template-columns: 1fr; gap: var(--sp-2-5); }
+  .sp-grid-actions { grid-template-columns: 1fr; gap: 8px; }
 }
 /* SOAP: entre 1024 y 1150px, lg: ya estrechó la columna a 3/5 y cada celda
    queda en ~180px — por debajo del ancho útil de un textarea. Rango real de
@@ -1250,7 +1272,6 @@ input[type="date"].sp-input {
 @media (min-width: 1024px) and (max-width: 1150px) {
   .sp-grid-2--soap { grid-template-columns: 1fr; gap: var(--sp-3); }
 }
-
 
 /* --- 16. CHECKBOX ------------------------------------------------------ */
 .sp-check { display: flex; align-items: center; gap: 11px; cursor: pointer; min-height: var(--sp-tap); }
@@ -1266,7 +1287,6 @@ input[type="date"].sp-input {
 .sp-check input:checked + .sp-check__box svg { opacity: 1; }
 .sp-check input:focus-visible + .sp-check__box { box-shadow: var(--sp-focus-ring); }
 .sp-check__label { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
-
 
 /* --- 17. SELECTOR DE TIPO DE DOCUMENTO (GUIA_FORMULARIOS_04) ------------ */
 
@@ -1285,121 +1305,9 @@ input[type="date"].sp-input {
   gap: var(--sp-gap-block);            /* 18px */
 }
 
-/* Un solo umbral: 4 columnas desde 600px de contenedor, 2 por debajo. Ocho se
-   divide en 4 y en 2, así que ninguna fila queda coja en ningún ancho. */
-.sp-doc-typecards {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-2-5);                  /* 10px */
-}
-
-/* minmax(0,1fr) y no 1fr: impide que el ancho mínimo intrínseco de la
-   etiqueta infle la pista y desborde la fila. */
-.sp-doc-typecard {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--sp-2-5);
-  min-height: 92px;                    /* 104px en 4 columnas */
-  padding: 14px 10px;
-  border-radius: var(--sp-r-card);     /* 16px */
-  background: var(--sp-surface);
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  box-shadow: var(--sp-shadow-flat);
-  color: var(--sp-ink-700);
-  font-size: 13px;                     /* 14px en 4 columnas */
-  font-weight: var(--sp-fw-semi);
-  line-height: 1.25;
-  text-align: center;
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              border-color var(--sp-dur-micro) var(--sp-ease-out);
-}
-
-/* El icono lleva el color del tipo AL 100 % EN LOS CUATRO ESTADOS. La
-   selección se comunica con peso, fondo y filete — nunca con la aparición
-   del color: si solo apareciera al seleccionar, cuando lo ves ya llegaste. */
-.sp-doc-typecard > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
-
-/* Máximo 2 líneas: la tarjeta las admite, así que «Honorarios / Cotización»
-   NO se acorta en móvil. */
-.sp-doc-typecard__label {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-
-/* @media (hover: hover): en táctil el hover se queda pegado tras el toque y
-   una tarjeta no seleccionada se leería como si lo estuviera. */
-@media (hover: hover) {
-  .sp-doc-typecard:hover {
-    background: color-mix(in srgb, var(--doc-color) 6%, var(--sp-surface));
-    border-color: color-mix(in srgb, var(--doc-color) 30%, var(--sp-surface));
-    color: var(--sp-ink-800);
-  }
-}
-
-/* Ninguna superficie del tipo es relleno sólido: máximo un lavado al 12 %
-   con filete de 1.5px. El acento del médico sí se pinta en sólido. Es lo que
-   impide confundir una tarjeta con un control de la app aunque los dos hex
-   coincidan.
-   Se mezcla contra --sp-surface y no contra #fff (spec §9): en claro es el
-   mismo #ffffff y en oscuro mezcla contra la superficie, que es lo que la
-   spec dejaba como NO DEFINIDO. */
-.sp-doc-typecard[aria-selected="true"] {
-  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
-  border: var(--sp-bw-accent) solid var(--doc-color);
-  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
-  font-weight: var(--sp-fw-bold);
-}
-
-.sp-doc-typecard:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
-}
-
-/* Línea plegada: 52px en vez de 398 en móvil (346 devueltos) y de 220 en el
-   resto. Toma el vestido del estado seleccionado. */
-.sp-doc-typecollapsed {
-  display: flex; align-items: center; gap: var(--sp-3);
-  width: 100%;
-  min-height: 52px;
-  padding: 0 14px;
-  border-radius: var(--sp-r-card);
-  background: color-mix(in srgb, var(--doc-color) 12%, var(--sp-surface));
-  border: var(--sp-bw-accent) solid var(--doc-color);
-  color: color-mix(in srgb, var(--doc-color) 40%, var(--sp-ink-700));
-  text-align: left;
-}
-.sp-doc-typecollapsed > svg { width: 22px; height: 22px; flex-shrink: 0; color: var(--doc-color); }
-.sp-doc-typecollapsed:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--doc-color) 18%, transparent);
-}
-.sp-doc-typecollapsed__eyebrow {
-  display: block;
-  font-size: var(--sp-fs-legal); font-weight: var(--sp-fw-bold);
-  letter-spacing: var(--sp-ls-label-w); text-transform: uppercase;
-  color: var(--sp-ink-350);
-}
-.sp-doc-typecollapsed__name {
-  display: block;
-  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.sp-doc-typecollapsed__cta {
-  margin-left: auto; display: flex; align-items: center; gap: var(--sp-1-5);
-  font-size: var(--sp-fs-meta); font-weight: var(--sp-fw-semi);
-  color: var(--sp-ink-500); flex-shrink: 0;
-}
-.sp-doc-typecollapsed__cta > svg { width: 18px; height: 18px; color: var(--sp-ink-icon); }
-
-@container docform (min-width: 600px) {
-  .sp-doc-typecards { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-gap-tiles); }
-  .sp-doc-typecard  { min-height: 104px; padding: 18px 12px; font-size: var(--sp-fs-body-sm); }
-  .sp-doc-typecard > svg { width: 24px; height: 24px; }
-}
-
 /* Sin soporte de consultas de contenedor (iPadOS ≤15): quedan las 2 columnas
    de la regla base. Correcto siempre, subóptimo en pantallas grandes — el
    fallback seguro, igual que en guía 03 §3.C.4. */
-
 
 /* --- 18. FORMULARIOS DE DOCUMENTO (GUIA_FORMULARIOS_01 §1 y §3) --------- */
 
@@ -1431,10 +1339,7 @@ input[type="date"].sp-input {
 @container docform (min-width: 840px) {
   .sp-doc-grid[data-cols="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-.sp-doc-span-2   { grid-column: span 2; }
 .sp-doc-span-all { grid-column: 1 / -1; }
-@container docform (max-width: 379px) { .sp-doc-span-2 { grid-column: auto; } }
-
 /* Campo: etiqueta sobre control, 6px. min-width:0 para que el campo pueda
    encogerse dentro de su pista de rejilla. */
 .sp-doc-field { display: flex; flex-direction: column; gap: var(--sp-gap-label); min-width: 0; }
@@ -1448,15 +1353,6 @@ input[type="date"].sp-input {
   border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
 }
 .sp-doc-cardbody { padding: var(--sp-pad-card); }   /* 18px 20px */
-.sp-doc-chips { display: flex; flex-wrap: wrap; gap: var(--sp-gap-item); }
-
-/* Acción de cabecera. En XS pierde el texto y queda como 44×44: el aria-label
-   viaja siempre, así que no se pierde el nombre. */
-.sp-doc-add { margin-left: auto; }
-@container docform (max-width: 379px) {
-  .sp-doc-add { width: var(--sp-tap); height: var(--sp-tap); min-height: var(--sp-tap); padding: 0; }
-  .sp-doc-add .sp-doc-long { display: none; }
-}
 
 /* Etiqueta larga del primario, que en XS no cabe */
 .sp-doc-short { display: none; }
@@ -1465,43 +1361,11 @@ input[type="date"].sp-input {
   .sp-doc-short { display: inline; }
 }
 
-/* Fila de lista. Con ≥4 filas gana un filete: por debajo, 12px de aire basta. */
-.sp-doc-listrow { display: flex; align-items: center; gap: var(--sp-2-5); }
-.sp-doc-listrow + .sp-doc-listrow { margin-top: var(--sp-3); }
-.sp-doc-list--long .sp-doc-listrow + .sp-doc-listrow {
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-  padding-top: var(--sp-3);
-}
-.sp-doc-listnum { flex: 0 0 20px; }
-
-/* Ícono-botón: 44×44 SIEMPRE, con el glifo a 18. El área táctil no se negocia
-   ni siquiera cuando el icono es pequeño (L-02 / I-01). Visible y disabled con
-   un solo ítem: ocultarlo mueve la interfaz entera al añadir el segundo. */
-.sp-doc-iconbtn {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  border: none; background: none; cursor: pointer;
-  border-radius: var(--sp-r-btn-sm);   /* 8 */
-  color: var(--sp-ink-icon);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              color var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-iconbtn:hover:not(:disabled) { color: var(--sp-danger); background: var(--sp-danger-bg); }
-.sp-doc-iconbtn:disabled { opacity: .4; cursor: not-allowed; }
-.sp-doc-iconbtn svg { width: 18px; height: 18px; }
-
-.sp-doc-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--sp-2); min-height: 96px; text-align: center;
-}
-.sp-doc-empty .sp-icobox { background: var(--sp-surface-empty); color: var(--sp-ink-150); }
-
 /* Campo señalado. Dos colores porque son dos cosas distintas: falta un
    obligatorio (warn, §3.8) o el par tipo+región está a medias (danger, §2.4).
    :focus gana por especificidad, que es lo que se quiere: al entrar a
    corregirlo, el campo se lee como activo y no como roto. */
 .sp-doc-invalid       { border-color: var(--sp-warn);   border-width: var(--sp-bw-accent); }
-.sp-doc-invalid--pair { border-color: var(--sp-danger); border-width: var(--sp-bw-accent); }
 
 /* Barra de acciones. SIN los márgenes negativos de la spec: ahí son los del
    padding de .sp-card, y esta barra es hermana de las cards, no hija — los
@@ -1642,77 +1506,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
  *   El más ancho de los cuatro pide 115 y la mitad da 159: sobran 44.
  */
 
-/* Renglón único: el reparto de siempre. */
-.sp-doc-actions--filas > .sp-btn { flex: 0 0 auto; white-space: nowrap; }
-.sp-doc-actions--filas > .sp-btn--primary { flex: 1; min-height: var(--sp-ctrl-h-desktop); }
-
-/* «Guardar como plantilla» va corto en esta barra a TODOS los anchos: con su
-   rótulo entero el renglón único pediría ≈935 y el contenedor más ancho mide
-   896. Es el único de los cuatro cuyo rótulo largo no dice nada que no diga ya
-   su icono. */
-.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__long  { display: none; }
-.sp-doc-actions--filas > .sp-tpl-guardar .sp-doc-actions__short { display: inline; }
-
-@container docform (max-width: 895px) {
-  /* Envolver, no apilar: `wrap` deja que dos quepan por renglón y que el corte
-     lo decida el ancho. El hueco entre renglones es el mismo `gap` de la barra,
-     así que no hay un número nuevo que mantener. */
-  .sp-doc-actions--filas { flex-wrap: wrap; align-items: stretch; }
-
-  /* Dos por renglón, exactos: dos veces `50% - gap/2` más el `gap` dan el 100%.
-     `min-width: 0` para que un rótulo largo no infle su mitad y empuje al otro
-     a un renglón propio. */
-  .sp-doc-actions--filas > .sp-btn {
-    flex: 1 1 calc(50% - (var(--sp-gap-item) / 2));
-    min-width: 0;
-    padding-left: 12px; padding-right: 12px;
-  }
-
-  /* Los cuatro rótulos, cortos. */
-  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__long  { display: none; }
-  .sp-doc-actions--filas > .sp-btn .sp-doc-actions__short { display: inline; }
-
-  /* ⚠️ LAS PAREJAS. El orden del marcado es el de escritorio —borrador,
-     plantilla, sin firma, firmar— y aquí se recompone: arriba lo que abre
-     camino (guardar la plantilla y firmar), abajo las dos salidas sin firma.
-     Sin esto, envolver daría [borrador|plantilla] y [sin firma|firmar], que es
-     el emparejamiento del paso anterior. */
-  .sp-doc-actions--filas > .sp-tpl-guardar      { order: 1; }
-  .sp-doc-actions--filas > .sp-doc-act-firmar   { order: 2; }
-  .sp-doc-actions--filas > .sp-doc-act-sinfirma { order: 3; }
-  .sp-doc-actions--filas > .sp-doc-act-borrador { order: 4; }
-}
-
-/* Bloque de estudio (imagenología). Contenedor PROPIO: la rejilla interior se
-   mide contra el interior del bloque, no contra el formulario. */
-.sp-doc-studyblock {
-  container-type: inline-size;
-  container-name: docstudy;
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card-inner);   /* 13 */
-  background: var(--sp-surface);
-  padding: 14px;
-}
-.sp-doc-studyblock + .sp-doc-studyblock { margin-top: var(--sp-3); }
-.sp-doc-studyblock--invalid { border-color: var(--sp-danger-border); background: var(--sp-danger-bg); }
-.sp-doc-studyhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
-.sp-doc-studychip { display: none; }
-
-/* Tres trazados, ninguno reparte medias columnas (I-02 · I-03). */
-.sp-doc-studygrid { display: grid; gap: 14px; grid-template-columns: 1fr; }
-@container docstudy (min-width: 520px) {
-  .sp-doc-studygrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sp-doc-studychip {
-    display: inline-block; max-width: 220px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-}
-@container docstudy (min-width: 760px) {
-  .sp-doc-studygrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .sp-doc-studygrid > [data-span="2"] { grid-column: span 2; }
-  .sp-doc-studygrid > [data-span="3"] { grid-column: span 3; }
-}
-
 /* Desplegable escribible — patrón de referencia del sistema (imagen §2.2).
    Portal a body y position:fixed: dentro del flujo, el menú quedaba recortado
    por el scroller de la card (L-03). */
@@ -1760,106 +1553,7 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    siendo el del formulario. */
 .sp-doc-formbody { display: flex; flex-direction: column; gap: var(--sp-gap-block); }
 
-/* ── Receta · bloque de medicamento (GUIA_FORM_RECETA §2) ────────────────
-   Como el bloque de estudio pero con radio de control (9) y SIN contenedor
-   propio: la rejilla interior es la primitiva `.sp-doc-grid[data-cols="3"]`,
-   que mide `docform`. Receta no tiene trazado de 4 —cinco campos en tres
-   columnas dan tres filas exactas—, así que un segundo contexto de medida no
-   distinguiría ningún caso. */
-.sp-doc-medblock {
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-field-sm);   /* 9 */
-  background: var(--sp-surface);
-  padding: 14px;
-}
-.sp-doc-medblock + .sp-doc-medblock { margin-top: var(--sp-3); }
-.sp-doc-medhead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
-.sp-doc-medhead > .sp-label { font-size: 11.5px; }
-.sp-doc-medhead > .sp-doc-iconbtn { margin-left: auto; }
-
-/* «Agregar medicamento» al pie de CADA bloque y no al final de la lista: con
-   tres o cuatro fármacos, un botón único obliga a bajar hasta abajo y volver a
-   subir (§2.2). */
-.sp-doc-medfoot { margin-top: 14px; }
-@container docform (max-width: 379px) {
-  .sp-doc-medfoot > .sp-btn { width: 100%; }
-}
-
-/* ── Suplementación · tarjetas (GUIA_FORM_SUPLEMENTACION §2) ─────────────
-   Columna única en los CUATRO anchos: cada tarjeta tiene alto distinto según su
-   beneficio, y en dos columnas la vecina nunca empieza donde la vista la busca
-   (§2.2). `align-items:start` para que abrir una no estire a ninguna otra. */
-.sp-doc-supgrid {
-  display: grid; grid-template-columns: 1fr;
-  gap: var(--sp-2-5); align-items: start;
-}
-.sp-doc-supcard {
-  display: flex; flex-direction: column; gap: var(--sp-2);
-  /* `relative` no es decorativo: la casilla es `sr-only`, o sea `absolute`, y
-     es el destino al que el banner de faltantes desplaza. Sin bloque contenedor
-     aquí, su rectángulo lo fija un ancestro cualquiera y el desplazamiento
-     aterriza en otro sitio. */
-  position: relative;
-  padding: 14px; cursor: pointer;
-  background: var(--sp-surface);
-  border: var(--sp-bw-hair) solid var(--sp-line-soft);
-  border-radius: var(--sp-r-card-inner);   /* 13 = --sp-r-field-sm + 4 */
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              border-color var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-supcard--on {
-  background: var(--sp-primary-bg-faint);
-  border-color: var(--sp-primary); border-width: var(--sp-bw-accent);
-}
-/* Solo la primera, y solo tras el primer intento: es la que el banner nombra. */
-.sp-doc-supcard--invalid { border-color: var(--sp-warn); border-width: var(--sp-bw-accent); }
-
-/* Cabecera: casilla + nombre + dosis de referencia. Es una etiqueta real, así
-   que el teclado la alcanza sin ARIA inventada; el resto de la tarjeta añade
-   superficie al mismo gesto. `flex-start` porque el nombre puede envolver. */
-.sp-doc-suphead { align-items: flex-start; }
-.sp-doc-suphead > .sp-check__box { margin-top: 1px; }
-.sp-doc-supname { font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-900); }
-.sp-doc-supref  { display: block; margin-top: 2px; font-size: 12.5px; color: var(--sp-ink-350); }
-
-/* El beneficio clínico es la referencia con la que el médico elige: se acota a
-   tres líneas, no se esconde (S-02). */
-.sp-doc-supbenefit { font-size: 13px; line-height: var(--sp-lh-body); color: var(--sp-ink-500); }
-.sp-doc-supbenefit--clamp {
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden;
-}
-/* Sin resetear el borde: `.sp-link-alt` vive de su subrayado punteado, que es
-   un `border-bottom`, y el preflight ya deja el botón sin borde ni fondo. */
-.sp-doc-supmore { align-self: flex-start; min-height: 32px; padding: 0; }
-
-/* Campos que aparecen al seleccionar. Dosis y marca a la par; la nota debajo. */
-.sp-doc-supfields { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); }
-@container docform (min-width: 600px) {
-  .sp-doc-supfields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .sp-doc-supfields > [data-span="2"] { grid-column: span 2; }
-}
-
-/* Notas y control: dos columnas SOLO desde 600px de contenedor (§4). El trazado
-   de `data-cols="2"` abre a 380, y ahí un textarea junto a un input miden 182px
-   cada uno. */
-.sp-doc-supnotas { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); }
-@container docform (min-width: 600px) {
-  .sp-doc-supnotas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-
 /* --- 19. PLANTILLAS DE DOCUMENTO (GUIA_FORMULARIOS_02) ------------------ */
-
-/* Fila de control del selector: select + «Gestionar». En XS el botón pasa
-   debajo a ancho completo (corrige H-03). */
-.sp-tpl-row { display: grid; grid-template-columns: 1fr auto; gap: var(--sp-gap-item); }
-@container docform (max-width: 379px) {
-  .sp-tpl-row { grid-template-columns: 1fr; gap: var(--sp-2); }
-  .sp-tpl-row > .sp-btn { width: 100%; }
-}
-/* El compacto sube a 44px: es un control de fila, no una acción inline. */
-.sp-tpl-manage { min-height: var(--sp-tap); white-space: nowrap; }
-.sp-tpl-manage svg { width: 17px; height: 17px; }
 
 /* Bloque de 44px mientras carga. Sin shimmer: por debajo de 200ms un skeleton
    parpadea más de lo que informa. */
@@ -1913,15 +1607,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
   margin-bottom: var(--sp-gap-section);
 }
-.sp-tpl-back {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  border: none; background: none; cursor: pointer;
-  border-radius: var(--sp-r-btn-sm); color: var(--sp-ink-500);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-tpl-back:hover { background: var(--sp-surface-muted); }
-.sp-tpl-back svg { width: 20px; height: 20px; }
 .sp-tpl-panelhead > .sp-badge { margin-left: auto; }
 @container docform (max-width: 379px) {
   .sp-tpl-panelhead > .sp-title-card { font-size: var(--sp-fs-vitals); }
@@ -1991,101 +1676,13 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   font-size: 11.5px; font-weight: var(--sp-fw-black);
 }
 
-
 /* --- 20. EDITOR DEL ESCRITO MÉDICO (GUIA_FORM_ESCRITO_MEDICO §2.2 y §3) -- */
 
 /* Sección propia y no un apartado de la 18: el editor es de UN formulario de
    los ocho. Los demás no tienen cuerpo de texto enriquecido y no heredan nada
    de aquí. */
 
-/* Fila del título del pie: campo + enlace de reenganche (§2.2). El enlace es
-   `flex: 0 0 auto` y el campo se queda con todo lo que sobre. */
-.sp-ed-pie { display: flex; align-items: center; gap: var(--sp-2-5); }
-.sp-ed-pie > .sp-input     { flex: 1; min-width: 0; }
-.sp-ed-pie > .sp-link-alt  { flex: 0 0 auto; }
-
 /* ── Barra de herramientas (§3.3 y §3.4) ────────────────────────────────── */
-/* `position: relative` porque es el ancla de los tres menús, que cuelgan de su
-   borde inferior. Van DENTRO de la barra y no de la card: colgados de la card
-   aparecerían al pie del área de escritura.
-   `flex-wrap: nowrap` es la regla entera: la barra nunca pasa de una fila, y
-   lo que no cabe baja al menú. El reparto lo decide el CONTENEDOR y no el
-   viewport, así que sale igual en el iPad vertical que en una ventana
-   estrecha de escritorio.
-   La card NO lleva `overflow: hidden` — recortaría los menús. */
-.sp-ed-bar {
-  position: relative;
-  display: flex; align-items: center; flex-wrap: nowrap;
-  gap: var(--sp-1-5);                        /* 6 — niveles 1 y 2 */
-  padding: 8px 12px;
-  background: var(--sp-surface-sunken);
-  border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-@container docform (min-width: 760px) {
-  .sp-ed-bar { gap: var(--sp-2); }           /* 8 — nivel 3, las nueve caben */
-}
-
-/* Objetivo de 44×44 con glifo de 18. Hoy eran 26 px reales, trece veces
-   (E-02). El área táctil no se negocia. */
-.sp-ed-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  border: none; background: none; cursor: pointer;
-  border-radius: var(--sp-r-btn-sm);         /* 8 */
-  color: var(--sp-ink-700);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out),
-              color var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-ed-btn:hover { background: var(--sp-surface-muted); }
-.sp-ed-btn svg { width: 18px; height: 18px; }
-/* Estado por FONDO y no solo por color de glifo: a 18 px la diferencia de
-   tinta sola no se lee. `aria-expanded` entra aquí para que el control que
-   tiene su menú abierto se vea encendido mientras dura. */
-.sp-ed-btn[aria-pressed="true"],
-.sp-ed-btn[aria-expanded="true"] {
-  background: var(--sp-primary-bg-faint); color: var(--sp-ink-900);
-}
-
-/* Control de bloque, nivel 1: 52×44 con el glifo del bloque actual + chevron.
-   Sustituye al `<select>` porque a 332 px de barra útil no hay sitio para los
-   128 px del desplegable. */
-.sp-ed-block { flex: 0 0 52px; width: 52px; gap: 1px; }
-.sp-ed-block > svg:last-child { width: 13px; height: 13px; color: var(--sp-ink-icon); }
-
-/* Control de bloque, niveles 2 y 3: `<select>` nativo — en el iPad abre la
-   rueda del sistema. Sube a 44 px de alto vía `.sp-input`: era el control más
-   pequeño de los ocho formularios (E-05). */
-.sp-ed-select { display: none; flex: 0 0 128px; width: 128px; }
-@container docform (min-width: 520px) {
-  .sp-ed-block  { display: none; }
-  .sp-ed-select { display: block; }
-}
-@container docform (min-width: 760px) {
-  .sp-ed-select { flex-basis: 150px; width: 150px; }
-}
-
-/* Botón del menú. Separado del grupo de formato con `margin-left: auto` para
-   no pulsarlo al ir a por las listas, y con borde para leerse como otra cosa.
-   En nivel 3 no se renderiza: las nueve están en la barra. */
-.sp-ed-more { margin-left: auto; border: var(--sp-bw-hair) solid var(--sp-line-control); }
-@container docform (min-width: 760px) { .sp-ed-more { display: none; } }
-
-/* El reparto de §3.3, en dos pares de clases:
-     .sp-ed-n2 / .sp-ed-n3 — el control EN LA BARRA desde 520 / desde 760
-     .sp-ed-m2 / .sp-ed-m3 — la fila EN EL MENÚ, hasta 520 / hasta 760
-   Cada control se escribe dos veces en el árbol y el contenedor apaga una. Es
-   la única forma de repartir por consulta de contenedor sin medir con JS, que
-   es justo lo que el sistema evita en todas las demás rejillas. `display:none`
-   los saca también del orden de tabulación: no hay objetivos fantasma. */
-.sp-ed-n2, .sp-ed-n3 { display: none; }
-@container docform (min-width: 520px) {
-  .sp-ed-n2 { display: inline-flex; }
-  .sp-ed-m2 { display: none; }
-}
-@container docform (min-width: 760px) {
-  .sp-ed-n3 { display: inline-flex; }
-  .sp-ed-m3 { display: none; }
-}
 
 /* ── Menús de la barra (§3.4) ───────────────────────────────────────────── */
 .sp-ed-menu {
@@ -2096,8 +1693,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   border-radius: 12px;
   box-shadow: 0 12px 28px rgba(16, 42, 73, .14);
 }
-/* El de bloque cuelga del extremo izquierdo: su control es el primero. */
-.sp-ed-menu--left { right: auto; left: 0; }
 
 /* Fila de 44 px con icono de 20 y NOMBRE ESCRITO: en un menú no hay que
    adivinar qué hace un glifo. */
@@ -2173,7 +1768,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   color: var(--sp-ink-200);
 }
 
-
 /* --- 21. HONORARIOS / COTIZACIÓN (GUIA_FORM_HONORARIOS §2, §4) ---------- */
 
 /* Los dos documentos son UN formulario con variantes declaradas, así que aquí
@@ -2207,177 +1801,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 }
 .sp-doc-segmented__opt:hover { color: var(--sp-ink-800); }
 .sp-doc-segmented__opt[aria-pressed="true"] { background: var(--sp-primary); color: #fff; }
-/* Como CAMPO (divisa) el control entero mide 44 y no 46: la altura de control
-   del sistema manda sobre los 38 px que el segmentado usa dentro de una
-   cabecera de 56. */
-.sp-doc-segmented--field .sp-doc-segmented__opt { min-height: 36px; }
-
-/* Datos de la cotización: son CUATRO campos. A 788 de contenedor, cuatro
-   columnas dejarían el folio en 165px, así que el tramo MD va a dos y la cuarta
-   abre a 840 (§0). No es `data-cols="4"`: esa primitiva abre a tres en 600. */
-.sp-doc-honodatos { display: grid; gap: var(--sp-4); grid-template-columns: 1fr; }
-@container docform (min-width: 380px) {
-  .sp-doc-honodatos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container docform (min-width: 840px) {
-  .sp-doc-honodatos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-/* Folio: lo asigna la base al insertar (§4.1), así que en pantalla no puede
-   mostrar número antes de emitir. Se lee como lo que es —un hueco reservado—,
-   no como un campo que el médico se dejó vacío. */
-.sp-doc-folio { background: var(--sp-surface-muted); color: var(--sp-ink-350); cursor: not-allowed; }
-
-/* Conmutador del seguro (§4.5). El RIEL mide 44×26 con perilla de 20, pero el
-   botón es 44×44: el piso táctil del sistema no admite excepciones (spec 01
-   §1) y un riel de 26 px de alto no es un objetivo de dedo. */
-.sp-doc-switch {
-  display: inline-flex; align-items: center; justify-content: center;
-  flex: 0 0 var(--sp-tap); width: var(--sp-tap); height: var(--sp-tap);
-  margin-left: auto; padding: 0; border: none; background: none; cursor: pointer;
-}
-.sp-doc-switch__track {
-  position: relative; width: 44px; height: 26px;
-  border-radius: var(--sp-r-pill); background: var(--sp-line-strong);
-  transition: background var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-switch[aria-checked="true"] .sp-doc-switch__track { background: var(--sp-primary); }
-.sp-doc-switch__knob {
-  position: absolute; top: 3px; left: 3px; width: 20px; height: 20px;
-  border-radius: var(--sp-r-pill); background: var(--sp-surface);
-  box-shadow: 0 1px 2px rgba(16, 42, 73, .28);
-  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-doc-switch[aria-checked="true"] .sp-doc-switch__knob { transform: translateX(18px); }
-
-/* ── Rejilla de conceptos — tres trazados (§4.2) ─────────────────────────
-   El umbral es de CONTENEDOR y no de viewport: el mismo formulario vive en
-   tres montajes. El trazado de partida es el APILADO, que es el peor caso
-   (390 de viewport) y el que cierra H-02: `grid-cols-[1fr_140px_36px]` fijo
-   dejaba el concepto en 94 px ahí.
-   Apilada, cada fila es una minitarjeta y cada celda lleva su etiqueta; en una
-   línea, la cabecera de columnas se renderiza una vez y las etiquetas de celda
-   desaparecen. Las dos cosas viven en el DOM siempre y las conmuta el CSS: el
-   umbral es de contenedor y ningún cálculo en JS lo acertaría. */
-.sp-doc-honofilas { display: flex; flex-direction: column; gap: var(--sp-2-5); }
-.sp-doc-honofila {
-  display: grid; gap: var(--sp-2-5);
-  grid-template-columns: minmax(0, 1fr) 40px;
-  grid-template-areas: "c d" "o o" "p p";
-  padding: 12px;
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-card-inner);      /* 13 */
-  background: var(--sp-surface);
-}
-.sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila { grid-template-areas: "c d" "p p"; }
-.sp-doc-honofila > [data-cell="c"] { grid-area: c; min-width: 0; }
-.sp-doc-honofila > [data-cell="o"] { grid-area: o; min-width: 0; }
-.sp-doc-honofila > [data-cell="p"] { grid-area: p; min-width: 0; }
-/* Apilada, la papelera comparte fila con el rótulo del concepto y su campo:
-   se alinea con el CAMPO, que es sobre lo que actúa. */
-.sp-doc-honofila > [data-cell="d"] { grid-area: d; align-self: end; }
-/* Etiqueta por celda. En los trazados de una línea se esconde A LA VISTA pero
-   NO se retira del árbol —`display:none` la quitaría de los dos—: la cabecera
-   de columnas es `aria-hidden`, así que sin esto el campo se quedaría sin
-   nombre justo en el trazado donde su rótulo está lejos. */
-.sp-doc-honocell-label { display: block; margin-bottom: var(--sp-gap-label); }
-/* La cabecera de columnas solo existe en los trazados de una línea. */
-.sp-doc-honocols { display: none; }
-.sp-doc-honocols > [data-cell="p"] { text-align: right; }
-
-@container docform (min-width: 520px) {
-  /* Recibo: concepto + precio + papelera, en una línea. */
-  .sp-doc-honofilas[data-tipo="honorarios"] { gap: var(--sp-3); }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila {
-    grid-template-columns: minmax(0, 1fr) 150px 40px;
-    grid-template-areas: "c p d";
-    align-items: center;
-    padding: 0; border: none; background: none;
-  }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocols { display: grid; }
-  .sp-doc-honofilas[data-tipo="honorarios"] .sp-doc-honocell-label {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
-  }
-
-  /* Cotización: el origen todavía no cabe en la línea y baja entero. */
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
-    grid-template-columns: minmax(0, 1fr) 150px 40px;
-    grid-template-areas: "c p d" "o o o";
-  }
-}
-@container docform (min-width: 760px) {
-  .sp-doc-honofilas[data-tipo="cotizacion"] { gap: var(--sp-3); }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila {
-    grid-template-columns: minmax(0, 1fr) 168px 150px 40px;
-    grid-template-areas: "c o p d";
-    align-items: center;
-    padding: 0; border: none; background: none;
-  }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honofila > [data-cell="d"] { align-self: center; }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocols { display: grid; }
-  .sp-doc-honofilas[data-tipo="cotizacion"] .sp-doc-honocell-label {
-    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
-  }
-}
-
-/* La papelera de la fila mide 40 de ancho y 44 de alto: los 44 son el piso
-   táctil y los 40 son la columna que la rejilla le reserva. */
-.sp-doc-honofila .sp-doc-iconbtn { flex: 0 0 40px; width: 40px; }
-
-/* Precio: el prefijo SIGUE A LA DIVISA. Cifra a la derecha y tabular para que
-   las columnas de importes se lean como una columna. */
-.sp-doc-precio { position: relative; }
-.sp-doc-precio > .sp-input {
-  padding-left: 28px; text-align: right; font-variant-numeric: tabular-nums;
-}
-/* «US$» no cabe en los 28 px que le bastan a «$». */
-.sp-doc-precio[data-divisa="USD"] > .sp-input { padding-left: 38px; }
-.sp-doc-precio__sim {
-  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
-  font-size: var(--sp-fs-body-sm); color: var(--sp-ink-350); pointer-events: none;
-}
-
-/* ── Bloque de cierre (§4.4) ─────────────────────────────────────────────
-   SIEMPRE visible, también con total en cero: renderizarlo solo con `total > 0`
-   es lo que hoy lo hace aparecer y desaparecer mientras se teclea. */
-.sp-doc-cierre {
-  margin-top: var(--sp-4);
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-.sp-doc-cierrefila {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--sp-3); min-height: var(--sp-tap);
-}
-.sp-doc-cierrelabel {
-  min-width: 0; font-size: var(--sp-fs-body-sm); font-weight: var(--sp-fw-semi);
-  color: var(--sp-ink-500);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.sp-doc-cierrecifra {
-  font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold);
-  color: var(--sp-ink-800); font-variant-numeric: tabular-nums;
-}
-/* La fila que cierra el documento: la que el paciente lee primero. */
-.sp-doc-cierrefila--final { border-top: var(--sp-bw-hair) solid var(--sp-line-divider); }
-.sp-doc-cierrefila--final .sp-doc-cierrelabel { font-size: var(--sp-fs-body); color: var(--sp-ink-700); }
-/* ⚠️ LA CIFRA TIENE TOKEN PROPIO, `--sp-cifra-cierre`, y las dos alternativas
-   obvias están descartadas por escrito junto a su declaración:
-   NO `--sp-primary-hover` —que es lo que había: el hover del RELLENO del botón
-   primario, tomado prestado por salir un tono más fuerte; en cuanto ese hover
-   pasó a oscurecer se llevó esta cifra a 2.66:1 sobre la card—, y tampoco
-   `--sp-primary-text` a secas, que arregla el oscuro pero en claro cambia el
-   navy por el azul de marca, y esto es una hoja que se imprime y que el paciente
-   lee. El token propio deja el navy en claro y la tinta aclarada en oscuro.
-   Claro 11.60:1 sobre blanco · oscuro 6.23:1 sobre la card. */
-.sp-doc-cierrefila--final .sp-doc-cierrecifra {
-  font-size: 20px; font-weight: var(--sp-fw-black); color: var(--sp-cifra-cierre);
-}
-/* El único número editable del bloque. */
-.sp-doc-anticipo { flex: 0 0 170px; width: 170px; }
-
 
 /* ============================================================================
    ANIMACIONES
@@ -2403,7 +1826,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 }
 */
 
-
 /* --- 22. SECCIÓN PLEGABLE E INDICACIONES DE PISO ------------------------- */
 /* (GUIA_FORM_INTERNAMIENTO §3 y §4 · mecánica de la propuesta §3.A.3)
 
@@ -2417,82 +1839,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    archivo. `.sp-section` nace ya con dos
    consumidores —GUIA_FORM_CONSENTIMIENTO §3 la nombra para sus siete
    secciones—; el control de dos niveles es de internamiento y de nadie más. */
-
-/* ── Card plegable ─────────────────────────────────────────────────────────
-   El <h2> NO puede vivir dentro del <button> —contenido de flujo dentro de
-   contenido de frase—, así que lo envuelve: el encabezado da la semántica y el
-   botón es lo pulsable, que es lo que `aria-expanded` necesita debajo. */
-.sp-section__title { margin: 0; font: inherit; }
-.sp-section__head {
-  width: 100%; text-align: left; cursor: pointer;
-  background: none; color: inherit;
-  border: 0; border-bottom: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-/* Plegada mide 58px: 56 de cabecera + 2 de bordes de la card. El filete
-   inferior se va porque ya no separa de nada. */
-.sp-section__head[aria-expanded="false"] { border-bottom: 0; }
-.sp-section__head:focus-visible { outline: none; box-shadow: var(--sp-focus-ring); }
-.sp-section__chev {
-  margin-left: auto; flex: 0 0 auto;
-  width: 18px; height: 18px; color: var(--sp-ink-icon);
-  transition: transform var(--sp-dur-micro) var(--sp-ease-out);
-}
-.sp-section__head[aria-expanded="true"] .sp-section__chev { transform: rotate(180deg); }
-/* El bloque global de `globals.css` solo neutraliza las clases `animate-*`. */
-@media (prefers-reduced-motion: reduce) { .sp-section__chev { transition: none; } }
-/* En XS el título se lleva la primera línea y el resumen cae debajo con el
-   chevron: los tres en fila dejan el título en cuatro renglones —«Indicaciones
-   de ingreso a piso» mide 255 de los 276 útiles y el badge otros 154—. Las dos
-   líneas suman 46 y caben en los 56 de la cabecera, así que plegada sigue
-   midiendo 58. */
-@container docform (max-width: 379px) { .sp-section__head { flex-wrap: wrap; } }
-
-/* ── Control de dos niveles: grupos y renglones (§3) ──────────────────────── */
-.sp-doc-piso { display: flex; flex-direction: column; gap: var(--sp-3-5); }
-
-/* Chip que abre la fila de grupo propio. Es una ACCIÓN, no un grupo: nunca
-   lleva `aria-pressed`, así que nunca se enciende. */
-.sp-doc-chipadd svg { width: 16px; height: 16px; }
-
-.sp-doc-grupos { display: flex; flex-direction: column; gap: var(--sp-3); }
-.sp-doc-grupo {
-  border: var(--sp-bw-hair) solid var(--sp-line-card);
-  border-radius: var(--sp-r-field-sm);
-  padding: 14px;
-}
-.sp-doc-grupohead { display: flex; align-items: center; gap: var(--sp-2); min-height: var(--sp-tap); }
-/* Los dos con `flex: 0 0 auto`: el que cede ancho a 316 es el nombre, que
-   admite dos líneas — la papelera encogida deja de ser un objetivo de 44. */
-.sp-doc-grupohead > .sp-doc-iconbtn { margin-left: auto; flex: 0 0 auto; }
-/* El recuento es lo que hace que plegar resuma en vez de esconder (§3.4). */
-.sp-doc-grupocount {
-  flex: 0 0 auto;
-  font-size: var(--sp-fs-hint); color: var(--sp-ink-350); white-space: nowrap;
-}
-/* La cabecera ya trae sus 44px de alto; el primer renglón solo necesita aire. */
-.sp-doc-grupohead + .sp-doc-listrow { margin-top: var(--sp-2); }
-.sp-doc-grupofoot { margin-top: 14px; }
-
-/* Zona de arranque: 96px punteados que dicen qué hacer y quién pone los
-   guiones. Sin ella, cuatro chips apagados no explican nada. */
-.sp-doc-dashzone {
-  display: flex; align-items: center; justify-content: center;
-  min-height: 96px; padding: var(--sp-3) var(--sp-4);
-  border: var(--sp-bw-hair) dashed var(--sp-line-dash);
-  border-radius: var(--sp-r-field-sm);
-  text-align: center;
-}
-
-/* Fila de grupo propio: campo + ✕ + Añadir. En XS el campo se lleva la primera
-   línea entera y los dos botones caen debajo. */
-.sp-doc-nuevogrupo { display: flex; align-items: center; gap: var(--sp-2); }
-.sp-doc-nuevogrupo > .sp-input { flex: 1; min-width: 0; }
-.sp-doc-nuevogrupo > .sp-btn { flex: 0 0 auto; min-height: var(--sp-tap); white-space: nowrap; }
-@container docform (max-width: 379px) {
-  .sp-doc-nuevogrupo { flex-wrap: wrap; }
-  .sp-doc-nuevogrupo > .sp-input { flex: 1 0 100%; }
-}
-
 
 /* --- 23. CONSENTIMIENTO INFORMADO (GUIA_FORM_CONSENTIMIENTO §2) ---------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22: fuera de
@@ -2514,33 +1860,11 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   .sp-doc-consent-id .sp-label-field { min-height: 34px; }
 }
 
-/* Fila 4: el divisor y las dos autorizaciones. Van bajo filete porque NO son
-   datos de identificación sino decisiones del paciente (§2).
-   Reparte por su cuenta y no con las columnas de la rejilla: en el tramo de dos
-   columnas el segmentado caería en una pista de 166px y sus dos botones en 77
-   cada uno, por debajo de lo cómodo. Abre a dos en el mismo umbral en que la
-   rejilla abre a tres, donde la pista ya mide 272. */
-.sp-doc-consent-auth {
-  grid-column: 1 / -1;
-  display: grid; grid-template-columns: 1fr; gap: var(--sp-4);
-  margin-top: var(--sp-4); padding-top: var(--sp-4);
-  border-top: var(--sp-bw-hair) solid var(--sp-line-divider);
-}
-@container docform (min-width: 600px) {
-  .sp-doc-consent-auth { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-/* El texto de la casilla envuelve a dos y tres renglones según el ancho, así
-   que la caja se ancla a la primera línea en vez de centrarse contra el bloque
-   entero. El contenedor conserva sus 44px de alto mínimo. */
-.sp-doc-consent-fotos { align-items: flex-start; }
-
 /* «El paciente no puede firmar», bajo el campo del familiar. Vive ahí y no con
    las autorizaciones porque marcarla cambia la regla del control que tiene
    encima: vuelve obligatorio el nombre del familiar, que pasa a ser quien
    consiente. Un poco de aire para que no se pegue al input. */
 .sp-doc-consent-nofirma { margin-top: var(--sp-1-5); }
-
 
 /* --- 24. DENEGACIÓN O REVOCACIÓN (GUIA_FORM_DENEGACION §1) --------------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22 y la 23.
@@ -2559,7 +1883,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
    ancho entero y baja a una SEGUNDA LÍNEA DE LA MISMA CABECERA, no a una card
    propia. El icono y el rótulo se quedan arriba, juntos. */
 .sp-doc-consent-head { flex-wrap: wrap; row-gap: var(--sp-2); padding-top: 9px; padding-bottom: 9px; }
-
 
 /* --- 25. FIRMADO ELECTRÓNICO (GUIA_FORMULARIOS_05 §3 y §5) --------------- */
 /* Va al final y DENTRO de @layer components, por lo mismo que la 22, 23 y 24.
@@ -2618,8 +1941,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   .sp-firma-long  { display: inline; }
   .sp-firma-short { display: none; }
 }
-
-.sp-firma-progress { flex: 0 0 auto; padding: var(--sp-3); }
 
 .sp-firma-cuerpo {
   flex: 1; min-height: 0; overflow-y: auto;
@@ -2701,7 +2022,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
   font-size: var(--sp-fs-body); font-weight: var(--sp-fw-bold); color: var(--sp-ink-800);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.sp-firma-ico-vacio { background: var(--sp-surface-muted); color: var(--sp-ink-icon); }
 
 /* ═══ §6 · la foto de identificación — captura nativa y recorte ═══════════
    Vive dentro del cuerpo del modo de firmado y sustituye al lienzo mientras
@@ -2714,8 +2034,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 
 /* §6.1 · la pregunta. `Sin foto` es una respuesta, no una cancelación, y por eso
    es un botón del mismo peso que los demás y no una X. */
-.sp-idfoto-card { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3); }
-.sp-idfoto-card-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--sp-3); }
 
 .sp-idfoto-controles { display: flex; align-items: center; gap: var(--sp-2-5); flex-wrap: wrap; }
 .sp-idfoto-controles > .sp-btn { min-height: var(--sp-ctrl-h-desktop); }
@@ -2748,8 +2066,1387 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-idfoto-pie { text-align: center; color: var(--sp-ink-350); }
 
 @media (max-width: 379px) {
-  .sp-idfoto-card { flex-direction: column; }
   .sp-idfoto-controles > .sp-btn { width: 100%; }
+}
+
+/* --- 26. PIEL DEL KIT EN LOS DOCUMENTOS (rediseño B9; CALMA §3, §5, §12, §23) --
+   Va al final y DENTRO de la capa, por lo mismo que la 22–25: así gana a las
+   secciones de arriba por orden y no por especificidad, y una utilidad de
+   Tailwind sigue pudiendo ajustarla. NO cambia marcado, nombres ni orden de
+   campos (alimentan las ranuras del PDF): sólo cómo se ven.
+
+   Maqueta: `docs-a`, `docs-b`, `docs-c`. Lo que se decide aquí:
+   · La sección deja de ser una caja con cabecera dentro: el rótulo sale fuera,
+     13/700 en `--enlace` (§12), y la tarjeta es el cuerpo (`--sup`, sin borde).
+     Las plegables (`.sp-section`) y la del cuerpo del escrito, que no tienen
+     `.sp-doc-cardbody` propio, se quedan como tarjeta con la cabecera dentro.
+   · Nada de caja dentro de caja (§3): el bloque de medicamento, de estudio y
+     de grupo pierden su borde y se separan con una línea `--linea`.
+   · Rótulos de campo en 13/600 `--tinta2`, sin mayúsculas (§4).
+   · La barra del pie: sin sombra ni filete, sobre `--fondo`; en `ext`/`tel`
+     el primario se estira y el secundario va corto en la misma fila; en
+     `ih`/`esc` el par va a la derecha y en `iv` centrado (§23.1). */
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) {
+  background: transparent; border: 0; border-radius: 0; padding: 0; box-shadow: none;
+}
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardhead {
+  min-height: 0; padding: 0 4px 8px; border-bottom: 0;
+}
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardhead.sp-doc-honohead,
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardhead.sp-doc-consent-head { padding-top: 0; }
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody {
+  background: var(--sup); border-radius: var(--r-tarjeta); padding: 16px;
+}
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody {
+  border-radius: var(--r-tarjeta-ancha); padding: 20px;
+}
+/* El icono delante del rótulo sobra (§3: no hay icono delante de cada rótulo). */
+.sp-doc-cardhead > .sp-icobox { display: none; }
+.sp-doc-cardhead .sp-label {
+  font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .4px; color: var(--enlace);
+}
+.sp-doc-cardhead { border-bottom-color: var(--linea); }
+
+/* Rótulos de campo y ayudas. */
+.sp-doc-form .sp-label-field {
+  font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--tinta2);
+}
+.sp-doc-form .sp-hint { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+
+/* Menú del desplegable escribible: capa con sombra (§3), sin borde. */
+.sp-doc-menu { border-color: transparent; background: var(--sup); border-radius: 14px; }
+.sp-doc-menu__item { color: var(--tinta); }
+.sp-doc-menu__item[aria-selected="true"] { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-doc-menu__foot { font-size: 12px; color: var(--tinta2); background: var(--sup2); border-top-color: var(--linea); }
+
+/* Urgente: 12 como mínimo (§4), no 11,5. */
+.sp-badge--danger { font-size: 12px; background: var(--mal-fondo); color: var(--mal-tinta); }
+
+/* ── Barra del pie ─────────────────────────────────────────────────────── */
+/* Translúcida y con desenfoque, como la barra de herramientas de iOS: el fondo
+   de la página no siempre es `--fondo` (el `body` de la app aún pinta el suyo)
+   y una barra opaca dibujaba una franja de otro gris. Con transparencia
+   reducida, opaca. */
+.sp-doc-actions {
+  background: color-mix(in srgb, var(--fondo) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  border-top: 0; box-shadow: none;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+}
+@media (prefers-reduced-transparency: reduce) {
+  .sp-doc-actions { background: var(--fondo); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+.sp-doc-actions > .sp-btn { min-height: 44px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-actions > .sp-btn { min-height: 36px; padding-top: 0; padding-bottom: 0; font-size: 14px; }
+/* Estrecho (`ext`): ya no se apila; el secundario va corto («Plantilla») a la
+   izquierda y el primario se estira (maqueta `docs-a`, vista 2 en `ext`). */
+@container docform (max-width: 379px) {
+  .sp-doc-actions:not(.sp-doc-actions--filas) { flex-direction: row; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > * { width: auto; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-tpl-guardar { flex: 0 0 auto; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-btn--primary { flex: 1 1 auto; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) .sp-doc-actions__long { display: none; }
+  .sp-doc-actions:not(.sp-doc-actions--filas) .sp-doc-actions__short { display: inline; }
+  .sp-doc-actions > .sp-btn { padding-left: 16px; padding-right: 16px; }
+}
+/* Ancho (`ih`/`esc`): el par pegado a la derecha, cada botón según su texto,
+   104 como mínimo (§21, §23.1). En `iv`, centrado (§23.1). */
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions:not(.sp-doc-actions--filas) { justify-content: flex-end; }
+:where([data-formato="iv"]) .sp-doc-actions:not(.sp-doc-actions--filas) { justify-content: center; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions:not(.sp-doc-actions--filas) > .sp-btn--primary {
+  flex: 0 0 auto; min-width: 104px;
+}
+/* Pie siempre a la vista en receta, laboratorio y honorarios (`ih`/`esc`,
+   «A2» del dueño). El pie ya era `sticky`; lo que lo tapaba era el propio
+   formulario: la tarjeta de conceptos con el foco sube a `z-index: 2`
+   (`.sp-hon:focus-within`) y pintaba encima de «Imprimir» mientras se
+   tabulaba, y las listas de los buscadores (`z-index: 5`/`20`) caían sobre él
+   cerca del fondo. Aquí el pie queda por encima de todo el formulario; la
+   lista que se abre cerca de él la trae a la vista su buscador
+   (`BuscadorMedicamento`, `BuscadorEstudio`, `CampoSugerido`, como ya hacía
+   `MenuRequerimientos`), con el `scroll-padding-bottom` de `main`. Sólo en
+   estos tres formularios y sólo en `ih`/`esc`: `tel`/`ext`/`iv` y los otros
+   cinco, como estaban. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody--pie-encima > .sp-doc-actions { z-index: 6; }
+
+/* La cabecera del formulario (`.sp-doc-cab`) va FUERA de la capa: ver el
+   bloque «Cabecera del formulario» tras el cierre de `@layer components`. */
+/* Dos clases: `.k-b` (sistema.css, después en la cascada) pone `inline-flex`. */
+.sp-doc-form .sp-doc-mas { display: none; }
+.sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas {
+  display: inline-flex; position: absolute; z-index: 1; right: 0;
+  top: calc((var(--doc-cab) - var(--k-toque)) / 2);
+}
+
+/* ── Plantilla en una sola fila (maquetas: «Plantilla — Sin plantilla ›») ── */
+.sp-tpl-card { padding: 0 16px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-tpl-card { padding: 0 20px; }
+.sp-tpl-fila { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+.sp-tpl-ic { flex: none; width: 20px; height: 20px; color: var(--enlace); }
+.sp-tpl-fila-t { display: flex; flex-direction: column; flex: none; min-width: 0; }
+.sp-tpl-cuenta { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-tpl-cuenta--tope { color: var(--aviso-tinta); }
+.sp-tpl-valor { position: relative; display: flex; align-items: center; flex: 1; min-width: 0; }
+.sp-tpl-select {
+  -webkit-appearance: none; appearance: none; width: 100%; min-width: 0; min-height: var(--k-toque);
+  margin: 0; padding: 0 26px 0 8px; border: 0; border-radius: 8px; background: transparent;
+  font: inherit; font-size: 15px; line-height: 20px; color: var(--tinta2);
+  text-align: right; text-align-last: right; text-overflow: ellipsis; cursor: pointer;
+}
+.sp-tpl-select:focus { outline: none; }
+.sp-tpl-select:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-tpl-select option { color: var(--tinta); background: var(--sup); }
+.sp-tpl-chev { position: absolute; right: 0; width: 18px; height: 18px; color: var(--tinta3); pointer-events: none; }
+.sp-tpl-fila > .sp-tpl-skeleton { flex: 1; min-height: 32px; border-radius: 8px; background: var(--sup2); }
+.sp-tpl-fila-err { flex: 1; margin: 8px 0; }
+.sp-tpl-empty { padding: 14px 0; }
+.sp-tpl-empty > .sp-tpl-ic { margin-top: 1px; }
+.sp-tpl-empty-t { flex: 1; min-width: 0; }
+.sp-tpl-empty-p { margin-top: 2px; }
+/* Dos clases: `.k-b` (sistema.css, misma capa y posterior) pondría `inline-flex`. */
+.sp-tpl-empty > .sp-tpl-empty-b { display: none; }
+/* `ih`/`esc`: la tarjeta vacía en UNA línea, del alto de la fila con
+   plantillas (52): «Sin plantillas de …» y, a la derecha, «Guardar esta como
+   plantilla». Táctil sin cambios. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty { align-items: center; min-height: 52px; padding: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty > .sp-tpl-ic { margin-top: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty .sp-tpl-empty-p { display: none; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-tpl-empty > .sp-tpl-empty-b { display: inline-flex; flex: none; }
+.sp-tpl-empty-b:disabled { color: var(--tinta3); cursor: default; }
+.sp-tpl-card > .sp-tpl-aviso { margin: 0 0 14px; }
+
+/* ── Campos como filas «rótulo — valor» (maquetas `docs-a/b/c`) ────────────
+   Sólo presentación: los campos, sus nombres y su orden no cambian (alimentan
+   las ranuras del PDF). Dentro del cuerpo de una sección cada campo es una
+   fila separada por `--linea`; el control pierde su caja (la fila es la caja) y
+   el foco se marca con un filete de 2 `--enlace` bajo el valor. En `ext`/`tel`
+   el rótulo va encima; desde 520 de contenedor, a la izquierda en una columna
+   de 188 (como `ih`/`iv`/`esc`). */
+.sp-doc-cardbody :is(.sp-doc-grid) { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > :is(.sp-doc-span-all, [data-span]) { grid-column: 1 / -1; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field { gap: 2px; padding: 8px 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > * + * { border-top: 1px solid var(--linea); }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field:first-child { padding-top: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field:last-child { padding-bottom: 0; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input {
+  min-height: 40px; padding: 8px 0; border-color: transparent; border-radius: 0; background-color: transparent;
+  font-size: 16px; line-height: 22px;
+}
+/* Táctil: el control de la fila mide el toque del formato (44), no 40
+   (revisión cruzada de los ocho formularios). */
+:where([data-formato="ext"], [data-formato="tel"], [data-formato="iv"]) .sp-doc-cardbody .sp-doc-grid > .sp-doc-field > :is(.sp-input, .sp-textarea) { min-height: 44px; }
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea):focus,
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input:focus {
+  border-color: transparent; background-color: transparent; box-shadow: inset 0 -2px 0 var(--enlace);
+}
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea).sp-doc-invalid,
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input.sp-doc-invalid {
+  border-color: transparent; box-shadow: inset 0 -2px 0 var(--mal-tinta);
+}
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field:has(.sp-doc-invalid) > .sp-label-field { color: var(--mal-tinta); }
+/* El área de texto en fila conserva su alto mínimo (88) y su asa. */
+.sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > textarea:is(.sp-input, .sp-textarea) { min-height: 88px; }
+@container docform (min-width: 520px) {
+  .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field {
+    display: grid; grid-template-columns: 188px minmax(0, 1fr); column-gap: 16px; row-gap: 2px;
+    align-items: start; padding: 4px 0;
+  }
+  .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > * { grid-column: 2; }
+  .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > .sp-label-field { grid-column: 1; grid-row: 1 / span 4; padding-top: 11px; }
+}
+
+/* ── Firmado electrónico y foto de identificación (piel del kit) ───────────
+   El modo SIGUE tapando la pantalla entera (es su función, §2 de la guía 05);
+   lo nuevo es que respeta las franjas del aparato (`--it/--ir/--ib/--il`): en
+   `tel` la cabecera y «Salir» quedaban bajo la isla. Fondo `--fondo`, tarjetas
+   `--sup` sin borde, progreso en `--accion`.
+   ⚠️ EL LIENZO ES PAPEL: blanco y con sus marcas en grises LITERALES en los dos
+   temas, porque ese mapa de bits es el que se imprime (la tinta del trazo
+   también es literal, en el componente). Con tokens, en oscuro la línea y el
+   rótulo salían claros sobre blanco: invisibles. */
+.sp-firma-modo { background: var(--fondo); padding: var(--it) var(--ir) var(--ib) var(--il); }
+.sp-firma-head, .sp-firma-cuerpo { width: 100%; max-width: 672px; margin-inline: auto; }
+.sp-firma-head { gap: 8px; padding: 0 8px; border-bottom: 0; }
+.sp-firma-salir { width: var(--k-toque); height: var(--k-toque); border-radius: var(--r-pildora); color: var(--tinta2); }
+.sp-firma-salir:active { background: var(--sup2); }
+.sp-firma-titulo { font-size: 17px; line-height: 22px; font-weight: 700; color: var(--tinta); }
+@media (min-width: 380px) { .sp-firma-titulo { font-size: 17px; } }
+.sp-firma-head > .sp-badge {
+  height: 24px; padding: 0 10px; border: 0; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 600;
+}
+.sp-firma-cuerpo { padding: 0 16px 16px; gap: 16px; }
+.sp-firma-quien .sp-label { font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .4px; color: var(--enlace); }
+.sp-firma-quien .sp-hint { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-firma-nombre { font-size: 22px; line-height: 28px; font-weight: 800; letter-spacing: -.3px; color: var(--tinta); }
+.sp-firma-girar { font-size: 13px; color: var(--tinta2); }
+.sp-firma-lienzo { background: #fff; border: 1px solid #d5dbe4; border-radius: var(--r-tarjeta); }
+.sp-firma-placeholder { font-size: 16px; color: #64748b; }
+.sp-firma-linea { border-top-color: #b4bfcd; }
+.sp-firma-rol { font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: .3px; color: #52627a; }
+.sp-firma-acciones > .sp-btn { min-height: 44px; }
+.sp-firma-resumen { gap: 0; background: var(--sup); border-radius: var(--r-tarjeta); padding: 0 16px; }
+.sp-firma-fila { min-height: 64px; padding: 10px 0; border: 0; border-radius: 0; background: transparent; }
+.sp-firma-fila + .sp-firma-fila { border-top: 1px solid var(--linea); }
+.sp-firma-fila-nombre { font-size: 15px; font-weight: 600; color: var(--tinta); }
+.sp-firma-fila .sp-hint { font-size: 13px; color: var(--tinta2); }
+.sp-idfoto-controles > .sp-btn { min-height: 44px; }
+.sp-idfoto-cropper { border-radius: var(--r-tarjeta); }
+.sp-idfoto-pie { font-size: 13px; color: var(--tinta2); }
+
+/* ── Barra del editor del escrito (piel del kit) ──────────────────────────
+   Botones de icono en `--tinta2`, encendidos en el par tonal; sin franja gris
+   ni borde en «más»; los tres menús como capa `--sup` con la sombra de capas.
+   Mismas medidas (44) y el mismo reparto por contenedor. */
+.sp-ed-menu { border: 0; border-radius: 14px; background: var(--sup); box-shadow: var(--sombra-capa); padding: 6px; }
+.sp-ed-row { border-radius: 10px; font-size: 15px; color: var(--tinta); }
+.sp-ed-row > svg { color: var(--enlace); }
+.sp-ed-row:hover { background: var(--sup2); }
+.sp-ed-row[aria-checked="true"] { background: var(--tonal); color: var(--tonal-tinta); font-weight: 600; }
+.sp-ed-row__cue { color: var(--enlace); }
+.sp-ed-menuhead { border-bottom-color: var(--linea); }
+
+/* Panel «Gestionar plantillas»: la fila es tarjeta `--sup` sin borde (§3). */
+.sp-tpl-item { border-color: transparent; background: var(--sup); border-radius: var(--r-tarjeta); }
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta TODO campo con
+   `--sup2` y borde con !important (sin capa). En una fila el campo no lleva
+   caja: aquí se gana con !important EN capa, que manda sobre el !important sin
+   capa. Sólo fondo y borde; el color de la tinta sigue siendo el suyo. */
+html.dark .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > :is(.sp-input, .sp-textarea),
+html.dark .sp-doc-cardbody :is(.sp-doc-grid) > .sp-doc-field > div > .sp-input,
+html.dark .sp-tpl-select { background-color: transparent !important; border-color: transparent !important; }
+
+/* La rejilla (`sistema.css`) va ya en `@layer components`, importada DESPUÉS
+   de esta hoja: a igual capa decide la especificidad, y aquí cada regla lleva
+   una clase más que la suya (`.sp-doc-cab`). */
+/* ── Cabecera del formulario (parte 2 de B9; maquetas `docs-a/b/c`) ────────
+   La línea plegada de `SelectorTipoDocumento` es la cabecera: el tipo en su
+   cuadro tintado y en grande, «Cambiar» tonal a la derecha, sin tarjeta. Sigue
+   siendo un solo botón (toda la línea abre la rejilla). El «···» lo monta el
+   formulario (`PlantillasDocumento`, `BotonMas`) y se coloca aquí, a la derecha
+   de «Cambiar», respecto del anfitrión: la cabecera es SIEMPRE lo primero de
+   `.sp-doc-host` (en `/documentos` el «Paso 2» va fuera por eso). Sin cabecera
+   —rejilla abierta— el «···» no se pinta; el formulario sigue debajo. */
+.sp-doc-host { position: relative; --doc-cab: 48px; }
+.k-az-linea.sp-doc-cab {
+  min-height: var(--doc-cab); gap: 12px; border-radius: 12px; background: transparent;
+  padding: 0 calc(var(--k-toque) + 8px) 0 0;
+}
+.sp-doc-cab .k-doc-caja { width: 36px; height: 36px; border-radius: 10px; }
+.sp-doc-cab .k-az-linea-t > span:last-child { font-size: 22px; line-height: 28px; font-weight: 800; letter-spacing: -.4px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-cab .k-az-linea-t > span:last-child { font-size: 24px; line-height: 30px; }
+.sp-doc-cab .k-az-cambiar {
+  height: 32px; padding: 0 12px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 14px; line-height: 18px;
+  transition: transform var(--dur-toque) ease-out;
+}
+.sp-doc-cab:active .k-az-cambiar { transform: scale(.97); }
+@media (hover: hover) { .sp-doc-cab:hover .k-az-cambiar { background: color-mix(in srgb, var(--tonal) 86%, var(--tonal-tinta)); } }
+@media (prefers-reduced-motion: reduce) { .sp-doc-cab:active .k-az-cambiar { transform: none; } }
+/* Estrecho (`ext`/`tel`, contenedor < 380): dos renglones, como la maqueta en
+   teléfono —«Cambiar» y «···» arriba a la derecha, el tipo con su icono
+   debajo y a todo el ancho—. En un renglón «Consentimiento» no cabía junto a
+   los dos botones y se cortaba. */
+@container docform (max-width: 379px) {
+  .k-az-linea.sp-doc-cab {
+    display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-rows: var(--k-toque) auto;
+    grid-template-areas: ". . cambiar" "icono titulo titulo"; column-gap: 12px; row-gap: 4px; padding: 0;
+  }
+  .sp-doc-cab > .k-doc { grid-area: icono; }
+  .sp-doc-cab > .k-az-linea-t { grid-area: titulo; }
+  .sp-doc-cab > .k-az-cambiar { grid-area: cambiar; align-self: center; justify-self: end; margin-right: calc(var(--k-toque) + 4px); }
+  .sp-doc-cab .k-az-linea-t > span:last-child { white-space: normal; }
+  .sp-doc-host:has(> div > .sp-doc-cab) .sp-doc-mas { top: 0; }
+}
+
+/* ── 26.1 · RECETA COMPACTA (maqueta `receta-compacta.html`, aprobada) ─────
+   Un medicamento abierto (`.sp-rx-ed`) y los demás plegados a una línea
+   (`.sp-rx-linea`), todo dentro de UNA tarjeta sin relleno. La etiqueta de vía
+   lleva color por familia (sólo pantalla; el PDF no lo usa), SIN leyenda.
+   Densidad: en táctil (`ext`/`tel`/`iv`) toques de 44 y letra de 16 en los
+   campos (iOS no amplía); en `ih`/`esc`, 36–40 y 15. Contenedor estrecho
+   (< 560): un campo por renglón, fichas en una fila desplazable, «Agregar» a
+   todo el ancho. Nada aquí es `fixed`: la lista del buscador es `absolute`
+   dentro del medicamento. */
+:root {
+  --via-iv-fondo: #EFE6FA; --via-iv-tinta: #5E2D9A;
+  --via-sc-fondo: #DCF1F2; --via-sc-tinta: #0B5D64;
+}
+html.dark {
+  --via-iv-fondo: #2F2247; --via-iv-tinta: #D2B8F7;
+  --via-sc-fondo: #103A3E; --via-sc-tinta: #8EDDE4;
+}
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-rx-cuerpo { padding: 0; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-rx-cuerpo { padding: 0; }
+.sp-rx-meds > * + * { border-top: 1px solid var(--linea); }
+.sp-rx-meds > :first-child { border-top-left-radius: var(--r-tarjeta); border-top-right-radius: var(--r-tarjeta); }
+.sp-rx-meds > :last-child { border-bottom-left-radius: var(--r-tarjeta); border-bottom-right-radius: var(--r-tarjeta); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-rx-meds > :first-child { border-top-left-radius: var(--r-tarjeta-ancha); border-top-right-radius: var(--r-tarjeta-ancha); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-rx-meds > :last-child { border-bottom-left-radius: var(--r-tarjeta-ancha); border-bottom-right-radius: var(--r-tarjeta-ancha); }
+
+.sp-rx-num {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sp-rx-num--on { background: var(--accion); color: var(--sobre-accion); }
+
+/* Línea plegada: un botón; dos renglones; la vía a la derecha. */
+.sp-rx-linea {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; margin: 0; padding: 10px 16px;
+  border: 0; background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-linea { min-height: 52px; padding: 8px 16px; }
+@media (hover: hover) { .sp-rx-linea:hover { background: var(--sup2); } }
+.sp-rx-linea:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.sp-rx-linea-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sp-rx-linea-1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+/* Dos renglones como mucho: comercial + detalle en el primero (el detalle se
+   recorta antes que el comercial), indicaciones recortadas en el segundo. */
+.sp-rx-linea-1 { flex-wrap: nowrap; }
+.sp-rx-com, .sp-rx-det { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-rx-com { flex: 0 0 auto; max-width: 75%; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tinta); }
+.sp-rx-det { flex: 0 1 auto; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+/* Sin detalle al lado, el nombre usa todo el renglón (auditoría H4: «Creatina
+   Monohidrat…» se cortaba al 75 % con sitio libre). */
+.sp-rx-linea-1 > .sp-rx-com:last-child { flex-shrink: 1; max-width: 100%; }
+.sp-rx-ind { font-size: 13px; line-height: 18px; color: var(--tinta2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Etiqueta de vía: familia de color (Oral azul tonal, IM ámbar, IV violeta,
+   Tópica/Transdérmica verde, SC turquesa, las demás gris; faltante en rojo). */
+.sp-rx-via {
+  flex: none; padding: 4px 9px; border-radius: var(--r-pildora); background: var(--sup2); color: var(--tinta2);
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.sp-rx-via--oral { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-rx-via--im { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+.sp-rx-via--iv { background: var(--via-iv-fondo); color: var(--via-iv-tinta); }
+.sp-rx-via--top { background: var(--ok-fondo); color: var(--ok-tinta); }
+.sp-rx-via--sc { background: var(--via-sc-fondo); color: var(--via-sc-tinta); }
+.sp-rx-via--falta { background: var(--mal-fondo); color: var(--mal-tinta); }
+
+/* Medicamento abierto. */
+.sp-rx-ed {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px;
+  background: var(--sup); box-shadow: inset 3px 0 0 var(--accion);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sp-rx-ed { animation: sp-rx-entra var(--dur-sale) var(--resorte-entra); }
+  @keyframes sp-rx-entra { from { opacity: .4; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+}
+.sp-rx-cab { display: flex; align-items: center; gap: 8px; min-height: var(--k-toque); }
+.sp-rx-cab-t { flex: 1; margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--tinta2); }
+.sp-rx-quitar:hover:not(:disabled) { color: var(--mal-tinta); }
+
+.sp-rx-campo {
+  position: relative; display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: 46px; padding: 0 12px; border-radius: var(--r-control); background: var(--sup2);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-campo { min-height: 40px; }
+.sp-rx-campo:focus-within { outline: 2px solid var(--enlace); outline-offset: 0; }
+.sp-rx-campo--falta { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-rx-campo--falta > .sp-rx-rot { color: var(--mal-tinta); }
+.sp-rx-campo--texto { align-items: flex-start; }
+.sp-rx-campo--texto > .sp-rx-rot { padding-top: 13px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-campo--texto > .sp-rx-rot { padding-top: 11px; }
+.sp-rx-rot {
+  flex: none; width: 108px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-rx-fi {
+  flex: 1; min-width: 0; width: 100%; margin: 0; padding: 11px 0; border: 0; border-radius: 0;
+  background: transparent; color: var(--tinta); font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-fi { padding: 9px 0; font-size: 15px; line-height: 20px; }
+.sp-rx-fi:focus { outline: none; }
+.sp-rx-fi::placeholder { color: var(--tinta2); opacity: .75; }
+.sp-rx-ta { display: block; resize: none; overflow: hidden; min-height: 44px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-ta { min-height: 38px; }
+.sp-rx-par { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px; }
+
+/* Lista del buscador: capa con sombra, dentro del medicamento (no portal). */
+.sp-rx-lista {
+  position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none;
+  max-height: 264px; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--sup); border-radius: 14px; box-shadow: var(--sombra-capa);
+}
+.sp-rx-op {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-height: var(--k-toque); padding: 10px 12px;
+  border-radius: 10px; cursor: pointer; color: var(--tinta);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-op { padding: 8px 10px; }
+.sp-rx-op > b { font-size: 15px; line-height: 20px; font-weight: 600; }
+.sp-rx-op > span { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-rx-op[aria-selected="true"] { background: var(--tonal); }
+.sp-rx-op[aria-selected="true"] > b { color: var(--tonal-tinta); }
+
+/* Vía: grupo de botones rápidos + «Otra…». */
+.sp-rx-viafila { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.sp-rx-viafila > .sp-rx-rot { padding-left: 12px; }
+.sp-rx-viafila--falta > .sp-rx-rot { color: var(--mal-tinta); }
+.sp-rx-viagrupo { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-rx-viabtn, .sp-rx-viaotra {
+  height: var(--k-toque); margin: 0; padding: 0 14px; border: 1px solid var(--borde); border-radius: var(--r-pildora);
+  background: var(--sup); color: var(--tinta); font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.sp-rx-viabtn { min-width: 44px; transition: transform var(--dur-toque) ease-out; }
+.sp-rx-viabtn:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { .sp-rx-viabtn:active { transform: none; } }
+.sp-rx-viabtn[aria-checked="true"] { background: var(--accion); border-color: var(--accion); color: var(--sobre-accion); font-weight: 600; }
+.sp-rx-viabtn:focus-visible, .sp-rx-viaotra:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-rx-viaotra { padding-right: 10px; max-width: 100%; }
+.sp-rx-viaotra--on { border-color: var(--accion); background: var(--tonal); color: var(--tonal-tinta); font-weight: 600; }
+.sp-rx-viafila--falta .sp-rx-viabtn:not([aria-checked="true"]), .sp-rx-viafila--falta .sp-rx-viaotra { border-color: var(--mal-tinta); }
+.sp-rx-err { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--mal-tinta); }
+
+/* Fichas: fuera del Tab; el área es el toque entero, el dibujo una píldora. */
+.sp-rx-fichas { display: flex; flex-wrap: wrap; gap: 0 6px; min-width: 0; }
+.sp-rx-ficha {
+  display: inline-flex; align-items: center; height: var(--k-toque); margin: 0; padding: 0; border: 0;
+  background: transparent; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sp-rx-ficha > span {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--borde);
+  border-radius: var(--r-pildora); color: var(--tinta2); font-size: 13px; line-height: 18px; white-space: nowrap;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-ficha > span { height: 28px; font-size: 12px; }
+@media (hover: hover) { .sp-rx-ficha:hover > span { background: var(--sup2); } }
+.sp-rx-ficha:active > span { background: var(--sup2); }
+.sp-rx-ficha--sug > span { border-color: var(--accion); color: var(--enlace); font-weight: 600; }
+
+/* «Agregar medicamento»: uno, al final; el atajo sólo donde hay teclado. */
+.sp-rx-agregar { margin-top: 8px; }
+.sp-rx-agregar-b { height: var(--k-toque); }
+.sp-rx-atajo { display: none; gap: 2px; margin-left: 4px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-rx-atajo { display: inline-flex; }
+.sp-rx-atajo > kbd {
+  padding: 0 5px; border: 1px solid var(--borde); border-radius: 5px; background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
+}
+
+/* Estrecho (`ext`/`tel`): un campo por renglón, la vía con «Otra…» debajo,
+   fichas en una fila que se desplaza, «Agregar» a todo el ancho. */
+@container docform (max-width: 559px) {
+  .sp-rx-par { grid-template-columns: minmax(0, 1fr); }
+  .sp-rx-rot { width: 104px; letter-spacing: .02em; }
+  .sp-rx-viafila > .sp-rx-rot { width: 100%; padding-left: 0; }
+  .sp-rx-viabtn { padding: 0 16px; }
+  .sp-rx-fichas { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+  .sp-rx-fichas::-webkit-scrollbar { display: none; }
+  .sp-rx-ficha { flex: none; }
+  .sp-rx-ficha > span { height: 36px; }
+  .sp-rx-ed { padding: 10px 14px 12px; }
+  .sp-rx-linea { padding: 12px 14px; }
+  .sp-rx-agregar-b { width: 100%; }
+}
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con
+   `--sup2` y borde con !important (sin capa); aquí se gana EN capa. */
+html.dark .sp-rx-fi { background-color: transparent !important; border-color: transparent !important; }
+html.dark .sp-rx-viaotra { background-color: var(--sup) !important; border-color: var(--borde) !important; color: var(--tinta) !important; }
+html.dark .sp-rx-viaotra--on { background-color: var(--tonal) !important; border-color: var(--accion) !important; color: var(--tonal-tinta) !important; }
+html.dark .sp-rx-viafila--falta .sp-rx-viaotra { border-color: var(--mal-tinta) !important; }
+
+/* ── 26.2 · SOLICITUD DE LABORATORIO RÁPIDA (maqueta `laboratorio-rapido.html`, aprobada) ──
+   UN buscador que añade con Enter (`.sp-lab-bus`, reusa `.sp-rx-fi`,
+   `.sp-rx-lista` y `.sp-rx-op` de 26.1), frecuentes que se encienden
+   (`.sp-lab-tog`, `aria-pressed`), lo pedido como fichas en `--accion`
+   (`.sp-lab-p`) y el catálogo por categoría plegado aparte
+   (`.sp-lab-catalogo`). Densidad como 26.1: en táctil toques de 44 y letra de
+   16 en el campo; en `ih`/`esc`, 36–40 y 15. Contenedor estrecho (< 560): una
+   columna en el catálogo y fichas más altas. Nada aquí es `fixed`. */
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-lab-cuerpo { display: flex; flex-direction: column; gap: 14px; }
+.sp-lab-bus {
+  position: relative; display: flex; align-items: center; gap: 8px; min-width: 0;
+  min-height: 50px; padding: 0 12px; border-radius: var(--r-control); background: var(--sup2);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-bus { min-height: 44px; }
+.sp-lab-bus:focus-within { outline: 2px solid var(--enlace); outline-offset: 0; }
+.sp-lab-bus--falta { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-lab-bus > svg { flex: none; width: 18px; height: 18px; color: var(--tinta2); }
+.sp-lab-rot {
+  margin: 0 0 6px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--tinta2);
+}
+
+/* Frecuentes: el toque mide `--k-toque`; el dibujo, una píldora. */
+.sp-lab-frec { display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-lab-tog {
+  display: inline-flex; align-items: center; gap: 5px; height: var(--k-toque); margin: 0; padding: 0 14px;
+  border: 1px solid var(--borde); border-radius: var(--r-pildora); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform var(--dur-toque) ease-out;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-tog { padding: 0 12px; font-size: 13px; }
+.sp-lab-tog > svg { width: 15px; height: 15px; margin-left: -2px; }
+.sp-lab-tog[aria-pressed="true"] { background: var(--tonal); border-color: var(--accion); color: var(--tonal-tinta); font-weight: 600; }
+@media (hover: hover) { .sp-lab-tog:hover:not([aria-pressed="true"]) { background: var(--sup2); } }
+.sp-lab-tog:active { transform: scale(.97); }
+.sp-lab-tog:focus-visible, .sp-lab-p > button:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+
+/* Lo pedido: fichas en `--accion`, cada una con su ✕. Entra sólo la última. */
+.sp-lab-ped { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sp-lab-p {
+  display: inline-flex; align-items: center; gap: 2px; max-width: 100%; height: 38px; padding: 0 3px 0 14px;
+  border-radius: var(--r-pildora); background: var(--accion); color: var(--sobre-accion);
+  font-size: 14px; line-height: 18px; font-weight: 500;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p { height: 36px; padding-left: 12px; font-size: 13px; }
+.sp-lab-p > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-lab-p > button {
+  /* El toque mide `--k-toque` aunque la píldora sea más baja: sobresale
+     (transparente) por arriba y por abajo, como el área de `.sp-rx-ficha`. */
+  flex: none; display: grid; place-items: center; width: 36px; height: var(--k-toque); margin: -4px 0; padding: 0; border: 0;
+  border-radius: var(--r-pildora); background: transparent; color: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p > button { margin: 0; }
+.sp-lab-p > button > svg { width: 15px; height: 15px; }
+@media (hover: hover) { .sp-lab-p > button:hover { background: color-mix(in srgb, var(--sobre-accion) 20%, transparent); } }
+.sp-lab-p > button:focus-visible { outline-color: var(--sobre-accion); outline-offset: -3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sp-lab-p--nuevo { animation: sp-lab-entra var(--dur-sale) var(--resorte-entra); }
+  @keyframes sp-lab-entra { from { opacity: .3; transform: scale(.85); } to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) { .sp-lab-tog:active { transform: none; } }
+.sp-lab-vacio { margin: 0; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+
+/* Catálogo por categoría: una tarjeta `details`, plegada por omisión. */
+.sp-lab-catalogo > summary, .sp-lab-cat > summary { list-style: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sp-lab-catalogo > summary::-webkit-details-marker, .sp-lab-cat > summary::-webkit-details-marker { display: none; }
+.sp-lab-catalogo-t {
+  display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 20px;
+  color: var(--enlace); font-size: 15px; line-height: 20px; font-weight: 600;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-catalogo-t { min-height: 44px; }
+.sp-lab-catalogo-t > span { flex: 1; }
+.sp-lab-flecha { flex: none; width: 18px; height: 18px; color: var(--tinta2); transition: transform var(--dur-toque) ease-out; }
+details[open] > summary > .sp-lab-flecha { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .sp-lab-flecha { transition: none; } }
+.sp-lab-catalogo > summary:focus-visible, .sp-lab-cat > summary:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; border-radius: var(--r-control); }
+.sp-lab-cats { padding: 0 20px 8px; }
+.sp-lab-cat { border-top: 1px solid var(--linea); }
+.sp-lab-cat > summary { display: flex; align-items: center; gap: 8px; min-height: var(--k-toque); padding: 6px 2px; }
+.sp-lab-cat > summary > .sp-lab-flecha { margin-left: auto; }
+.sp-lab-cat-n { flex: 0 1 auto; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--tinta); }
+.sp-lab-cat-c { flex: none; white-space: nowrap; font-size: 12px; line-height: 16px; color: var(--tinta2); font-variant-numeric: tabular-nums; }
+.sp-lab-cat-c > b { color: var(--enlace); font-weight: 700; }
+.sp-lab-its { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0 12px; padding: 0 0 10px; }
+.sp-lab-it {
+  display: flex; align-items: center; gap: 10px; min-width: 0; min-height: var(--k-toque); padding: 4px 6px;
+  border-radius: var(--r-control); font-size: 14px; line-height: 18px; color: var(--tinta); cursor: pointer;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-it { font-size: 13px; }
+@media (hover: hover) { .sp-lab-it:hover { background: var(--sup2); } }
+.sp-lab-it > input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accion); }
+.sp-lab-it:focus-within { outline: 3px solid var(--enlace); outline-offset: -3px; }
+.sp-lab-it > input:focus-visible { outline: none; }
+
+/* Notas: una línea que crece (reusa `.sp-rx-campo` sin rótulo visible). */
+.sp-lab-notas { padding: 0 12px; }
+
+/* Estrecho (`ext`/`tel`): una columna en el catálogo, fichas de 40. */
+@container docform (max-width: 559px) {
+  .sp-lab-p { height: 40px; font-size: 15px; }
+  .sp-lab-p > button { width: 40px; margin: -2px 0; }
+  .sp-lab-its { grid-template-columns: minmax(0, 1fr); }
+  .sp-lab-it { font-size: 15px; padding-block: 8px; }
+  .sp-lab-cat > summary { min-height: 52px; }
+  .sp-lab-cat-n { font-size: 15px; }
+  .sp-lab-catalogo-t { padding: 0 16px; }
+  .sp-lab-cats { padding: 0 16px 8px; }
+}
+
+/* Densidad de ratón (`ih`/`esc`): el objetivo es no desplazar. Fichas de 32 de
+   dibujo y 13 de letra con huecos de 6, como la maqueta; el área de 36 la da un
+   `::after` centrado (la regla del kit, `.k-b::after`), que no pisa la fila de
+   al lado porque sobresale 2 y el hueco es 6. El ✕ se dibuja de 28 y su área
+   mide 36. Datos, «Estudios» y notas con relleno ceñido. `tel`/`ext`/`iv` no
+   cambian. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody:has(> :is(.sp-lab, .sp-img)) { gap: 12px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody:is(.sp-lab-datos, .sp-lab-cuerpo, .sp-lab-notascuerpo) { padding: 12px 16px; }
+/* (26.3 usa las mismas filas de datos compactas: `.sp-lab-datos` va también en la de imagen.) */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-lab-cuerpo { gap: 10px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field { padding-block: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field > .sp-input { min-height: 36px; padding-block: 7px; font-size: 15px; line-height: 20px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-datos :is(.sp-doc-grid) > .sp-doc-field > .sp-label-field { padding-top: 9px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-bus { min-height: 40px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-rot { margin-bottom: 4px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-tog { position: relative; height: 32px; padding: 0 10px; font-size: 13px; line-height: 18px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p { height: 32px; padding: 0 2px 0 11px; font-size: 13px; line-height: 18px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p > button { position: relative; width: 28px; height: 28px; margin: 0; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-p > button > svg { width: 14px; height: 14px; }
+:where([data-formato="ih"], [data-formato="esc"]) :is(.sp-lab-tog, .sp-lab-p > button)::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-lab-catalogo-t { min-height: 40px; }
+
+/* ── 26.3 · SOLICITUD DE IMAGEN COMPACTA (maqueta `solicitud-imagen.html`, aprobada) ──
+   Misma familia que 26.1: un estudio abierto (`.sp-rx-ed`) y los demás
+   plegados (`.sp-rx-linea`), en UNA tarjeta sin relleno. Lo propio: la
+   etiqueta del tipo con color (`.sp-img-etq`, Rx azul tonal, TC ámbar, RM
+   violeta, US turquesa, DXA/Mx verde, el resto gris; reusa `--via-*`), las
+   filas «rótulo — fichas» (`.sp-img-blo`), las fichas de tipo, lado,
+   contraste, región y proyecciones (`.sp-img-tog`; las de región y
+   proyección, `--suave`, se marcan en tonal) y los grupos como pestañas
+   (`.sp-img-grupo`). Táctil: fichas de `--k-toque` (44) y 14 de letra; en
+   `ih`/`esc`, densidad de ratón: 32 de dibujo y 13 de letra, con el área de
+   36 en un `::after` (la regla del kit). Contenedor estrecho (< 560): el
+   rótulo encima, grupos en una fila que se desplaza, regiones con alto máximo
+   y desplazamiento propio, y la línea plegada en tres renglones. Nada aquí es
+   `fixed`. */
+.sp-img-etq {
+  flex: none; min-width: 40px; padding: 4px 8px; border-radius: var(--r-pildora); background: var(--sup2); color: var(--tinta2);
+  font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: center; white-space: nowrap;
+}
+.sp-img-etq--rx { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-img-etq--tc { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+.sp-img-etq--rm { background: var(--via-iv-fondo); color: var(--via-iv-tinta); }
+.sp-img-etq--us { background: var(--via-sc-fondo); color: var(--via-sc-tinta); }
+.sp-img-etq--verde { background: var(--ok-fondo); color: var(--ok-tinta); }
+.sp-img-linea { gap: 10px; }
+
+/* Filas «rótulo — fichas»: el rótulo alinea con el de `.sp-rx-campo`. */
+.sp-img-blo { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 8px; min-width: 0; }
+.sp-img-rot {
+  flex: none; width: 108px; padding-left: 12px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .02em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-img-blo > .sp-img-rot { padding-top: calc((var(--k-toque) - 16px) / 2); }
+.sp-img-blo--falta > .sp-img-rot { color: var(--mal-tinta); }
+.sp-img-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.sp-img-fichas { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-img-blo > .sp-rx-err { flex-basis: 100%; padding-left: 128px; }
+
+.sp-img-tog {
+  position: relative; display: inline-flex; align-items: center; gap: 5px; height: var(--k-toque); margin: 0; padding: 0 15px;
+  border: 1px solid var(--borde); border-radius: var(--r-pildora); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform var(--dur-toque) ease-out;
+}
+.sp-img-tog > svg { width: 14px; height: 14px; margin-left: -3px; }
+.sp-img-tog[aria-checked="true"] { background: var(--accion); border-color: var(--accion); color: var(--sobre-accion); font-weight: 600; }
+.sp-img-tog--suave[aria-pressed="true"] { background: var(--tonal); border-color: var(--accion); color: var(--tonal-tinta); font-weight: 600; }
+@media (hover: hover) { .sp-img-tog:hover:not([aria-checked="true"], [aria-pressed="true"]) { background: var(--sup2); } }
+.sp-img-tog:active { transform: scale(.97); }
+.sp-img-tog:focus-visible, .sp-img-grupo:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-img-blo--falta .sp-img-tog:not([aria-checked="true"], [aria-pressed="true"]) { border-color: var(--mal-tinta); }
+
+/* Grupos como pestañas, sobre una raya. */
+.sp-img-grupos { display: flex; flex-wrap: wrap; gap: 4px; padding-bottom: 6px; border-bottom: 1px solid var(--linea); }
+.sp-img-grupo {
+  position: relative; height: var(--k-toque); margin: 0; padding: 0 12px; border: 0; border-radius: var(--r-control);
+  background: transparent; color: var(--tinta2); font: inherit; font-size: 14px; line-height: 18px; font-weight: 500;
+  white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+.sp-img-grupo[aria-pressed="true"] { background: var(--sup2); color: var(--tinta); font-weight: 600; }
+@media (hover: hover) { .sp-img-grupo:hover:not([aria-pressed="true"]) { color: var(--tinta); } }
+.sp-img-regiones { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; padding: 2px; margin: -2px; }
+.sp-img-pista { margin: 0; padding-left: 128px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+@media (prefers-reduced-motion: reduce) { .sp-img-tog:active { transform: none; } }
+
+/* Densidad de ratón (`ih`/`esc`): no desplazar. */
+:where([data-formato="ih"], [data-formato="esc"]) :is(.sp-img-tog, .sp-img-grupo) { height: 32px; font-size: 13px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-tog { padding: 0 12px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-grupo { padding: 0 10px; }
+:where([data-formato="ih"], [data-formato="esc"]) :is(.sp-img-tog, .sp-img-grupo)::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-blo > .sp-img-rot { padding-top: 8px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-regiones { max-height: 134px; padding: 3px 2px; margin: -3px -2px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-img-ed { gap: 8px; }
+
+/* Estrecho (`ext`/`tel`): rótulo encima, grupos desplazables, tres renglones. */
+@container docform (max-width: 559px) {
+  .sp-img-rot { width: 100%; padding-left: 0; }
+  .sp-img-ed .sp-rx-rot { width: 96px; letter-spacing: .02em; }
+  .sp-img-blo > .sp-img-rot { padding-top: 0; }
+  .sp-img-blo > .sp-rx-err, .sp-img-pista { padding-left: 0; }
+  .sp-img-tog { padding: 0 16px; }
+  .sp-img-grupos { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px 6px; }
+  .sp-img-grupos::-webkit-scrollbar { display: none; }
+  .sp-img-grupo { flex: none; }
+  .sp-img-regiones { max-height: 212px; }
+  .sp-img-linea .sp-rx-linea-1 { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .sp-img-linea .sp-rx-com { max-width: 100%; }
+  .sp-img-linea .sp-rx-det { max-width: 100%; }
+  /* Una falta larga («Falta simple o contrastada») no cabe al lado del estudio:
+     baja a su renglón, a la derecha, y parte si hace falta. Antes no encogía,
+     dejaba el nombre en 0 y desbordaba la página (auditoría H2). */
+  .sp-img-linea { flex-wrap: wrap; row-gap: 6px; }
+  .sp-img-linea > .sp-rx-linea-t { flex-basis: 140px; }
+  .sp-img-linea > .sp-rx-via--falta { margin-left: auto; max-width: 100%; white-space: normal; }
+}
+
+/* ── 26.4 · SOLICITUD DE INTERNAMIENTO COMPACTA (maqueta `internamiento.html`, aprobada) ──
+   Cinco secciones numeradas (`.sp-int-sec`), UNA abierta (filete `--accion` a
+   la izquierda) y las demás en una línea: número, título y resumen truncado;
+   completa en verde (`--ok-*`), con un obligatorio que falta tras intentar
+   imprimir en rojo. Campos con la piel de 26.1 (`.sp-rx-campo`, `.sp-rx-rot`,
+   `.sp-rx-fi`, `.sp-rx-ta`, `.sp-rx-par`); tipo y ASA como botones de un toque
+   (`.sp-int-op`, `role="radio"`); requerimientos por menú (`.sp-int-menu`,
+   `absolute` bajo su botón) con lo elegido en fichas (`.sp-int-ficha`); las
+   indicaciones de piso como hoja de órdenes (`.sp-int-gp`: nombre a la
+   izquierda en 150, renglones a la derecha). Táctil: toques de 44 y letra de
+   16 en los campos; `ih`/`esc`: densidad de ratón (32–36, 13–15). Contenedor
+   estrecho (< 560): el resumen baja a un segundo renglón, botones de 42–44 y
+   los grupos de piso en una columna. Nada aquí es `fixed`. */
+.sp-int { display: flex; flex-direction: column; gap: 10px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int { gap: 8px; }
+.sp-int-sec { background: var(--sup); border-radius: var(--r-tarjeta); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-int-sec { border-radius: var(--r-tarjeta-ancha); }
+/* La abierta sube sobre el pie fijo (`z-index: 1`): su menú de requerimientos
+   puede caer encima de la barra. */
+.sp-int-sec[data-estado="abierta"] { position: relative; z-index: 2; box-shadow: inset 3px 0 0 var(--accion); }
+.sp-int-sec-h { margin: 0; font: inherit; }
+.sp-int-sec-b {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; margin: 0; padding: 10px 16px;
+  border: 0; border-radius: inherit; background: transparent; color: var(--tinta); font: inherit; text-align: left;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-sec-b { min-height: 44px; padding: 8px 16px; }
+.sp-int-sec-b:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+@media (hover: hover) { .sp-int-sec:not([data-estado="abierta"]) .sp-int-sec-b:hover { background: var(--sup2); } }
+.sp-int-n {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 12px; line-height: 16px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.sp-int-sec[data-estado="abierta"] .sp-int-n { background: var(--accion); color: var(--sobre-accion); }
+.sp-int-sec[data-estado="completa"] .sp-int-n { background: var(--ok-fondo); color: var(--ok-tinta); }
+.sp-int-sec[data-estado="falta"] .sp-int-n { background: var(--mal-fondo); color: var(--mal-tinta); }
+.sp-int-t { flex: none; font-size: 15px; line-height: 20px; font-weight: 600; }
+.sp-int-sec[data-estado="completa"] .sp-int-t { color: var(--ok-tinta); }
+.sp-int-res {
+  flex: 1; min-width: 0; font-size: 13px; line-height: 18px; color: var(--tinta2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sp-int-sec[data-estado="falta"] .sp-int-res { color: var(--mal-tinta); font-weight: 600; }
+.sp-int-chev { flex: none; width: 18px; height: 18px; margin-left: auto; color: var(--tinta2); transition: transform var(--dur-toque) ease-out; }
+.sp-int-sec[data-estado="abierta"] .sp-int-chev { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .sp-int-chev { transition: none; } }
+.sp-int-cuerpo { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 14px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sp-int-cuerpo { animation: sp-rx-entra var(--dur-sale) var(--resorte-entra); }
+}
+.sp-int-ob { margin-left: 2px; color: var(--mal-tinta); }
+.sp-int-cuerpo .sp-rx-rot { width: 112px; }
+.sp-int-quitar { margin-right: -8px; }
+
+/* Filas «rótulo — botones». */
+.sp-int-blo { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 8px; min-width: 0; }
+.sp-int-rot {
+  flex: none; width: 124px; padding-left: 12px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-int-blo > .sp-int-rot { padding-top: calc((var(--k-toque) - 16px) / 2); }
+.sp-int-opciones { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.sp-int-op {
+  position: relative; display: inline-flex; align-items: center; height: var(--k-toque); margin: 0; padding: 0 15px;
+  border: 1px solid var(--borde); border-radius: var(--r-pildora); background: var(--sup); color: var(--tinta);
+  font: inherit; font-size: 14px; line-height: 18px; font-weight: 500; white-space: nowrap; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform var(--dur-toque) ease-out;
+}
+.sp-int-op[aria-checked="true"] { background: var(--accion); border-color: var(--accion); color: var(--sobre-accion); font-weight: 600; }
+@media (hover: hover) { .sp-int-op:hover:not([aria-checked="true"]) { background: var(--sup2); } }
+.sp-int-op:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) { .sp-int-op:active { transform: none; } }
+.sp-int-op:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-int-urgente { min-height: var(--k-toque); padding-left: 12px; }
+
+/* Requerimientos: botón + menú; lo elegido en fichas con ✕. */
+.sp-int-reqs { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: var(--k-toque); }
+.sp-int-reqs > .sp-int-rot { align-self: center; }
+.sp-int-ficha {
+  display: inline-flex; align-items: center; gap: 2px; height: 32px; padding: 0 2px 0 12px; border-radius: var(--r-pildora);
+  background: var(--tonal); color: var(--tonal-tinta); font-size: 13px; line-height: 18px; font-weight: 600; max-width: 100%;
+}
+.sp-int-ficha > button {
+  position: relative; display: grid; place-items: center; width: 28px; height: 28px; margin: 0; padding: 0; border: 0;
+  border-radius: var(--r-pildora); background: transparent; color: inherit; cursor: pointer;
+}
+.sp-int-ficha > button::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: var(--k-toque); height: var(--k-toque); transform: translate(-50%, -50%);
+}
+.sp-int-ficha > button > svg { width: 14px; height: 14px; }
+.sp-int-ficha > button:focus-visible { outline: 3px solid var(--enlace); outline-offset: 0; }
+.sp-int-reqbtn > svg { width: 16px; height: 16px; }
+.sp-int-menu {
+  position: absolute; z-index: 6; left: 0; top: calc(100% + 6px); width: min(360px, 100%); padding: 6px;
+  background: var(--sup); border-radius: 14px; box-shadow: var(--sombra-capa);
+}
+.sp-int-menu-op {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--k-toque); margin: 0; padding: 8px 10px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--tinta); font: inherit; font-size: 15px; line-height: 20px;
+  text-align: left; cursor: pointer;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-menu-op { font-size: 14px; padding: 6px 10px; }
+@media (hover: hover) { .sp-int-menu-op:hover { background: var(--sup2); } }
+.sp-int-menu-op:focus-visible { outline: 2px solid var(--enlace); outline-offset: -2px; }
+.sp-int-casilla {
+  flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px;
+  border: 1.5px solid var(--tinta2); color: var(--sobre-accion);
+}
+.sp-int-casilla > svg { width: 13px; height: 13px; }
+.sp-int-menu-op[aria-checked="true"] .sp-int-casilla { background: var(--accion); border-color: var(--accion); }
+.sp-int-menu-otro {
+  display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 44px; padding: 0 10px;
+  border-radius: var(--r-control); background: var(--sup2);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-menu-otro { min-height: 38px; }
+.sp-int-menu-otro:focus-within { outline: 2px solid var(--enlace); }
+.sp-int-menu-otro > .sp-int-rot { width: auto; padding-left: 0; }
+.sp-int-menu-fi {
+  flex: 1; min-width: 0; min-height: var(--k-toque); margin: 0; padding: 9px 0; border: 0; background: transparent; color: var(--tinta);
+  font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-menu-fi { font-size: 15px; line-height: 20px; padding: 7px 0; }
+.sp-int-menu-fi:focus { outline: none; }
+.sp-int-menu-fi::placeholder { color: var(--tinta2); opacity: .75; }
+
+/* Instrucciones: el texto estándar entero, sin tirador. */
+.sp-int-ins { min-height: 120px; }
+
+/* Indicaciones de piso: una hoja de órdenes. */
+.sp-int-piso { display: flex; flex-direction: column; }
+.sp-int-gp { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 0 10px; padding: 4px 0; border-top: 1px solid var(--linea); }
+.sp-int-gp:first-child { border-top: 0; }
+.sp-int-gn { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px 6px; min-width: 0; padding-top: 10px; }
+.sp-int-gn-t > .sp-int-gn-c { margin-left: 6px; white-space: nowrap; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-gn { padding-top: 8px; }
+.sp-int-gn-t { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--tinta); }
+.sp-int-gn-c { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--tinta2); font-variant-numeric: tabular-nums; }
+.sp-int-gn-fi {
+  flex: 1; min-width: 0; margin: -6px 0 0; padding: 5px 8px; border: 0; border-radius: 8px; background: var(--sup2);
+  color: var(--tinta); font: inherit; font-size: 16px; line-height: 20px; font-weight: 600;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-gn-fi { font-size: 13px; line-height: 18px; }
+.sp-int-gn-fi:focus { outline: 2px solid var(--enlace); }
+.sp-int-gn-fi[aria-invalid="true"] { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-int-gn-x { margin: -10px -8px -10px auto; }
+.sp-int-gn-err { flex-basis: 100%; margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--mal-tinta); }
+.sp-int-rs { display: flex; flex-direction: column; min-width: 0; }
+.sp-int-rg { display: flex; align-items: center; gap: 6px; }
+.sp-int-rg::before { content: "–"; flex: none; width: 10px; color: var(--tinta2); }
+.sp-int-rg-fi {
+  flex: 1; min-width: 0; min-height: var(--k-toque); margin: 0; padding: 8px 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--tinta); font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-rg-fi { font-size: 15px; line-height: 20px; padding: 6px 8px; }
+.sp-int-rg-fi:focus { outline: 2px solid var(--enlace); background: var(--sup2); }
+.sp-int-rg-fi::placeholder { color: var(--tinta2); opacity: .75; }
+.sp-int-pisopie { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-top: 6px; border-top: 1px solid var(--linea); }
+.sp-int-pisopie svg { width: 16px; height: 16px; }
+.sp-int-ayuda { font-size: 12px; line-height: 16px; color: var(--tinta2); }
+
+/* Densidad de ratón (`ih`/`esc`): las opciones a 32 con área de 36. */
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-op { height: 32px; padding: 0 12px; font-size: 13px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-op::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  width: max(100%, var(--k-toque)); height: max(100%, var(--k-toque)); transform: translate(-50%, -50%);
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-blo > .sp-int-rot { padding-top: 8px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-int-ficha { height: 28px; font-size: 12px; }
+
+/* Estrecho (`ext`/`tel`): el resumen en un segundo renglón, rótulos encima,
+   botones de 42–44, una columna en la hoja de piso. */
+@container docform (max-width: 559px) {
+  .sp-int-sec-b { flex-wrap: wrap; min-height: 56px; padding: 12px 14px; row-gap: 2px; }
+  .sp-int-t { flex: 1; min-width: 0; }
+  .sp-int-res { flex-basis: 100%; order: 3; padding-left: 34px; }
+  .sp-int-cuerpo { padding: 0 14px 12px; }
+  .sp-int-rot { width: 100%; padding-left: 0; }
+  .sp-int-blo > .sp-int-rot { padding-top: 0; }
+  .sp-int-op { padding: 0 16px; }
+  .sp-int-urgente { padding-left: 0; }
+  .sp-int-cuerpo .sp-rx-rot { width: 100px; letter-spacing: .02em; }
+  .sp-int-reqs > .sp-int-rot { width: auto; }
+  .sp-int-ficha { height: 38px; }
+  .sp-int-menu-op { padding: 12px 10px; }
+  .sp-int-gp { grid-template-columns: minmax(0, 1fr); }
+  .sp-int-gn { padding-top: 8px; }
+}
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con
+   `--sup2` y borde con !important (sin capa); aquí se gana EN capa. */
+html.dark :is(.sp-int-rg-fi, .sp-int-menu-fi) { background-color: transparent !important; border-color: transparent !important; }
+html.dark .sp-int-rg-fi:focus { background-color: var(--sup2) !important; }
+html.dark .sp-int-gn-fi { border-color: transparent !important; }
+
+/* ── 26.5 · RECIBO DE HONORARIOS Y COTIZACIÓN COMPACTOS (maqueta `honorarios.html`, aprobada) ──
+   Datos en una fila (`.sp-hon-datos`, campos de 26.1), un cobro por línea
+   (`.sp-hon-ln`: número, concepto, «de quién es el cobro» sólo en cotización,
+   precio a la derecha con cifras tabulares, ✕), los totales siempre debajo
+   (`.sp-hon-tot`), y vigencia, forma de pago y divisa como botones de un toque
+   (`.sp-int-op` de 26.4). El origen y la aseguradora son `CampoSugerido`
+   (`.sp-hon-sug`, lista `absolute` bajo el campo). Táctil: toques de 44 y
+   letra de 16; `ih`/`esc`: densidad de ratón. Contenedor estrecho (< 560): el
+   origen baja a un segundo renglón de su línea y los datos a una columna.
+   Nada aquí es `fixed`. */
+.sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-hon-cuerpo { display: flex; flex-direction: column; gap: 8px; }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-card:not(.sp-section):has(> .sp-doc-cardbody) > .sp-doc-cardbody.sp-hon-cuerpo { padding: 14px 16px; }
+:where([data-formato="ih"], [data-formato="esc"]) .sp-doc-formbody:has(> .sp-hon) { gap: 12px; }
+/* La tarjeta con el foco sube: su lista de sugerencias cae sobre la siguiente y sobre el pie. */
+.sp-hon:focus-within { position: relative; z-index: 2; }
+.sp-hon-datos { display: flex; flex-wrap: wrap; gap: 8px; }
+.sp-hon-datos > * { flex: 0 0 auto; }
+.sp-hon-datos > :first-child { flex: 1 1 200px; }
+.sp-hon-datos .sp-rx-fi[type="date"] { width: 9.5em; }
+.sp-hon-datos .sp-hon-folio { width: 17ch; }
+.sp-hon-datos .sp-rx-rot, .sp-hon-seguro .sp-rx-rot { width: auto; min-width: 56px; }
+.sp-hon-folio { color: var(--tinta2); }
+.sp-hon-nota { margin: 0; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-hon-vig { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.sp-hon-vig > .sp-int-opciones { flex: 0 1 auto; }
+
+/* Líneas: número · concepto · origen · precio · ✕. */
+.sp-hon-ln {
+  display: grid; grid-template-columns: 22px minmax(0, 1.4fr) minmax(0, 1fr) 120px var(--k-toque);
+  column-gap: 6px; align-items: center; padding: 2px 0; border-top: 1px solid var(--linea);
+}
+.sp-hon-conceptos[data-tipo="honorarios"] .sp-hon-ln { grid-template-columns: 22px minmax(0, 1fr) 150px var(--k-toque); }
+.sp-hon-cols {
+  border-top: 0; padding: 0 0 2px; font-size: 12px; line-height: 16px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--tinta2);
+}
+.sp-hon-cols > * { min-width: 0; padding-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sp-hon-cols > .sp-hon-der { text-align: right; padding: 0 8px 0 0; }
+.sp-hon-n { font-size: 12px; line-height: 16px; color: var(--tinta2); text-align: center; font-variant-numeric: tabular-nums; }
+.sp-hon-fi {
+  width: 100%; min-width: 0; min-height: var(--k-toque); margin: 0; padding: 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--tinta); font: inherit; font-size: 16px; line-height: 22px;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-hon-fi { padding: 6px 8px; font-size: 15px; line-height: 20px; }
+.sp-hon-fi:focus { outline: 2px solid var(--enlace); background: var(--sup2); }
+.sp-hon-fi::placeholder { color: var(--tinta2); opacity: .75; }
+.sp-hon-fi--falta { box-shadow: inset 0 0 0 2px var(--mal-tinta); }
+.sp-hon-p { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.sp-hon-x:disabled { opacity: .35; }
+.sp-hon-err { grid-column: 2 / -1; margin: 0 0 4px; padding-left: 8px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--mal-tinta); }
+
+/* Campo con sugerencias: la lista va bajo el campo, sin portal. */
+.sp-hon-sug { position: relative; min-width: 0; }
+.sp-rx-campo > .sp-hon-sug { flex: 1; position: static; }
+/* En un campo con rótulo (la aseguradora) la lista toma el ancho del campo entero. */
+.sp-rx-campo > .sp-hon-sug > .sp-hon-lista { left: 0; right: 0; min-width: 0; }
+.sp-hon-lista {
+  position: absolute; z-index: 20; left: 0; top: calc(100% + 4px); min-width: max(100%, 240px); max-height: 264px;
+  overflow-y: auto; overscroll-behavior: contain; padding: 4px; background: var(--sup); border-radius: 14px; box-shadow: var(--sombra-capa);
+}
+.sp-hon-op {
+  display: flex; align-items: center; min-height: var(--k-toque); padding: 8px 10px; border-radius: 10px;
+  color: var(--tinta); font-size: 15px; line-height: 20px; cursor: pointer;
+}
+:where([data-formato="ih"], [data-formato="esc"]) .sp-hon-op { font-size: 14px; padding: 6px 10px; }
+.sp-hon-op[aria-selected="true"] { background: var(--tonal); color: var(--tonal-tinta); font-weight: 600; }
+.sp-hon-pie { margin: 2px 0 0; padding: 6px 10px 4px; border-top: 1px solid var(--linea); font-size: 12px; line-height: 16px; color: var(--tinta2); }
+
+/* Totales: siempre a la vista, alineados con la columna del precio. */
+.sp-hon-tot { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; padding-top: 8px; border-top: 2px solid var(--linea); }
+.sp-hon-tf { display: flex; align-items: center; justify-content: flex-end; gap: 16px; min-height: 30px; padding-right: calc(var(--k-toque) + 6px); }
+.sp-hon-tl { min-width: 0; font-size: 14px; line-height: 18px; color: var(--tinta2); text-align: right; }
+.sp-hon-cifra { flex: none; min-width: 150px; padding-right: 8px; text-align: right; font-size: 15px; line-height: 20px; font-weight: 500; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.sp-hon-tf--fin .sp-hon-tl { font-size: 16px; font-weight: 600; color: var(--tinta); }
+.sp-hon-tf--fin .sp-hon-cifra { font-size: 18px; line-height: 24px; font-weight: 700; }
+.sp-hon-anticipo { flex: none; width: 150px; background: var(--sup2); }
+
+.sp-hon-seguro { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.sp-hon-quitarseg { margin-left: auto; }
+.sp-hon-notas { min-height: 44px; resize: vertical; }
+.sp-hon-mas { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sp-hon-mas svg { width: 16px; height: 16px; }
+.sp-hon .sp-int-rot { width: 112px; }
+/* El segmentado Recibo/Cotización con el toque del formato (44 táctil, 36 ratón). */
+.sp-hon .sp-doc-segmented__opt { min-height: var(--k-toque); }
+
+/* Estrecho (`ext`/`tel`): datos y seguro en una columna; el origen en un
+   segundo renglón de su línea; totales a la medida. */
+@container docform (max-width: 559px) {
+  .sp-hon-seguro { grid-template-columns: minmax(0, 1fr); }
+  .sp-hon-datos > * { flex: 1 1 100%; }
+  .sp-hon-datos .sp-rx-fi[type="date"], .sp-hon-datos .sp-hon-folio { width: 100%; }
+  .sp-hon .sp-int-rot { width: 100%; }
+  .sp-hon-cols { display: none; }
+  .sp-hon-ln, .sp-hon-conceptos[data-tipo="honorarios"] .sp-hon-ln {
+    grid-template-columns: 22px minmax(0, 1fr) 112px var(--k-toque); padding: 4px 0;
+  }
+  .sp-hon-ln > .sp-hon-n { grid-column: 1; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-c { grid-column: 2; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-p { grid-column: 3; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-x { grid-column: 4; grid-row: 1; }
+  .sp-hon-ln > .sp-hon-sug { grid-column: 2 / 4; grid-row: 2; }
+  .sp-hon-tf { justify-content: space-between; gap: 10px; padding-right: 0; }
+  .sp-hon-tl { flex: 1; text-align: left; }
+  .sp-hon-cifra { min-width: 0; }
+  .sp-hon-anticipo { width: 112px; }
+}
+
+/* Muy estrecho (`ext`, contenedor < 380): el concepto se lleva el primer
+   renglón entero con su ✕; debajo, el origen y el precio. */
+@container docform (max-width: 379px) {
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln { grid-template-columns: 22px minmax(0, 1fr) 104px var(--k-toque); }
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln > .sp-hon-c { grid-column: 2 / 4; }
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln > .sp-hon-p { grid-column: 3; grid-row: 2; }
+  .sp-hon-conceptos[data-tipo="cotizacion"] .sp-hon-ln > .sp-hon-sug { grid-column: 2; grid-row: 2; }
+  .sp-hon-conceptos[data-tipo="honorarios"] .sp-hon-ln { grid-template-columns: 22px minmax(0, 1fr) 96px var(--k-toque); }
+}
+
+/* Oscuro: la hoja de traducción de `ThemeProvider` pinta todo campo con
+   `--sup2` y borde con !important (sin capa); aquí se gana EN capa. */
+html.dark .sp-hon-fi { background-color: transparent !important; border-color: transparent !important; }
+html.dark .sp-hon-fi:focus, html.dark .sp-hon-anticipo { background-color: var(--sup2) !important; }
+
+/* ── 26.6 · EMBUDO DEL CONSENTIMIENTO INFORMADO (maqueta `consentimiento.html`, aprobada) ──
+   Captura en cuatro bloques con la piel de 26.4 (`.sp-int-sec`, una abierta) y
+   los campos de 26.1 (`.sp-rx-campo`). Lo propio: las siete secciones del texto
+   como lista con su estado (`.sp-ci-sx`: «Texto estándar» / «Escrita por ti» /
+   «Obligatoria · falta» en rojo), «Quién firma» con su opción larga en dos
+   renglones, el pie de tres acciones (`.sp-ci-pie`) y la revisión antes de
+   firmar (`.sp-ci-rev`). El modo paciente del firmado (`.sp-firma-modo--pac`) y
+   el botón de mantener pulsado (`.sp-mantener`) también viven aquí. Táctil:
+   toques de 44 y letra de 16 en los campos; `ih`/`esc`: densidad de ratón.
+   Nada aquí es `fixed` salvo el modo de firmado, que ya era la excepción. */
+.sp-ci-ayuda { margin: 0; padding: 0 12px; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-ci-mas { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sp-ci-mas svg { width: 16px; height: 16px; }
+
+/* Bloque 2: las siete secciones como lista. La abierta es un campo que crece. */
+.sp-ci-secs { display: flex; flex-direction: column; }
+.sp-ci-sx {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: var(--k-toque); margin: 0; padding: 8px 6px;
+  border: 0; border-top: 1px solid var(--linea); background: transparent; color: var(--tinta); font: inherit;
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sp-ci-secs > :first-child { border-top: 0; }
+@media (hover: hover) { .sp-ci-sx:hover { background: var(--sup2); } }
+.sp-ci-sx:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; border-radius: 8px; }
+.sp-ci-sx-t { flex: 1; min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; }
+.sp-ci-sx-e { flex: none; font-size: 12px; line-height: 16px; color: var(--tinta2); white-space: nowrap; }
+.sp-ci-sx[data-estado="propia"] .sp-ci-sx-e { color: var(--enlace); font-weight: 600; }
+.sp-ci-sx[data-estado="falta"] .sp-ci-sx-e { color: var(--mal-tinta); font-weight: 600; }
+.sp-ci-sx-chev { flex: none; width: 16px; height: 16px; color: var(--tinta2); }
+.sp-ci-secab { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
+.sp-ci-secab .sp-rx-rot { width: 132px; }
+
+/* Bloque 3: la transfusión que falta, en rojo; la casilla de fotos con su toque. */
+.sp-ci-blo--falta > .sp-int-rot { color: var(--mal-tinta); }
+.sp-ci-blo--falta .sp-int-op:not([aria-checked="true"]) { border-color: var(--mal-tinta); }
+.sp-ci-fotos { min-height: var(--k-toque); align-items: center; padding-left: 12px; }
+
+/* Bloque 4: la opción larga («Familiar o representante (el paciente no puede
+   firmar)») parte en dos renglones antes que desbordar. */
+.sp-ci-quien .sp-int-op { height: auto; min-height: var(--k-toque); padding-block: 8px; white-space: normal; text-align: left; line-height: 18px; }
+
+/* Pie de tres acciones: papel (texto), borrador y el primario. */
+.sp-doc-actions.sp-ci-pie { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.sp-doc-actions.sp-ci-pie > .sp-btn { flex: 0 0 auto; width: auto; white-space: nowrap; }
+.sp-doc-actions.sp-ci-pie > .sp-btn--primary { min-width: 104px; }
+.sp-ci-pie svg { flex: none; }
+/* Ancho (`ih`/`iv`/`esc`): las tres en un renglón dentro de la columna de 640. */
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-doc-actions.sp-ci-pie > .sp-btn { padding-left: 14px; padding-right: 14px; }
+/* Los botones de texto del embudo, con el toque del formato (44 táctil, 36 ratón). */
+:is(.sp-ci-volver, .sp-ci-mas > .k-b, .sp-ci-den > .k-b, .sp-ci-offline > .k-b) { height: auto; min-height: var(--k-toque); }
+/* El rótulo corto de «Imprimir para firmar en papel» sólo donde el pie va a mitades. */
+.sp-ci-pie .sp-ci-corto { display: none; }
+@container docform (max-width: 559px) {
+  .sp-ci-pie .sp-ci-largo { display: none; }
+  .sp-ci-pie .sp-ci-corto { display: inline; }
+}
+/* «Rehacer» de cada firma, con el toque del formato. */
+.sp-firma-fm .sp-btn--compact { min-height: var(--k-toque); }
+/* Estrecho (`ext`/`tel`): el primario arriba a todo el ancho; las otras dos debajo, a mitades. */
+@container docform (max-width: 559px) {
+  .sp-doc-actions.sp-ci-pie > .sp-btn { flex: 1 1 0; min-width: 0; padding-left: 10px; padding-right: 10px; white-space: normal; line-height: 18px; }
+  .sp-doc-actions.sp-ci-pie > .sp-btn--primary { order: -1; flex-basis: 100%; }
+  .sp-ci-secab .sp-rx-rot { width: 100px; }
+  .sp-ci-sx { flex-wrap: wrap; row-gap: 2px; }
+  .sp-ci-sx-t { flex-basis: calc(100% - 26px); }
+  .sp-ci-sx-e { order: 3; padding-left: 0; }
+  .sp-ci-sx-chev { order: 2; }
+}
+
+/* La revisión antes de firmar. */
+.sp-ci-rev { display: flex; flex-direction: column; gap: 10px; }
+.sp-ci-volver { align-self: flex-start; margin-left: -4px; }
+.sp-ci-sec:focus { outline: none; }
+.sp-doc-actions.sp-ci-pie > .sp-btn--ghost { color: var(--enlace); }
+.sp-ci-sec { margin: 6px 0 0; font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--enlace); }
+.sp-ci-dl { margin: 0; padding: 10px 16px; background: var(--sup); border-radius: var(--r-tarjeta); }
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) :is(.sp-ci-dl, .sp-ci-orden) { border-radius: var(--r-tarjeta-ancha); }
+.sp-ci-dl-f { display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 2px 14px; padding: 5px 0; }
+.sp-ci-dl dt { font-size: 13px; line-height: 20px; color: var(--tinta2); }
+.sp-ci-dl dd { margin: 0; min-width: 0; font-size: 15px; line-height: 20px; color: var(--tinta); overflow-wrap: anywhere; }
+.sp-ci-dl dd[data-falta] { color: var(--mal-tinta); font-weight: 600; }
+.sp-ci-dl-nota { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--aviso-tinta); }
+.sp-ci-orden { padding: 4px 16px; background: var(--sup); border-radius: var(--r-tarjeta); }
+.sp-ci-orden :is(ol, ul) { margin: 0; padding: 0; list-style: none; }
+.sp-ci-orden li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 12px; min-height: var(--k-toque); padding: 6px 0; border-top: 1px solid var(--linea); }
+.sp-ci-orden li:first-child { border-top: 0; }
+.sp-ci-orden li > b { font-size: 15px; line-height: 20px; font-weight: 500; color: var(--tinta); }
+.sp-ci-orden li > span { font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-ci-orden > .sp-ci-ayuda { padding: 4px 0 8px; border-top: 1px solid var(--linea); font-size: 13px; line-height: 18px; }
+.sp-ci-enlace {
+  display: inline-flex; align-items: center; min-height: var(--k-toque); margin: 0; padding: 0; border: 0; background: transparent;
+  color: var(--enlace); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.sp-ci-enlace:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; border-radius: 4px; }
+.sp-ci-aviso { margin: 0; padding: 10px 14px; border-radius: var(--r-control); background: var(--sup2); font-size: 14px; line-height: 20px; color: var(--tinta); }
+@container docform (max-width: 559px) {
+  .sp-ci-dl-f { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .sp-ci-dl, .sp-ci-orden { padding-inline: 14px; }
+}
+.sp-ci-offline { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.sp-ci-offline svg { width: 16px; height: 16px; }
+.sp-ci-den { flex-wrap: wrap; }
+.sp-ci-den > span { flex: 1 1 220px; }
+.sp-ci-previo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+
+/* Botón que sólo actúa si se mantiene pulsado («Médico: salir», «Soy el médico»). */
+.sp-mantener {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; isolation: isolate;
+  min-height: var(--k-toque); margin: 0; padding: 0 14px; border: 1px solid var(--linea); border-radius: var(--r-pildora);
+  background: transparent; color: var(--tinta2); font: inherit; font-size: 13px; line-height: 16px; font-weight: 500;
+  cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+.sp-mantener:focus-visible { outline: 3px solid var(--enlace); outline-offset: 2px; }
+.sp-mantener:disabled { opacity: .5; cursor: not-allowed; }
+.sp-mantener-relleno { position: absolute; inset: 0; z-index: -1; background: var(--tonal); transform: scaleX(0); transform-origin: left center; }
+.sp-mantener[data-pulsado] .sp-mantener-relleno { transform: scaleX(1); transition: transform 1.2s linear; }
+@media (prefers-reduced-motion: reduce) { .sp-mantener[data-pulsado] .sp-mantener-relleno { transition: none; } }
+.sp-mantener--grande { min-height: 56px; padding: 0 26px; border-radius: 14px; font-size: 16px; line-height: 20px; font-weight: 600; color: var(--tinta); border-color: var(--borde); }
+
+/* Modo paciente: grande, centrado y sin nada del médico. */
+.sp-firma-medico { flex: 0 0 auto; display: flex; justify-content: flex-end; padding: 10px 12px 0; }
+/* `.sp-firma-modo` ya lleva las franjas (`--it/--ir/--ib/--il`). */
+.sp-firma-cuerpo.sp-firma-pac { max-width: 860px; align-items: center; justify-content: safe center; gap: 16px; text-align: center; padding-top: 8px; }
+.sp-firma-pac .sp-firma-quien { align-items: center; gap: 6px; }
+.sp-firma-rolpaso { margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--enlace); }
+.sp-firma-pac .sp-firma-nombre, .sp-idfoto-pregunta .sp-firma-nombre {
+  margin: 0; font-size: clamp(22px, 4vw, 32px); line-height: 1.2; font-weight: 700; letter-spacing: -.02em; text-wrap: balance; color: var(--tinta);
+}
+.sp-firma-instr { margin: 0; max-width: 44ch; font-size: clamp(15px, 2.4vw, 19px); line-height: 1.35; color: var(--tinta2); }
+.sp-firma-pac .sp-firma-lienzo-wrap { width: min(760px, 100%); }
+.sp-firma-pac .sp-firma-lienzo { height: clamp(220px, 42vw, min(52vh, 320px)); border-radius: 18px; border-style: dashed; border-width: 2px; }
+.sp-firma-pac .sp-firma-acciones { justify-content: center; gap: 12px; }
+.sp-firma-pac .sp-firma-acciones > .sp-btn, .sp-firma-grande { min-height: 56px; padding: 0 28px; font-size: 17px; border-radius: 14px; }
+.sp-firma-pac .sp-banner { max-width: 760px; text-align: left; }
+.sp-firma-pase, .sp-idfoto-pregunta { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 560px; }
+.sp-idfoto-pregunta .sp-idfoto-controles { justify-content: center; }
+.sp-firma-pac .sp-idfoto { width: min(760px, 100%); align-items: center; }
+.sp-firma-pac .sp-idfoto-controles > .sp-btn { min-height: 56px; padding: 0 24px; font-size: 16px; border-radius: 14px; }
+
+/* El médico antes de sellar: las firmas recabadas como miniaturas. */
+.sp-firma-cuerpo:not(.sp-firma-pac) { padding-top: var(--sp-3); }
+.sp-firma-resumen { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; padding: 0; background: transparent; }
+.sp-firma-fm { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px; border-radius: 12px; background: var(--sup); min-width: 0; }
+/* Fondo literal, como el del lienzo: la tinta es la que se imprime. */
+.sp-firma-fm-img { display: grid; place-items: center; width: 100%; aspect-ratio: 2.4; border-radius: 8px; background: #fbfcfe; overflow: hidden; }
+.sp-firma-fm-img > img { width: 100%; height: 100%; object-fit: contain; }
+.sp-firma-fm-img > span { font-size: 13px; color: #52627a; }
+.sp-firma-fm .sp-firma-fila-txt { width: 100%; }
+.sp-firma-datos { display: grid; gap: 6px; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--sup2); }
+.sp-firma-datos > div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 2px 12px; }
+.sp-firma-datos dt { font-size: 13px; line-height: 20px; color: var(--tinta2); }
+.sp-firma-datos dd { margin: 0; font-size: 15px; line-height: 20px; color: var(--tinta); overflow-wrap: anywhere; }
+.sp-firma-sellopie { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.sp-firma-sellopie > .sp-btn { min-height: 48px; }
+@media (max-width: 559px) {
+  .sp-firma-resumen { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sp-firma-datos > div { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .sp-firma-sellopie > .sp-btn { flex: 1 1 0; }
+}
+
+/* ── 26.7 · ESCRITO MÉDICO: LA HOJA (maqueta `escrito.html`, aprobada) ──
+   Una hoja de alto fijo (`--esc-alto`, medido por el formulario: el área de
+   contenido menos su relleno de arriba y el pie de acciones) que se queda
+   pegada arriba (`sticky`, `--esc-arriba`) y en la que SOLO el cuerpo se
+   desplaza (`overscroll-behavior: contain`): datos en una línea, título como
+   título, la barra de formato y el pie de la hoja quedan siempre a la vista.
+   La barra reparte por el CONTENEDOR de la hoja (`escrito`): ancho, una fila;
+   medio, dos renglones; estrecho, lo `.sp-esc-ocu` baja al «⋯». Nada aquí es
+   `fixed`. */
+.sp-esc-hoja {
+  position: sticky; top: var(--esc-arriba, 0px); z-index: 2;
+  display: flex; flex-direction: column; height: var(--esc-alto, 70dvh);
+  background: var(--sup); border-radius: var(--r-tarjeta);
+  container: escrito / inline-size;
+}
+:where([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .sp-esc-hoja { border-radius: var(--r-tarjeta-ancha); }
+.sp-esc-meta {
+  flex: none; display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--k-toque); margin: 0; padding: 4px 16px;
+  border: 0; border-bottom: 1px solid var(--linea); border-radius: var(--r-tarjeta) var(--r-tarjeta) 0 0; background: transparent;
+  color: var(--tinta2); font: inherit; font-size: 13px; line-height: 18px; text-align: left; cursor: pointer;
+}
+.sp-esc-meta > b { color: var(--tinta); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-esc-meta > span { white-space: nowrap; }
+.sp-esc-meta > b { flex: 0 1 auto; min-width: 8ch; }
+.sp-esc-meta > span:nth-of-type(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sp-esc-cambiar { margin-left: auto; color: var(--enlace); font-weight: 600; }
+.sp-esc-meta:focus-visible { outline: 3px solid var(--enlace); outline-offset: -3px; }
+@media (hover: hover) { .sp-esc-meta:hover { background: var(--sup2); } }
+.sp-esc-datos { flex: none; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--linea); }
+.sp-esc-datos .sp-rx-rot { width: auto; min-width: 64px; }
+.sp-esc-listo { min-height: var(--k-toque); }
+.sp-esc-nota { grid-column: 1 / -1; margin: 0; padding: 0 12px; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-esc-titulo {
+  flex: none; width: 100%; margin: 0; padding: 12px 16px 4px; border: 0; background: transparent; color: var(--tinta);
+  font: inherit; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em;
+}
+.sp-esc-titulo::placeholder { color: var(--tinta2); opacity: .6; }
+.sp-esc-titulo:focus { outline: none; }
+.sp-esc-titulo:focus-visible { box-shadow: inset 0 -2px 0 var(--enlace); }
+:where([data-formato="ext"], [data-formato="tel"], [data-formato="iv"]) .sp-esc-titulo { min-height: 44px; }
+
+.sp-esc-bar { position: relative; flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--linea); }
+.sp-esc-btn[aria-pressed="true"] { background: var(--tonal); color: var(--tonal-tinta); }
+.sp-esc-btn[aria-expanded="true"] { background: var(--sup2); color: var(--tinta); }
+.sp-esc-btn:disabled { opacity: .38; cursor: default; }
+.sp-esc-sep { flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--linea); }
+.sp-esc-fin { flex: 1 0 0; }
+.sp-esc-bloque { margin: 0 2px; }
+.sp-esc-bloque .k-seg-op { padding: 0 10px; font-size: 13px; }
+.sp-esc-bar .sp-esc-solo-estrecho, .sp-esc-bar .sp-esc-solo-xs { display: none; }
+.sp-esc-menu-align { right: auto; left: 50%; transform: translateX(-50%); }
+.sp-esc-ayuda { width: min(340px, calc(100% - 16px)); padding: 12px 14px; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-esc-ayuda-t { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--tinta); }
+.sp-esc-ayuda dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; }
+.sp-esc-ayuda dl > div { display: contents; }
+.sp-esc-ayuda dt { white-space: nowrap; }
+.sp-esc-ayuda dd { margin: 0; color: var(--tinta); }
+.sp-esc-ayuda kbd { display: inline-block; padding: 1px 6px; border-radius: 6px; background: var(--sup2); color: var(--tinta); font: inherit; font-size: 12px; font-weight: 600; }
+.sp-esc-ayuda-n { margin: 8px 0 0; }
+
+/* El único que se desplaza. */
+.sp-esc-cuerpo { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.sp-esc-cuerpo > div { display: flex; flex-direction: column; min-height: 100%; }
+.sp-esc-cuerpo .sp-ed-prose { flex: 1; min-height: 0; padding: 14px 18px 18px; }
+/* El pie de acciones (sticky abajo, `z-index: 1`) va POR ENCIMA de la hoja
+   (sticky arriba, `z-index: 2`): al abrir, la hoja aún no ha subido y su parte
+   de abajo pasa por detrás del pie; con la hoja encima, «Imprimir» quedaba
+   tapado (auditoría H1). */
+.sp-doc-formbody:has(> .sp-esc-hoja) > .sp-doc-actions { z-index: 3; }
+.sp-esc-pieh { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 10px 6px; border-top: 1px solid var(--linea); }
+.sp-esc-pieh svg { width: 16px; height: 16px; }
+.sp-esc-piecampo { flex: 1 1 280px; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 4px 0; }
+.sp-esc-piecampo .sp-rx-rot { width: auto; min-width: 40px; }
+.sp-esc-piecampo .sp-esc-nota { padding: 0 12px; }
+.sp-esc-usar { flex: none; white-space: nowrap; }
+.sp-esc-cnt { margin-left: auto; font-size: 12px; line-height: 16px; color: var(--tinta2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Ancho: una fila, sin menús escondidos. */
+@container escrito (min-width: 760px) { .sp-esc-bar { flex-wrap: nowrap; } }
+/* Estrecho (`tel`/`ext`): Deshacer, el bloque, «⋯» y «?» en el primer renglón;
+   letra, listas y sangrías en el segundo; lo demás, en el «⋯». */
+@container escrito (max-width: 559px) {
+  .sp-esc-bar .sp-esc-ocu { display: none; }
+  .sp-esc-bar .sp-esc-solo-estrecho { display: inline-flex; }
+  .sp-esc-sep, .sp-esc-fin { display: none; }
+  .sp-esc-bar > * { order: 6; }
+  .sp-esc-bar > :first-child { order: 1; }
+  .sp-esc-bar > .sp-esc-bloque { order: 2; flex: 1 1 auto; display: flex; }
+  .sp-esc-bloque .k-seg-op { flex: 1; }
+  .sp-esc-bar > .sp-esc-solo-estrecho { order: 3; }
+  .sp-esc-bar > [aria-label="Atajos de escritura"] { order: 4; }
+  .sp-esc-bar::after { content: ""; order: 5; flex-basis: 100%; height: 0; }
+  .sp-esc-bar > .sp-ed-menu { order: 7; }
+  .sp-esc-titulo { font-size: 20px; line-height: 26px; padding: 12px 14px 4px; }
+  .sp-esc-datos { grid-template-columns: minmax(0, 1fr); }
+  .sp-esc-cuerpo .sp-ed-prose { padding: 12px 14px; }
+}
+/* Muy estrecho (`ext`, < 400): las sangrías también al «⋯» y el «?» al segundo
+   renglón, para que la barra quede en dos. */
+@container escrito (max-width: 399px) {
+  .sp-esc-bar .sp-esc-ocu-xs { display: none; }
+  .sp-esc-bar .sp-esc-solo-xs { display: flex; }
+  .sp-esc-bar > [aria-label="Atajos de escritura"] { order: 6; }
+  .sp-esc-bar > .sp-esc-bloque { flex: 0 1 auto; }
+  .sp-esc-bloque .k-seg-op { flex: none; padding: 0 5px; font-size: 12.5px; }
+  .sp-esc-bar { padding-inline: 4px; column-gap: 0; }
+}
+html.dark .sp-esc-titulo { background-color: transparent !important; border-color: transparent !important; }
+
+/* El visor del expediente (`TipTapViewer`): la misma jerarquía que el editor.
+   Sin esto, el preflight de Tailwind dejaba títulos del tamaño del texto y listas
+   sin marcador. */
+.tiptap-viewer p { margin: 8px 0; }
+.tiptap-viewer :is(h1, h2) { font-size: 19px; margin: 18px 0 6px; }
+.tiptap-viewer h3 { font-size: 17px; margin: 14px 0 5px; }
+.tiptap-viewer :is(h1, h2, h3) { font-weight: 700; line-height: 1.3; color: var(--tinta); }
+.tiptap-viewer ul { list-style: disc; padding-left: 24px; margin: 8px 0; }
+.tiptap-viewer ol { list-style: decimal; padding-left: 24px; margin: 8px 0; }
+.tiptap-viewer li { margin: 2px 0; }
+.tiptap-viewer li > p { margin: 0; }
+.tiptap-viewer blockquote { border-left: 3px solid var(--linea); padding-left: 16px; margin: 10px 0; font-style: italic; color: var(--tinta2); }
+.tiptap-viewer hr { border: 0; border-top: 1px solid var(--linea); margin: 14px 0; }
+.tiptap-viewer > :first-child { margin-top: 0; }
+
+/* ── 26.8 · PLAN DE SUPLEMENTACIÓN COMPACTO (maqueta `suplementos.html`, aprobada) ──
+   El patrón de la receta (26.1) con sus mismas piezas: un suplemento abierto
+   (`.sp-rx-ed`), los demás plegados (`.sp-rx-linea`), y los datos en una fila
+   con los campos de 26.5 (`.sp-hon-datos`). Lo propio: el peso con área de
+   escritura de ≥ 72 px en TODOS los formatos (en la primera maqueta quedó de
+   16 y no se podía teclear), el «para qué» del suplemento, la referencia del
+   cálculo por peso y las opciones ya elegidas atenuadas en el buscador. Nada
+   aquí es `fixed`. */
+.sp-hon-datos.sp-sup-datos > :first-child { flex: 1 1 240px; }
+.sp-sup-datos > :nth-child(2) { flex: 1 1 140px; }
+.sp-sup-peso .sp-rx-rot { width: auto; min-width: 0; }
+.sp-sup-pesofi {
+  flex: 0 0 auto; width: 88px; min-width: 72px; text-align: right;
+  font-weight: 600; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield;
+}
+.sp-sup-pesofi::-webkit-inner-spin-button, .sp-sup-pesofi::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.sp-sup-kg { flex: none; font-size: 13px; line-height: 18px; color: var(--tinta2); }
+.sp-sup-benef {
+  margin: 0; padding: 8px 12px; border-radius: var(--r-control); background: var(--sup2);
+  font-size: 13px; line-height: 18px; color: var(--tinta2);
+}
+.sp-sup-dosis { font-weight: 600; font-variant-numeric: tabular-nums; }
+.sp-sup-calc { margin: -2px 0 0; padding: 0 4px; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-sup-usar { position: relative; font-size: 12px; }
+/* El enlace es de 16 de alto; el área de toque, la del formato (44 / 36). */
+.sp-sup-usar::after { content: ''; position: absolute; left: -4px; right: -4px; top: 50%; height: var(--k-toque); transform: translateY(-50%); }
+.sp-sup-op > small { flex-basis: 100%; font-size: 12px; line-height: 16px; color: var(--tinta2); }
+.sp-sup-op--ya { opacity: .5; cursor: default; }
+.sp-sup-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.sp-sup-mas { margin-top: -4px; }
+@container docform (max-width: 559px) {
+  .sp-sup-acciones > .k-b-texto { width: 100%; justify-content: center; }
+  /* El peso conserva su ancho aunque la fila pase a una columna. */
+  .sp-hon-datos.sp-sup-datos > .sp-sup-peso { flex: 1 1 100%; }
+  /* La dosis es el dato largo («4,200–6,000 UI/día»): su rótulo, a su medida,
+     no a los 104 de la columna (auditoría H4: el texto se recortaba en `ext`). */
+  .sp-rx-campo:has(> .sp-sup-dosis) > .sp-rx-rot { width: auto; }
+}
+/* El desplegable del buscador pasa POR DEBAJO del pie de acciones (sticky,
+   `z-index: 1`, después en el árbol): sigue encima del resto del formulario,
+   pero ya no tapa «Imprimir» (auditoría H5). */
+.sp-rx-lista.sp-sup-lista { z-index: 1; }
+
+/* ── 26.9 · ALTURA COMPARTIDA EN `esc` (recomendación aprobada) ──────────────
+   Con un formulario abierto la columna crece a 880 en `esc` (lo decide el
+   anfitrión). A ese ancho, los tres datos del paciente «rótulo — valor» de
+   receta, laboratorio e imagen dejaban el valor perdido a 200 px de su
+   rótulo, un renglón cada uno: aquí pasan a UNA fila de tres fichas con el
+   rótulo encima. Sólo `esc` y sólo con contenedor ≥ 800 (`ext`/`tel`/`iv`/`ih`
+   no cambian ni un píxel). La denegación del consentimiento (once celdas,
+   `.sp-doc-consent-id`) queda como está. */
+@container docform (min-width: 800px) {
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) {
+    grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 16px;
+  }
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) > .sp-doc-field {
+    display: flex; flex-direction: column; gap: 0; padding: 0; border-top: 0;
+  }
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) > .sp-doc-field > .sp-label-field { padding-top: 0; }
+  :where([data-formato="esc"]) .sp-doc-cardbody .sp-doc-grid[data-cols="3"]:not(.sp-doc-consent-id) > .sp-doc-span-all { margin-top: 8px; padding-top: 8px; }
 }
 
 } /* fin @layer components */
@@ -2766,7 +3463,6 @@ main:has(.sp-doc-actions) { scroll-padding-bottom: 150px; }
 .sp-idfoto-cropper .reactEasyCrop_CropAreaGrid::after {
   border-color: rgba(255, 255, 255, 0.75);
 }
-
 
 /* ============================================================================
    20. GRÁFICA DE ANALITOS — el SVG de Recharts, vestido con tokens

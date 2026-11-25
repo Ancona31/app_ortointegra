@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { prepararAtendidaEnGoogle } from '@/lib/gcalEscritura'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { fueraDeLimitesDuros, type SignoVitalKey } from '@/lib/signosVitalesRangos'
 
@@ -293,7 +294,10 @@ export async function POST(req: NextRequest) {
        ── CERO FILAS NO ES UN ERROR, Y UN FALLO TAMPOCO ABORTA NADA ─────────
        La nota ya está guardada y es lo que importa. Como mucho, la línea de log.
 
-       ── COSTE ACEPTADO: GOOGLE NO SE ENTERA ──────────────────────────────
+       ── COSTE ACEPTADO: GOOGLE NO SE ENTERA (SÓLO CON LA AGENDA V2 APAGADA) ─
+       Con el interruptor v2 encendido SÍ se entera: ver el bloque C5 de abajo
+       (`prepararAtendidaEnGoogle`), que manda sólo el color en `after()`. Lo
+       que sigue describe el caso apagado, que no cambia.
        Esto no pasa por `PUT /api/appointments/[id]`, así que el evento conserva
        su color y no recibe el colorId de 'attended'. Replicarlo aquí metería un
        `events.get` + `events.patch` en el camino crítico de guardar una nota
@@ -303,13 +307,24 @@ export async function POST(req: NextRequest) {
        `clinica_id` explícito aunque el cliente sea el de sesión y la RLS ya
        acote: deja la barrera escrita para quien mañana cambie el cliente. */
     if (citaVinculada) {
-      const { error: errCita } = await supabase
+      const { data: marcadas, error: errCita } = await supabase
         .from('appointments')
         .update({ status: 'attended', updated_at: new Date().toISOString() })
         .eq('id', citaVinculada)
         .eq('clinica_id', profile.clinica_id)
         .in('status', ['scheduled', 'confirmed'])
+        .select('id, google_event_id')
       if (errCita) console.error('[POST /api/consultas] no se pudo marcar la cita como atendida:', errCita.message)
+      /* C5 · AGENDA V2: Google SÍ se entera ahora, con el interruptor encendido
+         y sólo si la cita pasó a atendida AQUÍ (cero filas = ya lo estaba) y
+         tenía evento. El patch sólo lleva el color y corre en `after()`, fuera
+         del camino crítico de la nota (ver `prepararAtendidaEnGoogle`).
+         Apagado, lo de arriba es lo de siempre y no se programa nada. */
+      const eventoAtendida = marcadas?.[0]?.google_event_id
+      if (typeof eventoAtendida === 'string' && eventoAtendida) {
+        const tarea = await prepararAtendidaEnGoogle(supabase, { clinicaId: profile.clinica_id, eventId: eventoAtendida, userId: user.id })
+        if (tarea) after(tarea)
+      }
     }
 
     return NextResponse.json({ consulta })

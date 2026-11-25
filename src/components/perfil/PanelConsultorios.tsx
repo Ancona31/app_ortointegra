@@ -1,16 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { MapPin, Plus, Star, Pencil, Trash2, Loader2 } from 'lucide-react'
+import { MapPin, Plus, Star, Pencil, Trash2, Loader2, Info } from 'lucide-react'
+import ModalShell from '@/components/ui/ModalShell'
 import { Consultorio } from '@/types'
 import { ZONAS_MEXICO, CHIPS_RAPIDOS } from '@/lib/consultorios/zonas-mexico'
-import { MAX_CONSULTORIOS } from '@/components/perfil/piezasDatos'
+import { MAX_CONSULTORIOS, RotuloSeccion, AyudaSeccion } from '@/components/perfil/piezasDatos'
 
 /**
  * Región 4 del spec: la pestaña Consultorios entera — lista en lectura,
- * edición EN LÍNEA y las reglas de borrado.
+ * edición y las reglas de borrado. Desde el rediseño (B10) la edición sale en
+ * la capa «Editar consultorio» (`ModalShell`) en vez de abrirse en el renglón;
+ * el formulario (`FilaEdicion`) y su lógica son los mismos.
  *
- * ⚠️ LA EDICIÓN EN LÍNEA SUSTITUYE A `EditConsultorioModal`, QUE QUEDA
+ * ⚠️ ESTA EDICIÓN SUSTITUYE A `EditConsultorioModal`, QUE QUEDA
  * HUÉRFANO. Su lógica de `nombre_corto` no se reinventó: está portada literal
  * más abajo, con los mismos cuatro casos. Si vuelves a montar aquel modal,
  * tendrás dos copias de esa regla divergiendo.
@@ -48,122 +51,104 @@ export default function PanelConsultorios({
 }) {
   const total = consultorios.length
   const topeAlcanzado = total >= MAX_CONSULTORIOS
+  const editando = consultorios.find(c => c.id === editandoId) ?? null
+  /* El último consultorio en edición sigue pintado mientras la capa SALE
+     (260 ms): sin esto se vaciaría antes de irse. Se ajusta durante el render,
+     el patrón de React para seguir a una prop. */
+  const [enCapa, setEnCapa] = useState<Consultorio | null>(editando)
+  if (editando && editando !== enCapa) setEnCapa(editando)
 
+  /* Rediseño B10 (maqueta `perfil`, pestaña Consultorios): rótulo de sección
+     con «Agregar» tonal a la derecha, la lista en una tarjeta y las notas
+     como ayuda debajo. La edición sale en una capa titulada «Editar
+     consultorio» (CALMA §30.6), con el MISMO formulario de antes. */
   return (
-    <>
-      <section className="sp-card flex flex-col gap-[var(--sp-3)]">
-
-        {/* ⚠️ `sm:flex-nowrap` ES LO QUE MANTIENE EL BOTÓN EN LA FILA DEL
-            TÍTULO, y sin él no basta con `justify-between`. Medido: a los 566 px
-            útiles de la card, el título más la línea de apoyo por su ancho
-            MÁXIMO (352 px), no por lo que encogería, y con el botón al lado se pasaba, y
-            `flex-wrap` responde bajando el botón a una fila propia — que es lo
-            que se está corrigiendo.
-            Sin envoltura, el bloque de texto encoge (`min-w-0`) y recibe 344 px:
-            el título entra de sobra con sus 127 y la que pasa a dos líneas es la
-            frase de apoyo, que es donde debe absorberse.
-            ⚠️ POR DEBAJO DE `sm` SÍ ENVUELVE, Y ES DELIBERADO: en un móvil la
-            card mide ~304 px y el botón solo ya son 210, así que forzar la misma
-            fila dejaría 94 px para el título. Ahí baja, y está bien. */}
-        <div className="flex flex-wrap items-start justify-between gap-[var(--sp-3)] sm:flex-nowrap">
-          <div className="min-w-0">
-            <h2 className="text-[length:var(--sp-fs-vitals)] font-bold text-[var(--sp-ink-800)]">Mis consultorios</h2>
-            <p className="sp-hint mt-[var(--sp-gap-title-sub)]">
-              {total} de {MAX_CONSULTORIOS} activos · el predeterminado es el que se abre al iniciar sesión.
-            </p>
-          </div>
-
-          {/* ⚠️ INHABILITADO = SECUNDARIO, NO PRIMARIO APAGADO, igual que en la
-              barra de guardado: `.sp-btn--primary:disabled` pinta blanco sobre
-              un gris azulado que no llega al 4.5:1.
-
-              ⚠️ EL RÓTULO ES «Agregar» A SECAS, Y EL COMPLETO VIVE EN
-              `aria-label`. Con «Agregar consultorio» y el relleno de 26 px del
-              primario el botón medía 220-252 px según la fuente: un 40 % del
-              ancho de la card para una acción secundaria. Con el rótulo corto y
-              el relleno del anexo (18 px) baja a 120-132. El sentido no se
-              pierde: va pegado al título «Mis consultorios» y lleva el «+», y
-              quien usa lector de pantalla sigue oyendo la frase entera.
-
-              ⚠️ LA ALTURA NO BAJA, Y NO ES UN OLVIDO: `--sp-tap` son 44 px y el
-              sistema los declara «ÁREA TÁCTIL MÍNIMA — nunca menor». No hay
-              escalón por debajo que el sistema permita, así que todo el ahorro
-              sale del ancho. */}
-          <button
-            type="button"
-            onClick={onAgregar}
-            disabled={topeAlcanzado}
-            aria-label="Agregar consultorio"
-            className={`sp-btn ${topeAlcanzado ? 'sp-btn--secondary' : 'sp-btn--primary'} shrink-0 px-[var(--sp-4-5)] disabled:cursor-not-allowed`}
-          >
-            <Plus size={16} /> Agregar
-          </button>
+    <section aria-labelledby="perfil-sec-mis-consultorios">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <RotuloSeccion id="perfil-sec-mis-consultorios" icono={MapPin} titulo="Mis consultorios" />
         </div>
+        {/* ⚠️ EL RÓTULO ES «Agregar» A SECAS Y EL COMPLETO VIVE EN `aria-label`:
+            va pegado al título «Mis consultorios» y lleva el «+». Al llegar al
+            tope (lo impone un trigger de base) se apaga. */}
+        <button
+          type="button"
+          onClick={onAgregar}
+          disabled={topeAlcanzado}
+          aria-label="Agregar consultorio"
+          className="k-b k-b-tonal mb-1.5 shrink-0"
+        >
+          <Plus size={18} aria-hidden="true" /> Agregar
+        </button>
+      </div>
 
-        {/* El tope de 10 lo impone un trigger de base de datos. Hasta ahora la
-            interfaz no lo conocía y sólo se descubría con un 409 al intentar
-            crear el número once. */}
-        {topeAlcanzado && (
-          <p className="sp-hint">
-            Has llegado al máximo de {MAX_CONSULTORIOS} consultorios activos. Para crear otro, elimina uno antes.
-          </p>
-        )}
-
+      <div className="k-tarjeta py-1">
         {cargando ? (
-          <div className="flex flex-col gap-[var(--sp-2)]">
-            <div className="skeleton h-[76px] rounded-[var(--sp-r-field)]" />
-            <div className="skeleton h-[76px] rounded-[var(--sp-r-field)]" />
-            <div className="skeleton h-[76px] rounded-[var(--sp-r-field)]" />
+          <div className="flex flex-col gap-2 py-2" aria-busy="true">
+            <div className="skeleton h-[72px] rounded-[12px]" />
+            <div className="skeleton h-[72px] rounded-[12px]" />
+            <div className="skeleton h-[72px] rounded-[12px]" />
           </div>
         ) : total === 0 ? (
           /* No debería ocurrir —toda cuenta nace con uno— pero si el trigger
              fallara alguna vez, la salida no puede ser una lista vacía muda. */
-          <div
-            className="flex flex-col items-center gap-[var(--sp-3)] rounded-[var(--sp-r-card-inner)] px-[var(--sp-5)] py-[var(--sp-7)]"
-            style={{ border: 'var(--sp-bw-dash) dashed var(--sp-line-dash)' }}
-          >
-            <MapPin size={20} className="text-[var(--sp-ink-150)]" />
-            <p className="sp-secondary text-center">No tienes consultorios activos.</p>
-            <button type="button" onClick={onAgregar} className="sp-btn sp-btn--primary">
-              <Plus size={16} /> Agregar el primero
+          <div className="flex flex-col items-center gap-3 px-2 py-6 text-center">
+            <MapPin size={20} aria-hidden="true" className="text-tinta2" />
+            <p className="text-[14px] leading-5 text-tinta2">No tienes consultorios activos.</p>
+            <button type="button" onClick={onAgregar} className="k-b k-b-tonal">
+              <Plus size={18} aria-hidden="true" /> Agregar el primero
             </button>
           </div>
         ) : (
-          <div className="flex flex-col">
-            {consultorios.map((c, i) => (
-              <div
-                key={c.id}
-                style={i > 0 ? { borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' } : undefined}
-              >
-                {editandoId === c.id ? (
-                  <FilaEdicion
-                    consultorio={c}
-                    onCancelar={() => onEditar(null)}
-                    onGuardado={actualizado => { onActualizado(actualizado); onEditar(null) }}
-                  />
-                ) : (
-                  <FilaLectura
-                    consultorio={c}
-                    onEditar={() => onEditar(c.id)}
-                    onMarcarDefault={() => onMarcarDefault(c)}
-                    onBorrar={() => onBorrar(c)}
-                    puedeBorrar={puedeBorrar(c)}
-                    motivoNoBorrar={motivoNoBorrar(c)}
-                  />
-                )}
-              </div>
+          <ul className="k-lista">
+            {consultorios.map(c => (
+              <li key={c.id}>
+                <FilaLectura
+                  consultorio={c}
+                  onEditar={() => onEditar(c.id)}
+                  onMarcarDefault={() => onMarcarDefault(c)}
+                  onBorrar={() => onBorrar(c)}
+                  puedeBorrar={puedeBorrar(c)}
+                  motivoNoBorrar={motivoNoBorrar(c)}
+                />
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </section>
+      </div>
 
-      <section className="sp-card">
-        <p className="sp-hint">
-          El consultorio predeterminado no se puede eliminar sin marcar otro antes. La zona horaria de cada
-          consultorio es la que usan la agenda y los documentos que se emiten ahí.
-        </p>
-      </section>
-    </>
+      <AyudaSeccion>
+        {total} de {MAX_CONSULTORIOS} activos · el predeterminado es el que se abre al iniciar sesión.
+      </AyudaSeccion>
+      {/* El tope de 10 lo impone un trigger de base de datos; sin esta línea
+          sólo se descubría con un 409 al intentar crear el número once. */}
+      {topeAlcanzado && (
+        <AyudaSeccion>
+          Has llegado al máximo de {MAX_CONSULTORIOS} consultorios activos. Para crear otro, elimina uno antes.
+        </AyudaSeccion>
+      )}
+      <AyudaSeccion>
+        El consultorio predeterminado no se puede eliminar sin marcar otro antes. La zona horaria de cada
+        consultorio es la que usan la agenda y los documentos que se emiten ahí.
+      </AyudaSeccion>
+
+      <ModalShell
+        open={editando !== null}
+        cierraConVelo={false}
+        onClose={() => onEditar(null)}
+        title="Editar consultorio"
+        maxWidth="max-w-[520px]"
+      >
+        {enCapa && (
+          <FilaEdicion
+            key={enCapa.id}
+            consultorio={enCapa}
+            onCancelar={() => onEditar(null)}
+            onGuardado={actualizado => { onActualizado(actualizado); onEditar(null) }}
+          />
+        )}
+      </ModalShell>
+    </section>
   )
 }
 
@@ -179,48 +164,29 @@ function FilaLectura({ consultorio: c, onEditar, onMarcarDefault, onBorrar, pued
 }) {
   const zona = offsetDeTimezone(c.timezone)
 
+  /* Rediseño B10: el motivo por el que no se puede eliminar se ENSEÑA bajo la
+     fila (antes sólo vivía en `title`, que en táctil no existe). */
   return (
-    <div className="flex flex-col gap-[var(--sp-2-5)] py-[var(--sp-3-5)] lg:flex-row lg:items-center lg:gap-[var(--sp-4)]">
-      <div className="flex min-w-0 flex-1 items-start gap-[var(--sp-3)]">
-        <span className="mt-[2px] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[var(--sp-r-icon-md)] bg-[var(--sp-primary-bg)] text-[var(--sp-primary-text)]">
-          <MapPin size={17} />
+    <div className="flex flex-col gap-2 py-3.5 esc:flex-row esc:flex-wrap esc:items-center esc:gap-x-4">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-sup2 text-enlace">
+          <MapPin size={18} />
         </span>
-
-        {/* ⚠️ TRES LÍNEAS, Y LA TERCERA NO ES CAPRICHO. El spec mete dirección,
-            teléfono y zona en UNA sola línea; medido, esa línea ocupa 470-534 px
-            y aquí hay 410, así que se cortaría — y lo primero en caer
-            sería la zona horaria, que es justo el dato que la nota al pie
-            declara gobernante de la agenda y de los documentos. Separándola con
-            el teléfono en una tercera línea corta (~130 px), esa línea nunca se
-            queda sin sitio.
-
-            ⚠️ Y LA DIRECCIÓN ENVUELVE A DOS LÍNEAS, NO TRUNCA. Mismo criterio
-            que la especialidad de la tarjeta de identidad y que el nombre de la
-            vista previa del PDF: aquí no hay ninguna anchura que garantice que
-            una dirección real entre —a 410 px caben unos 60-65 caracteres y las
-            de consultorio con torre, piso y número pasan de 110—, así que
-            truncar era perder dato de forma sistemática. Dos líneas cubren hasta
-            ~820 px de texto y cuestan ~16 px de alto por renglón. El tope sigue
-            existiendo, pero ya no lo alcanza una dirección normal. */}
+        {/* ⚠️ TRES LÍNEAS, Y LA TERCERA NO ES CAPRICHO: la zona horaria es el
+            dato que gobierna la agenda y los documentos, y en una línea con la
+            dirección sería lo primero en cortarse. La dirección envuelve a dos
+            líneas, no trunca. */}
         <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-[var(--sp-2)]">
-            <p className="min-w-0 truncate text-[length:var(--sp-fs-body)] font-bold text-[var(--sp-ink-800)]">
-              {c.nombre}
-            </p>
-            {c.es_default && (
-              <span className="shrink-0 rounded-[var(--sp-r-pill)] bg-[var(--sp-primary-bg)] px-[8px] py-[3px] text-[length:var(--sp-fs-tile)] font-bold uppercase tracking-[var(--sp-ls-label-w)] text-[var(--sp-primary-ink)]">
-                Predeterminado
-              </span>
-            )}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="k-t-fila min-w-0 truncate">{c.nombre}</p>
+            {c.es_default && <span className="k-etq k-etq-tonal shrink-0">Predeterminado</span>}
           </div>
-          <p className="line-clamp-2 text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-500)]">{c.direccion}</p>
-          <p className="truncate text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-400)]">
-            {[c.telefono, zona].filter(Boolean).join(' · ')}
-          </p>
+          <p className="k-t-sec line-clamp-2">{c.direccion}</p>
+          <p className="k-t-sec k-num truncate">{[c.telefono, zona].filter(Boolean).join(' · ')}</p>
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-[var(--sp-1)] max-lg:justify-end">
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 esc:justify-end">
         {/* En el predeterminado no se muestra: ya lo es. */}
         {!c.es_default && (
           <BotonAccion icono={Star} texto="Hacer predeterminado" onClick={onMarcarDefault} />
@@ -235,25 +201,23 @@ function FilaLectura({ consultorio: c, onEditar, onMarcarDefault, onBorrar, pued
           destructivo
         />
       </div>
+
+      {!puedeBorrar && (
+        <p className="flex items-start gap-1.5 text-[13px] leading-[18px] text-tinta2 esc:basis-full esc:pl-12">
+          <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" /> {motivoNoBorrar}
+        </p>
+      )}
     </div>
   )
 }
 
 /**
- * ⚠️ ICONO SOLO EN ESCRITORIO, ICONO Y TEXTO POR DEBAJO DE `lg`, Y ESTÁ MEDIDO.
- * El spec pide las tres acciones como texto. A los 586 px útiles de la card
- * en `lg` —el cuerpo mide 628—, «Hacer predeterminado · Editar · Eliminar»
- * ocupa 245-294 px según la fuente y deja 222-271 px para el nombre y los datos,
- * que necesitan 470-534: se truncaría más de la mitad de cada renglón. En icono
- * las tres caben en ~110 px y quedan ~410.
- * Por debajo de `lg` el cuerpo deja de ser una columna estrecha y sí hay sitio,
- * así que ahí sale el texto —y de paso el objetivo táctil sube a 44 px, como
- * pide el spec para móvil—.
- * El icono nunca va desnudo: lleva `aria-label` y `title` en los dos tamaños.
- *
- * ⚠️ INHABILITADO POR COLOR, NO POR OPACIDAD. El spec pide que el estado
- * inhabilitado siga siendo legible; `opacity-40` sobre el rojo de peligro lo
- * deja en un rosa que no se lee. `--sp-ink-400` da 4.4:1 sobre la superficie.
+ * Acción de texto de la fila (CALMA §2, nivel 3): icono de 16 y texto en
+ * `--enlace`; la destructiva en `--mal-tinta`. Área de toque del kit (`.k-b`,
+ * 44 en táctil y 36 en `ih`/`esc`).
+ * ⚠️ INHABILITADO POR COLOR, NO SÓLO POR OPACIDAD: el rojo apagado se leía
+ * como rosa. Lleva `title` con el motivo y, debajo de la fila, el motivo a la
+ * vista.
  */
 function BotonAccion({ icono: Icono, texto, onClick, disabled, titulo, destructivo }: {
   icono: typeof Star
@@ -263,10 +227,7 @@ function BotonAccion({ icono: Icono, texto, onClick, disabled, titulo, destructi
   titulo?: string
   destructivo?: boolean
 }) {
-  const tinta = disabled
-    ? 'var(--sp-ink-400)'
-    : destructivo ? 'var(--sp-danger)' : 'var(--sp-ink-500)'
-
+  const tinta = disabled ? 'text-tinta2' : destructivo ? 'text-mal-tinta' : 'text-enlace'
   return (
     <button
       type="button"
@@ -274,11 +235,10 @@ function BotonAccion({ icono: Icono, texto, onClick, disabled, titulo, destructi
       disabled={disabled}
       title={titulo ?? texto}
       aria-label={texto}
-      className="inline-flex min-h-[var(--sp-tap)] items-center justify-center gap-[var(--sp-1-5)] whitespace-nowrap rounded-[var(--sp-r-btn-sm)] px-[10px] text-[length:var(--sp-fs-hint)] font-semibold transition-colors hover:bg-[var(--sp-surface-muted)] disabled:cursor-not-allowed disabled:hover:bg-transparent lg:h-[34px] lg:min-h-0 lg:w-[34px] lg:px-0"
-      style={{ color: tinta }}
+      className={`k-b k-b-texto gap-1.5 text-[14px] ${tinta}`}
     >
-      <Icono size={16} />
-      <span className="lg:hidden">{texto}</span>
+      <Icono size={15} aria-hidden="true" className="hidden esc:block" />
+      {texto}
     </button>
   )
 }
@@ -383,57 +343,55 @@ function FilaEdicion({ consultorio: c, onCancelar, onGuardado }: {
     }
   }
 
+  /* Rediseño B10: el formulario va en la capa «Editar consultorio» (maqueta
+     `perfil`): filas «rótulo — campo» en una tarjeta `--sup2` y el pie con el
+     secundario a la izquierda y el principal a la derecha (CALMA §23.1). */
   return (
-    <div
-      className="my-[var(--sp-2)] flex flex-col gap-[var(--sp-3)] rounded-[var(--sp-r-card-inner)] bg-[var(--sp-surface-sunken)] px-[var(--sp-5)] py-[var(--sp-4)]"
-      style={{ border: 'var(--sp-bw-accent) solid var(--sp-primary-border)' }}
-    >
-      <div className="grid gap-[var(--sp-2-5)] sm:grid-cols-2">
-        <CampoLinea etiqueta="Nombre del consultorio" obligatorio className={requiereNombreCorto ? undefined : 'sm:col-span-2'}>
-          <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
-            placeholder="Ej: Consultorio Centro" className="sp-input" />
+    <div className="flex flex-col gap-4 px-6 pt-2 pb-5 ext:px-5">
+      <div className="flex flex-col divide-y divide-linea rounded-[14px] bg-fondo px-4 py-1">
+        <CampoLinea etiqueta="Nombre del consultorio" obligatorio htmlFor="cons-ed-nombre">
+          <input id="cons-ed-nombre" type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+            placeholder="Ej: Consultorio Centro" className={CAMPO_LINEA} />
         </CampoLinea>
 
         {requiereNombreCorto && (
           <CampoLinea
             etiqueta="Nombre corto"
             obligatorio
+            htmlFor="cons-ed-corto"
             ayuda="Máx. 12 caracteres. Es el que se ve en el menú y en la agenda."
           >
-            <input type="text" value={nombreCorto} onChange={e => setNombreCorto(e.target.value)}
-              maxLength={12} placeholder="Ej: Centro" className="sp-input" />
+            <input id="cons-ed-corto" type="text" value={nombreCorto} onChange={e => setNombreCorto(e.target.value)}
+              maxLength={12} placeholder="Ej: Centro" className={CAMPO_LINEA} />
           </CampoLinea>
         )}
 
-        <CampoLinea etiqueta="Dirección" obligatorio>
-          <input type="text" value={direccion} onChange={e => setDireccion(e.target.value)}
-            placeholder="Ej: Calle 60 #400, Mérida, Yucatán" className="sp-input" />
+        <CampoLinea etiqueta="Dirección" obligatorio htmlFor="cons-ed-direccion">
+          <input id="cons-ed-direccion" type="text" value={direccion} onChange={e => setDireccion(e.target.value)}
+            placeholder="Ej: Calle 60 #400, Mérida, Yucatán" className={CAMPO_LINEA} />
         </CampoLinea>
 
-        <CampoLinea etiqueta="Teléfono">
-          <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
-            placeholder="Ej: 999 123 4567" className="sp-input" />
+        <CampoLinea etiqueta="Teléfono" htmlFor="cons-ed-telefono">
+          <input id="cons-ed-telefono" type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
+            placeholder="Ej: 999 123 4567" className={CAMPO_LINEA} />
         </CampoLinea>
 
-        <CampoLinea etiqueta="Zona horaria" obligatorio className="sm:col-span-2">
-          <div className="flex flex-col gap-[var(--sp-2)]">
-            <div className="flex flex-wrap gap-[var(--sp-2)]">
+        <CampoLinea etiqueta="Zona horaria" obligatorio htmlFor="cons-ed-zona">
+          <div className="flex flex-col gap-1 py-1.5">
+            <div className="flex flex-wrap gap-2">
               {CHIPS_RAPIDOS.map(chip => (
                 <button
                   key={chip.value}
                   type="button"
                   aria-pressed={timezone === chip.value}
                   onClick={() => setTimezone(chip.value)}
-                  className="rounded-[var(--sp-r-pill)] px-[12px] py-[6px] text-[length:var(--sp-fs-hint)] font-semibold transition-colors"
-                  style={timezone === chip.value
-                    ? { background: 'var(--sp-primary)', color: 'var(--sp-on-primary)', border: 'var(--sp-bw-hair) solid var(--sp-primary)' }
-                    : { background: 'var(--sp-surface)', color: 'var(--sp-ink-600)', border: 'var(--sp-bw-hair) solid var(--sp-line-chip)' }}
+                  className={`k-b h-9 rounded-full px-3 text-[13px] ${timezone === chip.value ? 'bg-tonal text-tonal-tinta outline-2 -outline-offset-2 outline-accion' : 'k-b-quieto'}`}
                 >
                   {chip.label}
                 </button>
               ))}
             </div>
-            <select value={timezone} onChange={e => setTimezone(e.target.value)} className="sp-input">
+            <select id="cons-ed-zona" value={timezone} onChange={e => setTimezone(e.target.value)} className={CAMPO_LINEA}>
               <option value="">— Selecciona tu zona —</option>
               {ZONAS_MEXICO.map(z => <option key={z.value} value={z.value}>{z.label}</option>)}
             </select>
@@ -441,43 +399,47 @@ function FilaEdicion({ consultorio: c, onCancelar, onGuardado }: {
         </CampoLinea>
       </div>
 
-      {error && (
-        <p className="text-[length:var(--sp-fs-hint)] text-[var(--sp-danger)]">{error}</p>
-      )}
+      {error && <p role="alert" className="k-campo-error">{error}</p>}
 
-      <div className="flex flex-wrap items-center gap-[var(--sp-gap-item)]">
+      <div className="flex flex-wrap items-center justify-end gap-2 max-sm:grid max-sm:grid-cols-2">
+        <button type="button" onClick={onCancelar} disabled={guardando} className="k-b k-b-quieto min-w-[104px]">
+          Cancelar
+        </button>
+        {/* ⚠️ INHABILITADO = QUIETO, NO PRIMARIO APAGADO (contraste). */}
         <button
           type="button"
           onClick={guardar}
           disabled={!puedeGuardar}
-          className={`sp-btn ${puedeGuardar ? 'sp-btn--primary' : 'sp-btn--secondary'} disabled:cursor-not-allowed`}
+          className={`k-b ${puedeGuardar ? 'k-b-prim' : 'k-b-quieto'} min-w-[104px]`}
         >
-          {guardando ? <><Loader2 size={15} className="animate-spin" /> Guardando…</> : 'Guardar consultorio'}
-        </button>
-        <button type="button" onClick={onCancelar} disabled={guardando} className="sp-btn sp-btn--secondary disabled:cursor-not-allowed">
-          Cancelar
+          {guardando ? <><Loader2 size={16} aria-hidden="true" className="animate-spin" /> Guardando…</> : 'Guardar consultorio'}
         </button>
       </div>
     </div>
   )
 }
 
-/** Etiqueta, control y ayuda para el renglón en edición. */
-function CampoLinea({ etiqueta, obligatorio, ayuda, className, children }: {
+/** El control de una fila de la capa: sin caja, a 15 px, alto táctil de 44. */
+const CAMPO_LINEA = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none k-campo-sin-caja'
+
+/** Etiqueta, control y ayuda de una fila: apilados en teléfono, en dos columnas desde 640. */
+function CampoLinea({ etiqueta, obligatorio, ayuda, htmlFor, children }: {
   etiqueta: string
   obligatorio?: boolean
   ayuda?: string
-  className?: string
+  htmlFor?: string
   children: React.ReactNode
 }) {
   return (
-    <div className={`min-w-0 ${className ?? ''}`}>
-      <label className="sp-label-field mb-[var(--sp-gap-label)] block">
+    <div className="-mx-2 grid min-w-0 grid-cols-1 gap-0.5 rounded-[10px] px-2 pt-2.5 pb-1 focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-enlace sm:grid-cols-[168px_minmax(0,1fr)] sm:items-start sm:gap-3 sm:py-1">
+      <label htmlFor={htmlFor} className="text-[13px] leading-[18px] text-tinta2 sm:pt-[13px]">
         {etiqueta}
-        {obligatorio && <span className="text-[var(--sp-danger)]"> *</span>}
+        {obligatorio && <span className="text-mal-tinta"> *</span>}
       </label>
-      {children}
-      {ayuda && <p className="sp-hint mt-[var(--sp-1)]">{ayuda}</p>}
+      <div className="min-w-0">
+        {children}
+        {ayuda && <p className="pb-2 text-[13px] leading-[18px] text-tinta2">{ayuda}</p>}
+      </div>
     </div>
   )
 }

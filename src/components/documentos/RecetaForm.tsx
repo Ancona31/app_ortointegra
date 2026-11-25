@@ -2,14 +2,13 @@
 
 import { generateDocFileName, calcularEdad } from '@/lib/patientUtils'
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, AlertTriangle, Pill } from 'lucide-react'
+import { Plus, AlertTriangle, Pill, ListChecks } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import QRCode from 'qrcode'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import type { Medicamento } from '@/types'
 import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useProfile } from '@/hooks/useProfile'
@@ -18,62 +17,64 @@ import { folioImpreso } from '@/lib/documentos/folio'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
-import { MEDICAMENTOS, type MedicamentoDB } from '@/data/medicamentos'
-import ComboEscribible from '@/components/documentos/ComboEscribible'
+import type { MedicamentoDB } from '@/data/medicamentos'
+import LineaMedicamento from '@/components/documentos/LineaMedicamento'
+import MedicamentoReceta from '@/components/documentos/MedicamentoReceta'
+import {
+  conTexto, estaCompleto, faltasDe, sinPauta, textoAvisoPauta,
+  type Falta, type MedicamentoConVia,
+} from '@/components/documentos/recetaCompacta'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
-
-type MedicamentoConVia = Medicamento & { via_administracion?: string }
-
-const VIAS = ['Oral', 'Tópica', 'Intramuscular', 'Intravenosa', 'Subcutánea', 'Sublingual', 'Oftálmica', 'Ótica', 'Nasal', 'Inhalatoria', 'Rectal', 'Transdérmica']
+import { escucharSalida } from '@/components/documentos/salidaPlegable'
 
 const FECHA_MIN = '1900-01-01'
 
+/**
+ * Un medicamento NUEVO nace SIN vía (receta compacta, decisión del dueño): la
+ * vía es obligatoria y se elige; antes nacía con «Oral» puesta y un
+ * inyectable podía salir como oral sin que nadie lo decidiera. Las plantillas
+ * y la precarga desde la nota NO pasan por aquí: traen la suya.
+ */
 const MED_VACIO: MedicamentoConVia = {
   nombre_comercial: '', presentacion: '', dosis: '',
-  principio_activo: '', indicacion: '', via_administracion: 'Oral',
+  principio_activo: '', indicacion: '', via_administracion: '',
 }
 
 /**
- * Etiqueta → fila del catálogo, para el desplegable del nombre comercial.
- *
- * El nombre comercial NO identifica una fila: «Keral» son dos —tabletas de
- * 25 mg y solución inyectable— y hay dos docenas de casos iguales. Por eso la
- * etiqueta lleva la presentación. Y lleva el principio activo porque
- * `ComboEscribible` filtra por el texto de la etiqueta, y buscar por
- * denominación genérica —«diclofenaco»— es media búsqueda real del médico.
- *
- * El `Map` dedupe por construcción: si dos filas produjeran la misma etiqueta,
- * colapsan en una y ninguna clave se repite. Es lo que necesita la lista, que
- * usa la cadena como `key`.
+ * Lo que acompaña a cada medicamento sin viajar al PDF ni al jsonb: su clave
+ * estable de React (no el índice, para no perder el foco al quitar uno) y la
+ * «dosis sugerida» del catálogo, que se ofrece como ficha insertable.
  */
-const CATALOGO = new Map<string, MedicamentoDB>(
-  MEDICAMENTOS.map(m => [`${m.nombre_comercial} · ${m.presentacion} · ${m.principio_activo}`, m]),
-)
-const ETIQUETAS_CATALOGO = [...CATALOGO.keys()]
-
-/** Pista por bloque. Vive fuera del medicamento para no viajar al PDF ni al jsonb. */
-type Pista = { dosisSugerida: string; principioDelCatalogo: boolean }
-const PISTA_VACIA: Pista = { dosisSugerida: '', principioDelCatalogo: false }
-
-/**
- * Alguno de los cuatro campos de texto tiene contenido. La vía NO cuenta:
- * llega con «Oral» puesta y un bloque intacto no es un bloque escrito.
- */
-function conTexto(m: MedicamentoConVia): boolean {
-  return !!(m.nombre_comercial.trim() || m.presentacion?.trim()
-    || m.principio_activo?.trim() || m.indicacion.trim())
+type Pista = { clave: number; dosisSugerida: string }
+let ultimaClave = 0
+function pistaNueva(dosisSugerida = ''): Pista {
+  ultimaClave += 1
+  return { clave: ultimaClave, dosisSugerida }
 }
 
-/** Los dos obligatorios del formato: comercial y denominación genérica (§4). */
-function estaCompleto(m: MedicamentoConVia): boolean {
-  return !!(m.nombre_comercial.trim() && m.principio_activo?.trim())
+/** Ids del DOM de cada campo de un medicamento, por su clave estable. */
+type CampoMed = 'nombre' | 'principio' | 'via' | 'indicacion'
+const CAMPO_DE_FALTA: Record<Falta, CampoMed> = { comercial: 'nombre', generico: 'principio', via: 'via' }
+const ROTULO_FALTA: Record<Falta, string> = { comercial: 'Nombre comercial', generico: 'Genérico', via: 'Vía' }
+
+/** El elemento enfocable de un campo; la vía es su botón con tabindex 0. */
+function elementoDe(raiz: HTMLElement | null, clave: number, campo: CampoMed): HTMLElement | null {
+  const sel = campo === 'via' ? `#receta-via-${clave} [tabindex="0"]` : `#receta-${campo}-${clave}`
+  return raiz?.querySelector<HTMLElement>(sel) ?? null
 }
 
 /**
  * Lee un medicamento guardado en jsonb, campo a campo y desconfiando de todo:
  * el contenido pudo escribirse con otra versión del formulario.
+ *
+ * Una fila SIN la clave `via_administracion` llega ahora sin vía (antes se
+ * rellenaba con «Oral»): la plantilla muestra lo que se guardó, y una vía que
+ * nadie eligió no se inventa. Toda plantilla guardada por este formulario la
+ * lleva, así que sólo afecta a filas hechas a mano o de otra versión; la vía
+ * es obligatoria y el médico la elige antes de imprimir.
  */
 function leerMedicamento(bruto: unknown): MedicamentoConVia | null {
   if (typeof bruto !== 'object' || bruto === null) return null
@@ -85,7 +86,7 @@ function leerMedicamento(bruto: unknown): MedicamentoConVia | null {
     dosis: texto(fila.dosis),
     principio_activo: texto(fila.principio_activo),
     indicacion: texto(fila.indicacion),
-    via_administracion: texto(fila.via_administracion) || 'Oral',
+    via_administracion: texto(fila.via_administracion),
   }
   return conTexto(m) ? m : null
 }
@@ -236,9 +237,15 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
   // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
   const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [medicamentos, setMedicamentos] = useState<MedicamentoConVia[]>(medInicial)
-  const [pistas, setPistas] = useState<Pista[]>(medInicial.map(() => ({ ...PISTA_VACIA })))
+  const [pistas, setPistas] = useState<Pista[]>(() => medInicial.map(() => pistaNueva()))
+  // Receta compacta: UN medicamento abierto a la vez (su clave), los demás
+  // plegados a una línea. Nace abierto el primero.
+  const [abierto, setAbierto] = useState<number | null>(() => pistas[0]?.clave ?? null)
+  // Aviso suave de pauta (no bloquea): cuántos medicamentos y cuál abrir.
+  const [avisoPauta, setAvisoPauta] = useState<{ n: number; clave: number } | null>(null)
   const [recomendaciones, setRecomendaciones] = useState('')
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
@@ -282,8 +289,12 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       const filas = guardados.length > 0 ? guardados : [{ ...MED_VACIO }]
       setMedicamentos(filas)
       // Las pistas son del catálogo, no del jsonb: una plantilla aplicada no
-      // trae sugerencia de posología ni presume de dónde salió el principio.
-      setPistas(filas.map(() => ({ ...PISTA_VACIA })))
+      // trae sugerencia de posología.
+      const nuevas = filas.map(() => pistaNueva())
+      setPistas(nuevas)
+      // Aplicada, todo plegado (se ve la receta entera); vaciada, el único
+      // medicamento queda abierto para escribir.
+      setAbierto(filas.length === 1 && !conTexto(filas[0]) ? nuevas[0].clave : null)
       setRecomendaciones(typeof c.recomendaciones === 'string' ? c.recomendaciones : '')
     },
   })
@@ -295,75 +306,165 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
 
-  function addMed(i: number) {
-    setMedicamentos(prev => [...prev.slice(0, i + 1), { ...MED_VACIO }, ...prev.slice(i + 1)])
-    setPistas(prev => [...prev.slice(0, i + 1), { ...PISTA_VACIA }, ...prev.slice(i + 1)])
+  // ── Receta compacta: abrir, plegar, agregar y quitar ───────────────────
+  const listaRef = useRef<HTMLDivElement>(null)
+  const agregarRef = useRef<HTMLButtonElement>(null)
+  const indiceDe = (clave: number): number => pistas.findIndex(p => p.clave === clave)
+
+  /**
+   * Enfoca un campo de un medicamento ya pintado y lo acerca al borde de
+   * arriba, para que el teclado en pantalla no lo tape. En `tel`/`iv` el
+   * encabezado fundido flota SOBRE el scroller: el margen es el relleno de
+   * arriba del contenido (`.app-contenido`), que ya lo descuenta.
+   */
+  function enfocarCampo(clave: number, campo: CampoMed) {
+    const contenido = formRef.current?.closest<HTMLElement>('.app-contenido')
+    const margen = contenido ? parseFloat(getComputedStyle(contenido).paddingTop) || 24 : 24
+    enfocarYAcercar(elementoDe(listaRef.current, clave, campo), Math.max(24, margen))
   }
 
-  function removeMed(i: number) {
+  /** El abierto, si está totalmente vacío y no es el único: al plegarse se quita. */
+  function vacioQueSobra(): number | null {
+    if (abierto === null || medicamentos.length < 2) return null
+    const i = indiceDe(abierto)
+    return i >= 0 && !conTexto(medicamentos[i]) ? abierto : null
+  }
+
+  function quitarSinFoco(clave: number) {
+    const i = indiceDe(clave)
+    if (i < 0) return
     setMedicamentos(prev => prev.filter((_, idx) => idx !== i))
     setPistas(prev => prev.filter((_, idx) => idx !== i))
   }
 
-  function updateMed(i: number, campo: keyof MedicamentoConVia, val: string) {
-    setMedicamentos(prev => prev.map((m, idx) => idx === i ? { ...m, [campo]: val } : m))
-    // Escribir el principio activo a mano retira el sello del catálogo: la
-    // pista dejaría de describir lo que hay en el campo.
-    if (campo === 'principio_activo') {
-      setPistas(prev => prev.map((p, idx) => idx === i ? { ...p, principioDelCatalogo: false } : p))
-    }
+  /** Abre un medicamento (plegando el que estuviera abierto) y enfoca un campo. */
+  function abrirEn(clave: number, campo: CampoMed = 'nombre') {
+    const sobra = vacioQueSobra()
+    flushSync(() => {
+      if (sobra !== null && sobra !== clave) quitarSinFoco(sobra)
+      setAbierto(clave)
+    })
+    enfocarCampo(clave, campo)
   }
 
   /**
-   * Elegir del desplegable escribe la etiqueta compuesta; aquí se cambia por la
-   * fila real antes de que llegue al estado, así que el campo nunca muestra la
-   * etiqueta. Si lo escrito no es una etiqueta del catálogo, es texto libre.
+   * Pliega el abierto al tocar o enfocar FUERA de la lista (decisión del dueño).
+   * Vacío y no único: se quita. Único y vacío: se queda abierto. Si el foco ya
+   * volvió dentro de la lista (lo abrió otra acción), no hace nada.
    */
-  function alEscribirNombre(i: number, val: string) {
-    const med = CATALOGO.get(val)
-    if (!med) { updateMed(i, 'nombre_comercial', val); return }
-    setMedicamentos(prev => prev.map((m, idx) => idx === i ? {
-      ...m,
-      nombre_comercial: med.nombre_comercial,
-      presentacion: med.presentacion,
-      principio_activo: med.principio_activo,
-    } : m))
-    setPistas(prev => prev.map((p, idx) => idx === i
-      ? { dosisSugerida: med.dosis_sugerida, principioDelCatalogo: true }
-      : p))
+  function plegar() {
+    if (abierto === null || listaRef.current?.contains(document.activeElement)) return
+    const sobra = vacioQueSobra()
+    if (sobra !== null) quitarSinFoco(sobra)
+    else if (medicamentos.length === 1 && !conTexto(medicamentos[0])) return
+    setAbierto(null)
+  }
+  const plegarRef = useRef(plegar)
+  useEffect(() => { plegarRef.current = plegar })
+
+  /* «Plegado al salir»: la escucha compartida (`salidaPlegable.ts`, con la
+     causa del defecto del texto de una casilla). */
+  useEffect(() => escucharSalida(el => !!(listaRef.current?.contains(el) || agregarRef.current?.contains(el)), () => plegarRef.current()), [])
+
+  /** «Agregar medicamento» y Ctrl/⌘+Enter: pliega el actual, crea otro al final y va a su buscador. */
+  function agregar() {
+    const i = abierto === null ? -1 : indiceDe(abierto)
+    if (abierto !== null && i >= 0 && !conTexto(medicamentos[i])) { enfocarCampo(abierto, 'nombre'); return }
+    const p = pistaNueva()
+    flushSync(() => {
+      setMedicamentos(prev => [...prev, { ...MED_VACIO }])
+      setPistas(prev => [...prev, p])
+      setAbierto(p.clave)
+    })
+    enfocarCampo(p.clave, 'nombre')
   }
 
-  // ── Validación (§3.8) ───────────────────────────────────────────
-  // El bloque de referencia es el primero con algo escrito, o el primero a
-  // secas: nombrar «Nombre comercial» sin decir de qué bloque solo tiene
-  // sentido si el banner lleva luego hasta él.
-  const hayCompleto = medicamentos.some(estaCompleto)
-  const iRef = Math.max(0, medicamentos.findIndex(conTexto))
+  /** Quitar: el foco va al vecino (el siguiente, o el anterior si era el último), abierto. */
+  function quitar(clave: number) {
+    const i = indiceDe(clave)
+    if (i < 0 || medicamentos.length < 2) return
+    const restantes = pistas.filter(p => p.clave !== clave)
+    const vecino = restantes[Math.min(i, restantes.length - 1)].clave
+    flushSync(() => { quitarSinFoco(clave); setAbierto(vecino) })
+    enfocarCampo(vecino, 'nombre')
+  }
 
-  const faltantes: { clave: string; nombre: string }[] = []
+  function cambiar(clave: number, campo: keyof MedicamentoConVia, val: string) {
+    const i = indiceDe(clave)
+    setMedicamentos(prev => prev.map((m, idx) => idx === i ? { ...m, [campo]: val } : m))
+  }
+
+  /**
+   * Elegir del catálogo rellena comercial, presentación, genérico y vía (si la
+   * fila la trae; si no, se conserva la que hubiera). El foco va a las
+   * indicaciones, o a la vía si quedó vacía.
+   */
+  function elegirDelCatalogo(clave: number, fila: MedicamentoDB) {
+    const i = indiceDe(clave)
+    const via = fila.via ?? medicamentos[i]?.via_administracion ?? ''
+    flushSync(() => {
+      setMedicamentos(prev => prev.map((m, idx) => idx === i ? {
+        ...m,
+        nombre_comercial: fila.nombre_comercial,
+        presentacion: fila.presentacion,
+        principio_activo: fila.principio_activo,
+        via_administracion: via,
+      } : m))
+      setPistas(prev => prev.map((p, idx) => idx === i ? { ...p, dosisSugerida: fila.dosis_sugerida } : p))
+    })
+    enfocarCampo(clave, via ? 'indicacion' : 'via')
+  }
+
+  // ── Validación (§3.8; receta compacta) ──────────────────────────
+  // Un medicamento con algo escrito y a medias YA NO se descarta en silencio:
+  // bloquea la impresión y se dice qué le falta (decisión del dueño). Los
+  // obligatorios son los de siempre —comercial y genérico— más la vía. Sin
+  // ningún medicamento escrito, se piden los dos de siempre en el primero.
+  const hayDatos = medicamentos.some(conTexto)
+  const faltasDeCadaUno: Falta[][] = medicamentos.map((m, i) =>
+    hayDatos ? faltasDe(m) : (i === 0 ? ['comercial', 'generico'] : []))
+
+  type Faltante = { clave: string; nombre: string; med?: { clave: number; campo: CampoMed } }
+  const faltantes: Faltante[] = []
   if (!paciente.trim()) faltantes.push({ clave: 'receta-paciente', nombre: 'Paciente' })
-  if (!hayCompleto) {
-    if (!medicamentos[iRef]?.nombre_comercial.trim()) {
-      faltantes.push({ clave: `receta-nombre-${iRef}`, nombre: 'Nombre comercial' })
+  faltasDeCadaUno.forEach((fs, i) => {
+    const k = pistas[i].clave
+    const deCual = medicamentos.length > 1 ? ` (medicamento ${i + 1})` : ''
+    for (const f of fs) {
+      const campo = CAMPO_DE_FALTA[f]
+      faltantes.push({ clave: `${campo}-${k}`, nombre: ROTULO_FALTA[f] + deCual, med: { clave: k, campo } })
     }
-    if (!medicamentos[iRef]?.principio_activo?.trim()) {
-      faltantes.push({ clave: `receta-principio-${iRef}`, nombre: 'Principio activo' })
-    }
+  })
+
+  function irA(f: Faltante) {
+    if (f.med) { abrirEn(f.med.clave, f.med.campo); return }
+    enfocarYAcercar(pacienteRef.current)
   }
 
-  function irA(clave: string) {
-    if (clave === 'receta-paciente') { enfocarYAcercar(pacienteRef.current); return }
-    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>(`#${clave}`) ?? null)
-  }
-
-  async function imprimir() {
+  function imprimir() {
     // El primario nunca está gris por faltantes: un botón apagado no enseña qué
     // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
     if (faltantes.length > 0) {
       setIntentado(true)
-      irA(faltantes[0].clave)
+      irA(faltantes[0])
       return
     }
+    // Aviso suave (NO bloquea): indicaciones sin frecuencia o sin duración.
+    const sin = medicamentos.flatMap((m, i) => estaCompleto(m) && sinPauta(m.indicacion) ? [pistas[i].clave] : [])
+    if (sin.length > 0) { setAvisoPauta({ n: sin.length, clave: sin[0] }); return }
+    void emitir()
+  }
+
+  /** «Revisar» del aviso: abre el primero sin pauta, en sus indicaciones. */
+  function revisarPauta() {
+    const clave = avisoPauta?.clave
+    setAvisoPauta(null)
+    // Tras devolver la capa el foco a su disparador, no antes.
+    if (clave !== undefined) setTimeout(() => abrirEn(clave, 'indicacion'), 0)
+  }
+
+  /** Emite la receta: fila, PDF y entrega (sin cambios respecto a antes). */
+  async function emitir() {
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
 
     // 1. Feedback instantáneo — el usuario ve progreso en <50ms
@@ -386,8 +487,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
     //     repone, las recetas nuevas empiezan a regenerarse con un número que su
     //     papel no lleva.
     const clientId = crypto.randomUUID()
-    // Un bloque a medias no llega ni al PDF ni al expediente, y ya no puede
-    // desaparecer en silencio: imprimir con uno incompleto es imposible.
+    // Aquí ya no hay bloques a medias (`imprimir` los bloquea): el filtro sólo
+    // deja fuera los totalmente vacíos. Mismo objeto de seis claves de siempre.
     const medsData = medicamentos.filter(estaCompleto)
     const contenido = {
       paciente,
@@ -607,8 +708,8 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         msg = `La receta quedó registrada${folioSerie ? ` con folio ${folioSerie}` : ''}, pero no se `
           + 'pudo generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       // eslint-disable-next-line no-console
       console.error('[RecetaForm] imprimir falló:', err)
     } finally {
@@ -626,7 +727,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
       {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
           está abierto: se apaga con display:none y el panel se monta como
           hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
-      <div className="sp-doc-formbody" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
+      <div className="sp-doc-formbody sp-doc-formbody--pie-encima" style={plantillas.panelAbierto ? { display: 'none' } : undefined}>
 
       {plantillas.selector}
 
@@ -664,100 +765,39 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         </div>
       </section>
 
-      <section className="sp-card sp-doc-card">
-        {/* La cabecera se queda solo con su etiqueta: «Agregar medicamento» va
-            al pie de CADA bloque (§2.2). Con cuatro fármacos, un botón único al
-            final obliga a bajar hasta abajo y volver a subir. */}
+      {/* Receta compacta (decisión del dueño): un medicamento abierto, los
+          demás plegados a una línea. «Agregar medicamento» vuelve a ser UNO,
+          al final de la lista, con Ctrl/⌘+Enter desde el abierto. */}
+      <section className="sp-card sp-doc-card sp-rx">
         <div className="sp-doc-cardhead">
           <div className="sp-icobox sp-icobox--sm"><Pill /></div>
           <h2 className="sp-label">Medicamentos</h2>
         </div>
-        <div className="sp-doc-cardbody">
-          {medicamentos.map((med, i) => (
-            <div key={i} className="sp-doc-medblock">
-              <div className="sp-doc-medhead">
-                <span className="sp-label">Medicamento {i + 1}</span>
-                <button type="button" onClick={() => removeMed(i)} disabled={medicamentos.length === 1}
-                  aria-label={med.nombre_comercial.trim()
-                    ? `Eliminar ${med.nombre_comercial.trim()}`
-                    : `Eliminar medicamento ${i + 1}`}
-                  className="sp-doc-iconbtn">
-                  <Trash2 />
-                </button>
-              </div>
-
-              <div className="sp-doc-grid" data-cols="3">
-                <div className="sp-doc-field sp-doc-span-2">
-                  <label htmlFor={`receta-nombre-${i}`} className="sp-label-field">
-                    Nombre comercial <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                    <span className="sr-only">obligatorio</span>
-                  </label>
-                  <ComboEscribible
-                    id={`receta-nombre-${i}`}
-                    value={med.nombre_comercial}
-                    onChange={val => alEscribirNombre(i, val)}
-                    sugerencias={ETIQUETAS_CATALOGO}
-                    minCaracteres={2}
-                    placeholder="Ej: Voltaren"
-                    pie="Ninguno encaja: escribe el nombre y se usa tal cual."
-                    invalido={senalar(`receta-nombre-${i}`)}
-                    claseExtra={senalar(`receta-nombre-${i}`) ? 'sp-doc-invalid' : ''}
-                  />
-                </div>
-
-                <div className="sp-doc-field">
-                  <label htmlFor={`receta-presentacion-${i}`} className="sp-label-field">Presentación</label>
-                  <input id={`receta-presentacion-${i}`} type="text" value={med.presentacion ?? ''}
-                    onChange={e => updateMed(i, 'presentacion', e.target.value)}
-                    placeholder="Tabletas 50 mg" className="sp-input" />
-                </div>
-
-                <div className="sp-doc-field">
-                  <label htmlFor={`receta-via-${i}`} className="sp-label-field">Vía de administración</label>
-                  <select id={`receta-via-${i}`} value={med.via_administracion || 'Oral'}
-                    onChange={e => updateMed(i, 'via_administracion', e.target.value)}
-                    className="sp-input">
-                    {VIAS.map(v => <option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-
-                {/* Se queda como campo EDITABLE y no como texto informativo: es
-                    la denominación genérica que exige el formato, y el catálogo
-                    no la trae siempre. Como texto, los fármacos fuera de
-                    catálogo perderían el dato exigible (§4). */}
-                <div className="sp-doc-field sp-doc-span-2">
-                  <label htmlFor={`receta-principio-${i}`} className="sp-label-field">
-                    Principio activo <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                    <span className="sr-only">obligatorio</span>
-                  </label>
-                  <input id={`receta-principio-${i}`} type="text" value={med.principio_activo ?? ''}
-                    onChange={e => updateMed(i, 'principio_activo', e.target.value)}
-                    placeholder="Diclofenaco sódico"
-                    aria-invalid={senalar(`receta-principio-${i}`) || undefined}
-                    className={`sp-input ${senalar(`receta-principio-${i}`) ? 'sp-doc-invalid' : ''}`} />
-                  {pistas[i]?.principioDelCatalogo && <p className="sp-hint">Del catálogo · editable</p>}
-                </div>
-
-                <div className="sp-doc-field sp-doc-span-all">
-                  <label htmlFor={`receta-indicacion-${i}`} className="sp-label-field">Indicaciones</label>
-                  <textarea id={`receta-indicacion-${i}`} value={med.indicacion}
-                    onChange={e => updateMed(i, 'indicacion', e.target.value)}
-                    placeholder="Tomar 1 tableta cada 8 hrs con alimentos por 7 días"
-                    className="sp-textarea" />
-                  {pistas[i]?.dosisSugerida && (
-                    <p className="sp-hint">Sugerencia del catálogo: {pistas[i].dosisSugerida}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="sp-doc-medfoot">
-                <button type="button" onClick={() => addMed(i)}
-                  className="sp-btn sp-btn--compact">
-                  <Plus size={17} /> Agregar medicamento
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="sp-doc-cardbody sp-rx-cuerpo">
+          <div ref={listaRef} className="sp-rx-meds">
+            {medicamentos.map((med, i) => {
+              const k = pistas[i].clave
+              const faltas = intentado ? faltasDeCadaUno[i] : []
+              return k === abierto ? (
+                <MedicamentoReceta key={k} numero={i + 1} clave={k} med={med}
+                  dosisSugerida={pistas[i].dosisSugerida} faltas={faltas}
+                  puedeQuitar={medicamentos.length > 1}
+                  onCampo={(campo, val) => cambiar(k, campo, val)}
+                  onElegir={fila => elegirDelCatalogo(k, fila)}
+                  onQuitar={() => quitar(k)} onAgregar={agregar}
+                  onEnfocar={campo => enfocarCampo(k, campo)} />
+              ) : (
+                <LineaMedicamento key={k} numero={i + 1} med={med} faltas={faltas}
+                  onAbrir={() => abrirEn(k)} />
+              )
+            })}
+          </div>
+        </div>
+        <div className="sp-rx-agregar">
+          <button ref={agregarRef} type="button" onClick={agregar} className="k-b k-b-tonal sp-rx-agregar-b">
+            <Plus aria-hidden="true" /> Agregar medicamento
+            <span className="sp-rx-atajo" aria-hidden="true"><kbd>Ctrl</kbd><kbd>Enter</kbd></span>
+          </button>
         </div>
       </section>
 
@@ -778,7 +818,50 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
         </div>
       </section>
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
+
+      {/* Aviso suave de la pauta (decisión del dueño): NO bloquea. «Revisar»
+          abre el primero sin frecuencia o sin duración; «Imprimir así» emite.
+          Heurística en `sinPauta` (recetaCompacta.ts). */}
+      <ModalShell
+        open={avisoPauta !== null}
+        onClose={() => setAvisoPauta(null)}
+        variante="alerta"
+        tono="avisar"
+        elevated
+        icon={<ListChecks aria-hidden="true" />}
+        title="Revisa las indicaciones"
+        footer={
+          <>
+            <button type="button" onClick={() => { setAvisoPauta(null); void emitir() }} className="k-b k-b-capa k-b-quieto">
+              Imprimir así
+            </button>
+            <button type="button" autoFocus data-principal onClick={revisarPauta} className="k-b k-b-capa k-b-prim">
+              Revisar
+            </button>
+          </>
+        }
+      >
+        <p>{textoAvisoPauta(avisoPauta?.n ?? 1)}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">
@@ -796,7 +879,7 @@ export default function RecetaForm({ pacienteInicial = '', diagnosticoInicial = 
             {faltantes.slice(0, 3).map((f, i) => (
               <span key={f.clave}>
                 {i > 0 && ' · '}
-                <button type="button" onClick={() => irA(f.clave)}
+                <button type="button" onClick={() => irA(f)}
                   className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
                   {f.nombre}
                 </button>

@@ -3,9 +3,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Pill, FlaskConical, ScanLine, ClipboardList,
-  BedDouble, PenLine, ShieldCheck, Receipt, ChevronDown,
+  BedDouble, PenLine, ShieldCheck, Receipt, AlertTriangle,
 } from 'lucide-react'
 import ModalShell from '@/components/ui/ModalShell'
+import IconoTipoDocumento from '@/components/ui/IconoTipoDocumento'
 // Misma búsqueda de scroller que usan los formularios: el scroller de esta app
 // no es la ventana. Una sola definición para que no diverjan.
 import { scrollerDe } from '@/lib/scrollDoc'
@@ -71,14 +72,6 @@ export function tipoDocumento(key: TipoDocumento | null): Tipo | null {
   return TIPOS_DOCUMENTO.find(t => t.key === key) ?? null
 }
 
-/** React.CSSProperties no admite custom properties. Se ensancha el tipo en vez
- *  de silenciarlo con `as`: --doc-color es una propiedad real del elemento. */
-type EstiloDoc = React.CSSProperties & { '--doc-color': string }
-
-function estiloDe(t: Tipo): EstiloDoc {
-  return { '--doc-color': `var(--sp-doc-${t.token})` }
-}
-
 /** Columnas vigentes de la rejilla. Se leen del CSS resuelto porque el umbral
  *  es de CONTENEDOR: ningún cálculo en JS sobre el viewport lo acertaría. */
 function columnasDe(grid: HTMLElement | null): number {
@@ -116,6 +109,8 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
   // de debajo del dedo, que es justo lo que el §5 evita.
   const [anim, setAnim] = useState(false)
   const [pendiente, setPendiente] = useState<TipoDocumento | null>(null)
+  // El último tipo pedido: lo que dice la alerta también mientras sale.
+  const [pedido, setPedido] = useState<TipoDocumento | null>(null)
 
   const slotRef  = useRef<HTMLDivElement>(null)   // tarjetas o línea: la ranura que cambia de alto
   const gridRef  = useRef<HTMLDivElement>(null)
@@ -211,7 +206,7 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
 
   function elegir(tipo: TipoDocumento) {
     if (tipo === value) { focoRef.current = 'linea'; setAnim(true); setAbierto(false); return }
-    if (value && conDatos) { setPendiente(tipo); return }
+    if (value && conDatos) { setPendiente(tipo); setPedido(tipo); return }
     aplicar(tipo)
   }
 
@@ -242,6 +237,7 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
   // Índice tabulable de la rejilla (roving tabindex): el activo, o el primero.
   const idxTab = Math.max(0, TIPOS_DOCUMENTO.findIndex(t => t.key === value))
   const entrante = tipoDocumento(pendiente)
+  const ultimo = tipoDocumento(pedido)
 
   return (
     <>
@@ -254,7 +250,7 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
             role="tablist"
             aria-label="Tipo de documento"
             onKeyDown={alTeclearRejilla}
-            className={`sp-doc-typecards${anim ? ' animate-fade-in' : ''}`}
+            className={`k-rej${anim ? ' animate-fade-in' : ''}`}
           >
             {TIPOS_DOCUMENTO.map((t, i) => (
               <button
@@ -266,33 +262,33 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
                 aria-controls={idPanel}
                 tabIndex={i === idxTab ? 0 : -1}
                 onClick={() => elegir(t.key)}
-                style={estiloDe(t)}
-                className="sp-doc-typecard"
+                className="k-az"
               >
-                <t.icon />
-                <span className="sp-doc-typecard__label">{t.label}</span>
+                <IconoTipoDocumento tipo={t.key} nivel="rejilla" />
+                <span className="k-az-n">{t.label}</span>
               </button>
             ))}
           </div>
         ) : (
+          /* Cabecera del formulario (maquetas `docs-a/b/c`): el tipo con su
+             icono en cuadro y «Cambiar» tonal. Sigue siendo UN botón —el mismo
+             disparador de siempre— y «Documento» sigue en su nombre accesible.
+             El «···» lo pone el formulario (`PlantillasDocumento`), alineado
+             con esta línea por `spinus-tokens.css` §26. */
           <button
             ref={lineaRef}
             type="button"
             aria-expanded={false}
             aria-controls={idPanel}
             onClick={() => { focoRef.current = 'tarjeta'; setAnim(true); setAbierto(true) }}
-            style={estiloDe(activo)}
-            className={`sp-doc-typecollapsed${anim ? ' animate-fade-in' : ''}`}
+            className={`k-az-linea sp-doc-cab${anim ? ' animate-fade-in' : ''}`}
           >
-            <activo.icon />
-            <span className="min-w-0">
-              <span className="sp-doc-typecollapsed__eyebrow">Documento</span>
-              <span className="sp-doc-typecollapsed__name">{activo.label}</span>
+            <IconoTipoDocumento tipo={activo.key} nivel="rejilla" />
+            <span className="k-az-linea-t">
+              <span className="sr-only">Documento</span>
+              <span>{activo.label}</span>
             </span>
-            <span className="sp-doc-typecollapsed__cta">
-              Cambiar
-              <ChevronDown />
-            </span>
+            <span className="k-az-cambiar">Cambiar</span>
           </button>
         )}
       </div>
@@ -305,6 +301,9 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
       {/* Confirmación PREVIA y no Deshacer: cambiar de tipo hace desaparecer el
           formulario entero, y un aviso posterior es una franja pequeña que se
           pierde, sobre todo en móvil. */}
+      {/* Alerta destructiva del catálogo (CALMA §13, §20): «Cambiar» y no
+          «Cambiar a X», para que los dos botones queden parejos; el título
+          conserva el nombre completo. El foco entra en «Cancelar». */}
       <ModalShell
         /* !!entrante y no una comparación contra un nulo concreto: es cierto
            solo cuando hay un tipo destino real, sea cual sea el nulo que
@@ -312,27 +311,24 @@ export default function SelectorTipoDocumento({ value, onChange, conDatos = fals
            donde el diálogo se quedaba abierto para siempre. */
         open={!!entrante}
         onClose={() => setPendiente(null)}
-        spinusGeometry="decide"
-        title={entrante ? `¿Cambiar a ${entrante.label}?` : ''}
+        variante="alerta"
+        tono="destruir"
+        icon={<AlertTriangle aria-hidden="true" />}
+        /* Mientras sale, `entrante` ya es null: el título y el texto se quedan
+           con el último tipo pedido (`ultimo`) para no cambiar a media salida. */
+        title={ultimo ? `¿Cambiar a ${ultimo.label}?` : ''}
         footer={
-          <div className="flex items-center gap-2 p-4 md:px-6">
-            <button onClick={() => setPendiente(null)} className="sp-btn sp-btn--ghost">
+          <>
+            <button type="button" autoFocus onClick={() => setPendiente(null)} className="k-b k-b-capa k-b-quieto">
               Cancelar
             </button>
-            <div className="flex-1" />
-            <button
-              onClick={() => entrante && aplicar(entrante.key)}
-              className="sp-btn sp-btn--primary">
-              Cambiar a {entrante?.label}
+            <button type="button" data-principal onClick={() => entrante && aplicar(entrante.key)} className="k-b k-b-capa k-b-mal">
+              Cambiar
             </button>
-          </div>
+          </>
         }
       >
-        <div className="p-4 md:p-6">
-          <p className="sp-banner sp-banner--danger">
-            Se descarta {activo?.def ?? 'el documento'} que estás llenando. No se puede deshacer.
-          </p>
-        </div>
+        <p>Se descarta {activo?.def ?? 'el documento'} que estás llenando. No se puede deshacer.</p>
       </ModalShell>
     </>
   )

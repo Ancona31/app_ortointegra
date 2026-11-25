@@ -25,7 +25,8 @@ export interface MedicoChipData {
   apellido_materno: string | null
 }
 
-// Paleta de tonos pastel, alineada con los avatares de la app.
+// Paleta de tonos pastel, alineada con los avatares de la app. Las iniciales
+// van a 12 px (mínimo del kit) y en oscuro las traduce la hoja de ThemeProvider.
 const TONOS = [
   'bg-violet-100 text-violet-700',
   'bg-blue-100 text-blue-700',
@@ -57,12 +58,12 @@ export function ChipMedico({ medico, size = 'sm' }: ChipMedicoProps) {
 
   const dims =
     size === 'md'
-      ? { wrap: 'gap-1.5 pl-1 pr-2.5 py-1', av: 'w-6 h-6 text-[10px]', txt: 'text-sm' }
-      : { wrap: 'gap-1 pl-0.5 pr-2 py-0.5', av: 'w-5 h-5 text-[9px]', txt: 'text-xs' }
+      ? { wrap: 'gap-1.5 pl-1 pr-2.5 py-1', av: 'w-7 h-7 text-[12px]', txt: 'text-sm' }
+      : { wrap: 'gap-1 pl-0.5 pr-2 py-0.5', av: 'w-6 h-6 text-[12px]', txt: 'text-[13px]' }
 
   return (
     <span
-      className={`inline-flex items-center ${dims.wrap} rounded-full bg-slate-50 border border-slate-200/70 max-w-full`}
+      className={`inline-flex items-center ${dims.wrap} rounded-full bg-sup2 max-w-full`}
       title={label}
     >
       <span
@@ -71,7 +72,7 @@ export function ChipMedico({ medico, size = 'sm' }: ChipMedicoProps) {
       >
         {iniciales}
       </span>
-      <span className={`${dims.txt} text-slate-700 truncate`}>{label}</span>
+      <span className={`${dims.txt} text-tinta2 truncate`}>{label}</span>
     </span>
   )
 }
@@ -91,7 +92,7 @@ export function ListaChipsMedicos({
   const lista = medicos ?? []
 
   if (lista.length === 0) {
-    return <span className="text-xs text-slate-400">—</span>
+    return <span className="text-[13px] text-tinta3">—</span>
   }
 
   const visibles = lista.slice(0, max)
@@ -104,7 +105,7 @@ export function ListaChipsMedicos({
       ))}
       {ocultos.length > 0 && (
         <span
-          className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium"
+          className="inline-flex items-center px-2 py-0.5 rounded-full bg-sup2 text-tinta2 text-[13px] font-medium"
           title={ocultos.map((m) => componerNombreMedicoCorto(m)).join(', ')}
         >
           +{ocultos.length}

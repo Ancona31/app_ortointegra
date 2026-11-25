@@ -1,0 +1,10 @@
+→ contenedor spinus-e0-b (public.ecr.aws/supabase/postgres:17.6.1.167) en 127.0.0.1:54392
+→ roles
+→ base postgres vacía (la de la imagen trae esquemas de arranque que chocarían)
+→ estructura (03-esquema-completo.sql)
+→ historial de migraciones
+→ 0 error(es) de restauración en /home/angel-m-ancona-perez/spinus-fusion/clon-spinus-e0-b.log:
+→ comparación clon ↔ foto
+
+Resumen: 2597 objetos en foto, 2585 en clon; 12 diferencias (12 esperadas, 0 inesperadas).
+aviso: la diferencia esperada de la línea 9 (restriccion public.tipos_cita.tipos_cita_duracion_check) no apareció; ¿sigue haciendo falta?

@@ -44,39 +44,24 @@ export default function PestanasPerfil({ activa, onCambiar }: {
   onCambiar: (clave: ClavePestanaPerfil) => void
 }) {
   return (
-    <div
-      role="tablist"
-      aria-label="Secciones de Mi perfil"
-      /* El desplazamiento es SÓLO de móvil (`max-lg:`). Con `overflow-x: auto`
-         suelto sale barra de scroll en escritorio aunque las tres pestañas
-         quepan de sobra: cuando un eje del overflow es `visible` y el otro no,
-         el `visible` computa a `auto`. El razonamiento largo está en
-         `PestanasExpediente.tsx`, que tropezó con ello primero.
-         El filete inferior va como sombra INTERIOR para que el subrayado de la
-         activa apoye encima sin necesitar margen negativo. */
-      className="flex items-stretch gap-[var(--sp-1)] max-lg:overflow-x-auto pr-[var(--sp-4)] lg:pr-0"
-      style={{ boxShadow: 'inset 0 -1px 0 var(--sp-line-card)' }}
-    >
-      {PESTANAS_PERFIL.map(p => {
-        const esActiva = p.clave === activa
-        return (
-          <button
-            key={p.clave}
-            type="button"
-            role="tab"
-            aria-selected={esActiva}
-            onClick={() => onCambiar(p.clave)}
-            className="shrink-0 whitespace-nowrap px-[var(--sp-4)] py-[var(--sp-3)] text-[length:var(--sp-fs-body-sm)] transition-colors"
-            style={{
-              borderBottom: `2.5px solid ${esActiva ? 'var(--sp-primary)' : 'transparent'}`,
-              color: esActiva ? 'var(--sp-ink-800)' : 'var(--sp-ink-500)',
-              fontWeight: esActiva ? 'var(--sp-fw-bold)' : 'var(--sp-fw-semi)',
-            }}
-          >
-            {p.rotulo}
-          </button>
-        )
-      })}
+    /* Rediseño B10: la fila de pestañas del kit (`.k-tabs`/`.k-tab`, CALMA §6),
+       la misma de Administración y del expediente. `data-t` reserva el ancho de
+       la negrita para que la fila no salte al cambiar de pestaña. Se desplaza en
+       horizontal si no cabe (nunca encoge la letra). */
+    <div role="tablist" aria-label="Secciones de Mi perfil" className="k-tabs">
+      {PESTANAS_PERFIL.map(p => (
+        <button
+          key={p.clave}
+          type="button"
+          role="tab"
+          aria-selected={p.clave === activa}
+          data-t={p.rotulo}
+          onClick={() => onCambiar(p.clave)}
+          className="k-tab"
+        >
+          {p.rotulo}
+        </button>
+      ))}
     </div>
   )
 }

@@ -67,31 +67,32 @@ export function KebabAccionesPaciente({ pacienteId }: { pacienteId: string }) {
         onClick={() => (open ? setOpen(false) : abrir())}
         aria-label="Acciones del paciente"
         aria-expanded={open}
-        className="p-1.5 rounded-lg text-slate-400 hover:text-[#1e5fa8] hover:bg-slate-100 transition-colors"
+        className="k-b k-b-icono"
       >
-        <MoreVertical size={18} />
+        {/* Área de toque propia del kit (`--k-toque`: 44 táctil, 36 en ih/esc). */}
+        <MoreVertical size={20} aria-hidden="true" />
       </button>
 
       {open && coords && typeof document !== 'undefined' && createPortal(
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: coords.top, right: coords.right }}
-          className="z-50 w-44 bg-white border border-slate-200 rounded-xl shadow-lg py-1 overflow-hidden"
+          className="z-50 w-48 bg-sup rounded-[var(--r-tarjeta)] shadow-lg py-1 overflow-hidden"
         >
           <Link
             href={`/expediente/${pacienteId}`}
             onClick={cerrar}
-            className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#1d1d1f] hover:bg-slate-50 transition-colors"
+            className="flex min-h-[var(--k-toque)] items-center gap-2.5 px-3.5 text-[15px] text-tinta hover:bg-sup2 transition-colors"
           >
-            <FileText size={15} className="text-[#86868b]" />
+            <FileText size={18} aria-hidden="true" className="text-enlace" />
             Ir a expediente
           </Link>
           <Link
             href={`/expediente/${pacienteId}/editar`}
             onClick={cerrar}
-            className="flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#1d1d1f] hover:bg-slate-50 transition-colors"
+            className="flex min-h-[var(--k-toque)] items-center gap-2.5 px-3.5 text-[15px] text-tinta hover:bg-sup2 transition-colors"
           >
-            <Pencil size={15} className="text-[#86868b]" />
+            <Pencil size={18} aria-hidden="true" className="text-enlace" />
             Editar paciente
           </Link>
         </div>,

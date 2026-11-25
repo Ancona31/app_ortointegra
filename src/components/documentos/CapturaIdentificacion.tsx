@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Cropper, { type Area, type MediaSize, type Point, type Size } from 'react-easy-crop'
-import { Camera, Images, RotateCw } from 'lucide-react'
+import { Camera, RotateCw } from 'lucide-react'
 import {
   ANCHO_MINIMO_NITIDO,
   PROPORCION,
@@ -31,10 +31,10 @@ import {
  *     `Permissions-Policy` — el permiso lo administra el sistema operativo a
  *     su propia app de cámara, no el navegador a esta página. Verificado: no
  *     deja copia en la galería del dispositivo (iOS y Android probados).
- *   · «Elegir archivo» — el mismo campo SIN `capture`: selector de fotos.
- *     Son dos entradas y no una porque `capture` fuerza la cámara y suprime la
- *     galería del selector nativo, y la guía declara que subir desde galería
- *     es aceptable (§6.3): la foto es cotejo, no prueba de presencia.
+ *   · «Elegir archivo» —el mismo campo SIN `capture`, que abría la fototeca—
+ *     SE RETIRÓ (CI-DT-9): el dispositivo es el del médico y en este paso lo
+ *     tiene el paciente, así que la galería le enseñaba fotos clínicas de otros
+ *     pacientes. Sólo cámara; si no la trae o no hay cámara, «No la traigo».
  *   · El recorte vive DESPUÉS, sobre la imagen quieta, con la proporción de la
  *     caja del anexo. Lo que se sube es SOLO lo de dentro del rectángulo: la
  *     mesa y los dedos no salen del dispositivo.
@@ -127,7 +127,6 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
   const cropSizeRef = useRef<Size | null>(null)
 
   const inputCamaraRef = useRef<HTMLInputElement>(null)
-  const inputArchivoRef = useRef<HTMLInputElement>(null)
   /**
    * Espejo del object-URL para la limpieza de desmontaje, que corre UNA vez y
    * no ve el estado. Sin revocarlo, cada foto descartada queda retenida
@@ -168,7 +167,7 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
       setRotacion(0)
       setFase('recortar')
     } catch {
-      setAviso('No se pudo leer esa imagen. Elige otro archivo o sigue sin foto.')
+      setAviso('No se pudo leer esa imagen. Tome otra foto o continúe sin ella.')
     }
   }
 
@@ -264,38 +263,32 @@ export default function CapturaIdentificacion({ documentoId, rol, onListo }: Pro
     <div className="sp-idfoto">
       {aviso && <p className="sp-banner sp-banner--warn">{aviso}</p>}
 
-      {/* Las dos entradas al mismo campo. Ocultas: los botones visibles de abajo
-          las disparan. El `value` se vacía tras leerlo para que repetir con el
-          MISMO archivo vuelva a disparar el `change`. */}
+      {/* SOLO CÁMARA (CI-DT-9): un campo con `capture="environment"`, oculto, que
+          dispara «Tomar foto». El `value` se vacía tras leerlo para que repetir
+          con el MISMO archivo vuelva a disparar el `change`. En escritorio,
+          `capture` se ignora y abre el selector: allí no hay paciente con el
+          aparato en la mano. */}
       <input ref={inputCamaraRef} type="file" accept="image/jpeg,image/png"
         capture="environment" hidden
         onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void elegir(f) }} />
-      <input ref={inputArchivoRef} type="file" accept="image/jpeg,image/png" hidden
-        onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; void elegir(f) }} />
 
       {fase === 'pregunta' && (
-        <div className="sp-card sp-idfoto-card">
+        <div className="sp-idfoto-pregunta">
           <span className="sp-icobox"><Camera aria-hidden="true" /></span>
-          <div className="sp-idfoto-card-txt">
-            <p className="sp-body">
-              Firma capturada. ¿Se anexa una foto de la identificación?
-            </p>
-            <div className="sp-idfoto-controles">
-              {/* `Sin foto` es una RESPUESTA, no una cancelación: por eso es un
-                  botón del mismo peso y no una X. */}
-              <button type="button" className="sp-btn sp-btn--secondary"
-                onClick={() => onListo(null)}>
-                Sin foto
-              </button>
-              <button type="button" className="sp-btn sp-btn--primary"
-                onClick={() => inputCamaraRef.current?.click()}>
-                <Camera size={18} aria-hidden="true" /> Tomar foto
-              </button>
-              <button type="button" className="sp-btn sp-btn--ghost"
-                onClick={() => inputArchivoRef.current?.click()}>
-                <Images size={18} aria-hidden="true" /> Elegir archivo
-              </button>
-            </div>
+          <p className="sp-firma-nombre">¿Trae su identificación oficial?</p>
+          <p className="sp-firma-instr">Si la tiene a la mano, tómele una foto. Si no, puede continuar sin ella.</p>
+          <div className="sp-idfoto-controles">
+            {/* «No la traigo» es una RESPUESTA, no una cancelación: por eso es un
+                botón del mismo peso y no una X. Es también la salida si el
+                dispositivo no tiene cámara. */}
+            <button type="button" className="sp-btn sp-btn--secondary"
+              onClick={() => onListo(null)}>
+              No la traigo
+            </button>
+            <button type="button" className="sp-btn sp-btn--primary"
+              onClick={() => inputCamaraRef.current?.click()}>
+              <Camera size={18} aria-hidden="true" /> Tomar foto
+            </button>
           </div>
         </div>
       )}

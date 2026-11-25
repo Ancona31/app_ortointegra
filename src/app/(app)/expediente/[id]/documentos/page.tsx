@@ -6,22 +6,22 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente } from '@/types'
 import { calcularEdad } from '@/lib/patientUtils'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import SelectorTipoDocumento, { TIPOS_DOCUMENTO, type TipoDocumento } from '@/components/documentos/SelectorTipoDocumento'
 
 const FormLoader = () => (
-  <div className="flex items-center justify-center py-16 text-slate-400">
-    <Loader2 size={20} className="animate-spin mr-2" />
-    <span className="text-sm">Cargando formulario...</span>
+  <div className="flex items-center justify-center gap-2 py-16 text-tinta2" role="status">
+    <Loader2 size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+    <span className="text-[15px]">Cargando formulario...</span>
   </div>
 )
 
 const FormError = () => (
-  <div className="flex flex-col items-center justify-center py-16 text-slate-400 gap-2">
-    <p className="text-sm font-medium">No se pudo cargar el formulario</p>
-    <p className="text-xs">Verifica tu conexion e intenta de nuevo</p>
+  <div className="flex flex-col items-center justify-center gap-1 py-16 text-center" role="alert">
+    <p className="text-[15px] font-semibold text-tinta">No se pudo cargar el formulario</p>
+    <p className="text-[13px] text-tinta2">Verifica tu conexion e intenta de nuevo</p>
   </div>
 )
 
@@ -120,6 +120,10 @@ function DocumentosPacienteContent() {
     const url = new URL(window.location.href)
     if (t) url.searchParams.set('tipo', t)
     else url.searchParams.delete('tipo')
+    /* El borrador que se retomaba ya no es el documento abierto: al cerrar tras
+       emitir (o al cambiar de tipo) `?borrador=` apuntaría a uno ya emitido
+       (CI-DT-14). */
+    url.searchParams.delete('borrador')
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
   }, [])
   // Los ocho reportan predicado: los siete del sistema de plantillas
@@ -141,7 +145,7 @@ function DocumentosPacienteContent() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente').eq('id', id).single()
+    supabase.from('pacientes').select('id, nombre, apellidos, fecha_nacimiento, sexo, numero_expediente, alergias').eq('id', id).single()
       .then((res: { data: Paciente | null }) => setPaciente(res.data))
       .catch(() => {})
       .finally(() => setFichaResuelta(true))
@@ -159,22 +163,40 @@ function DocumentosPacienteContent() {
     : ''
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href={`/expediente/${id}`} className="text-slate-400 hover:text-slate-600">
-          <ArrowLeft size={20} />
+    /* Columna de 640 centrada en el área de contenido (CALMA §14); en `iv`,
+       la de 600 (§19). Con un formulario abierto, en `esc` crece a 880 —el
+       mismo criterio para los ocho; no más: las líneas largas se leen peor—
+       (altura compartida de los formularios, aprobada). `ih` no gana nada: su
+       área ya es de ~650. La rejilla de tipos sigue en 640. */
+    <div lang="es" className={`mx-auto w-full max-w-[640px] iv:max-w-[600px] space-y-5${tab ? ' esc:max-w-[880px]' : ''}`}>
+      {/* Cabecera: «‹ Expediente» (CALMA §6, §20), título y quién. El regreso
+          va a la pestaña Documentos del expediente (`?tab=documentos`, clave de
+          `PestanasExpediente`), no al Resumen: se llega aquí desde «Nuevo
+          documento», «Crear documento» de esa pestaña, «Receta» del dashboard
+          o ⌘K, siempre con este mismo paciente. */}
+      <header>
+        <Link href={`/expediente/${id}?tab=documentos`} className="k-b k-b-texto -ml-1 h-[var(--k-toque)] text-[13px]">
+          <ChevronLeft size={16} aria-hidden="true" />
+          Expediente
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-[#1a3a5c]">Documentos</h1>
-          {paciente && (
-            <p className="text-slate-500 text-sm mt-0.5">
+        <h1 className="k-t-pantalla mt-1">Documentos</h1>
+        {paciente && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="k-t-sec">
               {paciente.nombre} {paciente.apellidos}
               {paciente.fecha_nacimiento ? ` · ${calcularEdad(paciente.fecha_nacimiento).textoElegante}` : ''}
             </p>
-          )}
-        </div>
-      </div>
+            {/* La alergia del paciente en la cabecera de la receta (CALMA §23.4).
+                Sin alergias registradas no se dibuja nada. */}
+            {tab === 'receta' && paciente.alergias?.trim() && (
+              <span className="k-etq k-etq-mal h-auto min-h-6 max-w-full whitespace-normal py-0.5">
+                <AlertTriangle aria-hidden="true" />
+                Alergias: {paciente.alergias.trim()}
+              </span>
+            )}
+          </div>
+        )}
+      </header>
 
       {/* Selector de tipo + formulario. Montaje 2 de la guía 04: el cromo
           encima del selector es la cabecera «Documentos» + paciente. */}
@@ -217,7 +239,7 @@ function DocumentosPacienteContent() {
           {tab === 'suplementacion' && <PlanSuplementacionForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'internamiento' && <SolicitudInternamientoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'escrito' && <EscritoMedicoForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
-          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
+          {tab === 'consentimiento' && <ConsentimientoInformadoForm pacienteInicial={nombreCompleto} diagnosticoInicial={diagnosticoInicial} edadInicial={edadInicial} fechaNacimiento={paciente?.fecha_nacimiento ?? null} pacienteId={id} borradorId={borradorId} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           {tab === 'honorarios' && <NotaHonorariosForm pacienteInicial={nombreCompleto} pacienteId={id} onVacioChange={setFormVacio} onCerrarTrasEmitir={() => irATipo(null)} onPanelPlantillasChange={setPanelPlantillas} />}
           </>}
         </SelectorTipoDocumento>

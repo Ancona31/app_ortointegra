@@ -1,0 +1,112 @@
+# Cromo global de `(app)` — qué falta en las maquetas
+
+Auditoría de la sección «A0 · Cromo global» de `funciones-componentes.md` contra el código (clon `S/app`, commit `951e31b3`) y contra las maquetas aprobadas (`dashboard-final`, `pub-pacientes`, `pub-nota`, `pub-documentos`, `tanda4`, `pub-capas`). Rutas de código relativas a `src/`.
+
+> **Estado al 21-nov (tras CALMA §28): ningún ítem de A0 queda en FALTA sin dueño.** Lo único sin dibujar en `entrega/cromo/` es «Plegar menú» (A0·8), **reservado al agente de herramientas de la agenda** (§28), y `OnboardingGuide` (A0·20), que **no existe en la app** (sin consumidores). La tabla obligatoria de §28 está justo debajo; la auditoría detallada de la primera pasada, más abajo.
+
+## Tabla obligatoria (CALMA §28): ítem del inventario → dónde está en la maqueta
+
+| # | Ítem A0 | Dónde está | Estado |
+|---|---|---|---|
+| 1 | Cabecera del menú (logo, nombre, especialidad / «Asistente Médico/a») | Logo de la clínica en el botón de consultorio y especialidad en el pie (no en `ih`): todas las vistas de `cromo/`, en especial **5-cajon**. Glifo Spinus + plan arriba (aprobado). «Asistente Médico/a» no se muestra: la fila de la secretaria lleva su nombre y «Ajustes». | resuelto (decisión §28) |
+| 2 | Selector de consultorio activo | **cromo/2-consultorio** (lista, «Gestionar consultorios →», confirmación, aviso); en `ext` desde «Más» (**1**, **2**, **5**) | dibujado |
+| 3 | Navegación del médico | Barra/cajón aprobados + **5-cajon** (por rol). Suplementación dentro de Expediente (§28); Ayuda en «Más» (`ext`, `iv`) y botón de Ayuda en el pie (barra y cajón); 8 tipos por la rejilla (`pub-documentos`); Estadísticas/Usuarios/Facturación por pestañas (`tanda4`) | dibujado |
+| 4 | Navegación de secretaria | **5-cajon** (variante Secretaria): Inicio · Expediente · Agenda · Ajustes; sin Mi perfil (§28) | dibujado |
+| 5 | Grupos plegables | Sustituidos por la navegación plana aprobada | resuelto (rediseño) |
+| 6 | Documentos ▸ tipo | `pub-documentos` vista 1 | dibujado |
+| 7 | Bloqueo por plan en el menú | **cromo/4-suscripcion** (el modal que abre) | dibujado |
+| 8 | Plegar / Desplegar menú (agenda) | — | **reservado al agente de herramientas de la agenda (§28)** |
+| 9 | Modo claro / oscuro | Médico: `tanda4` vista 1 (Ajustes) y **6-sesion**; secretaria: «Ajustes» en **5-cajon** | dibujado |
+| 10 | Cerrar sesión (+ aviso de revocación) | **cromo/6-sesion** (reposo, mientras cierra, aviso exacto; confirmación como propuesta); secretaria en **5-cajon** | dibujado |
+| 11 | Aviso de perfil «N datos pendientes» | **cromo/1-aviso-perfil** (+ dentro del cajón en **5**) | dibujado |
+| 12 | Aviso de Privacidad | `tanda4` vistas 1 y 5; **5-cajon** y **6-sesion** | dibujado |
+| 13 | Menú móvil (cajón) | **cromo/5-cajon** (abierto, por rol, con arrastre para cerrar) y **1-aviso-perfil**; «Más» en `ext`/`iv` | dibujado |
+| 14 | Paleta ⌘K | **cromo/3-paleta** (anclada arriba en ancho, aprobada §28) | dibujado |
+| 15 | Paleta → registro rápido y duplicado | **cromo/3-paleta** | dibujado |
+| 16 | Banner de suscripción | **cromo/4-suscripcion** (los cinco marcos, todos los roles) | dibujado |
+| 17 | `BloqueoFeatureModal` | **cromo/4-suscripcion** (admin / sin administrar) | dibujado |
+| 18 | Sin conexión | `pub-capas` vista 7 | dibujado |
+| 19 | Asistente de perfil (`OnboardingModal`) | **cromo/7-asistente-perfil** (los siete pasos, invitado sin clínica, «ya creada», guardando, logo elegido, firma en sus dos modos) | dibujado |
+| 20 | `OnboardingGuide` | — | **no existe en la app** (0 consumidores en 951e31b y en `origin/main`); decidir si se retira (P4) |
+| 21 | Avisos breves | `pub-capas` vista 5 (+ ejemplos en **2** y **6**) | dibujado |
+| 22 | `ErrorBoundary` | `pub-capas` vista 7 | dibujado |
+| 23 | Esqueletos y transición | `pub-capas` vista 8 (la transición entre páginas sigue sin especificar) | dibujado (transición: parcial) |
+
+## Auditoría de la primera pasada (antes de §28)
+
+**Leyenda de estado:** **FALTA** = no está dibujado en ninguna maqueta aprobada · **parcial** = algo se ve, pero falta parte de la función, de sus estados o de un dispositivo · **ok** = dibujado y alcanzable. La columna «Ahora» dice dónde queda tras esta tanda (`entrega/cromo/`).
+
+### Tabla
+
+| # | Ítem | Qué hace hoy (archivo:línea · textos exactos · quién lo ve) | ¿En alguna maqueta? | Estado | Ahora |
+|---|---|---|---|---|---|
+| 1 | Cabecera del menú lateral | `layout/Sidebar.tsx:616-646`: logo de la clínica (o `/logo.png`) en círculo de 56, nombre de clínica o del médico, subtítulo = especialidad, o «Asistente Médico/a» para secretaria. Todos. | La barra aprobada cambió la cabecera por glifo «Spinus» + chip «Plan VIP» (`dashboard-final`, lateral). El nombre del médico baja al pie («Dr. Admin Semilla · Mi perfil · Ajustes»). **No se ven ni el logo de la clínica ni la especialidad ni «Asistente Médico/a».** | parcial | Sin cambio (decisión del dueño, ver propuesta P5) |
+| 2 | Selector de consultorio activo | `sidebar/ConsultorioActivoSelector.tsx`: solo médico con ≥ 2 consultorios (`:62-64`). Botón «CONSULTORIO ACTIVO / Centro» (`:92-96`) → desplegable con la lista y palomita en el activo (`:105-118`), enlace «Gestionar consultorios →» a `/perfil` (`:120-131`); al elegir otro, modal «Cambiar consultorio activo» · «¿Cambiar a **X**?» · «Cancelar» / «Sí, cambiar» (`:137-164`); aviso «Consultorio activo: X» (`:79`). Esc y clic fuera cierran (`:40-60`). | Botón dibujado en la barra lateral (`ih`, `esc`) del dashboard («Consultorio · Centro» con ⇕) y el rótulo «CENTRO» sobre el saludo. El aviso está en `pub-capas` vista 5. **Desplegable, «Gestionar consultorios →» y el modal de confirmación: FALTAN en todas.** En `ext` no hay ningún acceso (no hay barra lateral). | parcial | **vista 2** (los cinco marcos) + fila en el menú «Más» de `ext` (vista 1) |
+| 3 | Navegación del médico | `Sidebar.tsx:156-201`: Dashboard · Pacientes ▸ (Expediente, Suplementación) · Agenda · Calculadoras · Documentos ▸ (8 tipos) · Administración ▸ (Estadísticas; «Usuarios de la clínica» y «Facturación» solo si administra) · — · Mi perfil · Ayuda. | Lista aprobada: Inicio · Expediente · Agenda · Documentos · Administración + pie «Mi perfil · Ajustes». Los 8 tipos se alcanzan por la rejilla de `/documentos` (`pub-documentos`); Estadísticas/Usuarios/Facturación por las pestañas de `tanda4`. **Sin entrada: Suplementación (`/suplementacion`, maquetada en `tanda4` vista 6 pero inalcanzable), Ayuda en la barra lateral de `ih`/`esc` y en el cajón** (el BRIEF la manda a «Más», que nadie dibujó). Calculadoras: fuera de alcance (se retiran). | parcial | Ayuda: menú «Más» (vista 1). Suplementación: **propuesta P1, sin dibujar** |
+| 4 | Navegación de secretaria | `Sidebar.tsx:203-216`: solo Dashboard · Pacientes ▸ (Expediente, **Nuevo paciente**) · Agenda. **Sin Mi perfil ni Ayuda** (y por tanto sin «Modo oscuro»/«Cerrar sesión» fuera del pie de la barra). | Dashboard y `pub-pacientes` (variante secretaria): Inicio · Expediente · Agenda y pie «Secretaria Semilla · **Mi perfil · Ajustes**». «Nuevo paciente» no está en la navegación (sí en el dashboard). **Discrepancia:** la maqueta le da a la secretaria una entrada a Mi perfil que hoy no tiene; a cambio, es la única vía que le deja a ella «Modo oscuro» y «Cerrar sesión», que hoy están en el pie de la barra. | parcial | Propuesta P2 (decidir) |
+| 5 | Grupos plegables | `Sidebar.tsx:697-780`: cabecera con chevron que gira; se abren solos si la ruta activa cae dentro (`:366-375`); activo de hoja (fondo blanco) y de grupo. | La navegación aprobada es plana (sin grupos): los hijos pasaron a pestañas o rejillas en sus pantallas. | ok (por rediseño) | — |
+| 6 | Documentos ▸ tipo | `Sidebar.tsx:351-359, 733-753`: con un paciente abierto en la ruta va directo a `/expediente/{id}/documentos?tipo=…`; si no, abre `ConsultaRapidaModal` titulado con el tipo y «Crear y continuar» (`:886-894`). | `pub-documentos` vista 1: buscador de paciente → rejilla de 8 tipos; «Crear y continuar» presente. El atajo «con paciente abierto» vive en el expediente («Nuevo documento»). | ok | — |
+| 7 | Bloqueo por plan en el menú | `Sidebar.tsx:739-745, 757-765`: con plan bloqueado, «Nuevo paciente» (secretaria) y los 8 tipos abren `BloqueoFeatureModal` en vez de navegar. | Solo como comentario en `pub-pacientes` vista 1 («abre el modal global “Función no disponible” (A0), que no cambia»). El modal no está dibujado. | FALTA (ver 17) | **vista 4** |
+| 8 | Plegar / Desplegar menú | `Sidebar.tsx:256-275, 788-798`: solo en `/agenda`, solo ≥ lg; «Plegar menú» / «Desplegar menú»; `localStorage["spinus.barra.plegada"]`; plegada, cada entrada conserva `title` y `aria-label`; pulsar un grupo la despliega. | No aparece en ninguna maqueta (tampoco en `agenda-base`). | FALTA | **Sin dibujar** — pertenece a la tanda de agenda v2 (ver P6) |
+| 9 | Modo claro / oscuro | `Sidebar.tsx:799-803` («Modo oscuro» / «Modo claro», icono luna/sol), `layout/ThemeProvider.tsx:79`. Todos los roles, en el pie de la barra. | `tanda4` vista 1 (Mi perfil, grupo «Ajustes», aprobado §23.11). Fuera de Mi perfil no hay conmutador. | ok (médico) · parcial (secretaria, ver 4) | — |
+| 10 | Cerrar sesión | `Sidebar.tsx:804-808, 423-488`. Registra en `audit_log` antes de salir; si el servidor no confirma la revocación, aviso de error: «Sesión cerrada en este navegador, pero el servidor no confirmó la revocación: puede seguir abierta en otros dispositivos. Cambia la contraseña para cerrarlas todas.» (`:483`). Todos. | Botón en `tanda4` vista 1 (Ajustes). **El aviso largo de revocación no está dibujado** (`pub-capas` vista 5 no lo incluye). | parcial | Sin cambio (cabe en el patrón de aviso de `pub-capas` 5; ver P7) |
+| 11 | **Aviso de perfil** (`AvisoPerfilSidebar`) | `sidebar/AvisoPerfilSidebar.tsx`, montado en `Sidebar.tsx:827-834` solo si `estadoPerfil.role === 'medico'`. Título `` `${n} dato${n>1?'s':''} pendiente${n>1?'s':''}` `` (`:153`); motivos «Documentos sin firma», «Sin cédula de especialidad», «Clínica sin logo» (`:122-124`, cédula solo si no es medicina general, lo decide `/api/me/estado-perfil`); «Completar ahora» (`:232`); los cuatro enlaces a `/perfil`. Plegable, recuerda en `localStorage["spinus.profileBanner.collapsed"]` y se reabre si aparece un pendiente nuevo (`:129-144`). `role="status"`, `aria-live="polite"`. Tres animaciones infinitas (halo, brillo, pulso) + degradado `#FFC53D→#F0A81E`. En móvil solo se ve abriendo el cajón. | **En ninguna.** | **FALTA** | **vista 1** (cinco marcos, seis variantes) |
+| 12 | Aviso de Privacidad | `Sidebar.tsx:871-874`: «Aviso de Privacidad», pestaña nueva, `rel="noopener noreferrer"`, sin precarga. Todos. | `tanda4` vista 1 (Ajustes) y vista 5 (Ayuda). | ok (médico) · parcial (secretaria) | — |
+| 13 | Menú móvil (cajón) | `Sidebar.tsx:557-614`: botón hamburguesa flotante (oculto en la agenda, que trae el suyo en su banda), fondo oscuro con desenfoque que cierra al tocar, cajón de 256 desde la izquierda; cada enlace cierra el cajón. El dashboard abre el mismo cajón desde su barra. | Los botones están dibujados (encabezado de `tel`, «Mostrar barra lateral» de `iv`, «···» del riel y «Más» de la pista). **El cajón abierto y el menú «Más» no están dibujados en ninguna maqueta** (dashboard: «menú no dibujado»; `tanda4`: «definidos en el dashboard»). | FALTA | **vista 1**: cajón (`tel`, `iv`) y menú «Más» (`ext`, `iv`) |
+| 14 | Paleta de comandos ⌘K | `CommandPalette.tsx`: `Ctrl/⌘+K` abre y cierra (`:88-97`); Esc cierra; campo «Buscar paciente por nombre o documento por folio...» (`:277`); resultados con avatar, edad · sexo · expediente; documento por folio con su tipo, paciente y fecha; ↑↓/Enter; pista vacía «Nombre del paciente, o folio del documento»; folio sin resultado: «Ningún documento tuyo con ese folio. Los emitidos antes del folio correlativo no se encuentran por aquí.»; pie de teclas. El dashboard la abre sintetizando Ctrl+K (`dashboard/page.tsx:66`, `AsistenteDashboard.tsx:51`). Todos. | Dashboard: el campo «Buscar paciente o folio» con la pista ⌘K (solo `ih`/`esc`). **La capa que abre no está dibujada**: la hoja del dashboard es «Nueva consulta» (`ConsultaRapidaModal`), otra pieza, sin folio ni documento. | parcial | **vista 3** |
+| 15 | Paleta → «Crear registro para "texto"» | `CommandPalette.tsx:364-366, 424-544`: «Crear registro para: "…"» · «Registro rápido — solo nombre, teléfono y motivo»; formulario «Registro rápido» / «Puedes completar el expediente después»: Nombre *, Apellidos, Fecha de nacimiento *, casilla con enlace «Aviso de Privacidad»; aviso de duplicado con sus salidas; «Cancelar» / «Crear e ir al expediente» («Creando...»). La opción sale con ≥ 2 caracteres que no sean folio y menos de 8 resultados (`:174`). Duplicado: «⚠️ Este paciente ya está en tu lista de pacientes: … (Exp. #…)» · «Ir a su expediente» · «Es otra persona, crear de todos modos» · «Cancelar». Todos los roles; a la secretaria, abrir un resultado o crear la lleva a `/expediente`, no al expediente del paciente (`:191, 202, 239`). | El alta rápida del dashboard (desde «Nueva consulta») tiene otro botón («Crear e iniciar consulta»). El duplicado está en `pub-capas` vista 1 («Paciente duplicado»). | parcial | **vista 3** |
+| 16 | Banner de suscripción | `billing/SuscripcionBanner.tsx:35-63`, montado en `(app)/layout.tsx:172-174` dentro del área segura: «Tu suscripción terminó. Tienes acceso a tus datos pero no puedes crear nuevos pacientes, consultas ni documentos.» + «Reactivar suscripción» → `/billing`. Solo con plan bloqueado (cancelada, sin VIP, > 5 pacientes). Todos los roles. | Solo dentro de `tanda4` vista 3 (Facturación), con el comentario «va fijo arriba del contenido en TODA la app». No se ve sobre la navegación de ningún otro marco ni con rol secretaria. | parcial | **vista 4** |
+| 17 | `BloqueoFeatureModal` | `billing/BloqueoFeatureModal.tsx`: «Función no disponible» · «Suscripción terminada» · «Esta es una característica disponible para suscripciones activas. Tu cuenta excedió el límite del plan gratuito.»; admin: «Cerrar» + «Reactivar suscripción»; no admin: además «Pídele a tu administrador que reactive la suscripción para recuperar el acceso completo.» y solo «Cerrar». Lo abre `useInterceptIfBlocked` en cualquier acción de crear. | Solo citado en comentarios (`pub-pacientes` vista 1). | FALTA | **vista 4** |
+| 18 | Sin conexión | `ui/OfflineAlert.tsx`: tras 4 s sin red (`:154-156`), capa bloqueante no descartable: «Sin conexión» · «No se detecta conexión o es de mala calidad. Espera a que se estabilice la red.» · «Esperando reconexión...»; desaparece sola al volver. Todos. | `pub-capas` vista 7 (Error). | ok | — |
+| 19 | Asistente de perfil (`GateOnboarding` → `OnboardingModal`) | `onboarding/GateOnboarding.tsx:54` (se muestra si `gate.completo` es falso) y `OnboardingModal.tsx` (962 líneas): pasos «Tu nombre», «Datos», «Cédulas», «Clínica», «Consultorio», «Logo», «Firma» (`:51-57`) según rol y lo que falte; «Paso requerido» (`:567`) u «Omitir por ahora» (`:564`, solo logo y firma); «Continuar» / «Finalizar» (`:589-591`); invitado sin clínica: panel de soporte sin «Continuar» (`:762`). Todos los roles (la secretaria solo su nombre). | **En ninguna.** | FALTA | **Sin dibujar** — es un formulario de siete pasos; pide tanda propia (P3) |
+| 20 | `OnboardingGuide` (asistente flotante de tips) | `ui/OnboardingGuide.tsx` (717 líneas): «Abrir asistente», «Activar voz»/«Silenciar voz», «Minimizar», «No mostrar más», «Siguiente tip»/«Entendido» (todo solo en `title`), anclas `data-onboard`. **Corrección al inventario: en `951e31b3` (y en `origin/main`) no lo importa ningún archivo: es código sin consumidores.** Solo quedan comentarios que lo nombran (`dashboard/page.tsx:126,186`, `perfil/page.tsx:1126`) y los atributos `data-onboard`. Nadie lo ve hoy. | Las maquetas conservan los `data-onboard` (`pub-pacientes`, `tanda4`…). | n/a (no vive) | Propuesta P4 (decidir si se retira o se monta) |
+| 21 | Avisos breves (toasts) | `ui/Toast.tsx`: 4 tipos con colores fijos, abajo a la derecha (`:78`), 4 s y 8 s los de advertencia (`:25`), botón de cerrar sin nombre. Todos. | `pub-capas` vista 5 (arriba y centrados, con los textos reales). | ok | — |
+| 22 | `ErrorBoundary` | `ErrorBoundary.tsx:37-44`, envuelve solo `{children}` (`(app)/layout.tsx:222`): «Algo salió mal», «Reintentar» y una segunda salida. | `pub-capas` vista 7. | ok | — |
+| 23 | Esqueletos y transición de página | `loading.tsx` en `(app)`, agenda, agenda/configuración, documentos, expediente, expediente/[id], nueva-nota; `layout/PageTransition.tsx:9` (`animate-page-enter` por ruta). | `pub-capas` vista 8 (Carga). La transición entre páginas no está especificada. | ok · parcial (transición) | — |
+
+### Global en el código que el inventario no listaba
+
+| Pieza | Qué hace hoy | ¿En maqueta? | Estado |
+|---|---|---|---|
+| `SessionGuard` (`components/SessionGuard.tsx`) | Sin interfaz: al pasar la sesión a no autenticada vacía cachés y lleva a `/login`. | No aplica (no se ve). | n/a |
+| Chip del plan («Plan VIP» / «Actualizar») | No es del cromo de `(app)` hoy: viene del lanzador. Las maquetas lo traen a la barra lateral y al saludo. | Dashboard y todas las barras laterales. | ok (traído del lanzador) |
+| Hamburguesa propia del dashboard y de la agenda | `dashboard/page.tsx:49`, `AsistenteDashboard.tsx:37`, `agenda/AgendaCliente.tsx:599` abren el mismo cajón (`MenuMovilContext`). | Encabezado fundido de `tel` en todas. | ok |
+| Franja navy bajo la barra de estado | `globals.css` (`body::before`); la sustituyen los encabezados fundidos. | Todas. | ok |
+
+## Resumen
+
+- **FALTA del todo (6):** aviso de perfil (11), cajón y menú «Más» abiertos (13), modal de bloqueo (17, y con él 7), plegar menú de la agenda (8), asistente de perfil (19). Más el desplegable y la confirmación del selector de consultorio (2).
+- **Parcial (8):** cabecera (1), selector (2), navegación del médico sin Suplementación ni Ayuda (3), secretaria con Mi perfil que hoy no tiene (4), aviso largo de cierre de sesión (10), paleta ⌘K sin su capa (14, 15), banner de suscripción solo en Facturación (16).
+- **No vive:** `OnboardingGuide` (20) — el inventario lo daba por montado.
+- Dibujado en esta tanda (`entrega/cromo/`): 11, 13, 2, 14–15, 16–17 (y 7). Sin dibujar y propuesto aparte: 8, 19, Suplementación.
+
+## Defectos del producto vistos de paso (solo se reportan)
+
+- Paleta: la opción de crear promete «Registro rápido — solo nombre, teléfono y motivo» (`CommandPalette.tsx:366`), pero el formulario pide nombre, apellidos y fecha de nacimiento; ni teléfono ni motivo.
+- Paleta: la casilla cita «(LFPDPPP Art. 9)», artículo de la ley abrogada en 2025 (ya listado en `ESTADO.md`); se reproduce en la maqueta tal cual.
+- Paleta: sin `role="dialog"` ni nombre; botones de cerrar y de volver sin nombre accesible; pie de teclas visible también en teléfono.
+- Aviso de perfil: tres animaciones infinitas sin pausa; en teléfono de 678 de alto, desplegado, deja 83 px a la navegación (`capturas-modales.md`, punto 4).
+- `OnboardingGuide`: 717 líneas sin consumidores (ver ítem 20).
+
+## Propuestas para el dueño (primera pasada; P1, P2 y P5 ya decididas en §28)
+
+- ~~**P1**~~ Decidido (§28): Suplementación sigue dentro de Expediente. — **P1 · Suplementación sin entrada.** Hoy cuelga de «Pacientes ▸». Propuesta: una fila «Suplementación» en el menú «Más» y en el cajón, o un enlace desde la rejilla de documentos («Plan de suplementación» → «Ver protocolo»). Decidir antes de implementar la navegación.
+- ~~**P2**~~ Decidido (§28): sin Mi perfil, con «Ajustes». — **P2 · Secretaria y Mi perfil.** Las maquetas aprobadas le dan «Mi perfil · Ajustes»; el código no. Si se mantiene, `/perfil` tiene que aceptar a la secretaria (hoy solo es inalcanzable desde el menú; no lo verifiqué a fondo). Si no, «Modo oscuro», «Aviso de Privacidad» y «Cerrar sesión» necesitan otro sitio para ella.
+- **P3** Hecho: `cromo/7-asistente-perfil`. — **P3 · Asistente de perfil (19).** Maquetarlo en una tanda propia con el patrón de modal de `pub-capas` vista 2: pasos con progreso, «Paso requerido»/«Omitir por ahora», «Continuar»/«Finalizar», y el panel del invitado sin clínica.
+- **P4 · `OnboardingGuide`.** No está montado: o se retira (y con él los `data-onboard` que el rediseño arrastra) o se decide dónde vive. Sus controles solo tienen `title`, invisible al tocar.
+- ~~**P5**~~ Decidido (§28): el logo vuelve en el botón de consultorio. — **P5 · Logo de la clínica y especialidad.** La barra aprobada ya no los enseña. Si el dueño quiere conservar la identidad de la clínica en la app (no solo en los PDF), el sitio natural es el botón de consultorio de la barra (logo en lugar del avatar «AS»).
+- **P6** Reservado al agente de herramientas de la agenda (§28). — **P6 · Plegar menú en la agenda (8).** Dibujarlo en la tanda de agenda v2: en `esc` la barra de 248 plegada a un riel de iconos con `aria-label`.
+- **P7** Dibujado en `cromo/6-sesion`. — **P7 · Aviso largo de revocación al cerrar sesión (10).** Hoy se ve «un instante» porque la navegación desmonta el proveedor de avisos (`Sidebar.tsx:477-481`). Con el patrón de `pub-capas` vista 5 basta un ejemplo más; el defecto de que se pierda es de funcionamiento, no de diseño.
+
+## Segunda pasada (§28): decisiones que tomé sin consultar
+
+- Secretaria en Duo cerrado y vertical: «Más» se le dibuja también, con sus tres «Ajustes» (hoy no tiene «Más»; sin esto, en `ext` no tendría Modo oscuro ni Cerrar sesión).
+- Ayuda en la barra y el cajón: botón de icono a la derecha del pie del médico (en `ih` el pie suelta el icono de perfil para que quepan nombre y Ayuda).
+- Especialidad: en el pie, bajo el nombre; no en `ih` (no cabe sin partir el nombre). Logo de la clínica ficticio dibujado en SVG.
+- Asistente de perfil en iPhone a pantalla completa (es bloqueante y largo; una hoja prometería un cierre por arrastre que no existe).
+- Cerrar sesión: «mientras cierra» es un giro en la propia fila (sin texto nuevo; hoy no hay señal); la confirmación previa NO existe hoy y va como **propuesta** en la tira, apagada por defecto.
+
+## Defectos adicionales vistos en la segunda pasada
+
+- `OnboardingModal`: el logo usa un emoji 🏥 dentro del recuadro (en la maqueta, icono); el marcador «Ej: Clínica Ortointegra» usa el nombre de una clínica real.
+- Cerrar sesión: sin indicador de espera mientras se registra la auditoría y se revoca; el aviso de revocación se desmonta al navegar (`Sidebar.tsx:477-481`).

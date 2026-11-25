@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { EditarConsultorioSchema } from '@/lib/consultorios/schemas'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { horarioEnOrden } from '@/lib/agenda/disponibilidad'
 
 async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   const {
@@ -139,6 +141,22 @@ export async function PATCH(
     // Si no se envió nombre_corto en absoluto, queda undefined → no se incluye
     // en el payload → se preserva el valor previo.
 
+    // Agenda B5 (disponibilidad por consultorio), SÓLO con la agenda v2
+    // encendida para la clínica. Apagada —o sin la tabla de ajustes—, el
+    // handler se comporta como antes: `horario_propio` se ignora y el horario
+    // no se valida en orden. El interruptor sólo se lee si el cuerpo toca el
+    // horario, para no añadir una consulta a las demás ediciones.
+    const tocaDisponibilidad = input.horario_propio !== undefined || input.horario !== undefined || input.horario_revisado === true
+    const v2 = tocaDisponibilidad && profile.clinica_id
+      ? await agendaV2Encendida(supabase, profile.clinica_id)
+      : false
+    if (v2 && input.horario !== undefined && !horarioEnOrden(input.horario)) {
+      return NextResponse.json(
+        { error: 'En los días abiertos, la hora de cierre tiene que ir después de la de apertura' },
+        { status: 400 }
+      )
+    }
+
     // Construir payload solo con campos presentes (PATCH parcial).
     const updatePayload: Record<string, unknown> = {}
     if (input.nombre !== undefined) updatePayload.nombre = input.nombre
@@ -147,17 +165,18 @@ export async function PATCH(
     if (input.telefono !== undefined) updatePayload.telefono = input.telefono
     if (input.timezone !== undefined) updatePayload.timezone = input.timezone
     if (input.horario !== undefined) updatePayload.horario = input.horario
+    if (v2 && input.horario_propio !== undefined) updatePayload.horario_propio = input.horario_propio
+    /* Tanda I (punto 3): con la v2, una persona confirmó o guardó el horario de
+       este consultorio desde la configuración: deja de estar «por revisar» en
+       «Primeros pasos» (`horario_revisado_en`, 20261121141000). Apagada no se
+       nombra la columna (puede no existir). */
+    if (v2) updatePayload.horario_revisado_en = new Date().toISOString()
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: 'Nada que actualizar' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('consultorios')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('*')
-      .single()
+    const { data, error } = await actualizarConsultorio(supabase, id, updatePayload)
 
     if (error) {
       console.error('[PATCH /api/consultorios/[id]] error:', error)
@@ -183,6 +202,27 @@ export async function PATCH(
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })
   }
+}
+
+/** Columna ausente (42703 por SQL, PGRST204 por la caché de esquema de PostgREST). */
+const COLUMNA_AUSENTE = new Set(['42703', 'PGRST204'])
+
+/**
+ * El UPDATE del PATCH. Tanda I (integración): sin la migración 20261121141000
+ * la columna `horario_revisado_en` no existe y, con la v2 encendida, guardar un
+ * horario daría 500. Se reintenta UNA vez sin ella: el horario se guarda como
+ * antes de la tanda I y «Primeros pasos» no se entera (no hay dónde apuntarlo).
+ */
+async function actualizarConsultorio(
+  supabase: Awaited<ReturnType<typeof createClient>>, id: string, payload: Record<string, unknown>,
+): Promise<{ data: unknown; error: { code?: string; message: string } | null }> {
+  const pedir = (p: Record<string, unknown>) => supabase.from('consultorios').update(p).eq('id', id).select('*').single()
+  const r = await pedir(payload)
+  if (!r.error?.code || !COLUMNA_AUSENTE.has(r.error.code) || !('horario_revisado_en' in payload)) return r
+  const resto = { ...payload }
+  delete resto.horario_revisado_en
+  /* Sólo venía la marca («Confirmar horario»): nada que escribir; se devuelve la fila tal cual. */
+  return Object.keys(resto).length > 0 ? pedir(resto) : supabase.from('consultorios').select('*').eq('id', id).single()
 }
 
 /**

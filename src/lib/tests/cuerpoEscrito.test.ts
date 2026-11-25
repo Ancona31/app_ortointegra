@@ -66,7 +66,7 @@ describe('las tres marcas que la barra ofrece', () => {
   /**
    * El subrayado es la marca que NO competía con nada, y por eso se prueba
    * combinada: `textDecoration` no es familia, así que se acumula con las otras
-   * dos. Negrita + cursiva sí compiten —no hay 500 itálica registrada— pero esa
+   * dos. Negrita + cursiva piden su propia cara —la 700 itálica, registrada— pero esa
    * decisión la toma el formato al componer, no el conversor: aquí llegan las dos.
    */
   it('las marcas se acumulan en el mismo tramo', () => {
@@ -194,21 +194,27 @@ describe('lo que no tiene equivalente sale nombrado, no en silencio', () => {
     ])
   })
 
-  it('una lista anidada se aplana y queda anotada', () => {
+  it('una lista anidada CONSERVA su jerarquía, sin descarte (rediseño del escrito)', () => {
     const d = doc({
       type: 'bulletList',
       content: [{
         type: 'listItem',
         content: [
           parrafo('padre'),
-          { type: 'bulletList', content: [{ type: 'listItem', content: [parrafo('hijo')] }] },
+          { type: 'orderedList', attrs: { start: 1 }, content: [
+            { type: 'listItem', content: [parrafo('hijo uno')] },
+            { type: 'listItem', content: [parrafo('hijo dos')] },
+          ] },
         ],
       }],
     })
     const { cuerpo, descartes } = cuerpoDesdeDoc(d)
     const nodo = cuerpo[0]
-    expect(nodo?.tipo === 'lista' ? nodo.items.length : 0).toBe(2)
-    expect(descartes).toEqual([{ que: 'lista anidada', veces: 1 }])
+    expect(nodo?.tipo === 'lista' ? nodo.items.length : 0).toBe(3)
+    expect(nodo?.tipo === 'lista' ? nodo.detalle : undefined).toEqual([
+      { nivel: 0, marca: '—' }, { nivel: 1, marca: '1.' }, { nivel: 1, marca: '2.' },
+    ])
+    expect(descartes).toEqual([])
   })
 })
 
@@ -331,5 +337,45 @@ describe('cuerpoEscritoDesde · elige el camino', () => {
   it('un JSON malformado no interrumpe la generación del PDF', () => {
     const roto = { schema: 'tiptap-doc-v1', content: { type: 'doc', content: [null, 7, {}] } }
     expect(() => cuerpoEscritoDesde({ doc: roto })).not.toThrow()
+  })
+})
+
+// ─── Fidelidad editor → papel (rediseño del escrito) ─────────────────────────
+
+describe('lo que se ve en el editor sale en el papel', () => {
+  it('la numeración respeta el inicio', () => {
+    const d = doc({ type: 'orderedList', attrs: { start: 3 }, content: [
+      { type: 'listItem', content: [parrafo('tres')] },
+      { type: 'listItem', content: [parrafo('cuatro')] },
+    ] })
+    const nodo = cuerpoDesdeDoc(d).cuerpo[0]
+    expect(nodo?.tipo === 'lista' ? nodo.detalle?.map(x => x.marca) : []).toEqual(['3.', '4.'])
+  })
+  it('un ítem con dos párrafos es UN ítem, con un salto entre los dos', () => {
+    const d = doc({ type: 'orderedList', content: [
+      { type: 'listItem', content: [parrafo('uno'), parrafo('sigue')] },
+    ] })
+    const nodo = cuerpoDesdeDoc(d).cuerpo[0]
+    expect(nodo?.tipo === 'lista' ? nodo.items : []).toEqual([[{ texto: 'uno' }, { texto: '\n' }, { texto: 'sigue' }]])
+  })
+  it('una cita de varios párrafos los separa', () => {
+    const d = doc({ type: 'blockquote', content: [parrafo('Cita uno'), parrafo('Cita dos')] })
+    const tramos = tramosDe(cuerpoDesdeDoc(d).cuerpo[0])
+    expect(tramos.map(t => t.texto).join('')).toBe('Cita uno\n\nCita dos')
+  })
+  it('las marcas dentro de un título se conservan', () => {
+    const d = doc({ type: 'heading', attrs: { level: 3 }, content: [
+      { type: 'text', text: 'Plan ' }, { type: 'text', text: 'urgente', marks: [{ type: 'italic' }, { type: 'underline' }] },
+    ] })
+    const nodo = cuerpoDesdeDoc(d).cuerpo[0]
+    expect(nodo).toMatchObject({ tipo: 'encabezado2', texto: 'Plan urgente' })
+    expect(nodo?.tipo === 'encabezado2' ? nodo.tramos : undefined).toEqual([
+      { texto: 'Plan ' }, { texto: 'urgente', cursiva: true, subrayado: true },
+    ])
+  })
+  it('el camino HTML de los escritos antiguos no cambia: lista de un nivel, sin detalle', () => {
+    const { cuerpo } = cuerpoDesdeHtml('<ol><li>a</li><li>b</li></ol>')
+    expect(cuerpo[0]).toMatchObject({ tipo: 'lista', marca: 'numero' })
+    expect(cuerpo[0]?.tipo === 'lista' ? cuerpo[0].detalle : 'x').toBeUndefined()
   })
 })

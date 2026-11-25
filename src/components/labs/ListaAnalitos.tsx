@@ -1,6 +1,8 @@
 'use client'
 
-import { Plus, ArrowUp, ArrowDown, Minus } from 'lucide-react'
+import { Plus, ArrowUp, ArrowDown, Minus, ChevronRight } from 'lucide-react'
+import { parseISO, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import type { AnalitoRastreado } from '@/hooks/useAnalitosRastreados'
 import type { AnalitoCatalogo, CategoriaAnalito } from '@/types'
 import { statusOf, type Sexo, type AnalitoStatus } from '@/lib/labs/utils'
@@ -67,11 +69,11 @@ function variacionDe(
   const pct = anterior !== 0 ? (delta / anterior) * 100 : 0
   const Icono = delta > 0 ? ArrowUp : delta < 0 ? ArrowDown : Minus
 
-  let color = 'var(--sp-ink-350)'
+  let color = 'text-tinta2'
   if (delta !== 0) {
     const bands = cat?.bands_type
-    if (bands === 'high-bad') color = delta > 0 ? 'var(--sp-danger)' : 'var(--sp-success-strong)'
-    else if (bands === 'low-bad') color = delta > 0 ? 'var(--sp-success-strong)' : 'var(--sp-danger)'
+    if (bands === 'high-bad') color = delta > 0 ? 'text-mal-tinta' : 'text-ok-tinta'
+    else if (bands === 'low-bad') color = delta > 0 ? 'text-ok-tinta' : 'text-mal-tinta'
   }
 
   const signo = delta > 0 ? '+' : delta < 0 ? '−' : ''
@@ -81,12 +83,62 @@ function variacionDe(
   return { Icono, texto, color }
 }
 
-/** El punto de semáforo. Sin rango de referencia no hay color que dar. */
-function colorSemaforo(estado: AnalitoStatus): string {
-  if (estado === 'ok') return 'var(--sp-success-dot)'
-  if (estado === 'warn') return 'var(--sp-warn-dot)'
-  if (estado === 'bad') return 'var(--sp-danger)'
-  return 'var(--sp-ink-150)'
+/** La etiqueta de estado (CALMA §11): sólo lo que cambia una decisión. Sin
+ *  rango de referencia, o en rango, no se dibuja nada. */
+function EtiquetaEstado({ estado }: { estado: AnalitoStatus }) {
+  if (estado === 'bad') return <span className="k-etq k-etq-mal">Fuera de rango</span>
+  if (estado === 'warn') return <span className="k-etq k-etq-aviso">A vigilar</span>
+  return null
+}
+
+function fechaDe(iso: string): string {
+  try { return format(parseISO(iso), 'd MMM yyyy', { locale: es }) } catch { return '' }
+}
+
+/* La rejilla de la tabla en ancho (CALMA §23.6: «Analito · Último valor ·
+   Estado · Fecha»). En ext/tel la fila es de dos líneas, sin encabezados. */
+const REJILLA = 'ih:grid iv:grid esc:grid ih:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_118px_minmax(0,0.8fr)_16px] iv:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_118px_minmax(0,0.8fr)_16px] esc:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_118px_minmax(0,0.8fr)_16px] ih:gap-x-3 iv:gap-x-3 esc:gap-x-4'
+
+function FilaAnalito({ a, cat, sexoPaciente, activo, onSeleccionar }: {
+  a: AnalitoRastreado
+  cat: AnalitoCatalogo | null
+  sexoPaciente: Sexo
+  activo: boolean
+  onSeleccionar: () => void
+}) {
+  const estado = statusOf(a.ultimoValor, cat, sexoPaciente)
+  const variacion = variacionDe(a.ultimoValor, a.valorAnterior, cat)
+  return (
+    <button
+      type="button"
+      onClick={onSeleccionar}
+      aria-current={activo ? 'true' : undefined}
+      className={`flex min-h-[56px] w-full items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-opacity active:opacity-70 ih:min-h-[48px] esc:min-h-[48px] ${REJILLA} ${activo ? 'bg-tonal' : 'hover:bg-sup2'}`}
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-semibold leading-5 text-tinta">{a.nombre}</span>
+        <span className="block text-[13px] leading-[18px] text-tinta2 ih:hidden iv:hidden esc:hidden">
+          {fechaDe(a.ultimoMedidoEn)} · {labelCategoria(a.categoria)}
+        </span>
+      </span>
+      <span className="shrink-0 text-right ih:text-left iv:text-left esc:text-left">
+        <span className="k-num block text-[15px] leading-5 text-tinta">{formatValor(a.ultimoValor, a.unidad)}</span>
+        {/* La variación contra la medición anterior. Con una sola medición no
+            hay contra qué compararla y se dice así. */}
+        {variacion ? (
+          <span className={`k-num flex items-center justify-end gap-0.5 text-[13px] leading-[18px] ih:justify-start iv:justify-start esc:justify-start ${variacion.color}`}>
+            <variacion.Icono size={13} aria-hidden="true" />{variacion.texto}
+          </span>
+        ) : (
+          <span className="block text-[13px] leading-[18px] text-tinta2">primera</span>
+        )}
+        <span className="mt-1 flex justify-end ih:hidden iv:hidden esc:hidden"><EtiquetaEstado estado={estado} /></span>
+      </span>
+      <span className="hidden ih:block iv:block esc:block"><EtiquetaEstado estado={estado} /></span>
+      <span className="k-num hidden text-[13px] text-tinta2 ih:block iv:block esc:block">{fechaDe(a.ultimoMedidoEn)}</span>
+      <ChevronRight className="k-fila-chev" aria-hidden="true" />
+    </button>
+  )
 }
 
 export default function ListaAnalitos({
@@ -100,75 +152,30 @@ export default function ListaAnalitos({
   onAgregar: () => void
 }) {
   return (
-    <div className="flex max-h-[440px] flex-col overflow-hidden rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] lg:max-h-[660px] lg:w-[300px] lg:shrink-0">
-      {/* Banda fija: va `shrink-0` fuera del contenedor que desplaza, así que
-          el conteo y la acción no se pierden al recorrer la lista. */}
-      <div className="flex shrink-0 items-center justify-between gap-[var(--sp-2)] border-b border-[color:var(--sp-line-divider)] px-[var(--sp-4)] py-[var(--sp-2-5)]">
-        <p className="text-[10.5px] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-          Analitos rastreados · <span className="tabular-nums">{analitos.length}</span>
-        </p>
-        <button
-          type="button"
-          onClick={onAgregar}
-          className="sp-btn sp-btn--compact whitespace-nowrap"
-        >
-          <Plus size={14} /> Medición
+    <div className="flex min-w-0 flex-col gap-2">
+      {/* El conteo y la acción, fuera de la tarjeta que desplaza. */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="k-t-sec">Analitos rastreados · <span className="k-num">{analitos.length}</span></p>
+        <button type="button" onClick={onAgregar} className="k-b k-b-texto -mr-1 whitespace-nowrap">
+          <Plus size={16} aria-hidden="true" /> Medición
         </button>
       </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {analitos.map(a => {
-          const activo = a.clave === claveSeleccionada
-          const cat = a.analitoId ? catalogo.find(c => c.id === a.analitoId) ?? null : null
-          const estado = statusOf(a.ultimoValor, cat, sexoPaciente)
-          const variacion = variacionDe(a.ultimoValor, a.valorAnterior, cat)
-          return (
-            <button
+      <div className="flex max-h-[440px] flex-col overflow-hidden rounded-[var(--r-tarjeta)] bg-sup ih:rounded-[var(--r-tarjeta-ancha)] iv:rounded-[var(--r-tarjeta-ancha)] esc:max-h-[660px] esc:rounded-[var(--r-tarjeta-ancha)]">
+        <div aria-hidden="true" className={`hidden px-5 pb-1 pt-3 text-[12px] font-semibold leading-4 text-tinta2 ${REJILLA}`}>
+          <span>Analito</span><span>Último valor</span><span>Estado</span><span>Fecha</span><span />
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+          {analitos.map(a => (
+            <FilaAnalito
               key={a.clave}
-              type="button"
-              onClick={() => onSeleccionar(a.clave)}
-              aria-current={activo ? 'true' : undefined}
-              className="flex w-full items-center gap-[var(--sp-2-5)] border-l-[var(--sp-bw-bar)] px-[var(--sp-3)] py-[13px] text-left transition-colors"
-              style={activo
-                ? { borderLeftColor: 'var(--sp-primary)', background: 'var(--sp-primary-bg-faint)' }
-                : { borderLeftColor: 'transparent' }}
-            >
-              <span
-                aria-hidden
-                className="h-[9px] w-[9px] shrink-0 rounded-[var(--sp-r-pill)]"
-                style={{ background: colorSemaforo(estado) }}
-              />
-              <span className="min-w-0 flex-1">
-                <span
-                  className="block truncate text-[length:var(--sp-fs-body-sm)] font-semibold"
-                  style={{ color: activo ? 'var(--sp-ink-800)' : 'var(--sp-ink-700)' }}
-                >
-                  {a.nombre}
-                </span>
-                <span className="block truncate text-[11.5px] text-[var(--sp-ink-350)]">
-                  {labelCategoria(a.categoria)}
-                </span>
-              </span>
-              <span className="shrink-0 text-right">
-                <span className="block text-[length:var(--sp-fs-body-sm)] font-bold tabular-nums text-[var(--sp-ink-800)]">
-                  {formatValor(a.ultimoValor, a.unidad)}
-                </span>
-                {/* La variación contra la medición anterior. Con una sola
-                    medición no hay contra qué compararla y se dice así. */}
-                {variacion ? (
-                  <span
-                    className="flex items-center justify-end gap-[2px] text-[11.5px] font-semibold tabular-nums"
-                    style={{ color: variacion.color }}
-                  >
-                    <variacion.Icono size={11} />{variacion.texto}
-                  </span>
-                ) : (
-                  <span className="block text-[11.5px] text-[var(--sp-ink-350)]">primera</span>
-                )}
-              </span>
-            </button>
-          )
-        })}
+              a={a}
+              cat={a.analitoId ? catalogo.find(c => c.id === a.analitoId) ?? null : null}
+              sexoPaciente={sexoPaciente}
+              activo={a.clave === claveSeleccionada}
+              onSeleccionar={() => onSeleccionar(a.clave)}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

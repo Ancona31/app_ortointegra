@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
-import { AlertTriangle, Check, EyeOff, FileClock, PenLine, Printer, ShieldCheck, ShieldOff } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type RefObject } from 'react'
+import { AlertTriangle, Check, ChevronRight, EyeOff, FileClock, PenLine, Plus, Printer, ShieldCheck, ShieldOff, X } from 'lucide-react'
 import { flushSync } from 'react-dom'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -13,14 +13,23 @@ import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileSha
 import { useToast } from '@/components/ui/Toast'
 import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
-import SeccionPlegable from '@/components/documentos/SeccionPlegable'
-import FirmadoConsentimiento, { type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
+import SeccionPaso from '@/components/documentos/SeccionPaso'
+import OpcionesRapidas from '@/components/documentos/OpcionesRapidas'
+import RevisionConsentimiento, { type FilaRevision } from '@/components/documentos/RevisionConsentimiento'
+import FirmadoConsentimiento, { firmantesDe, type FirmaCapturada } from '@/components/documentos/FirmadoConsentimiento'
 import type { IdentificacionImpresa } from '@/lib/pdf/ConsentimientoInformadoPdf'
 import { huellaDocumento } from '@/lib/documentos/firmaTrazo'
+import {
+  BLOQUES, TEXTO_CASILLA_FOTOS, TEXTO_ESTADO_SECCION, bloqueDeFaltante, camposDePlantilla, estadoBorrador,
+  estadoSeccion, faltantesConsentimiento, faltantesDeBorrador, fechaYEdadAlFirmar, noPuedeFirmarDe,
+  plantillaConsentimiento, quienFirmaDe, resumenAutorizaciones, resumenDatos, resumenFirmantes, resumenTexto,
+  type BloqueConsentimiento, type Resumen,
+} from '@/components/documentos/consentimientoEmbudo'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
+import { escucharSalida } from '@/components/documentos/salidaPlegable'
 
 /**
  * Consentimiento informado — GUIA_FORM_CONSENTIMIENTO.md — y su contrario, la
@@ -95,6 +104,12 @@ interface Props {
    */
   edadInicial?: string
   /**
+   * Fecha de nacimiento de la ficha (YYYY-MM-DD). Sólo sirve para recalcular la
+   * edad el día de la firma (CI-DT-3): si la edad que hay salió de la ficha en
+   * la fecha que tenía el documento, se pone la de hoy; si se tecleó, se respeta.
+   */
+  fechaNacimiento?: string | null
+  /**
    * Borrador que se retoma, desde `?borrador=` de la lista de documentos (§9).
    * Se carga en el MISMO formulario, editable: editar y firmar son la misma
    * tarea sin terminar, no dos pantallas.
@@ -143,6 +158,17 @@ interface Props {
 
 const FECHA_MIN = '1900-01-01'
 
+/** Sí / No de la transfusión: los mismos valores guardados de siempre ('si' / 'no'). */
+const OPCIONES_TRANSFUSION = [
+  { valor: 'si', etiqueta: 'Sí autoriza' },
+  { valor: 'no', etiqueta: 'No autoriza' },
+] as const
+/** Quién firma: la casilla `pacienteNoPuedeFirmar` como dos opciones de un toque. */
+const OPCIONES_QUIEN = [
+  { valor: 'paciente', etiqueta: 'El paciente' },
+  { valor: 'familiar', etiqueta: 'Familiar o representante (el paciente no puede firmar)' },
+] as const
+
 /** Cuál de los dos documentos excluyentes se está emitiendo. */
 type TipoDoc = 'consentimiento' | 'denegacion'
 
@@ -180,6 +206,19 @@ interface FilaFirma {
    */
   identificacion_path: string | null
   creado_por: string
+}
+
+/** Ajusta el alto del área de texto a su contenido: una línea que crece, sin tirador. */
+function ajustarAlto(t: HTMLElement | null): void {
+  if (!(t instanceof HTMLTextAreaElement)) return
+  t.style.height = 'auto'
+  t.style.height = `${t.scrollHeight}px`
+}
+
+/** Lo que el Tab recorre dentro de un bloque, en orden de documento. */
+function enfocables(raiz: HTMLElement): HTMLElement[] {
+  return Array.from(raiz.querySelectorAll<HTMLElement>('input, textarea, select, button, [tabindex]'))
+    .filter(el => el.tabIndex >= 0 && !el.hasAttribute('disabled') && el.getClientRects().length > 0)
 }
 
 /** Lee una clave de texto del jsonb: pudo guardarse con otra versión del formulario. */
@@ -306,7 +345,7 @@ function isFormEmpty(e: EstadoVacio): boolean {
 }
 
 export default function ConsentimientoInformadoForm({
-  pacienteInicial = '', pacienteId, diagnosticoInicial = '', edadInicial = '',
+  pacienteInicial = '', pacienteId, diagnosticoInicial = '', edadInicial = '', fechaNacimiento,
   borradorId: borradorIdInicial, offlineMode, onOfflineSave, onVacioChange, onCerrarTrasEmitir,
   onPanelPlantillasChange,
 }: Props) {
@@ -399,9 +438,27 @@ export default function ConsentimientoInformadoForm({
   const [secciones, setSecciones] = useState<Secciones>({ ...SECCIONES_DEFAULT })
 
   const [tipoDoc, setTipoDoc] = useState<TipoDoc>('consentimiento')
+
+  // ── El embudo (maqueta `consentimiento.html`, aprobada por el dueño) ──────
+  // Captura en cuatro bloques, UNO abierto a la vez y los demás resumidos en una
+  // línea; después, la revisión antes de firmar, con las dos vías al mismo
+  // nivel. Nada de esto se guarda: es sólo por dónde va el médico.
+  const [etapa, setEtapa] = useState<'captura' | 'revision'>('captura')
+  const [abierta, setAbierta] = useState<BloqueConsentimiento | null>('dat')
+  /** De las siete secciones del bloque 2, la que se está escribiendo (una a la vez). */
+  const [seccionAbierta, setSeccionAbierta] = useState<SeccionKey | null>(null)
+  /** Testigos pedidos con «＋ Agregar testigo» y todavía sin nombre. */
+  const [testigosPedidos, setTestigosPedidos] = useState(0)
+  /** «＋ Agregar familiar» cuando firma el paciente (el familiar acompaña, como hoy). */
+  const [familiarPedido, setFamiliarPedido] = useState(false)
+  /** «Imprimir para firmar en papel» cierra el documento con folio: se confirma (CI-DT-12). */
+  const [confirmarPapel, setConfirmarPapel] = useState(false)
+  const [avisoRevision, setAvisoRevision] = useState('')
+  const seccionesRef = useRef<HTMLDivElement>(null)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
-  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
+  const [errorAbierto, setErrorAbierto] = useState(false)
+  const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null; sellado?: boolean } | null>(null)
   // El banner de faltantes NO existe hasta el primer intento de imprimir: un
   // formulario recién abierto no acusa de nada. Después permanece y se
   // actualiza en vivo.
@@ -469,13 +526,14 @@ export default function ConsentimientoInformadoForm({
   // dijo. Ese es el motivo entero, y no se ha movido: si alguna vez se propone
   // meterlas «para que la plantilla quede completa», esta es la respuesta.
   //
-  // LOS DOS TESTIGOS SÍ ENTRAN, y ahí sí cambió el criterio. No son una decisión
-  // del paciente: son personal de la clínica, casi siempre el mismo, y teclearlos
-  // en cada consentimiento es exactamente el trabajo repetido que una plantilla
-  // existe para quitar. El familiar se queda fuera porque es del paciente.
+  // LOS TESTIGOS TAMPOCO ENTRAN (CI-DT-19, decisión del dueño): cambian siempre
+  // y suelen ser familiares, así que una plantilla los copiaba de un paciente al
+  // expediente de otro —y como «firma quien tiene nombre», entraban solos al
+  // flujo de firmado—. Una plantilla antigua que los traiga se aplica igual: esas
+  // dos claves se ignoran y los testigos que haya en pantalla no se tocan.
   //
   // Consecuencia buscada: ni aplicar una plantilla ni «Vaciar formulario» tocan
-  // el familiar ni las autorizaciones. Es lo que promete el aviso del selector
+  // el familiar, los testigos ni las autorizaciones. Es lo que promete el aviso del selector
   // —«los datos del paciente no cambiaron»—, y hace que Deshacer los devuelva
   // intactos porque nunca se movieron.
   const plantillas = usePlantillasDocumento({
@@ -484,26 +542,44 @@ export default function ConsentimientoInformadoForm({
     // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
     desactivado: !!offlineMode,
     onPanelChange: onPanelPlantillasChange,
+    // «Guardar borrador» también en el «···» de la cabecera (maqueta `docs-c`,
+    // vista 8): la misma función y las mismas condiciones que el botón del pie,
+    // que en ese caso la hoja esconde (`spinus-tokens.css` §26). La denegación
+    // no tiene borrador.
+    // La DENEGACIÓN sale del conmutador principal y vive aquí (maqueta
+    // aprobada; casi nunca se usa): mismo formulario y mismo comportamiento.
+    masOpciones: esDenegacion ? [{
+      id: 'consentimiento', texto: 'Volver al consentimiento', icono: <ShieldCheck />,
+      alElegir: () => setTipoDoc('consentimiento'),
+    }] : [{
+      id: 'borrador',
+      texto: guardandoBorrador ? 'Guardando…' : 'Guardar borrador',
+      icono: <FileClock />,
+      deshabilitada: guardandoBorrador || imprimiendo || vacio,
+      detalle: vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined,
+      alElegir: () => void guardarBorrador(),
+    }, {
+      id: 'denegacion', texto: 'Emitir denegación…', icono: <ShieldOff />,
+      detalle: 'El paciente rechaza el procedimiento. Se imprime y se firma a mano.',
+      alElegir: () => { setTipoDoc('denegacion'); setEtapa('captura') },
+    }],
     // El tipo elegido NO viaja en la plantilla, al revés que en Honorarios: allí
     // una plantilla de cotización lo es entera —vigencia y orígenes incluidos—,
     // y aquí las dos comparten lo único plantillable, que son lugar,
     // procedimiento y las secciones. Una «plantilla de denegación» sería la
     // misma plantilla con las secciones sin usar, así que el tipo se queda como
     // lo que es: la decisión de qué documento estoy emitiendo ahora.
-    leer: () => ({
-      _v: 1, lugar, procedimiento, testigo1, testigo2,
-      secciones: { ...secciones },
-    }),
+    leer: () => plantillaConsentimiento(lugar, procedimiento, secciones),
     aplicar: (c: ContenidoPlantilla) => {
       // Solo las claves que existen HOY en el formulario, y comprobando el tipo
       // de cada una: el jsonb pudo guardarse con otra versión del formulario.
       // Los `else` NO son defensa de sobra: «Vaciar formulario» aplica un
       // contenido sin ninguna clave, así que es justo lo que repone el estado
       // inicial.
-      setLugar(typeof c.lugar === 'string' ? c.lugar : '')
-      setProcedimiento(typeof c.procedimiento === 'string' ? c.procedimiento : '')
-      setTestigo1(typeof c.testigo1 === 'string' ? c.testigo1 : '')
-      setTestigo2(typeof c.testigo2 === 'string' ? c.testigo2 : '')
+      const campos = camposDePlantilla(c)
+      setLugar(campos.lugar)
+      setProcedimiento(campos.procedimiento)
+      // `testigo1`/`testigo2` de una plantilla antigua: se ignoran (CI-DT-19).
       // Las plantillas guardadas antes de este pase traen `imprimirDenegacion`.
       // La clave se ignora y no rompe nada: la casilla que la escribía ya no
       // existe, y la denegación es ahora un documento propio.
@@ -515,8 +591,9 @@ export default function ConsentimientoInformadoForm({
   // G-10: foco al primer campo editable vacío al montar. preventScroll para no
   // arrastrar la página hasta él. En móvil esto abre el teclado en cada montaje.
   useEffect(() => {
-    const primero = formRef.current?.querySelector<HTMLElement>('input:not([type="date"]), textarea')
-    if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
+    const campos = formRef.current?.querySelectorAll<HTMLInputElement>('input[type="text"]') ?? []
+    const primero = Array.from(campos).find(c => !c.value)
+    primero?.focus({ preventScroll: true })
   }, [])
 
   function updateSeccion(key: SeccionKey, val: string): void {
@@ -554,6 +631,11 @@ export default function ConsentimientoInformadoForm({
     setBorradorFecha(fila.created_at)
     setBorradorPrevio(null)
     setDialogoPrevio(false)
+    // Se retoma donde se quedó (maqueta aprobada): completo, en la revisión
+    // («Falta firmar»); con faltantes, en el bloque del primero.
+    const pendientes = faltantesDeBorrador(c)
+    if (pendientes.length === 0) setEtapa('revision')
+    else { setEtapa('captura'); setAbierta(bloqueDeFaltante(pendientes[0].clave)) }
   }, [])
 
   /**
@@ -613,49 +695,13 @@ export default function ConsentimientoInformadoForm({
   // emisión de un rechazo por no haber redactado antes lo que el paciente
   // acaba de rechazar. Cuando falta, la declaración se compone sin su inciso.
   // El familiar SÍ sigue exigido: firma el documento en las dos variantes (§8).
-  const faltantes: { clave: string; nombre: string }[] = []
-  if (!fecha) faltantes.push({ clave: 'fecha', nombre: 'Fecha' })
-  if (!lugar.trim()) faltantes.push({ clave: 'lugar', nombre: 'Lugar' })
-  if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
-  if (!edad.trim()) faltantes.push({ clave: 'edad', nombre: 'Edad del paciente' })
-  if (!esDenegacion && !diagnostico.trim()) faltantes.push({ clave: 'diagnostico', nombre: 'Diagnóstico' })
-  if (!procedimiento.trim()) faltantes.push({ clave: 'procedimiento', nombre: 'Procedimiento' })
-  // El familiar ya NO es obligatorio siempre: su nombre vacío es la forma de
-  // decir que no hay familiar que firme, y entonces sale del flujo de firmado
-  // igual que un testigo sin nombre. Una firma sin nombre no acredita a nadie.
-  //
-  // ⚠ SALVO SI EL PACIENTE NO PUEDE FIRMAR, que es la excepción que da sentido
-  // a todo el flujo: ahí el familiar es QUIEN CONSIENTE, no un acompañante, así
-  // que su nombre vuelve a ser exigible —y su firma también, porque sin nombre
-  // no entra al flujo y sin él en el flujo el documento no lo consiente nadie—.
-  //
-  // En DENEGACIÓN se queda como estaba, exigido siempre: aquella hoja no pasa
-  // por el flujo de firmado —se emite en el momento y se firma a mano—, así que
-  // nada de lo de arriba le aplica, y su obligatoriedad era una decisión
-  // auditada del formato (§8 de su guía). Aflojarla de rebote sería cambiar un
-  // documento que nadie pidió tocar.
-  if (!familiar.trim() && (esDenegacion || pacienteNoPuedeFirmar)) {
-    faltantes.push({ clave: 'familiar', nombre: 'Familiar responsable o representante legal' })
-  }
-  // LA TRANSFUSIÓN ES OBLIGATORIA, y es la única de las tres decisiones que lo
-  // es. El papel compone sus DOS respuestas —«Autorizo» y «NO autorizo, asumiendo
-  // los riesgos»— porque las dos son decisiones del paciente que tienen que
-  // constar, así que no contestar no es un tercer estado que el documento pueda
-  // expresar: sería un consentimiento firmado del que no consta si se preguntó.
-  //
-  // Sin respuesta no se emite. Sí se puede GUARDAR COMO BORRADOR sin ella: el
-  // borrador existe justo para poder estar incompleto, y no valida faltantes.
-  //
-  // La denegación no la lleva: quien rechaza el procedimiento no autoriza nada
-  // dentro de él, y su fila 4 no se compone (§2).
-  if (!esDenegacion && autorizaTransfusion === null) {
-    faltantes.push({ clave: 'transfusion', nombre: 'Autorización de transfusión' })
-  }
-  if (!esDenegacion) {
-    for (const k of SECCIONES_OBLIGATORIAS) {
-      if (!secciones[k].trim()) faltantes.push({ clave: `seccion-${k}`, nombre: LABELS[k].titulo.slice(4) })
-    }
-  }
+  // La regla vive en `consentimientoEmbudo.ts` (`faltantesConsentimiento`),
+  // movida de aquí SIN CAMBIOS para que el estado de un borrador en la lista
+  // («Faltan N datos») cuente con la misma vara que este formulario.
+  const faltantes = faltantesConsentimiento({
+    fecha, lugar, paciente, edad, diagnostico, procedimiento, familiar,
+    pacienteNoPuedeFirmar, autorizaTransfusion, secciones, esDenegacion,
+  })
 
   // ── Franja de lo conservado ─────────────────────────────────────
   // Conmutar no borra nada: lo que la denegación no lleva deja de mostrarse y
@@ -688,29 +734,149 @@ export default function ConsentimientoInformadoForm({
     return n === 1 ? 'Falta 1 campo' : `Faltan ${n} campos`
   }
 
+  /**
+   * Lleva a un faltante. En la denegación, a su campo de la tarjeta de siempre.
+   * En el consentimiento, abre su bloque (y, si es una sección, la sección) y
+   * pone el foco DENTRO, en el control: antes iba a una cabecera plegada y eran
+   * dos pasos más.
+   */
   function irA(clave: string): void {
-    // Una sección obligatoria puede estar plegada, y entonces su textarea no
-    // está en el árbol: el destino es su cabecera, que sí lo está siempre y es
-    // pulsable. `SeccionPlegable` publica ese id como parte de su contrato.
-    if (clave.startsWith('seccion-')) {
-      enfocarYAcercar(document.getElementById(`consentimiento-${clave.slice(8)}-cabecera`))
-      return
-    }
-    // La transfusión no es un input con ref: es un grupo de dos botones. El
-    // destino es el primero, que sí es enfocable y desde el que la flecha
-    // alcanza el otro.
-    if (clave === 'transfusion') {
-      enfocarYAcercar(
-        formRef.current?.querySelector<HTMLElement>('#consentimiento-transfusion-grupo button')
-          ?? null,
-      )
-      return
-    }
     const destinos: Record<string, RefObject<HTMLInputElement | null>> = {
       fecha: fechaRef, lugar: lugarRef, paciente: pacienteRef, edad: edadRef,
       diagnostico: diagnosticoRef, procedimiento: procedimientoRef, familiar: familiarRef,
     }
-    enfocarYAcercar(destinos[clave]?.current ?? null)
+    if (esDenegacion) { enfocarYAcercar(destinos[clave]?.current ?? null); return }
+    const bloque = bloqueDeFaltante(clave)
+    const seccion = SECCIONES_ORDEN.find(k => clave === `seccion-${k}`) ?? null
+    flushSync(() => {
+      setEtapa('captura')
+      setAbierta(bloque)
+      if (seccion) setSeccionAbierta(seccion)
+    })
+    const el = seccion ? document.getElementById(`consentimiento-${seccion}-texto`)
+      : clave === 'transfusion' ? document.querySelector<HTMLElement>('#consentimiento-transfusion [tabindex="0"]')
+      : destinos[clave]?.current ?? null
+    acercar(el)
+  }
+
+  /** Enfoca y acerca al borde de arriba, bajo el encabezado fundido de `tel`/`iv`. */
+  function acercar(el: HTMLElement | null): void {
+    const contenido = formRef.current?.closest<HTMLElement>('.app-contenido')
+    const margen = contenido ? parseFloat(getComputedStyle(contenido).paddingTop) || 24 : 24
+    enfocarYAcercar(el, Math.max(24, margen))
+  }
+
+  // ── Bloques: abrir, Tab al final, tocar fuera (patrón de internamiento) ──
+  /** Abre un bloque (plegando el abierto) y enfoca su primer control, o `el`. */
+  function abrir(b: BloqueConsentimiento, el?: () => HTMLElement | null): void {
+    flushSync(() => { setAbierta(b); setSeccionAbierta(null) })
+    const cuerpo = document.getElementById(`consentimiento-${b}-cuerpo`)
+    acercar(el?.() ?? (cuerpo ? enfocables(cuerpo)[0] ?? null : null))
+  }
+
+  /** Tab (sin Mayús) en el último control de un bloque lo resume y abre el siguiente. */
+  function teclaCuerpo(b: BloqueConsentimiento, e: KeyboardEvent<HTMLDivElement>): void {
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey || e.defaultPrevented) return
+    const sig = BLOQUES[BLOQUES.indexOf(b) + 1]
+    const todos = enfocables(e.currentTarget)
+    if (!sig || document.activeElement !== todos[todos.length - 1]) return
+    e.preventDefault()
+    abrir(sig)
+  }
+
+  /** Enter en un campo de una línea del bloque 1 pasa al siguiente; en el último, abre el texto. */
+  function teclaDato(e: KeyboardEvent<HTMLInputElement>, siguiente: RefObject<HTMLInputElement | null> | null): void {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    if (siguiente) siguiente.current?.focus()
+    else abrir('txt')
+  }
+
+  /**
+   * Tab en la sección que se escribe salta a la siguiente OBLIGATORIA vacía; si
+   * no queda ninguna, abre las autorizaciones. Escape la cierra.
+   */
+  function teclaSeccion(k: SeccionKey, e: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      flushSync(() => setSeccionAbierta(null))
+      document.getElementById(`consentimiento-${k}-fila`)?.focus()
+      return
+    }
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey) return
+    e.preventDefault()
+    const desde = SECCIONES_ORDEN.indexOf(k)
+    const sig = SECCIONES_ORDEN.find((x, i) => i > desde && SECCIONES_OBLIGATORIAS.includes(x) && !secciones[x].trim())
+    if (!sig) { abrir('aut'); return }
+    flushSync(() => setSeccionAbierta(sig))
+    document.getElementById(`consentimiento-${sig}-texto`)?.focus()
+  }
+
+  /** Abre una sección del bloque 2 y pone el foco en su texto. */
+  function abrirSeccion(k: SeccionKey): void {
+    flushSync(() => setSeccionAbierta(k))
+    document.getElementById(`consentimiento-${k}-texto`)?.focus()
+  }
+
+  /** Pliega el bloque abierto al tocar o enfocar fuera (si el foco no volvió dentro). */
+  function plegar(): void {
+    if (abierta === null || seccionesRef.current?.contains(document.activeElement)) return
+    setAbierta(null)
+    setSeccionAbierta(null)
+  }
+  const plegarRef = useRef(plegar)
+  useEffect(() => { plegarRef.current = plegar })
+
+  /* «Plegado al salir»: la escucha compartida (`salidaPlegable.ts`). El
+     arreglo del `<label>` que nació aquí —mientras el puntero está pulsado el
+     `focusin` no decide— ahora vale para los cinco formularios. */
+  useEffect(() => escucharSalida(el => !!seccionesRef.current?.contains(el), () => plegarRef.current()), [])
+
+  // La sección abierta es una línea que crece, sin tirador.
+  useLayoutEffect(() => {
+    if (seccionAbierta) ajustarAlto(document.getElementById(`consentimiento-${seccionAbierta}-texto`))
+  }, [seccionAbierta, secciones])
+
+  /** «Revisar y firmar»: con faltantes no avanza y lleva al primero, como hacía «Iniciar firmado». */
+  function revisar(): void {
+    if (faltantes.length > 0) {
+      setIntentado(true)
+      irA(faltantes[0].clave)
+      return
+    }
+    flushSync(() => { setAvisoRevision(''); setEtapa('revision') })
+    // El foco al título de la revisión: lo que se lee primero es qué se va a firmar.
+    acercar(document.getElementById('consentimiento-revision'))
+  }
+
+  /**
+   * «Imprimir para firmar en papel» es la función de siempre («Imprimir sin
+   * firma»), sólo renombrada. Con red, antes pregunta: cierra el documento con
+   * su folio y ya no se podrá firmar en pantalla (CI-DT-12). Con faltantes no
+   * pregunta nada: `imprimir` los señala igual que antes.
+   */
+  function pedirPapel(): void {
+    if (offlineMode || faltantes.length > 0) { void imprimir(); return }
+    setConfirmarPapel(true)
+  }
+
+  /**
+   * Cuántos testigos se ven: los que tienen nombre (testigo1 antes que
+   * testigo2, como el orden en que firman) o los pedidos con «＋», hasta dos.
+   */
+  const testigosVisibles = Math.min(2, Math.max(testigosPedidos, testigo2.trim() ? 2 : testigo1.trim() ? 1 : 0))
+
+  /** «＋ Agregar testigo»: aparece el siguiente campo, con el foco dentro. */
+  function agregarTestigo(): void {
+    const n = testigosVisibles + 1
+    flushSync(() => setTestigosPedidos(n))
+    document.getElementById(`consentimiento-testigo${n}`)?.focus()
+  }
+
+  /** Quita un testigo; si se quita el primero, el segundo pasa a ser el primero. */
+  function quitarTestigo(n: 1 | 2): void {
+    if (n === 1) { setTestigo1(testigo2); setTestigo2('') } else setTestigo2('')
+    setTestigosPedidos(testigosVisibles - 1)
   }
 
   /**
@@ -720,9 +886,9 @@ export default function ConsentimientoInformadoForm({
    *
    * El FOLIO no está aquí: es columna propia y lo escribe la base.
    */
-  function contenidoConsentimiento(): Record<string, unknown> {
+  function contenidoConsentimiento(dia?: { fecha: string; edad: string }): Record<string, unknown> {
     return {
-      paciente, lugar, fecha, edad, procedimiento, diagnostico,
+      paciente, lugar, fecha: dia?.fecha ?? fecha, edad: dia?.edad ?? edad, procedimiento, diagnostico,
       familiar, testigo1, testigo2, autorizaTransfusion, autorizaFotos,
       // Entra en el contenido, y por tanto en la HUELLA: es lo que explica que
       // el papel no lleve firma del paciente, así que forma parte de lo que se
@@ -730,6 +896,21 @@ export default function ConsentimientoInformadoForm({
       pacienteNoPuedeFirmar,
       secciones, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }
+  }
+
+  /**
+   * LA FECHA DEL DOCUMENTO ES LA DEL DÍA DE LA FIRMA (CI-DT-3, decisión del
+   * dueño). Al abrir el firmado en el dispositivo y al imprimir para firmar en
+   * papel, la fecha pasa a hoy —en la misma zona de siempre, `TZ_CLINICA`— y la
+   * edad se recalcula desde la ficha si salió de ella (la tecleada se respeta).
+   * Se fija ANTES de componer el contenido, así que entra en lo guardado, en la
+   * huella y en el papel. El sello de tiempo y su zona no se tocan (CI-DT-5).
+   */
+  function diaDeLaFirma(): { fecha: string; edad: string } {
+    const d = fechaYEdadAlFirmar({ hoy: hoyEnTZ(TZ_CLINICA), fechaActual: fecha, edadActual: edad, fechaNacimiento })
+    setFecha(d.fecha)
+    setEdad(d.edad)
+    return { fecha: d.fecha, edad: d.edad }
   }
 
   // ── Borrador · guardar (§9) ─────────────────────────────────────
@@ -788,7 +969,7 @@ export default function ConsentimientoInformadoForm({
   }
 
   async function guardarBorrador(): Promise<void> {
-    if (guardandoBorrador || imprimiendo) return
+    if (guardandoBorrador || imprimiendo || offlineMode) return
     // Guardar sin resolver el que ya había crearía el segundo borrador que la
     // regla prohíbe. Cerrar el diálogo no es responderlo.
     if (!borradorId && borradorPrevio) { setDialogoPrevio(true); return }
@@ -802,8 +983,8 @@ export default function ConsentimientoInformadoForm({
       const msg = err instanceof Error && err.message === 'SIN_FILAS'
         ? 'No se pudo guardar el borrador: no es tuyo o ya se emitió.'
         : 'No se pudo guardar el borrador. Revisa tu conexión e intenta de nuevo.'
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[ConsentimientoInformadoForm] guardarBorrador falló:', err)
     } finally {
       setGuardandoBorrador(false)
@@ -822,7 +1003,7 @@ export default function ConsentimientoInformadoForm({
    * documento al que le faltan campos.
    */
   async function iniciarFirmado(): Promise<void> {
-    if (guardandoBorrador || imprimiendo || firmando) return
+    if (guardandoBorrador || imprimiendo || firmando || offlineMode) return
     if (faltantes.length > 0) {
       setIntentado(true)
       irA(faltantes[0].clave)
@@ -834,7 +1015,7 @@ export default function ConsentimientoInformadoForm({
     setErrorSellado('')
     setGuardandoBorrador(true)
     try {
-      const contenido = contenidoConsentimiento()
+      const contenido = contenidoConsentimiento(diaDeLaFirma())
       const documentoId = await persistirBorrador(contenido)
       setFirmando({ documentoId, huella: await huellaDocumento(contenido), contenido })
     } catch (err) {
@@ -845,8 +1026,8 @@ export default function ConsentimientoInformadoForm({
         ? 'Este navegador no puede calcular la huella del documento porque la página no se '
           + 'abrió por HTTPS. Ábrela por HTTPS o desde localhost para firmar.'
         : 'No se pudo abrir el firmado. Revisa tu conexión e intenta de nuevo.'
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[ConsentimientoInformadoForm] iniciarFirmado falló:', err)
     } finally {
       setGuardandoBorrador(false)
@@ -875,7 +1056,7 @@ export default function ConsentimientoInformadoForm({
    * Los datos de impresión que comparten el consentimiento sellado y el que se
    * imprime sin firma. Se lee dos veces en este archivo y en ningún otro sitio.
    */
-  function datosDePapel() {
+  function datosDePapel(fechaDoc: string) {
     const medicoData = medicoInfo ? {
       nombre: medicoInfo.nombre,
       titulo: medicoInfo.titulo ?? null,
@@ -902,7 +1083,7 @@ export default function ConsentimientoInformadoForm({
         direccion: consultorioActivo.direccion,
         telefono: consultorioActivo.telefono,
       } : undefined,
-      fechaFmt: format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }),
+      fechaFmt: format(new Date(fechaDoc + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es }),
     }
   }
 
@@ -1000,7 +1181,8 @@ export default function ConsentimientoInformadoForm({
         })),
       )
 
-      const papel = datosDePapel()
+      // La fecha del CONTENIDO CONGELADO (la del día de la firma), no del estado.
+      const papel = datosDePapel(texto(firmando.contenido.fecha) || fecha)
       const { blob, storagePath } = await generarPdf({
         tipo: 'consentimiento_informado',
         pacienteId,
@@ -1072,12 +1254,22 @@ export default function ConsentimientoInformadoForm({
         // El caso incómodo: el documento ya es terminal y el folio ya se
         // consumió. Cerrar el modo es lo correcto —no hay nada más que firmar—
         // y el mensaje lleva el número delante para poder encontrarlo.
-        msg = `El consentimiento quedó sellado${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
-          + 'generar el PDF. Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
+        //
+        // ⚠️ NO MANDA A «RECUPERARLO DESDE LA LISTA», que es lo que decía: eso
+        // era «Regenerar», que compone sin firmas (CI-DT-1) y ya no se ofrece en
+        // un sellado. Hoy NO existe un camino que vuelva a generar el PDF CON las
+        // firmas guardadas, así que el mensaje lo dice y remite a soporte. El caso
+        // queda anotado en DEUDA_CONSENTIMIENTO.md (CI-DT-1, «sellado sin PDF»).
+        msg = `El consentimiento quedó sellado${folio ? ` con folio ${folio}` : ''} y sus firmas están `
+          + 'guardadas, pero no se pudo generar el PDF. La app todavía no puede volver a generarlo con '
+          + 'las firmas: no lo emitas de nuevo y escribe a soporte@spinus.com.mx con el folio para recuperarlo.'
       }
-      toast.error(msg)
+      // Sellado pero sin PDF: un solo mensaje, la alerta «No se pudo guardar»
+      // (rediseño B9). El otro caso sigue con su aviso y su texto del firmado.
+      if (!selladoOk) toast.error(msg)
       if (selladoOk) {
         setErrorGuardado(msg)
+        setErrorAbierto(true)
         setFirmando(null)
         setBorradorId(null)
         setBorradorFecha(null)
@@ -1087,7 +1279,7 @@ export default function ConsentimientoInformadoForm({
       console.error('[ConsentimientoInformadoForm] sellar falló:', err)
     } finally {
       setSellando(false)
-      if (pdfBlob) { setDocGenerado({ blob: pdfBlob, guardado: true, documentoId: firmando?.documentoId ?? null }) }
+      if (pdfBlob) { setDocGenerado({ blob: pdfBlob, guardado: true, documentoId: firmando?.documentoId ?? null, sellado: true }) }
     }
   }
 
@@ -1127,7 +1319,7 @@ export default function ConsentimientoInformadoForm({
         paciente, lugar, fecha, edad, procedimiento, diagnostico, familiar,
         pacienteNoPuedeFirmar, timezone,
       }
-      : contenidoConsentimiento()
+      : contenidoConsentimiento(diaDeLaFirma())
 
     // El borrador cargado se emite solo si lo que se imprime es un
     // CONSENTIMIENTO. La denegación no tiene borrador —se emite en el momento,
@@ -1226,7 +1418,8 @@ export default function ConsentimientoInformadoForm({
         firma_url: medicoInfo.firma_url ?? null,
       } : null
       const logoUrl = medicoInfo?.logo_url?.startsWith('https://') ? medicoInfo.logo_url : undefined
-      const fechaFmt = format(new Date(fecha + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
+      // La fecha que VIAJA en el contenido: en el consentimiento, la de hoy.
+      const fechaFmt = format(new Date(texto(contenido.fecha) + 'T12:00:00'), "dd 'de' MMMM 'de' yyyy", { locale: es })
 
       const consultorioData = consultorioActivo ? {
         nombre: consultorioActivo.nombre,
@@ -1325,8 +1518,8 @@ export default function ConsentimientoInformadoForm({
         msg = `El documento quedó registrado${folio ? ` con folio ${folio}` : ''}, pero no se pudo generar el PDF. `
           + 'Búscalo en la lista de documentos del paciente y recupéralo desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       console.error('[ConsentimientoInformadoForm] imprimir falló:', err)
     } finally {
       setImprimiendo(false)
@@ -1339,20 +1532,88 @@ export default function ConsentimientoInformadoForm({
   const senalar = (clave: string) => intentado && faltantes.some(f => f.clave === clave)
   const maxFecha = desplazarFecha(hoyEnTZ(TZ_CLINICA), { anios: 1 })
 
-  return (
-    <div ref={formRef} className="sp-doc-form">
-      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
-          está abierto: se apaga con display:none y el panel se monta como
-          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
-      {/* Con el firmado abierto el formulario sigue MONTADO y apagado, no
-          desmontado (§2): al salir del modo el médico vuelve a lo que estaba
-          escribiendo, sin haberlo traspasado a ninguna parte. */}
-      <div className="sp-doc-formbody"
-        style={plantillas.panelAbierto || firmando ? { display: 'none' } : undefined}>
+  /** Lo que dice cada bloque plegado. Tras intentar avanzar, el que tenga un faltante lo dice en rojo. */
+  function cabecera(b: BloqueConsentimiento, r: Resumen) {
+    const suyos = intentado ? faltantes.filter(f => bloqueDeFaltante(f.clave) === b) : []
+    const falta = suyos.length > 0
+    return {
+      id: b, prefijo: 'consentimiento',
+      resumen: falta ? `Falta ${suyos.map(f => f.nombre).join(' · ')}` : r.texto,
+      completa: r.completa && !falta, falta, abierta: abierta === b,
+      onAlternar: () => (abierta === b ? setAbierta(null) : abrir(b)),
+      onTeclaCuerpo: (e: KeyboardEvent<HTMLDivElement>) => teclaCuerpo(b, e),
+    }
+  }
+  const campo = (clave: string) => `sp-rx-campo${senalar(clave) ? ' sp-rx-campo--falta' : ''}`
+  const obligatorio = <><span aria-hidden="true" className="sp-int-ob">*</span><span className="sr-only"> obligatorio</span></>
 
+  /** «Quién firma»: la misma casilla `pacienteNoPuedeFirmar`. Con familiar, el foco va a su nombre. */
+  function elegirQuien(v: string): void {
+    const familiarFirma = noPuedeFirmarDe(v === 'familiar' ? 'familiar' : 'paciente')
+    flushSync(() => setPacienteNoPuedeFirmar(familiarFirma))
+    if (familiarFirma) familiarRef.current?.focus()
+  }
+
+  // Lo que la revisión enseña: la fecha y la edad que TENDRÁ el documento al
+  // firmarse (se fijan al pulsar una de las dos vías, no antes).
+  const dia = fechaYEdadAlFirmar({ hoy: hoyEnTZ(TZ_CLINICA), fechaActual: fecha, edadActual: edad, fechaNacimiento })
+  const fechaLarga = (iso: string): string => format(new Date(iso + 'T12:00:00'), "d 'de' MMMM 'de' yyyy", { locale: es })
+  const nombresFirma = { paciente, familiar, testigo_1: testigo1, testigo_2: testigo2 }
+  const filasRevision: FilaRevision[] = [
+    {
+      etiqueta: 'Paciente', valor: [paciente.trim(), dia.edad.trim()].filter(Boolean).join(' · '),
+      nota: dia.edadManual ? 'La edad la escribiste a mano: se respeta tal cual.' : undefined,
+    },
+    { etiqueta: 'Lugar', valor: lugar },
+    { etiqueta: 'Diagnóstico', valor: diagnostico },
+    { etiqueta: 'Procedimiento', valor: procedimiento },
+    { etiqueta: 'Texto', valor: resumenTexto(secciones, SECCIONES_DEFAULT).texto },
+    { etiqueta: 'Transfusión', valor: autorizaTransfusion === null ? '' : autorizaTransfusion === 'si' ? 'Sí autoriza' : 'No autoriza' },
+    { etiqueta: 'Fotografías clínicas', valor: autorizaFotos ? 'Sí autoriza' : 'No autoriza' },
+    { etiqueta: 'Fecha del documento', valor: `${fechaLarga(dia.fecha)} (hoy, día de la firma)` },
+  ]
+  // El MISMO orden y la misma regla que el modo de firmado (`firmantesDe`).
+  const firmantesRevision = firmantesDe(nombresFirma).map(p => ({
+    nombre: nombresFirma[p.rol].trim() || p.titulo,
+    rol: p.rol === 'paciente' && pacienteNoPuedeFirmar ? 'Paciente · no puede firmar' : p.titulo,
+  }))
+
+  // Lo común a las tres vistas: perfil incompleto y faltantes.
+  const avisos = (
+    <>
+      {!cargandoPerfil && !medicoInfo && (
+        <p className="sp-banner sp-banner--warn">
+          <AlertTriangle size={17} />
+          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
+          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
+        </p>
+      )}
+      {intentado && faltantes.length > 0 && (
+        <p className="sp-banner sp-banner--warn" aria-live="polite">
+          <AlertTriangle size={17} />
+          <span>
+            {textoFaltantes()}:{' '}
+            {faltantes.slice(0, 3).map((f, i) => (
+              <span key={f.clave}>
+                {i > 0 && ' · '}
+                <button type="button" onClick={() => irA(f.clave)}
+                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
+                  {f.nombre}
+                </button>
+              </span>
+            ))}
+            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
+          </span>
+        </p>
+      )}
+    </>
+  )
+
+  const vistaCaptura = (
+    <>
       {/* Banner del borrador retomado (§9.2). Arriba del todo: lo primero que
           hay que saber al abrir esta pantalla es que nada se ha emitido. */}
-      {borradorId && !esDenegacion && (
+      {borradorId && (
         <p className="sp-banner sp-banner--warn">
           <FileClock size={17} />
           <span>
@@ -1366,30 +1627,248 @@ export default function ConsentimientoInformadoForm({
 
       {plantillas.selector}
 
-      <section className="sp-card sp-doc-card">
-        {/* El segmentado vive en la cabecera de la primera card, como en
-            Honorarios: una card entera para dos botones sería una card de más,
-            y el orden de las cards no cambia al conmutar. */}
-        <div className="sp-doc-cardhead sp-doc-consent-head">
-          {/* El escudo sigue al tipo: un escudo con paloma junto al rótulo
-              «Denegación» afirmaría lo contrario del documento. */}
-          <div className="sp-icobox sp-icobox--sm">{esDenegacion ? <ShieldOff /> : <ShieldCheck />}</div>
-          <h2 className="sp-label">Datos de identificación</h2>
-          <div className="sp-doc-segmented sp-doc-segmented--tipo" role="group" aria-label="Tipo de documento">
-            {([
-              { key: 'consentimiento', label: 'Consentimiento' },
-              { key: 'denegacion', label: 'Denegación' },
-            ] as { key: TipoDoc; label: string }[]).map(({ key, label }) => (
-              <button key={key} type="button" aria-pressed={tipoDoc === key}
-                onClick={() => setTipoDoc(key)} className="sp-doc-segmented__opt">
-                {label}
-              </button>
-            ))}
+      {/* Captura en cuatro bloques (maqueta aprobada): UNO abierto y los demás
+          resumidos en una línea. Tab en el último control de un bloque lo
+          resume y abre el siguiente; Enter avanza en los datos; tocar fuera
+          pliega. Las claves de `contenido` no cambian. */}
+      <div ref={seccionesRef} className="sp-int sp-ci">
+        <SeccionPaso numero={1} titulo="Paciente y procedimiento"
+          {...cabecera('dat', resumenDatos({ paciente, edad, procedimiento, lugar, diagnostico }))}>
+          <div className="sp-rx-par">
+            <div className={campo('paciente')}>
+              <label htmlFor="consentimiento-paciente" className="sp-rx-rot">Paciente{obligatorio}</label>
+              <input ref={pacienteRef} id="consentimiento-paciente" type="text" value={paciente} autoComplete="off"
+                onChange={e => setPaciente(e.target.value)} onKeyDown={e => teclaDato(e, edadRef)}
+                placeholder="Nombre completo" aria-invalid={senalar('paciente') || undefined} className="sp-rx-fi" />
+            </div>
+            <div className={campo('edad')}>
+              <label htmlFor="consentimiento-edad" className="sp-rx-rot">Edad{obligatorio}</label>
+              <input ref={edadRef} id="consentimiento-edad" type="text" value={edad} autoComplete="off"
+                onChange={e => setEdad(e.target.value)} onKeyDown={e => teclaDato(e, lugarRef)}
+                aria-label="Edad del paciente (obligatorio)"
+                placeholder="Ej: 45 años" aria-invalid={senalar('edad') || undefined} className="sp-rx-fi" />
+            </div>
           </div>
+          {(pacienteInicial || edadInicial) && <p className="sp-ci-ayuda">De la ficha · editable</p>}
+          <div className={campo('lugar')}>
+            <label htmlFor="consentimiento-lugar" className="sp-rx-rot">Lugar{obligatorio}</label>
+            <input ref={lugarRef} id="consentimiento-lugar" type="text" value={lugar} autoComplete="off"
+              onChange={e => setLugar(e.target.value)} onKeyDown={e => teclaDato(e, diagnosticoRef)}
+              placeholder="Ej: Monterrey, N.L." aria-invalid={senalar('lugar') || undefined} className="sp-rx-fi" />
+          </div>
+          <div className={campo('diagnostico')}>
+            <label htmlFor="consentimiento-diagnostico" className="sp-rx-rot">Diagnóstico{obligatorio}</label>
+            <input ref={diagnosticoRef} id="consentimiento-diagnostico" type="text" value={diagnostico} autoComplete="off"
+              onChange={e => setDiagnostico(e.target.value)} onKeyDown={e => teclaDato(e, procedimientoRef)}
+              placeholder="Diagnóstico principal" aria-invalid={senalar('diagnostico') || undefined} className="sp-rx-fi" />
+          </div>
+          {diagnosticoInicial && <p className="sp-ci-ayuda">Del diagnóstico de la consulta</p>}
+          <div className={campo('procedimiento')}>
+            <label htmlFor="consentimiento-procedimiento" className="sp-rx-rot">Procedimiento{obligatorio}</label>
+            <input ref={procedimientoRef} id="consentimiento-procedimiento" type="text" value={procedimiento} autoComplete="off"
+              onChange={e => setProcedimiento(e.target.value)} onKeyDown={e => teclaDato(e, null)}
+              placeholder="Ej: Artrodesis cervical anterior" aria-invalid={senalar('procedimiento') || undefined} className="sp-rx-fi" />
+          </div>
+          <p className="sp-ci-ayuda">La fecha del documento se pone sola el día en que se firma.</p>
+        </SeccionPaso>
+
+        <SeccionPaso numero={2} titulo="Texto del consentimiento" {...cabecera('txt', resumenTexto(secciones, SECCIONES_DEFAULT))}>
+          <div className="sp-ci-secs">
+            {SECCIONES_ORDEN.map(k => {
+              const est = estadoSeccion(secciones[k], SECCIONES_DEFAULT[k], SECCIONES_OBLIGATORIAS.includes(k))
+              if (seccionAbierta === k) return (
+                <div key={k} className="sp-ci-secab">
+                  <div className={`sp-rx-campo sp-rx-campo--texto${senalar(`seccion-${k}`) && est === 'falta' ? ' sp-rx-campo--falta' : ''}`}>
+                    <label htmlFor={`consentimiento-${k}-texto`} className="sp-rx-rot">{LABELS[k].titulo}</label>
+                    <textarea id={`consentimiento-${k}-texto`} value={secciones[k]} rows={2}
+                      onChange={e => updateSeccion(k, e.target.value)} onKeyDown={e => teclaSeccion(k, e)}
+                      placeholder={est === 'falta' ? 'Obligatoria: descríbela para este paciente' : undefined}
+                      aria-describedby={`consentimiento-${k}-ayuda`} className="sp-rx-fi sp-rx-ta" />
+                  </div>
+                  <p id={`consentimiento-${k}-ayuda`} className="sp-ci-ayuda">{LABELS[k].hint}</p>
+                </div>
+              )
+              return (
+                <button key={k} id={`consentimiento-${k}-fila`} type="button" className="sp-ci-sx" data-estado={est}
+                  onClick={() => abrirSeccion(k)}>
+                  <span className="sp-ci-sx-t">{LABELS[k].titulo}</span>
+                  <span className="sp-ci-sx-e">{TEXTO_ESTADO_SECCION[est]}</span>
+                  <ChevronRight aria-hidden="true" className="sp-ci-sx-chev" />
+                </button>
+              )
+            })}
+          </div>
+        </SeccionPaso>
+
+        <SeccionPaso numero={3} titulo="Autorizaciones" {...cabecera('aut', resumenAutorizaciones(autorizaTransfusion, autorizaFotos))}>
+          {/* La transfusión es OBLIGATORIA y SIN valor por defecto, como siempre:
+              el papel compone sus dos respuestas y no contestar no es un estado
+              que pueda expresar. Las autorizaciones nunca entran en plantillas. */}
+          <div className={`sp-int-blo${senalar('transfusion') ? ' sp-ci-blo--falta' : ''}`}>
+            <span className="sp-int-rot" aria-hidden="true">Transfusión de sangre{obligatorio}</span>
+            <OpcionesRapidas id="consentimiento-transfusion" nombre="Autoriza transfusión de sangre (obligatorio)"
+              opciones={OPCIONES_TRANSFUSION} valor={autorizaTransfusion ?? ''} obligatoria
+              onCambio={v => setAutorizaTransfusion(v === 'si' ? 'si' : 'no')} />
+          </div>
+          <label className="sp-check sp-ci-fotos">
+            <input id="consentimiento-fotos" type="checkbox" className="sr-only"
+              checked={autorizaFotos} onChange={e => setAutorizaFotos(e.target.checked)} />
+            <span className="sp-check__box"><Check aria-hidden="true" /></span>
+            {/* El texto del PDF (CI-DT-4). */}
+            <span className="sp-check__label">{TEXTO_CASILLA_FOTOS}</span>
+          </label>
+        </SeccionPaso>
+
+        <SeccionPaso numero={4} titulo="Quién firma"
+          {...cabecera('fir', resumenFirmantes({ pacienteNoPuedeFirmar, familiar, testigo1, testigo2 }))}>
+          {/* Las dos opciones son la casilla `pacienteNoPuedeFirmar` de siempre:
+              «Familiar o representante» = el paciente no puede firmar, y su
+              nombre pasa a ser obligatorio. */}
+          <div className="sp-ci-quien">
+            <OpcionesRapidas id="consentimiento-quien" nombre="Quién firma" opciones={OPCIONES_QUIEN}
+              valor={quienFirmaDe(pacienteNoPuedeFirmar)} obligatoria onCambio={elegirQuien} />
+          </div>
+          {pacienteNoPuedeFirmar || familiar.trim() || familiarPedido ? (
+            <div className={campo('familiar')}>
+              <label htmlFor="consentimiento-familiar" className="sp-rx-rot">
+                Familiar{pacienteNoPuedeFirmar && obligatorio}
+              </label>
+              <input ref={familiarRef} id="consentimiento-familiar" type="text" value={familiar} autoComplete="off"
+                onChange={e => setFamiliar(e.target.value)}
+                aria-label={`Familiar responsable o representante legal${pacienteNoPuedeFirmar ? ' (obligatorio)' : ''}`}
+                placeholder="Familiar responsable o representante legal"
+                aria-invalid={senalar('familiar') || undefined} className="sp-rx-fi" />
+              {!pacienteNoPuedeFirmar && (
+                <button type="button" tabIndex={-1} className="k-b k-b-icono sp-int-quitar" aria-label="Quitar familiar"
+                  onClick={() => { setFamiliar(''); setFamiliarPedido(false) }}>
+                  <X aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          ) : null}
+          {pacienteNoPuedeFirmar && (
+            <p className="sp-ci-ayuda">El familiar responsable firma en su lugar: su nombre pasa a ser obligatorio.</p>
+          )}
+          {([1, 2] as const).filter(n => n <= testigosVisibles).map(n => (
+            <div key={n} className="sp-rx-campo">
+              <label htmlFor={`consentimiento-testigo${n}`} className="sp-rx-rot">Testigo {n}</label>
+              <input id={`consentimiento-testigo${n}`} type="text" value={n === 1 ? testigo1 : testigo2} autoComplete="off"
+                onChange={e => (n === 1 ? setTestigo1 : setTestigo2)(e.target.value)}
+                placeholder="Nombre completo del testigo" className="sp-rx-fi" />
+              <button type="button" tabIndex={-1} className="k-b k-b-icono sp-int-quitar" aria-label={`Quitar testigo ${n}`}
+                onClick={() => quitarTestigo(n)}>
+                <X aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          <div className="sp-ci-mas">
+            {!pacienteNoPuedeFirmar && !familiar.trim() && !familiarPedido && (
+              <button type="button" className="k-b k-b-texto"
+                onClick={() => { flushSync(() => setFamiliarPedido(true)); familiarRef.current?.focus() }}>
+                <Plus aria-hidden="true" /> Agregar familiar
+              </button>
+            )}
+            {testigosVisibles < 2 && (
+              <button type="button" className="k-b k-b-texto" onClick={agregarTestigo}>
+                <Plus aria-hidden="true" /> Agregar testigo
+              </button>
+            )}
+          </div>
+          <p className="sp-ci-ayuda">Los nombres de familiar y testigos también se pueden escribir el día de la firma.</p>
+        </SeccionPaso>
+      </div>
+
+      {avisos}
+
+      <div className="sp-doc-actions sp-ci-pie">
+        <button type="button" onClick={pedirPapel} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+          className="sp-btn sp-btn--ghost sp-ci-papel">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <><Printer size={17} aria-hidden="true" /><span className="sp-ci-largo">Imprimir para firmar en papel</span><span className="sp-ci-corto">Imprimir en papel</span></>}
+        </button>
+        {/* Sin conexión no hay borrador que guardar (va a Supabase): no se
+            enseña un botón que sólo puede fallar (CI-DT-17). */}
+        {!offlineMode && (
+          <button type="button" onClick={guardarBorrador} disabled={guardandoBorrador || imprimiendo || vacio}
+            title={vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined}
+            className="sp-btn sp-btn--secondary sp-ci-borrador">
+            {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
+          </button>
+        )}
+        {/* No se apaga por faltantes: un botón gris no enseña qué falta. Al
+            pulsar con faltantes no avanza y lleva al primero. */}
+        <button type="button" onClick={revisar} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+          className="sp-btn sp-btn--primary sp-ci-firmar">
+          <PenLine size={18} aria-hidden="true" /> Revisar y firmar
+        </button>
+      </div>
+      {/* El búnker no tiene «···»: la denegación se ofrece aquí, y se dice por
+          qué no hay borrador ni firmado en el dispositivo. */}
+      {offlineMode && (
+        <div className="sp-ci-offline">
+          <p className="sp-ci-ayuda">Sin conexión: se imprime para firmarse a mano. El borrador y el firmado en el dispositivo necesitan red.</p>
+          <button type="button" onClick={() => setTipoDoc('denegacion')} className="k-b k-b-texto">
+            <ShieldOff aria-hidden="true" /> Emitir denegación…
+          </button>
+        </div>
+      )}
+    </>
+  )
+
+  const vistaRevision = (
+    <>
+      <RevisionConsentimiento filas={filasRevision} firmantes={firmantesRevision}
+        conDispositivo={!offlineMode} aviso={avisoRevision}
+        onVolver={() => { setEtapa('captura'); setAvisoRevision('') }}
+        onEditarFirmantes={() => { setEtapa('captura'); setAvisoRevision(''); setTimeout(() => abrir('fir'), 0) }} />
+      {avisos}
+      <div className="sp-doc-actions sp-ci-pie">
+        {/* Sin conexión ni borrador ni firmado en el dispositivo (CI-DT-17):
+            los dos llaman a Supabase. «Imprimir para firmar en papel», como hoy. */}
+        {!offlineMode && (
+          <button type="button" onClick={guardarBorrador} disabled={guardandoBorrador || imprimiendo || vacio}
+            className="sp-btn sp-btn--ghost sp-ci-borrador">
+            {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar borrador'}
+          </button>
+        )}
+        <button type="button" onClick={pedirPapel} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+          className="sp-btn sp-btn--secondary sp-ci-papel">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <><Printer size={17} aria-hidden="true" /><span className="sp-ci-largo">Imprimir para firmar en papel</span><span className="sp-ci-corto">Imprimir en papel</span></>}
+        </button>
+        {!offlineMode && (
+          <button type="button" onClick={iniciarFirmado} disabled={imprimiendo || guardandoBorrador || perfilPendiente}
+            className="sp-btn sp-btn--primary sp-ci-firmar">
+            <PenLine size={18} aria-hidden="true" /> Firmar en este dispositivo
+          </button>
+        )}
+      </div>
+    </>
+  )
+
+  const vistaDenegacion = (
+    <>
+      {/* La denegación sale del «···» (maqueta aprobada; casi nunca se usa):
+          el MISMO formulario y el mismo comportamiento de siempre. */}
+      <p className="sp-banner sp-banner--info sp-ci-den">
+        <ShieldOff size={17} aria-hidden="true" />
+        <span>Denegación del consentimiento: el paciente rechaza el procedimiento. Se imprime y se firma a mano.</span>
+        <button type="button" onClick={() => setTipoDoc('consentimiento')} className="k-b k-b-texto">
+          Volver al consentimiento
+        </button>
+      </p>
+
+      {plantillas.selector}
+
+      <section className="sp-card sp-doc-card">
+        <div className="sp-doc-cardhead sp-doc-consent-head">
+          <div className="sp-icobox sp-icobox--sm"><ShieldOff /></div>
+          <h2 className="sp-label">Datos de identificación</h2>
         </div>
         <div className="sp-doc-cardbody">
           <div className="sp-doc-grid sp-doc-consent-id" data-cols="3">
-
             {/* Fila 1 — Fecha · Lugar · Paciente */}
             <div className="sp-doc-field">
               <label htmlFor="consentimiento-fecha" className="sp-label-field">
@@ -1530,76 +2009,9 @@ export default function ConsentimientoInformadoForm({
                 className="sp-input" />
             </div>
 
-            {/* Fila 4 — bajo divisor: no son datos de identificación, son
-                decisiones del paciente (§2). La denegación no las lleva: quien
-                rechaza el procedimiento no autoriza nada dentro de él. */}
-            {!esDenegacion && (
-            <div className="sp-doc-consent-auth">
-              <div className="sp-doc-field">
-                <span className="sp-label-field" id="consentimiento-transfusion">
-                  Autoriza transfusión de sangre
-                </span>
-                {/* Obligatoria: el papel compone las DOS respuestas, así que no
-                    contestar no es un estado que el documento pueda expresar.
-                    Se señala en rojo como los demás campos.
-
-                    SIN `aria-invalid`, y no por descuido: ni `role="group"` ni
-                    `button` lo admiten —lo dice ARIA y lo comprueba jsx-a11y—.
-                    Lo que anuncia el faltante es el banner, que lo nombra, y el
-                    foco que este formulario lleva hasta el primer botón. Es la
-                    misma estrategia que el resto del formulario, no una excepción. */}
-                <div id="consentimiento-transfusion-grupo"
-                  className={`sp-doc-segmented sp-doc-segmented--field ${senalar('transfusion') ? 'sp-doc-invalid' : ''}`}
-                  role="group" aria-labelledby="consentimiento-transfusion">
-                  {(['si', 'no'] as const).map(v => (
-                    <button key={v} type="button" aria-pressed={autorizaTransfusion === v}
-                      onClick={() => setAutorizaTransfusion(v)} className="sp-doc-segmented__opt">
-                      {v === 'si' ? 'Sí' : 'No'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="sp-doc-field">
-                <span className="sp-label-field">Uso de fotografías</span>
-                {/* El `<label>` envuelve al control, así que el nombre accesible
-                    de la casilla es su propio texto: el rótulo de arriba agrupa
-                    la celda, no nombra la casilla. */}
-                <label className="sp-check sp-doc-consent-fotos">
-                  <input id="consentimiento-fotos" type="checkbox" className="sr-only"
-                    checked={autorizaFotos} onChange={e => setAutorizaFotos(e.target.checked)} />
-                  <span className="sp-check__box"><Check aria-hidden="true" /></span>
-                  <span className="sp-check__label">
-                    Autoriza su uso con fines educativos y de publicación académica
-                  </span>
-                </label>
-              </div>
-            </div>
-            )}
-
           </div>
         </div>
       </section>
-
-      {/* Las siete nacen PLEGADAS (§3): abiertas, el formulario mide ≈2.400px
-          antes de escribir nada. El badge de la cabecera es lo que hace que
-          plegar resuma en vez de esconder.
-          En denegación no se muestran: son las hojas que explican y otorgan
-          justo lo que el paciente rechaza. Lo escrito en ellas sigue en el
-          estado —conmutar no borra— y se declara en la franja de abajo. */}
-      {!esDenegacion && SECCIONES_ORDEN.map(key => (
-        <SeccionPlegable
-          key={key}
-          id={`consentimiento-${key}`}
-          titulo={LABELS[key].titulo}
-          resumen={resumenSeccion(key, secciones[key])}
-        >
-          <p className="sp-hint" style={{ marginBottom: 'var(--sp-gap-label)' }}>{LABELS[key].hint}</p>
-          <label htmlFor={`consentimiento-${key}-texto`} className="sr-only">{LABELS[key].titulo}</label>
-          <textarea id={`consentimiento-${key}-texto`} value={secciones[key]}
-            onChange={e => updateSeccion(key, e.target.value)}
-            rows={6} className="sp-textarea" />
-        </SeccionPlegable>
-      ))}
 
       {/* Franja de lo conservado. Conmutar no borra nada: lo que la denegación
           no lleva deja de verse y de imprimirse, pero sigue escrito y se
@@ -1614,117 +2026,77 @@ export default function ConsentimientoInformadoForm({
         </p>
       )}
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {avisos}
 
-      {!cargandoPerfil && !medicoInfo && (
-        <p className="sp-banner sp-banner--warn">
-          <AlertTriangle size={17} />
-          <span style={{ flex: 1 }}>Completa tu perfil para que el documento salga con tu encabezado.</span>
-          <Link href="/perfil" className="sp-link-alt">Ir a mi perfil</Link>
-        </p>
-      )}
+      {/* La denegación no tiene borrador ni firmado: se emite en el momento. */}
+      <div className="sp-doc-actions">
+        <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
+          className="sp-btn sp-btn--primary">
+          {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
+            : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
+            : <><Printer size={17} /> Imprimir</>}
+        </button>
+      </div>
+    </>
+  )
 
-      {intentado && faltantes.length > 0 && (
-        <p className="sp-banner sp-banner--warn" aria-live="polite">
-          <AlertTriangle size={17} />
-          <span>
-            {textoFaltantes()}:{' '}
-            {faltantes.slice(0, 3).map((f, i) => (
-              <span key={f.clave}>
-                {i > 0 && ' · '}
-                <button type="button" onClick={() => irA(f.clave)}
-                  className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
-                  {f.nombre}
-                </button>
-              </span>
-            ))}
-            {faltantes.length > 3 && ` y ${faltantes.length - 3} más`}
-          </span>
-        </p>
-      )}
+  return (
+    <div ref={formRef} className="sp-doc-form">
+      {/* El árbol del formulario NO se desmonta cuando el panel de plantillas
+          está abierto: se apaga con display:none y el panel se monta como
+          hermano, en el mismo contenedor de scroll (spec 02 §3.1). */}
+      {/* Con el firmado abierto el formulario sigue MONTADO y apagado, no
+          desmontado (§2): al salir del modo el médico vuelve a lo que estaba
+          escribiendo, sin haberlo traspasado a ninguna parte. */}
+      <div className="sp-doc-formbody"
+        style={plantillas.panelAbierto || firmando ? { display: 'none' } : undefined}>
 
-      {/* Orden del DOM = orden en fila desde 380px (§1). En XS `.sp-doc-actions`
-          es `column-reverse`, así que el primario queda arriba sin más. */}
-      {/* `--filas` sólo con las cuatro acciones: es quien las envuelve en dos
-          renglones por debajo de 896px de contenedor y quien acorta ahí los
-          rótulos. La denegación es de un botón y sigue con la barra de siempre. */}
-      <div className={`sp-doc-actions${esDenegacion ? '' : ' sp-doc-actions--filas'}`}>
-        {esDenegacion ? (
-          /* La denegación no tiene borrador ni firmado: se emite en el momento.
-             Su barra es la de siempre. */
-          <button type="button" onClick={imprimir} disabled={imprimiendo || perfilPendiente}
-            className="sp-btn sp-btn--primary">
-            {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
-              : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-              : <><Printer size={17} /> Imprimir</>}
+      {esDenegacion ? vistaDenegacion : etapa === 'revision' ? vistaRevision : vistaCaptura}
+
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
           </button>
-        ) : (
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
+
+      {/* «Imprimir para firmar en papel» cierra el documento con folio y deja
+          de poder firmarse en pantalla: no es una vista previa (CI-DT-12). */}
+      <ModalShell
+        open={confirmarPapel}
+        onClose={() => setConfirmarPapel(false)}
+        variante="alerta"
+        tono="avisar"
+        apilada
+        icon={<Printer aria-hidden="true" />}
+        title="¿Imprimir para firmar en papel?"
+        footer={
           <>
-            {/* ⚠️ LOS CUATRO SON HIJOS DIRECTOS DE LA BARRA, SIN ENVOLTORIOS, y
-                el orden del marcado es el de ESCRITORIO: borrador, plantilla,
-                sin firma y firmar, con el primario al final. En estrecho la
-                barra envuelve en dos renglones y son las `order` de la hoja las
-                que emparejan «Plantilla» con «Firmar» arriba y «Sin firma» con
-                «Borrador» abajo.
-
-                ⚠️ AQUÍ HUBO DOS `<div>` DE FILA CON `display: contents`, y se
-                fueron a propósito. Un envoltorio ata cada botón a su renglón,
-                así que no había forma de que las parejas cambiaran entre
-                anchos —que es justo lo que pide esta disposición—. Con
-                `flex-wrap` y `order` el emparejamiento es una propiedad del
-                ancho, no de la estructura. De paso desaparece el
-                `display: contents`, que era el único mecanismo nuevo del ítem 3
-                que no pude descartar del todo como causa del despegue.
-
-                ⚠️ NINGUNO LLEVA `style` INLINE CON `flex`: un estilo en línea
-                gana a cualquier hoja y dejaría a la fila estrecha sin poder
-                repartirlos. El reparto vive entero en la hoja. */}
-            <button type="button" onClick={guardarBorrador}
-              disabled={guardandoBorrador || imprimiendo || vacio}
-              title={vacio ? 'Escribe algo antes de guardarlo como borrador.' : undefined}
-              /* ⚠️ `--secondary` Y NO `--ghost`, QUE ES LO QUE ERA. El ghost va
-                 sin fondo y SIN BORDE (`spinus-tokens.css`, `.sp-btn--ghost`),
-                 así que entre tres botones con contorno éste se leía como texto
-                 suelto y no parecía pulsable. Es una de las cuatro acciones del
-                 pie, no un «Cancelar» de diálogo. */
-              className="sp-btn sp-btn--secondary sp-doc-act-borrador">
-              {guardandoBorrador ? <><span className="sp-spinner" /> Guardando…</> : <>
-                <span className="sp-doc-actions__long">Guardar borrador</span>
-                <span className="sp-doc-actions__short">Borrador</span>
-              </>}
+            <button type="button" autoFocus onClick={() => setConfirmarPapel(false)} className="k-b k-b-capa k-b-quieto">
+              Cancelar
             </button>
-
-            {plantillas.botonGuardar}
-
-            <button type="button" onClick={imprimir}
-              disabled={imprimiendo || guardandoBorrador || perfilPendiente}
-              className="sp-btn sp-btn--secondary sp-doc-act-sinfirma">
-              {imprimiendo ? <><span className="sp-spinner" /> Generando PDF…</>
-                : perfilPendiente ? <><span className="sp-spinner" /> Cargando tu perfil…</>
-                : <>
-                    <Printer size={17} />
-                    <span className="sp-doc-actions__long">Imprimir sin firma</span>
-                    <span className="sp-doc-actions__short">Sin firma</span>
-                  </>}
-            </button>
-
-            {/* No se apaga por faltantes, igual que el de imprimir: un botón
-                gris no enseña qué falta, el banner sí. Al pulsar con faltantes
-                no abre el firmado y lleva al primero. */}
-            <button type="button" onClick={iniciarFirmado}
-              disabled={imprimiendo || guardandoBorrador || perfilPendiente}
-              className="sp-btn sp-btn--primary sp-doc-act-firmar">
-              <PenLine size={18} />
-              <span className="sp-doc-actions__long">
-                {borradorId ? 'Continuar firmado' : 'Iniciar firmado electrónico'}
-              </span>
-              <span className="sp-doc-actions__short">
-                {borradorId ? 'Continuar' : 'Firmar'}
-              </span>
+            <button type="button" data-principal onClick={() => { setConfirmarPapel(false); void imprimir() }}
+              className="k-b k-b-capa k-b-prim">
+              Imprimir para firmar en papel
             </button>
           </>
-        )}
-      </div>
+        }
+      >
+        <p>Se cerrará con su folio y ya no podrá editarse; las firmas irán a mano.</p>
+      </ModalShell>
 
       </div>
 
@@ -1735,10 +2107,20 @@ export default function ConsentimientoInformadoForm({
           no deshace nada: el borrador ya está escrito con este contenido. */}
       {firmando && (
         <FirmadoConsentimiento
-          nombres={{ paciente, familiar, testigo_1: testigo1, testigo_2: testigo2 }}
+          nombres={nombresFirma}
           documentoId={firmando.documentoId}
           pacienteNoPuedeFirmar={pacienteNoPuedeFirmar}
-          onSalir={() => { if (!sellando) { setFirmando(null); setErrorSellado('') } }}
+          datosClave={[
+            { etiqueta: 'Paciente', valor: texto(firmando.contenido.paciente) },
+            { etiqueta: 'Procedimiento', valor: texto(firmando.contenido.procedimiento) },
+            { etiqueta: 'Fecha del documento', valor: fechaLarga(texto(firmando.contenido.fecha) || fecha) },
+          ]}
+          onSalir={() => {
+            if (sellando) return
+            setFirmando(null)
+            setErrorSellado('')
+            setAvisoRevision('Saliste del firmado sin sellar: las firmas no se guardaron. El borrador sigue intacto.')
+          }}
           onSellar={sellar}
           sellando={sellando}
           errorSellado={errorSellado}
@@ -1747,7 +2129,8 @@ export default function ConsentimientoInformadoForm({
 
       {/* §9.3 · ya hay un borrador PROPIO de este paciente. Retomar es el
           primario: casi siempre es el mismo procedimiento y lo que el médico
-          quiere es seguir. */}
+          quiere es seguir. Con su ESTADO a la vista («Falta firmar», «Faltan N
+          datos»): es lo que se va a retomar. */}
       <ModalShell
         open={dialogoPrevio && borradorPrevio !== null}
         onClose={() => !reemplazando && setDialogoPrevio(false)}
@@ -1784,10 +2167,15 @@ export default function ConsentimientoInformadoForm({
             <p className="sp-body" style={{ fontWeight: 'var(--sp-fw-bold)' }}>
               {texto(borradorPrevio?.contenido?.procedimiento) || 'Sin procedimiento anotado'}
             </p>
-            <p className="sp-hint" style={{ marginTop: 2 }}>
+            <p className="sp-hint sp-ci-previo" style={{ marginTop: 2 }}>
               {borradorPrevio
-                ? `Guardado el ${format(parseISO(borradorPrevio.created_at), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })} · sin firmar`
+                ? `Guardado el ${format(parseISO(borradorPrevio.created_at), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}`
                 : ''}
+              {borradorPrevio && (
+                <span className={`k-etq ${estadoBorrador(borradorPrevio.contenido).faltan > 0 ? 'k-etq-aviso' : 'k-etq-tonal'}`}>
+                  {estadoBorrador(borradorPrevio.contenido).etiqueta}
+                </span>
+              )}
             </p>
           </div>
           <p className="sp-hint" style={{ marginTop: 'var(--sp-gap-item)' }}>
@@ -1804,26 +2192,15 @@ export default function ConsentimientoInformadoForm({
            desmontarse este formulario entero. */
         onClose={() => { setDocGenerado(null); onCerrarTrasEmitir?.() }}
         blob={docGenerado?.blob ?? null}
-        titulo={esDenegacion ? 'Denegación generada' : 'Consentimiento generado'}
+        titulo={esDenegacion ? 'Denegación generada' : docGenerado?.sellado ? 'Consentimiento sellado' : 'Consentimiento generado'}
         guardadoEnExpediente={docGenerado?.guardado ?? false}
         documentoId={docGenerado?.documentoId ?? null}
+        /* Tras sellar, la acción principal es enviar la copia al paciente (el
+           médico siempre se la manda). El envío y lo que adjunta, como hoy. */
+        correoPrimero={docGenerado?.sellado === true}
       />
     </div>
   )
-}
-
-/**
- * Badge de la cabecera plegada (§3). `Editada` cuando el texto difiere del
- * defecto y nada cuando está intacto —eso es la spec—, con una salvedad: las
- * dos que nacen vacías Y bloquean la emisión dicen `Obligatoria` mientras lo
- * estén. Sin ella, el único aviso de un campo obligatorio viviría dentro de una
- * card plegada, que es donde no se ve.
- */
-function resumenSeccion(key: SeccionKey, valor: string): string | undefined {
-  if (valor === SECCIONES_DEFAULT[key]) {
-    return SECCIONES_OBLIGATORIAS.includes(key) ? 'Obligatoria' : undefined
-  }
-  return valor.trim() === '' && SECCIONES_OBLIGATORIAS.includes(key) ? 'Obligatoria' : 'Editada'
 }
 
 /**

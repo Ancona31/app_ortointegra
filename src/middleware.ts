@@ -184,7 +184,15 @@ export async function middleware(request: NextRequest) {
   }
 
   const isLoginPage = pathname === '/login'
-  /* ⚠️ `/privacidad` Y `/privacy` SON LA MISMA PÁGINA Y LAS DOS TIENEN QUE ESTAR.
+  /* ⚠️ ACTUALIZACIÓN (privacidad 2026-12): el aviso ya tiene UNA sola ruta,
+     `/privacidad`; `/privacy` quedó como redirección hacia ella
+     (`app/privacy/page.tsx`). LAS DOS SIGUEN EN LA LISTA Y TIENEN QUE SEGUIR:
+     los enlaces viejos a `/privacy` (pie de la landing, login, ayuda, correos)
+     llegan sin sesión, y sin esta entrada el middleware los mandaría a /login
+     antes de que la página pudiera redirigir. Lo que sigue es la historia de
+     por qué había dos, y sigue valiendo como advertencia.
+
+     ⚠️ `/privacidad` Y `/privacy` SON LA MISMA PÁGINA Y LAS DOS TIENEN QUE ESTAR.
      No es redundancia: existen las dos rutas —`app/privacidad/page.tsx` y
      `app/privacy/page.tsx`, las dos devuelven `<AvisoPrivacidadContent />`— y los
      enlaces del proyecto están repartidos entre ambas. Hacia dentro se usa
@@ -223,10 +231,40 @@ export async function middleware(request: NextRequest) {
     || pathname.startsWith('/r/')
     || pathname.startsWith('/offline-mode')
     || pathname.startsWith('/offline-setup')
+    /* ⚠️ LA RESERVA POR ENLACE (agenda D5) ES PÚBLICA Y VA EN SU LÍNEA, CON SU
+       PREFIJO Y LA BARRA FINAL: quien la abre aún no es paciente ni tiene
+       cuenta. NO LA CUBRE `startsWith('/r/')` de arriba ('/reservar/x' no
+       empieza por '/r/'), y esa línea NO se toca: es la verificación del QR
+       impreso de las recetas. La página no llama a getUser() ni redirige; su
+       puerta es el código del enlace, el interruptor y el aviso aprobado. */
+    || pathname.startsWith('/reservar/')
+    /* La confirmación de asistencia por enlace (agenda E3), con su prefijo y la
+       barra final, como /reservar/. Pública: quien la abre es el paciente desde
+       su correo. La página sólo LEE; su puerta es el código del enlace. */
+    || pathname.startsWith('/confirmar/')
 
   // Rutas API que no requieren sesión (OAuth callbacks, Stripe webhook y Stripe checkout/portal que manejan su propia auth)
   const publicApiPaths = ['/api/google/callback', '/api/stripe/webhook', '/api/stripe/checkout', '/api/stripe/portal', '/api/auth/registro', '/api/auth/email-hook', '/api/auth/verify-email', '/api/auth/audit-login', '/api/auth/rate-limit', '/api/auth/login', '/api/auth/reset-password', '/api/auth/aceptar-invitacion']
+  /* ⚠️ LA TAREA PROGRAMADA DE GOOGLE (C7) VA APARTE Y CON `===`, NO EN LA LISTA
+     DE ARRIBA, A PROPÓSITO: esa lista compara con `startsWith`, y meterla ahí
+     haría pública cualquier ruta que algún día empiece igual
+     (`/api/cron/google-sync-lo-que-sea`). Vercel Cron no manda cookie ni sigue
+     redirecciones, así que sin esta línea recibiría el 302 a /login y no
+     sincronizaría nunca, en silencio. La autenticación de esa ruta es
+     `CRON_SECRET`, dentro de la propia ruta (S2 de `mejora_agendaV2.md`). */
   const isPublicApi = publicApiPaths.some(p => pathname.startsWith(p))
+    || pathname === '/api/cron/google-sync'
+    /* E4: la tarea del recordatorio por correo, igual que la de arriba: `===`,
+       fuera de la lista, y su autenticación es `CRON_SECRET` en la ruta. */
+    || pathname === '/api/cron/recordatorios'
+    /* La API de la reserva por enlace (D5), aparte de la lista y con prefijo
+       propio terminado en barra: sólo abre lo que cuelga de /api/reservar/.
+       Sin sesión por diseño; cada ruta exige el código del enlace, el
+       interruptor de la clínica y el aviso aprobado (404 uniforme si no). */
+    || pathname.startsWith('/api/reservar/')
+    /* El POST de la confirmación (E3): EXACTA, con el código de 22 y nada
+       detrás, por la misma razón que C7 no entró en `publicApiPaths`. */
+    || /^\/api\/confirmar\/[A-Za-z0-9_-]{22}$/.test(pathname)
 
   // Si no hay sesión y no está en ruta pública → verificar cookies antes de redirigir.
   // La verificación puede no dar sesión por latencia post-login (las cookies

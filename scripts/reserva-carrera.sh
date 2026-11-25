@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# Carrera de reservar_por_enlace (agenda D3) con DOS sesiones de psql a la vez,
+# contra la base LOCAL de Docker. Nunca toca producción.
+#
+# Lo que demuestra:
+#   1. Dos reservas simultáneas al mismo turno, por DOS enlaces únicos del mismo
+#      médico (no comparten fila de enlace: sólo los separa el candado consultivo
+#      1790): la primera reserva y la segunda espera al candado y sale «ocupado».
+#      Queda UNA cita.
+#   2. Control: la misma carrera con una copia de la función SIN la línea del
+#      candado (en pg_temp de la sesión B, que termina en ROLLBACK) reserva las
+#      dos. Es el candado lo que lo impide.
+#   3. Dos reservas a la vez con el MISMO enlace único (turnos distintos): la
+#      segunda espera a la fila del enlace y sale «enlace_usado».
+#   4. En REPEATABLE READ la función se niega (25001) en vez de duplicar.
+#   5. (j2) El tope del único no se esquiva con un client_id en carrera: otra
+#      transacción (sin el candado: otro médico u otro camino) tiene sin
+#      confirmar una cita con ese client_id; B, con un único, pasa la
+#      comprobación `client_id_en_uso`, cuenta el intento y choca con el
+#      índice único al insertar. Sale «client_id_en_uso» y el intento QUEDA
+#      contado (intentos = 1): la excepción del índice no deshace el conteo.
+#   6. (k1) Un bloqueo y una reserva del mismo médico a la vez, sobre el mismo
+#      turno: A crea el bloqueo (su disparador toma el candado 1790) y retiene;
+#      B reserva, espera al candado y sale «ocupado». Control (6b): con los
+#      disparadores apagados en A (session_replication_role = replica, sólo
+#      en ESA transacción) B no espera y reserva encima del bloqueo. Es el
+#      candado del disparador lo que lo impide.
+#
+# Orden: B arranca cuando A ya tiene el candado 1790 (se mira en pg_locks; nadie
+# más usa esa clave), no tras una espera fija.
+#
+# Limpieza: los datos son de una clínica de prueba con ids fijos. Al final (y si
+# algo falla, por trap) se borran como postgres con session_replication_role =
+# replica, que apaga los disparadores en ESA transacción. Sólo filas de esta
+# prueba. Las filas de audit_log NO se borran (orden de Angel, tanda M): se
+# quedan, y ningún escenario las cuenta.
+# Como replica también apaga las FK, al final se cuenta lo que quede en TODAS
+# las tablas que la prueba toca, y se avisa si algo sobra.
+set -euo pipefail
+
+raiz="$(cd "$(dirname "$0")/.." && pwd)"
+proyecto="$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$raiz/supabase/config.toml")"
+contenedor="supabase_db_${proyecto}"
+if [ -z "$proyecto" ] || [ "$(docker inspect -f '{{.State.Running}}' "$contenedor" 2>/dev/null)" != "true" ]; then
+  echo "La base local no está corriendo (contenedor ${contenedor})." >&2
+  exit 1
+fi
+
+sql() { docker exec -i "$contenedor" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At -q "$@"; }
+tmp="$(mktemp -d)"
+
+C=00000000-0000-4000-8000-0000ca7e0c01   # clínica
+U=00000000-0000-4000-8000-0000ca7e0b01   # médico
+K=00000000-0000-4000-8000-0000ca7e0dd1   # consultorio
+T=00000000-0000-4000-8000-0000ca7e0a01   # tipo de cita (30 min)
+J=00000000-0000-4000-8000-0000ca7e0aa1   # agenda_ajustes.id
+AV=carrera-d3                             # versión del aviso
+E1=00000000-0000-4000-8000-0000ca7e0f01; E2=00000000-0000-4000-8000-0000ca7e0f02
+E3=00000000-0000-4000-8000-0000ca7e0f03; E4=00000000-0000-4000-8000-0000ca7e0f04
+E5=00000000-0000-4000-8000-0000ca7e0f05; E6=00000000-0000-4000-8000-0000ca7e0f06
+E7=00000000-0000-4000-8000-0000ca7e0f07; E8=00000000-0000-4000-8000-0000ca7e0f08
+CID5=00000000-0000-4000-8000-0000ca7e0c55  # client_id del escenario 5
+FIRMA="public.reservar_por_enlace(uuid, text, uuid, uuid, timestamptz, text, text, text, text, text, text, text, text, uuid)"
+
+limpiar() {
+  sql <<SQL || echo "AVISO: la limpieza falló; revisar la clínica $C a mano." >&2
+begin;
+set local session_replication_role = replica;
+-- los avisos de I5 y L5 (sus disparadores AFTER); su audit_log se queda (no se borra, tanda M)
+delete from public.avisos_clinica where clinica_id = '$C';
+delete from public.reserva_incidencias where clinica_id = '$C';
+delete from public.reserva_verificaciones where clinica_id = '$C';
+delete from public.reserva_contactos where clinica_id = '$C';
+delete from public.agenda_bloqueos where clinica_id = '$C';
+update public.reserva_enlaces set usado_en = null, usado_cita_id = null where clinica_id = '$C';
+delete from public.appointments where clinica_id = '$C';
+delete from public.reserva_enlaces where clinica_id = '$C';
+delete from public.reserva_avisos where version = '$AV';
+delete from public.tipos_cita where clinica_id = '$C';
+delete from public.consultorios where clinica_id = '$C';
+delete from public.agenda_ajustes where clinica_id = '$C';
+delete from public.profiles where id = '$U';
+delete from auth.users where id = '$U';
+delete from public.clinicas where id = '$C';
+commit;
+SQL
+  local resto
+  resto="$(sql -c "select (select count(*) from public.appointments where clinica_id = '$C')
+                    + (select count(*) from public.reserva_enlaces where clinica_id = '$C')
+                    + (select count(*) from public.avisos_clinica where clinica_id = '$C')
+                    + (select count(*) from public.reserva_incidencias where clinica_id = '$C')
+                    + (select count(*) from public.reserva_verificaciones where clinica_id = '$C')
+                    + (select count(*) from public.reserva_contactos where clinica_id = '$C')
+                    + (select count(*) from public.agenda_bloqueos where clinica_id = '$C')
+                    + (select count(*) from public.tipos_cita where clinica_id = '$C')
+                    + (select count(*) from public.consultorios where clinica_id = '$C')
+                    + (select count(*) from public.agenda_ajustes where clinica_id = '$C')
+                    + (select count(*) from public.profiles where id = '$U' or clinica_id = '$C')
+                    + (select count(*) from auth.users where id = '$U')
+                    + (select count(*) from public.clinicas where id = '$C')
+                    + (select count(*) from public.reserva_avisos where version = '$AV')" 2>/dev/null || echo '?')"
+  [ "$resto" = 0 ] || echo "AVISO: tras limpiar quedan $resto fila(s) de la prueba." >&2
+  rm -rf "$tmp"
+}
+trap limpiar EXIT
+
+# ── Datos (confirmados: la otra sesión tiene que verlos) ────────────────
+limpiar >/dev/null 2>&1 || true
+tmp="$(mktemp -d)"
+sql <<SQL
+insert into public.clinicas (id, nombre, es_vip_grant) values ('$C', 'Carrera D3', true);
+insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at)
+values ('$U', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'carrera-d3@prueba.local', now(), now());
+update public.profiles set clinica_id = '$C', es_admin_de_clinica = true where id = '$U';
+insert into public.agenda_ajustes (id, clinica_id, agenda_v2_encendida) values ('$J', '$C', true);
+insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion) values ('$K', '$C', '$U', 'C', 'C', 'Calle');
+insert into public.tipos_cita (id, clinica_id, nombre, duracion_min) values ('$T', '$C', 'Consulta', 30);
+insert into public.reserva_avisos (version, texto_sha256, aprobado, aprobado_en)
+values ('$AV', encode(sha256('aviso'), 'hex'), true, now());
+insert into public.reserva_enlaces (id, clinica_id, medico_id, clase, codigo_hash, vigencia_dias, caduca_en)
+select e, '$C', '$U', 'unico', encode(sha256(convert_to(e::text, 'UTF8')), 'hex'), 7, now() + interval '7 days'
+  from unnest(array['$E1', '$E2', '$E3', '$E4', '$E5', '$E6', '$E7', '$E8']::uuid[]) e;
+SQL
+
+cronometro() { date +%s%N; }
+falla() { echo "FALLÓ: $*" >&2; exit 1; }
+turno() { sql -c "select date_trunc('hour', now()) + interval '3 days' + interval '$1 hours'"; }
+llamada() {  # $1 = función, $2 = enlace, $3 = inicio, $4 = teléfono, $5 = client_id (opcional)
+  local cid="gen_random_uuid()"
+  [ -n "${5:-}" ] && cid="'$5'::uuid"
+  echo "select r_resultado from $1('$C', encode(sha256(convert_to('$2', 'UTF8')), 'hex'), '$K', '$T', '$3'::timestamptz,
+    'Persona Carrera', '$4', 'p$4@prueba.local', encode(sha256(convert_to('t$4', 'UTF8')), 'hex'),
+    encode(sha256(convert_to('c$4', 'UTF8')), 'hex'), null, '$AV', encode(sha256('aviso'), 'hex'), $cid);"
+}
+sesion_a() {  # reserva, retiene 2 s y confirma (en segundo plano); espera a que tenga el candado
+  { echo "begin;"; echo "set local role service_role;"; llamada public.reservar_por_enlace "$1" "$2" "$3"
+    echo "select pg_sleep(2);"; echo "commit;"; } | sql > "$tmp/a.out" &
+  pid_a=$!
+  local i
+  for i in $(seq 1 100); do  # hasta 10 s: A dentro de la sección (candado 1790 concedido)
+    [ "$(sql -c "select count(*) from pg_locks where locktype = 'advisory' and classid = 1790 and granted")" = 1 ] && return 0
+    sleep 0.1
+  done
+  falla "la sesión A no tomó el candado en 10 s"
+}
+esperar_a() {  # espera a A, falla si A falló, y deja su resultado en $a
+  wait "$pid_a" || falla "la sesión A terminó con error: $(cat "$tmp/a.out")"
+  a="$(grep -v '^$' "$tmp/a.out" | head -1 || true)"
+}
+
+# ── 1 · Dos enlaces, mismo médico, mismo turno ──────────────────────────
+X="$(turno 10)"
+sesion_a "$E1" "$X" 5500000001
+t0="$(cronometro)"
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E2" "$X" 5500000002; } | sql || echo error)"
+t1="$(cronometro)"
+esperar_a
+espera_ms=$(( (t1 - t0) / 1000000 ))
+n="$(sql -c "select count(*) from public.appointments where clinica_id = '$C' and start_time = '$X'")"
+echo "1 · con candado: A=$a  B=$b  (B esperó ${espera_ms} ms)  citas en el turno=$n"
+[ "$a" = ok ] && [ "$b" = ocupado ] && [ "$n" = 1 ] || falla "escenario 1"
+[ "$espera_ms" -ge 1000 ] || falla "B no esperó al candado (${espera_ms} ms)"
+
+# ── 2 · Control: sin la línea del candado, las dos reservan ─────────────
+def="$(sql -c "select pg_get_functiondef('$FIRMA'::regprocedure)")"
+sin="$(printf '%s\n' "$def" | sed -e 's/FUNCTION public\.reservar_por_enlace(/FUNCTION pg_temp.reservar_sin_candado(/' \
+                                  -e '/pg_advisory_xact_lock(1790/d')"
+printf '%s\n' "$sin" | grep -q 'pg_temp.reservar_sin_candado' || falla "no se pudo copiar la función"
+if printf '%s\n' "$sin" | grep -q 'pg_advisory_xact_lock'; then falla "la copia conserva el candado"; fi
+Y="$(turno 12)"
+sesion_a "$E3" "$Y" 5500000003
+t0="$(cronometro)"
+b="$( { echo "begin;"; printf '%s;\n' "$sin"; llamada pg_temp.reservar_sin_candado "$E4" "$Y" 5500000004; echo "rollback;"; } | sql || echo error)"
+t1="$(cronometro)"
+esperar_a
+echo "2 · control sin candado: A=$a  B=$b (B, en ROLLBACK, tardó $(( (t1 - t0) / 1000000 )) ms)"
+[ "$a" = ok ] && [ "$b" = ok ] || falla "escenario 2: sin el candado la segunda debió reservar"
+
+# ── 3 · Mismo enlace único, turnos distintos ────────────────────────────
+Z1="$(turno 14)"; Z2="$(turno 16)"
+sesion_a "$E5" "$Z1" 5500000005
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E5" "$Z2" 5500000006; } | sql || echo error)"
+esperar_a
+echo "3 · mismo enlace único: A=$a  B=$b"
+[ "$a" = ok ] && [ "$b" = enlace_usado ] || falla "escenario 3"
+
+# ── 4 · REPEATABLE READ: se niega ───────────────────────────────────────
+r="$( { echo "begin isolation level repeatable read;"; echo "set local role service_role;"
+        llamada public.reservar_por_enlace "$E2" "$(turno 18)" 5500000007; echo "rollback;"; } \
+      | docker exec -i "$contenedor" psql -U postgres -d postgres -At -q -v ON_ERROR_STOP=1 2>&1 || true)"
+echo "4 · repeatable read: $(printf '%s' "$r" | grep -o 'requiere READ COMMITTED[^)]*)' || echo "$r")"
+printf '%s' "$r" | grep -q 'requiere READ COMMITTED' || falla "escenario 4"
+
+# ── 5 · (j2) client_id en carrera: el intento del único queda contado ───
+W="$(turno 20)"
+{ echo "set application_name = 'carrera-j2-5';"; echo "begin;"
+  echo "insert into public.appointments (clinica_id, medico_id, title, start_time, end_time, status, all_day, client_id)
+        values ('$C', '$U', 'Carrera j2 5', '$(turno 22)'::timestamptz, '$(turno 22)'::timestamptz + interval '30 minutes',
+                'scheduled', false, '$CID5');"
+  echo "select pg_sleep(2);"; echo "commit;"; } | sql > "$tmp/a5.out" &
+pid_a=$!
+for i in $(seq 1 100); do  # hasta 10 s: A ya insertó y duerme sin confirmar
+  [ "$(sql -c "select count(*) from pg_stat_activity where application_name = 'carrera-j2-5' and query like 'select pg_sleep%'")" = 1 ] && break
+  sleep 0.1
+  [ "$i" = 100 ] && falla "la sesión A del escenario 5 no llegó a su espera"
+done
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E6" "$W" 5500000008 "$CID5"; } \
+      | docker exec -i "$contenedor" psql -U postgres -d postgres -At -q -v ON_ERROR_STOP=1 2>&1 || true)"
+wait "$pid_a" || falla "la sesión A del escenario 5 terminó con error: $(cat "$tmp/a5.out")"
+intentos="$(sql -c "select intentos || '/' || (usado_en is null) || '/' || (agotado_en is null) from public.reserva_enlaces where id = '$E6'")"
+echo "5 · client_id en carrera: B=$(printf '%s' "$b" | head -1)  intentos/sin usar/sin agotar del único=$intentos"
+[ "$b" = client_id_en_uso ] && [ "$intentos" = 1/true/true ] || falla "escenario 5: el intento debió quedar contado con client_id_en_uso"
+
+# ── 6 · (k1) Bloqueo contra reserva, mismo médico y mismo turno ────────
+bloqueo_a() {  # $1 = turno, $2 = sí/no disparadores; crea el bloqueo, retiene 2 s y confirma
+  { echo "set application_name = 'carrera-k1-6';"; echo "begin;"
+    [ "$2" = no ] && echo "set local session_replication_role = replica;"
+    echo "insert into public.agenda_bloqueos (clinica_id, medico_id, inicio, fin, motivo)
+          values ('$C', '$U', '$1'::timestamptz - interval '1 hour', '$1'::timestamptz + interval '1 hour', 'Carrera k1');"
+    echo "select pg_sleep(2);"; echo "commit;"; } | sql > "$tmp/a6.out" &
+  pid_a=$!
+  local i
+  for i in $(seq 1 100); do  # hasta 10 s: A ya insertó y duerme sin confirmar
+    [ "$(sql -c "select count(*) from pg_stat_activity where application_name = 'carrera-k1-6' and query like 'select pg_sleep%'")" = 1 ] && return 0
+    sleep 0.1
+  done
+  falla "la sesión A del escenario 6 no llegó a su espera"
+}
+V="$(turno 24)"
+bloqueo_a "$V" si
+[ "$(sql -c "select count(*) from pg_locks where locktype = 'advisory' and classid = 1790 and granted")" = 1 ] \
+  || falla "escenario 6: el bloqueo no tomó el candado 1790"
+t0="$(cronometro)"
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E7" "$V" 5500000009; } | sql || echo error)"
+t1="$(cronometro)"
+wait "$pid_a" || falla "la sesión A del escenario 6 terminó con error: $(cat "$tmp/a6.out")"
+espera_ms=$(( (t1 - t0) / 1000000 ))
+echo "6 · bloqueo contra reserva: B=$b  (B esperó ${espera_ms} ms)"
+[ "$b" = ocupado ] || falla "escenario 6: la reserva debió salir ocupado"
+[ "$espera_ms" -ge 1000 ] || falla "escenario 6: B no esperó al candado del bloqueo (${espera_ms} ms)"
+
+V2="$(turno 28)"
+bloqueo_a "$V2" no
+b="$( { echo "set role service_role;"; llamada public.reservar_por_enlace "$E8" "$V2" 5500000010; } | sql || echo error)"
+wait "$pid_a" || falla "la sesión A del escenario 6b terminó con error: $(cat "$tmp/a6.out")"
+echo "6b · control sin el disparador: B=$b (reserva encima del bloqueo sin confirmar)"
+[ "$b" = ok ] || falla "escenario 6b: sin el candado del disparador la reserva debió entrar"
+
+total="$(sql -c "select count(*) from public.appointments where clinica_id = '$C'")"
+echo "Citas que quedaron: $total (esperadas 5: escenarios 1, 2-A, 3-A, 5-A y 6b-B)"
+[ "$total" = 5 ] || falla "quedaron $total citas"
+echo "Carrera en verde. Limpiando…"

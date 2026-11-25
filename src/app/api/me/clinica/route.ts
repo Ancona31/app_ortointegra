@@ -56,11 +56,12 @@ export async function GET() {
 
     if (!profile?.clinica_id) return NextResponse.json({ clinica: null })
 
-    const { data: clinica } = await supabase
-      .from('clinicas')
-      .select('id, nombre, nombre_display, subtitulo, color_primario, color_secundario, logo_url')
-      .eq('id', profile.clinica_id)
-      .single()
+    /* K3 (punto 12): con `timezone`, el huso «de fábrica» con el que el perfil propone el de un
+       consultorio nuevo. Sin la migración de K3 (42703), la lectura de siempre. */
+    const COLUMNAS = 'id, nombre, nombre_display, subtitulo, color_primario, color_secundario, logo_url'
+    const leer = (columnas: string) => supabase.from('clinicas').select(columnas).eq('id', profile.clinica_id).single()
+    const conHuso = await leer(`${COLUMNAS}, timezone`)
+    const { data: clinica } = conHuso.error?.code === '42703' ? await leer(COLUMNAS) : conHuso
 
     return NextResponse.json({ clinica })
   } catch (err: unknown) {

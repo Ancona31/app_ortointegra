@@ -6,12 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { canManageClinica } from '@/lib/permissions'
 import { PLANS, formatPrecio, type PlanKey } from '@/lib/plans'
-import { CheckCircle, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, Users, UserCheck, FileText, ArrowUpRight, Sparkles } from 'lucide-react'
+import { CheckCircle, Check, CreditCard, Loader2, ExternalLink, AlertTriangle, Zap, ArrowUpRight, Sparkles } from 'lucide-react'
 import { BillingSkeleton } from '@/components/ui/Skeleton'
 import Link from 'next/link'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Suspense } from 'react'
+import PestanasAdministracion from '@/components/admin/PestanasAdministracion'
 
 type ClinicaInfo = {
   plan: PlanKey
@@ -32,12 +33,13 @@ type UsageInfo = {
   pacientes: number
 }
 
-const ESTADO_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  free:      { label: 'Plan gratuito',   color: 'bg-slate-100 text-slate-600',    icon: <Zap size={14} /> },
-  trial:     { label: 'Prueba gratuita', color: 'bg-blue-100 text-blue-700',      icon: <Zap size={14} /> },
-  activo:    { label: 'Activo',          color: 'bg-emerald-100 text-emerald-700',icon: <CheckCircle size={14} /> },
-  vencido:   { label: 'Pago pendiente',  color: 'bg-red-100 text-red-700',        icon: <AlertTriangle size={14} /> },
-  cancelado: { label: 'Cancelado',       color: 'bg-slate-100 text-slate-500',    icon: <AlertTriangle size={14} /> },
+/* Rediseño B10: cada estado es una etiqueta del kit (CALMA §11), con su icono de 14. */
+const ESTADO_CONFIG: Record<string, { label: string; etq: string; icon: React.ReactNode }> = {
+  free:      { label: 'Plan gratuito',   etq: 'bg-sup2 text-tinta2', icon: <Zap aria-hidden="true" /> },
+  trial:     { label: 'Prueba gratuita', etq: 'k-etq-tonal',         icon: <Zap aria-hidden="true" /> },
+  activo:    { label: 'Activo',          etq: 'k-etq-ok',            icon: <CheckCircle aria-hidden="true" /> },
+  vencido:   { label: 'Pago pendiente',  etq: 'k-etq-mal',           icon: <AlertTriangle aria-hidden="true" /> },
+  cancelado: { label: 'Cancelado',       etq: 'bg-sup2 text-tinta2', icon: <AlertTriangle aria-hidden="true" /> },
 }
 
 function BillingContent() {
@@ -106,7 +108,10 @@ function BillingContent() {
     }
   }
 
-  if (loading || loadingProfile) return <BillingSkeleton />
+  /* B12: las pestañas también al cargar, en el mismo sitio que la página. */
+  if (loading || loadingProfile) return (
+    <div className="mx-auto max-w-6xl"><PestanasAdministracion /><BillingSkeleton /></div>
+  )
 
   if (!clinica) return null
 
@@ -116,215 +121,194 @@ function BillingContent() {
   const esVip = clinica.es_vip_grant
   const tieneSuscripcionStripe = !!clinica.stripe_subscription_id
 
+  /* Rediseño B10 (maqueta `admin`, vista 2): una tarjeta del plan con el uso
+     dentro, otra con lo incluido, y avisos como franjas tintadas. Textos de
+     hoy salvo «funciones» y «Prueba» (CALMA §23.10). Sin lógica nueva: los
+     mismos estados, los mismos botones y los mismos destinos. */
   return (
-    <div className="max-w-3xl mx-auto space-y-5 animate-slide-up">
+    /* B12: el contenedor es el de Estadísticas (max-w-6xl) para que la fila de
+       pestañas no salte al cambiar de pestaña; el contenido sigue a 840px. */
+    <div className="mx-auto max-w-6xl [&>*:not(nav)]:max-w-[840px]">
+      {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
+      <PestanasAdministracion />
 
       <div>
-        <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Cuenta</p>
-        <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Facturación</h1>
-        <p className="text-sm text-[#86868b] mt-0.5">Gestiona tu suscripción y plan</p>
+        <p className="k-t-rotulo">Administración</p>
+        <h1 className="k-t-pantalla mt-0.5">Facturación</h1>
+        <p className="k-t-sec mt-0.5">Gestiona tu suscripción y plan</p>
       </div>
 
-      {/* Banner de éxito */}
-      {success && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-          <CheckCircle size={20} className="text-emerald-600 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-emerald-800">¡Suscripción activada!</p>
-            <p className="text-sm text-emerald-700">
-              Tu plan {newPlan ? PLANS[newPlan]?.nombre : ''} está activo. Bienvenido a Spinus® Pro.
-            </p>
+      <div className="mt-5 flex flex-col gap-4">
+        {/* Banner de éxito */}
+        {success && (
+          <div role="status" className="flex items-start gap-3 rounded-[var(--r-tarjeta)] bg-ok-fondo px-4 py-3">
+            <CheckCircle size={20} aria-hidden="true" className="mt-0.5 shrink-0 text-ok-tinta" />
+            <div>
+              <p className="text-[15px] font-semibold leading-5 text-ok-tinta">¡Suscripción activada!</p>
+              <p className="text-[14px] leading-5 text-ok-tinta">
+                Tu plan {newPlan ? PLANS[newPlan]?.nombre : ''} está activo. Bienvenido a Spinus Pro.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Banner de pago vencido */}
-      {clinica.suscripcion_estado === 'vencido' && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-red-800">Pago pendiente</p>
-            <p className="text-sm text-red-700">Hay un problema con tu método de pago. Actualízalo para mantener el acceso.</p>
-            <button
-              onClick={abrirPortal}
-              disabled={openingPortal}
-              className="mt-2 text-sm font-medium text-red-700 underline hover:no-underline"
-            >
+        {/* Banner de pago vencido */}
+        {clinica.suscripcion_estado === 'vencido' && (
+          <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--r-tarjeta)] bg-mal-fondo px-4 py-3">
+            <AlertTriangle size={20} aria-hidden="true" className="shrink-0 text-mal-tinta" />
+            <div className="min-w-0 flex-1 basis-[220px]">
+              <p className="text-[15px] font-semibold leading-5 text-mal-tinta">Pago pendiente</p>
+              <p className="text-[14px] leading-5 text-mal-tinta">Hay un problema con tu método de pago. Actualízalo para mantener el acceso.</p>
+            </div>
+            <button type="button" onClick={abrirPortal} disabled={openingPortal} className="k-b bg-sup text-mal-tinta">
               {openingPortal ? 'Abriendo...' : 'Actualizar método de pago →'}
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Card del plan actual */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100">
+        {/* Tarjeta del plan actual */}
+        <section className="k-tarjeta esc:p-5" aria-labelledby="billing-plan">
           {esVip ? (
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-lg font-bold text-slate-800">Plan VIP</h2>
-                  <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                    <Sparkles size={14} /> Acceso completo
-                  </span>
-                </div>
-                <p className="text-sm text-slate-600">Tienes acceso a todas las features de Spinus®.</p>
-                {tieneSuscripcionStripe && (
-                  <p className="text-xs text-slate-500 mt-2">
-                    Tienes una suscripción Stripe activa adicional. Puedes cancelarla desde el portal de Stripe.
-                  </p>
-                )}
-              </div>
-              {tieneSuscripcionStripe && (
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={abrirPortal}
-                    disabled={openingPortal}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#1a3a5c] text-white rounded-xl text-sm font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-60"
-                  >
-                    {openingPortal ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                    Gestionar suscripción Stripe
-                  </button>
-                </div>
-              )}
-            </div>
+            <PlanVip tieneSuscripcionStripe={tieneSuscripcionStripe} openingPortal={openingPortal} onPortal={abrirPortal} />
           ) : (
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-lg font-bold text-slate-800">{plan.nombre}</h2>
-                  <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${estado.color}`}>
-                    {estado.icon} {estado.label}
-                  </span>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 id="billing-plan" className="k-t-seccion">{plan.nombre}</h2>
+                  <span className={`k-etq ${estado.etq}`}>{estado.icon} {estado.label}</span>
                 </div>
                 {clinica.plan !== 'free' && (
-                  <p className="text-2xl font-bold text-[#1a3a5c]">
-                    {formatPrecio(plan.precio_mensual)}<span className="text-sm font-normal text-slate-400"> / mes</span>
+                  <p className="k-num mt-1 text-[22px] font-bold leading-7 text-tinta">
+                    {formatPrecio(plan.precio_mensual)}<span className="text-[14px] font-normal text-tinta2"> / mes</span>
                   </p>
                 )}
                 {clinica.suscripcion_ends_at && (
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="k-t-sec mt-1">
                     Próxima renovación: {format(parseISO(clinica.suscripcion_ends_at), "dd 'de' MMMM 'de' yyyy", { locale: es })}
                   </p>
                 )}
                 {clinica.suscripcion_estado === 'trial' && clinica.trial_ends_at && (
-                  <p className="text-xs text-blue-600 mt-1">
-                    Trial hasta: {format(parseISO(clinica.trial_ends_at), "dd 'de' MMMM", { locale: es })}
+                  <p className="mt-1 text-[13px] font-semibold leading-[18px] text-enlace">
+                    Prueba hasta: {format(parseISO(clinica.trial_ends_at), "dd 'de' MMMM", { locale: es })}
                   </p>
                 )}
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex flex-wrap gap-2">
                 {tieneStripe && (
-                  <button
-                    onClick={abrirPortal}
-                    disabled={openingPortal}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#1a3a5c] text-white rounded-xl text-sm font-medium hover:bg-[#0f2540] transition-colors disabled:opacity-60"
-                  >
-                    {openingPortal ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                  <button type="button" onClick={abrirPortal} disabled={openingPortal} className="k-b k-b-tonal">
+                    {openingPortal ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : <ExternalLink size={16} aria-hidden="true" />}
                     Gestionar
                   </button>
                 )}
                 {clinica.plan === 'free' || clinica.suscripcion_estado !== 'activo' ? (
-                  <Link
-                    href="/pricing"
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#1e5fa8] text-white rounded-xl text-sm font-medium hover:bg-[#1a3a5c] transition-colors"
-                  >
-                    <ArrowUpRight size={14} /> Actualizar plan
+                  <Link href="/pricing" className="k-b k-b-prim">
+                    <ArrowUpRight size={16} aria-hidden="true" /> Actualizar plan
                   </Link>
                 ) : null}
               </div>
             </div>
           )}
-        </div>
 
-        {/* Uso actual */}
-        <div className="px-6 py-5">
-          <h3 className="text-sm font-semibold text-slate-600 mb-4">Uso actual</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <UsageCard
-              icon={<Users size={18} className="text-blue-600" />}
-              label="Médicos"
-              usado={usage?.medicos ?? 0}
-              limite={clinica.max_medicos}
-            />
-            <UsageCard
-              icon={<UserCheck size={18} className="text-emerald-600" />}
-              label="Asistentes"
-              usado={usage?.secretarias ?? 0}
-              limite={clinica.max_secretarias}
-            />
-            <UsageCard
-              icon={<FileText size={18} className="text-violet-600" />}
-              label="Pacientes"
-              usado={usage?.pacientes ?? 0}
-              limite={clinica.max_pacientes}
-            />
+          {/* Uso actual */}
+          <div className="mt-4 border-t border-linea pt-4">
+            <h3 className="k-t-tarjeta mb-3">Uso actual</h3>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-3">
+              <UsageCard label="Médicos" usado={usage?.medicos ?? 0} limite={clinica.max_medicos} />
+              <UsageCard label="Asistentes" usado={usage?.secretarias ?? 0} limite={clinica.max_secretarias} />
+              <UsageCard label="Pacientes" usado={usage?.pacientes ?? 0} limite={clinica.max_pacientes} />
+            </div>
           </div>
-        </div>
+        </section>
+
+        {/* Lo incluido en el plan */}
+        <section className="k-tarjeta esc:p-5">
+          {esVip ? (
+            <h3 className="k-t-tarjeta">Acceso VIP — todo incluido</h3>
+          ) : (
+            <>
+              <h3 className="k-t-tarjeta mb-3">Incluido en tu plan</h3>
+              <ul className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                {plan.features.map(f => (
+                  <li key={f} className="flex items-start gap-2 text-[14px] leading-5 text-tinta">
+                    <Check size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-ok-tinta" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              {clinica.plan !== 'premium' && (
+                <div className="mt-3 border-t border-linea pt-2">
+                  <Link href="/pricing" className="k-b k-b-texto text-[14px]">
+                    Ver todos los planes y funcionalidades <ArrowUpRight size={16} aria-hidden="true" />
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* Seguridad de pagos */}
+        <p className="flex items-start gap-2 px-1 text-[13px] leading-[18px] text-tinta2">
+          <CreditCard size={16} aria-hidden="true" className="mt-px shrink-0" /> Pagos procesados de forma segura por Stripe. Spinus no almacena datos de tarjetas.
+        </p>
       </div>
-
-      {/* Features del plan */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        {esVip ? (
-          <h3 className="text-sm font-semibold text-slate-600">Acceso VIP — todo incluido</h3>
-        ) : (
-          <>
-            <h3 className="text-sm font-semibold text-slate-600 mb-3">Incluido en tu plan</h3>
-            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {plan.features.map(f => (
-                <li key={f} className="flex items-center gap-2 text-sm text-slate-600">
-                  <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
-                  {f}
-                </li>
-              ))}
-            </ul>
-            {clinica.plan !== 'premium' && (
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <Link href="/pricing" className="text-sm text-[#1e5fa8] hover:underline font-medium flex items-center gap-1">
-                  Ver todos los planes y funcionalidades <ArrowUpRight size={14} />
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Seguridad de pagos */}
-      <p className="text-xs text-slate-400 text-center flex items-center justify-center gap-1.5">
-        <CreditCard size={12} /> Pagos procesados de forma segura por Stripe. Spinus® no almacena datos de tarjetas.
-      </p>
-
     </div>
   )
 }
 
-function UsageCard({ icon, label, usado, limite }: {
-  icon: React.ReactNode
+function PlanVip({ tieneSuscripcionStripe, openingPortal, onPortal }: {
+  tieneSuscripcionStripe: boolean
+  openingPortal: boolean
+  onPortal: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id="billing-plan" className="k-t-seccion">Plan VIP</h2>
+          <span className="k-etq k-etq-tonal"><Sparkles aria-hidden="true" /> Acceso completo</span>
+        </div>
+        <p className="k-t-sec mt-1">Tienes acceso a todas las funciones de Spinus.</p>
+        {tieneSuscripcionStripe && (
+          <p className="k-t-sec mt-2">
+            Tienes una suscripción Stripe activa adicional. Puedes cancelarla desde el portal de Stripe.
+          </p>
+        )}
+      </div>
+      {tieneSuscripcionStripe && (
+        <button type="button" onClick={onPortal} disabled={openingPortal} className="k-b k-b-tonal">
+          {openingPortal ? <Loader2 size={16} aria-hidden="true" className="animate-spin" /> : <ExternalLink size={16} aria-hidden="true" />}
+          Gestionar suscripción Stripe
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* Una barra de uso. La barra crece con `scaleX` desde la izquierda (sólo
+   `transform`); antes animaba `width`. En el límite, en `--mal-tinta`. */
+function UsageCard({ label, usado, limite }: {
   label: string
   usado: number
   limite: number | null
 }) {
   const ilimitado = limite === null || limite === -1
-  const porcentaje = ilimitado ? 0 : Math.min((usado / (limite || 1)) * 100, 100)
+  const fraccion = ilimitado ? 0 : Math.min(usado / (limite || 1), 1)
   const enLimite = !ilimitado && usado >= (limite ?? 0)
 
   return (
-    <div className="bg-slate-50/80 rounded-2xl p-4">
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <span className="text-xs font-medium text-slate-500">{label}</span>
-      </div>
-      <p className="text-xl font-bold text-slate-800">
-        {usado}
-        <span className="text-sm font-normal text-slate-400">
-          /{ilimitado ? '∞' : limite}
+    <div className="min-w-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[15px] font-semibold leading-5 text-tinta">{label}</span>
+        <span className="k-num text-[15px] font-bold leading-5 text-tinta">
+          {usado}
+          <span className="text-[13px] font-normal text-tinta2"> /{ilimitado ? '∞' : limite}</span>
         </span>
-      </p>
+      </div>
       {!ilimitado && (
-        <div className="mt-2 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-sup2">
           <div
-            className={`h-full rounded-full transition-all ${enLimite ? 'bg-red-500' : 'bg-[#1e5fa8]'}`}
-            style={{ width: `${porcentaje}%` }}
+            className={`h-full w-full origin-left rounded-full ${enLimite ? 'bg-mal-tinta' : 'bg-accion'}`}
+            style={{ transform: `scaleX(${fraccion})` }}
           />
         </div>
       )}

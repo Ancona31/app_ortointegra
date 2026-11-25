@@ -1,0 +1,290 @@
+'use client'
+
+/**
+ * src/components/agenda/HerramientasV2.tsx
+ *
+ * Las piezas de las interacciones v2 (bloque F, F3) que viven FUERA de la capa
+ * principal: los botones de la barra —«Ir a una fecha» con el minicalendario
+ * desplegable, «Buscar citas de un paciente» y «Atajos de teclado»— y el
+ * minicalendario del panel de la vista Día.
+ *
+ * Como `InteraccionesV2.tsx`, sólo se carga con el interruptor encendido
+ * (`next/dynamic` en `AgendaCliente`). Lo que abre la capa principal (el
+ * buscador, la ayuda) se pide por `apiRef`, la misma referencia que usa
+ * `altaCitas.ts`.
+ *
+ * ⚠️ CADA PIEZA VA EN SU RANURA (cierre de F). `CabeceraEscritorio` y
+ * `BandaMovil` tienen dos: `selectorFecha` (la primera de la fila de controles,
+ * pegada a la fecha de FullCalendar) y `buscar` (antes de «Por confirmar»). En
+ * escritorio, `SelectorFechaV2` va en la primera y `BuscarV2` —la lupa y, a su
+ * lado, «Atajos de teclado»— en la segunda. En el teléfono sólo la lupa, en
+ * `buscar` (delante del filtro) y a 44 px: el minicalendario no va allí
+ * (decisión 21) y el botón de la ayuda le quitaría al filtro el ancho que le
+ * queda a 360 px. Hasta el cierre de F estuvieron juntas en el hueco
+ * `porConfirmar`, provisionales.
+ *
+ * I5 (puntos 14 y 15 de Angel): la fecha de la barra ES el botón del
+ * minicalendario (ya no hay botón «Ir a una fecha» aparte) y la ayuda de
+ * atajos se abre desde el menú del engrane (`MenuEngraneAgenda`); en la ranura
+ * `buscar` queda sólo la lupa.
+ *
+ * El desplegable sigue el patrón «Date Picker Dialog» de APG: botón con
+ * `aria-haspopup="dialog"` y `aria-expanded`, diálogo modal con el foco en el
+ * día activo, Escape cierra y el foco vuelve al botón.
+ */
+import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode, type RefObject } from 'react'
+import { ChevronDown, Search } from 'lucide-react'
+import Portal from '@/components/ui/Portal'
+import MiniMes from '@/components/agenda/MiniMes'
+import BuscadorCitas from '@/components/agenda/BuscadorCitas'
+import { useDialogoModal } from '@/hooks/useDialogoModal'
+import type { ApiInteraccionesV2 } from '@/lib/agenda/contratosV2'
+import { posicionCapa, ventanaParaCapas, type Caja } from '@/lib/agenda/posicionCapa'
+import { partirFechaHora } from '@/lib/agenda/fechasAgenda'
+import { teclasDeAccion } from '@/lib/agenda/atajosAgenda'
+
+/** `'YYYY-MM-DD/YYYY-MM-DD'`: el periodo que pinta el calendario, `[desde, hasta)`. Lo escribe `datesSet`. */
+export type RangoVisibleV2 = string
+
+/* Tanda I (punto 11) · La pregunta de asistencia viaja en ESTE chunk (el de
+   las herramientas v2, ya descargado en ocioso): ni un archivo más al abrir. */
+export { default as PreguntaAsistenciaV2 } from '@/components/agenda/PreguntaAsistencia'
+
+function partirRango(rango: RangoVisibleV2): { desde: string; hasta: string } {
+  const [desde = '', hasta = ''] = rango.split('/')
+  return { desde, hasta }
+}
+
+const hoyLocal = (): string => partirFechaHora(new Date().toISOString()).fecha
+
+function cajaDe(el: Element): Caja {
+  const r = el.getBoundingClientRect()
+  return { left: r.left, top: r.top, width: r.width, height: r.height }
+}
+
+/* ⚠️ COPIA DELIBERADA (tercera) de `colocar`, `hayOtroDialogoModal` y
+   `useCerrarAlTocarFuera` de `BurbujaAlta.tsx` / `TarjetaLectura.tsx`, con una
+   diferencia: aquí se ignora el botón que abre, para que pulsarlo con el
+   desplegable abierto lo cierre y no lo cierre y lo vuelva a abrir. Un arreglo
+   en una se aplica a las tres (CLAUDE.md, protocolo 4: sacarlas a un gancho
+   compartido pide el visto bueno de Angel). */
+/**
+ * B13 · AG5/AG8 · Fuera de computadora la capa la centra (o la apoya abajo, en `tel`) el CSS; aquí sólo
+ * se la sube a la parte VISIBLE cuando el teclado en pantalla encoge `visualViewport` (T1). Sin
+ * teclado, nada en línea. COPIA DELIBERADA en las tres copias de `colocar` (AG-DT-38).
+ */
+function colocarSinAncla(nodo: HTMLElement, formato: string): void {
+  const vv = window.visualViewport
+  const abajo = vv ? Math.max(0, Math.round(window.innerHeight - (vv.offsetTop + vv.height))) : 0
+  nodo.style.left = ''
+  nodo.style.transformOrigin = ''
+  nodo.style.top = vv && abajo > 0 && formato !== 'tel' ? `${Math.round(vv.offsetTop) + 8}px` : ''
+  nodo.style.bottom = vv && abajo > 0 ? `${abajo + (formato === 'tel' ? 0 : 8)}px` : ''
+  nodo.style.maxHeight = vv && abajo > 0 ? `${Math.floor(vv.height) - 16}px` : ''
+}
+
+function colocar(nodo: HTMLElement, ancla: Caja): void {
+  /* B13 · AG5/AG8 (CALMA §25–§28): sólo en computadora se ancla; en Duo va centrada y en teléfono
+     es hoja, por CSS (`.ag-capa-barra`). Aquí se quita lo que se hubiera puesto (en las TRES copias). */
+  const formato = document.documentElement.dataset.formato
+  if (formato !== undefined && formato !== 'esc') { colocarSinAncla(nodo, formato); return }
+  /* T1: el arreglo de las otras dos copias (alto natural, parte visible de la
+     ventana, `max-height`). El desplegable no cambia de alto: no se sigue. */
+  const alto = nodo.scrollHeight + (nodo.offsetHeight - nodo.clientHeight)
+  /* B13 · AG8: sin el cromo (riel o barra), en las TRES copias (AG-DT-38). */
+  const ventana = ventanaParaCapas()
+  const p = posicionCapa(ancla, { width: nodo.offsetWidth, height: alto }, ventana)
+  nodo.style.left = `${p.left}px`
+  nodo.style.top = `${p.top}px`
+  nodo.style.maxHeight = `${p.altoMaximo}px`
+  nodo.style.transformOrigin = p.origen
+}
+
+/**
+ * ¿Hay OTRO diálogo modal abierto encima? Entonces el toque es suyo, no
+ * «fuera» de esta capa: el aviso de empalme o de horario (`ConfirmModal`) sale
+ * encima de la capa abierta, y contestarle —también pulsando su velo, que es
+ * HERMANO del diálogo y no su hijo— no puede cerrarla.
+ */
+function hayOtroDialogoModal(propio: HTMLElement): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"][aria-modal="true"]')).some(d => d !== propio)
+}
+
+function useCerrarAlTocarFuera(panel: { current: HTMLElement | null }, cerrar: () => void, ignorar: string): void {
+  useEffect(() => {
+    function alTocar(e: PointerEvent): void {
+      if (!panel.current || !(e.target instanceof Element) || panel.current.contains(e.target)) return
+      if (e.target.closest(ignorar) || hayOtroDialogoModal(panel.current)) return
+      cerrar()
+    }
+    document.addEventListener('pointerdown', alTocar, true)
+    return () => document.removeEventListener('pointerdown', alTocar, true)
+  }, [panel, cerrar, ignorar])
+}
+
+interface PropsDesplegable {
+  ancla: Caja
+  etiqueta: string
+  /** El selector del botón que lo abre: pulsarlo con el desplegable abierto lo cierra (no lo reabre). */
+  disparador: string
+  /** Lo que se enfoca al abrir, si no lo hace ya un `autoFocus` de dentro. */
+  enfocar?: string
+  clase?: string
+  alCerrar: () => void
+  children: ReactNode
+}
+
+/**
+ * Un diálogo modal junto a su botón (el minicalendario, el buscador): rol,
+ * foco atrapado, Escape y devolución del foco al botón (`useDialogoModal`),
+ * tocar fuera cierra. Dos usos en este archivo; no se exporta.
+ */
+function Desplegable({ ancla, etiqueta, disparador, enfocar, clase, alCerrar, children }: PropsDesplegable): ReactElement {
+  const { montarPanel, alPulsarTecla } = useDialogoModal(alCerrar)
+  const panel = useRef<HTMLDivElement | null>(null)
+  const inicial = useRef({ ancla, enfocar })
+  const montar = useCallback((nodo: HTMLDivElement | null) => {
+    panel.current = nodo
+    if (nodo) {
+      colocar(nodo, inicial.current.ancla)
+      if (inicial.current.enfocar) nodo.querySelector<HTMLElement>(inicial.current.enfocar)?.focus({ preventScroll: true })
+    }
+    montarPanel(nodo)
+  }, [montarPanel])
+  useCerrarAlTocarFuera(panel, alCerrar, disparador)
+  return (
+    <Portal>
+      {/* B13 · AG8 · el velo del catálogo fuera de computadora (en `esc` no se pinta: CSS). */}
+      <div className="ag-capa-velo ag-capa-barra-velo" aria-hidden="true" />
+      <div ref={montar} role="dialog" aria-modal="true" aria-label={etiqueta} tabIndex={-1}
+        onKeyDown={alPulsarTecla} className={`ag-capa ag-capa-barra${clase ? ` ${clase}` : ''}`} data-estado="abierta">
+        {children}
+      </div>
+    </Portal>
+  )
+}
+
+/**
+ * La fecha de la barra y su minicalendario (APG: el foco va al día activo al
+ * abrir). I5 (punto 14 de Angel): la FECHA ES EL BOTÓN —el texto del periodo
+ * que antes pintaba FullCalendar, con su flecha— y sustituye al botón
+ * «Ir a una fecha», que sale de la barra. El título nativo se oculta por CSS
+ * en cuanto este botón existe (`.agenda-fc:has([data-selector-fecha])`).
+ */
+/** B13 · En la barra de fuera de la computadora el periodo parte en líneas limpias: la mayúscula
+    inicial va escrita (`::first-letter` no alcanza a un texto en línea) y la última palabra viaja
+    con su flecha (`.ag-fecha-nw`, PIEZAS §13.4). */
+function TextoEnLineas({ titulo }: { titulo: string }): ReactElement {
+  const texto = titulo.charAt(0).toUpperCase() + titulo.slice(1)
+  const corte = texto.lastIndexOf(' ')
+  return (
+    <span className="ag-fecha-boton-texto">
+      {corte > 0 ? texto.slice(0, corte + 1) : ''}
+      <span className="ag-fecha-nw">{corte > 0 ? texto.slice(corte + 1) : texto}<ChevronDown size={16} aria-hidden="true" /></span>
+    </span>
+  )
+}
+
+function SelectorFecha({ rango, titulo, alIrAFecha, enLineas = false }: {
+  rango: RangoVisibleV2; titulo: string; alIrAFecha: (fecha: string) => void; enLineas?: boolean
+}): ReactElement {
+  const [ancla, setAncla] = useState<Caja | null>(null)
+  const cerrar = useCallback(() => setAncla(null), [])
+  const { desde, hasta } = partirRango(rango)
+  const hoy = hoyLocal()
+  return (
+    <>
+      <button type="button" className="ag-fecha-boton" data-selector-fecha=""
+        aria-label={titulo ? `Ir a una fecha: ${titulo}` : 'Ir a una fecha'} title="Ir a una fecha"
+        aria-haspopup="dialog" aria-expanded={ancla !== null}
+        /* La caja se lee en el clic, FUERA del actualizador: React pone `currentTarget`
+           a null al acabar el despacho, y el actualizador puede correr después, en el
+           render (reabrir tras Escape tumbaba la pantalla; I1, punto 7). */
+        onClick={e => { const caja = cajaDe(e.currentTarget); setAncla(a => (a ? null : caja)) }}>
+        {enLineas ? <TextoEnLineas titulo={titulo} /> : (
+          <>
+            <span className="ag-fecha-boton-texto">{titulo}</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </>
+        )}
+      </button>
+      {ancla && (
+        <Desplegable ancla={ancla} etiqueta="Elegir fecha" disparador="[data-selector-fecha]" clase="ag-capa--fecha"
+          enfocar={'button[data-fecha][tabindex="0"]'} alCerrar={cerrar}>
+          <MiniMes fechaInicial={desde || hoy} hoy={hoy} visibleDesde={desde} visibleHasta={hasta}
+            alElegir={f => { cerrar(); alIrAFecha(f) }} />
+        </Desplegable>
+      )}
+    </>
+  )
+}
+
+/**
+ * La lupa y su buscador (F3.6). Elegir una cita la delega en la capa principal
+ * (`irACita`: su día en la vista Día y su tarjeta). `/` lo abre pulsando este
+ * botón (`InteraccionesV2`), así el foco vuelve aquí al cerrar.
+ */
+function BotonBuscar({ apiRef, clase, icono, atajos }: {
+  apiRef: RefObject<ApiInteraccionesV2 | null>; clase: string; icono: number; atajos: boolean
+}): ReactElement {
+  const [ancla, setAncla] = useState<Caja | null>(null)
+  const cerrar = useCallback(() => setAncla(null), [])
+  return (
+    <>
+      <button type="button" className={clase} data-buscar-citas=""
+        aria-label="Buscar citas de un paciente" title={atajos ? 'Buscar citas de un paciente (/)' : 'Buscar citas de un paciente'}
+        aria-keyshortcuts={atajos ? teclasDeAccion('buscar') : undefined} aria-haspopup="dialog" aria-expanded={ancla !== null}
+        /* Fuera del actualizador, como en `SelectorFecha` (I1, punto 7). */
+        onClick={e => { const caja = cajaDe(e.currentTarget); setAncla(a => (a ? null : caja)) }}>
+        <Search size={icono} aria-hidden="true" />
+      </button>
+      {ancla && (
+        <Desplegable ancla={ancla} etiqueta="Buscar citas" disparador="[data-buscar-citas]" alCerrar={cerrar}>
+          <BuscadorCitas agendaV2 alCerrar={cerrar} alElegirCita={c => { cerrar(); apiRef.current?.irACita(c) }} />
+        </Desplegable>
+      )}
+    </>
+  )
+}
+
+/** Ranura `selectorFecha` de la barra de escritorio: la fecha, que abre el minicalendario. */
+export function SelectorFechaV2({ rango, titulo, alIrAFecha, enBanda = false }: {
+  rango: RangoVisibleV2
+  /** B13 · En la barra de `ext`/`tel`/`ih`/`iv`: el periodo en líneas limpias (`TextoEnLineas`). */
+  enBanda?: boolean
+  /** I5 · El texto del periodo (`view.title`, el mismo que pintaba FullCalendar). */
+  titulo: string
+  /** `api.gotoDate(fecha)`: conserva la vista. */
+  alIrAFecha: (fecha: string) => void
+}): ReactElement {
+  return <SelectorFecha rango={rango} titulo={titulo} alIrAFecha={alIrAFecha} enLineas={enBanda} />
+}
+
+export interface PropsBuscarV2 {
+  /** La capa principal: el buscador y la ayuda se piden por aquí. */
+  apiRef: RefObject<ApiInteraccionesV2 | null>
+  /** Con los atajos de una tecla activos: `aria-keyshortcuts` y la tecla en el `title`. */
+  atajos: boolean
+  /** En la banda del teléfono: la lupa sola, a 44 px y con la pinta de la banda. */
+  enBanda?: boolean
+}
+
+/**
+ * Ranura `buscar`: la lupa. I5 (punto 15): el botón de la ayuda de atajos salió
+ * de la barra al menú del engrane (`MenuEngraneAgenda`, «Atajos de teclado»),
+ * que sigue abriéndola SIN el atajo (WCAG 2.1.4: es donde se vuelven a encender
+ * cuando alguien los apagó); `?` la sigue abriendo.
+ */
+export function BuscarV2({ apiRef, atajos, enBanda = false }: PropsBuscarV2): ReactElement {
+  if (enBanda) {
+    return <BotonBuscar apiRef={apiRef} atajos={atajos} icono={18} clase="ag-banda-movil-ctrl ag-banda-movil-ctrl--marco" />
+  }
+  return <BotonBuscar apiRef={apiRef} atajos={atajos} icono={16} clase="ag-herramienta" />
+}
+
+/** El minicalendario del hueco inferior del panel de Día (`PanelDia`, ranura `miniMes`). */
+export function MiniMesPanelV2({ rango, alIrAFecha }: { rango: RangoVisibleV2; alIrAFecha: (fecha: string) => void }): ReactElement {
+  const { desde, hasta } = partirRango(rango)
+  const hoy = hoyLocal()
+  return <MiniMes fechaInicial={desde || hoy} hoy={hoy} visibleDesde={desde} visibleHasta={hasta} alElegir={alIrAFecha} />
+}

@@ -4,58 +4,32 @@ import { useMedicoInfo } from '@/hooks/useMedicoInfo'
 import { useConsultorioActivo } from '@/contexts/ConsultorioActivoContext'
 import { useEffect, useRef, useState } from 'react'
 
-import { Trash2, Plus, Check, AlertTriangle, ScanLine } from 'lucide-react'
+import { Plus, Check, AlertTriangle, ScanLine } from 'lucide-react'
 import PieAccionesDocumento from '@/components/documentos/PieAccionesDocumento'
 import { flushSync } from 'react-dom'
 import { generarPdf, VERSION_DE_EMISION, versionQueEmite } from '@/lib/mobileShare'
 import { useToast } from '@/components/ui/Toast'
+import ModalShell from '@/components/ui/ModalShell'
 import ModalDocumentoGenerado from '@/components/documentos/ModalDocumentoGenerado'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
-import ComboEscribible from '@/components/documentos/ComboEscribible'
+import EditorEstudioImagen from '@/components/documentos/EditorEstudioImagen'
+import LineaEstudioImagen from '@/components/documentos/LineaEstudioImagen'
+import {
+  componer, ESTUDIO_EDITOR_VACIO, estaVacio, faltasDe, interpretar, siguienteCampo,
+  type EstudioEditor, type Falta, type Siguiente,
+} from '@/components/documentos/imagenCompuesta'
 import { usePlantillasDocumento, type ContenidoPlantilla } from '@/components/documentos/PlantillasDocumento'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { createClient } from '@/lib/supabase/client'
 import { hoyEnTZ, desplazarFecha, TZ_CLINICA } from '@/lib/dates'
 import { enfocarYAcercar } from '@/lib/scrollDoc'
-
-const TIPOS_ESTUDIO = [
-  'Radiografía',
-  // Las dos variantes de RMN por separado: es lo que cambia la preparación del
-  // paciente y el coste del estudio, así que el radiólogo necesita saber cuál
-  // desde la solicitud. Quien tenga otro caso lo escribe — el campo es libre y
-  // esto es solo la lista de sugerencias.
-  'Resonancia magnética simple',
-  'Resonancia magnética contrastada',
-  'Tomografía (TAC)',
-  'Ultrasonido',
-  'Densitometría ósea',
-  'Gammagrafía',
-  'Electromiografía (EMG)',
-  'Mielograma',
-] as const
+import { escucharSalida } from '@/components/documentos/salidaPlegable'
 
 const FECHA_MIN = '1900-01-01'
 
 type Estudio = { tipo: string; region: string; proyecciones?: string; indicacion?: string }
-
-const ESTUDIO_VACIO: Estudio = { tipo: '', region: '', proyecciones: '', indicacion: '' }
-
-/**
- * El par tipo + región se exige JUNTO, no campo a campo.
- * Un estudio a medias no es una petición — y hasta ahora se caía del PDF sin
- * decirlo, porque el payload filtraba por `e.tipo && e.region`.
- */
-type EstadoEstudio = 'vacio' | 'completo' | 'faltaRegion' | 'faltaTipo'
-
-function estadoDe(e: Estudio): EstadoEstudio {
-  const tipo = e.tipo.trim()
-  const region = e.region.trim()
-  if (!tipo && !region) return 'vacio'      // se ignora: ni molesta ni bloquea
-  if (tipo && region) return 'completo'
-  return tipo ? 'faltaRegion' : 'faltaTipo'
-}
 
 /** Alguno de los cuatro campos tiene texto. Gobierna qué filas van a plantilla. */
 function conTexto(e: Estudio): boolean {
@@ -81,15 +55,34 @@ function leerEstudio(bruto: unknown): Estudio | null {
 
 /** Predicado único de «formulario vacío». Mismo criterio que Honorarios. */
 function isFormEmpty(
-  estudios: Estudio[], urgente: boolean,
+  estudios: EstudioEditor[], urgente: boolean,
   paciente: string, pacienteInicial: string,
   diagnostico: string, diagnosticoInicial: string,
 ): boolean {
   const pacienteIntacto = paciente.trim() === '' || paciente.trim() === pacienteInicial.trim()
   const dxIntacto = diagnostico.trim() === '' || diagnostico.trim() === diagnosticoInicial.trim()
-  const sinEstudios = estudios.every(e =>
-    !e.tipo.trim() && !e.region.trim() && !e.proyecciones?.trim() && !e.indicacion?.trim())
-  return pacienteIntacto && dxIntacto && !urgente && sinEstudios
+  return pacienteIntacto && dxIntacto && !urgente && estudios.every(estaVacio)
+}
+
+/** Clave estable de React de cada estudio (no el índice: quitar uno no pierde el foco). */
+let ultimaClave = 0
+function claveNueva(): number { ultimaClave += 1; return ultimaClave }
+
+/** Ids del DOM de cada campo de un estudio, por su clave estable. */
+type CampoImg = 'buscar' | 'tipo' | 'region' | 'lado' | 'contraste' | 'indicacion' | 'tipolibre' | 'regionlibre'
+const GRUPOS_DE_FICHAS: readonly CampoImg[] = ['tipo', 'region', 'lado', 'contraste']
+const CAMPO_SIGUIENTE: Record<Siguiente, CampoImg> = {
+  tipo: 'tipo', region: 'region', lado: 'lado', contraste: 'contraste', indicacion: 'indicacion', tipoLibre: 'tipolibre',
+}
+/** El elemento enfocable de un campo; en un grupo de fichas, su botón con tabindex 0. */
+function elementoDe(raiz: HTMLElement | null, clave: number, campo: CampoImg): HTMLElement | null {
+  const sel = GRUPOS_DE_FICHAS.includes(campo) ? `#imagen-${campo}-${clave} [tabindex="0"]` : `#imagen-${campo}-${clave}`
+  return raiz?.querySelector<HTMLElement>(sel) ?? null
+}
+const ROTULO_FALTA: Record<Falta, string> = { tipo: 'Tipo de estudio', region: 'Región', lado: 'Lado', contraste: 'Contraste' }
+function campoDeFalta(f: Falta, e: EstudioEditor): CampoImg {
+  if (e.modalidad === 'otro') return f === 'region' ? 'regionlibre' : 'tipolibre'
+  return f
 }
 
 interface Props {
@@ -180,9 +173,14 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
   // documento es de la clínica de todos modos (LA REGLA, en `@/lib/dates`).
   const [fecha, setFecha] = useState(hoyEnTZ(TZ_CLINICA))
   const [diagnostico, setDiagnostico] = useState(diagnosticoInicial)
-  const [estudios, setEstudios] = useState<Estudio[]>([{ ...ESTUDIO_VACIO }])
+  const [estudios, setEstudios] = useState<EstudioEditor[]>([{ ...ESTUDIO_EDITOR_VACIO }])
+  const [claves, setClaves] = useState<number[]>(() => [claveNueva()])
+  // Solicitud compacta: UN estudio abierto a la vez (su clave), los demás
+  // plegados a una línea. Nace abierto el primero.
+  const [abierto, setAbierto] = useState<number | null>(() => claves[0] ?? null)
   const [urgente, setUrgente] = useState(false)
   const [errorGuardado, setErrorGuardado] = useState('')
+  const [errorAbierto, setErrorAbierto] = useState(false)
   const [imprimiendo, setImprimiendo] = useState(false)
   const [docGenerado, setDocGenerado] = useState<{ blob: Blob; guardado: boolean; documentoId: string | null } | null>(null)
   // Nada acusa antes del primer intento de imprimir; después todo se actualiza
@@ -215,17 +213,26 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     // El búnker no tiene red ni sesión de Supabase: el sistema no se monta.
     desactivado: !!offlineMode,
     onPanelChange: onPanelPlantillasChange,
-    leer: () => ({ _v: 1, estudios: estudios.filter(conTexto), urgente }),
+    // Las cuatro cadenas de siempre, compuestas: la plantilla no cambia de forma.
+    leer: () => ({ _v: 1, estudios: estudios.map(componer).filter(conTexto), urgente }),
     aplicar: (c: ContenidoPlantilla) => {
       // Solo las claves que existen HOY en el formulario, campo a campo.
       // Los dos valores de repuesto NO son defensa de sobra: «Vaciar
       // formulario» aplica un contenido sin ninguna clave, así que es justo lo
       // que repone el estado inicial. El paciente y el diagnóstico no se tocan
       // aquí, y por eso sobreviven al vaciado.
+      // Cada estudio se RECONOCE en el catálogo sólo si al volver a componerse
+      // da exactamente el mismo texto; si no, se abre en «Otro» intacto.
       const guardados = Array.isArray(c.estudios)
-        ? c.estudios.map(leerEstudio).filter((e): e is Estudio => e !== null)
+        ? c.estudios.map(leerEstudio).filter((e): e is Estudio => e !== null).map(interpretar)
         : []
-      setEstudios(guardados.length > 0 ? guardados : [{ ...ESTUDIO_VACIO }])
+      const filas = guardados.length > 0 ? guardados : [{ ...ESTUDIO_EDITOR_VACIO }]
+      const nuevas = filas.map(() => claveNueva())
+      setEstudios(filas)
+      setClaves(nuevas)
+      // Aplicada, todo plegado (se ve la solicitud entera); vaciada, el único
+      // estudio queda abierto para escribir.
+      setAbierto(filas.length === 1 && estaVacio(filas[0]) ? nuevas[0] : null)
       setUrgente(c.urgente === true)
     },
   })
@@ -237,41 +244,128 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     if (primero instanceof HTMLInputElement && !primero.value) primero.focus({ preventScroll: true })
   }, [])
 
-  function addEstudio() { setEstudios([...estudios, { ...ESTUDIO_VACIO }]) }
-  function removeEstudio(i: number) { setEstudios(estudios.filter((_, idx) => idx !== i)) }
-  function updateEstudio(i: number, campo: keyof Estudio, val: string) {
-    setEstudios(estudios.map((e, idx) => idx === i ? { ...e, [campo]: val } : e))
+  // ── Solicitud compacta: abrir, plegar, agregar y quitar (como la receta) ──
+  const listaRef = useRef<HTMLDivElement>(null)
+  const agregarRef = useRef<HTMLButtonElement>(null)
+  const indiceDe = (clave: number): number => claves.indexOf(clave)
+
+  /**
+   * Enfoca un campo de un estudio ya pintado y lo acerca al borde de arriba,
+   * para que el teclado en pantalla no lo tape. En `tel`/`iv` el encabezado
+   * fundido flota SOBRE el scroller: el margen es el relleno de arriba del
+   * contenido (`.app-contenido`), que ya lo descuenta.
+   */
+  function enfocarCampo(clave: number, campo: CampoImg) {
+    const contenido = formRef.current?.closest<HTMLElement>('.app-contenido')
+    const margen = contenido ? parseFloat(getComputedStyle(contenido).paddingTop) || 24 : 24
+    enfocarYAcercar(elementoDe(listaRef.current, clave, campo), Math.max(24, margen))
   }
 
-  // ── Validación ──────────────────────────────────────────────────
-  const estados = estudios.map(estadoDe)
-  const primerIncompleto = estados.findIndex(s => s === 'faltaRegion' || s === 'faltaTipo')
-  const completos = estudios.filter((_, i) => estados[i] === 'completo')
+  /** El abierto, si está totalmente vacío y no es el único: al plegarse se quita. */
+  function vacioQueSobra(): number | null {
+    if (abierto === null || estudios.length < 2) return null
+    const i = indiceDe(abierto)
+    return i >= 0 && estaVacio(estudios[i]) ? abierto : null
+  }
 
-  const faltantes: { clave: string; nombre: string }[] = []
+  function quitarSinFoco(clave: number) {
+    const i = indiceDe(clave)
+    if (i < 0) return
+    setEstudios(prev => prev.filter((_, idx) => idx !== i))
+    setClaves(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  /** Abre un estudio (plegando el que estuviera abierto) y enfoca un campo. */
+  function abrirEn(clave: number, campo: CampoImg = 'buscar') {
+    const sobra = vacioQueSobra()
+    flushSync(() => {
+      if (sobra !== null && sobra !== clave) quitarSinFoco(sobra)
+      setAbierto(clave)
+    })
+    enfocarCampo(clave, campo)
+  }
+
+  /**
+   * Pliega el abierto al tocar o enfocar FUERA de la lista. Vacío y no único:
+   * se quita. Único y vacío: se queda abierto. Si el foco ya volvió dentro de
+   * la lista (lo abrió otra acción), no hace nada.
+   */
+  function plegar() {
+    if (abierto === null || listaRef.current?.contains(document.activeElement)) return
+    const sobra = vacioQueSobra()
+    if (sobra !== null) quitarSinFoco(sobra)
+    else if (estudios.length === 1 && estaVacio(estudios[0])) return
+    setAbierto(null)
+  }
+  const plegarRef = useRef(plegar)
+  useEffect(() => { plegarRef.current = plegar })
+
+  /* «Plegado al salir»: la escucha compartida (`salidaPlegable.ts`, con la
+     causa del defecto del texto de una casilla). */
+  useEffect(() => escucharSalida(el => !!(listaRef.current?.contains(el) || agregarRef.current?.contains(el)), () => plegarRef.current()), [])
+
+  /** «Agregar estudio» y Ctrl/⌘+Enter: pliega el actual, crea otro al final y va a su buscador. */
+  function agregar() {
+    const i = abierto === null ? -1 : indiceDe(abierto)
+    if (abierto !== null && i >= 0 && estaVacio(estudios[i])) { enfocarCampo(abierto, 'buscar'); return }
+    const k = claveNueva()
+    flushSync(() => {
+      setEstudios(prev => [...prev, { ...ESTUDIO_EDITOR_VACIO }])
+      setClaves(prev => [...prev, k])
+      setAbierto(k)
+    })
+    enfocarCampo(k, 'buscar')
+  }
+
+  /** Quitar: el foco va al vecino (el siguiente, o el anterior si era el último), abierto. */
+  function quitar(clave: number) {
+    const i = indiceDe(clave)
+    if (i < 0 || estudios.length < 2) return
+    const restantes = claves.filter(k => k !== clave)
+    const vecino = restantes[Math.min(i, restantes.length - 1)]
+    flushSync(() => { quitarSinFoco(clave); setAbierto(vecino) })
+    enfocarCampo(vecino, 'buscar')
+  }
+
+  /** Tras una elección (`seguir`), el foco va a lo siguiente que falta o a la indicación. */
+  function cambiar(clave: number, nuevo: EstudioEditor, seguir: boolean) {
+    const i = indiceDe(clave)
+    flushSync(() => setEstudios(prev => prev.map((e, idx) => idx === i ? nuevo : e)))
+    if (seguir) enfocarCampo(clave, CAMPO_SIGUIENTE[siguienteCampo(nuevo)])
+  }
+
+  // ── Validación (solicitud compacta) ─────────────────────────────
+  // Un estudio con datos y a medias bloquea la impresión, se abre y se dice qué
+  // le falta (como la receta): tipo y región, el lado donde la región lo lleva
+  // y el contraste en TC y RM (salvo angio). «Otro» exige lo de antes: tipo y
+  // región. Los estudios del todo vacíos se ignoran.
+  const faltasDeCadaUno: Falta[][] = estudios.map(faltasDe)
+  const vivos = estudios.filter(e => !estaVacio(e))
+
+  type Faltante = { clave: string; nombre: string; est?: { clave: number; campo: CampoImg } }
+  const faltantes: Faltante[] = []
+  faltasDeCadaUno.forEach((fs, i) => {
+    const k = claves[i]
+    const deCual = estudios.length > 1 ? ` (estudio ${i + 1})` : ''
+    for (const f of fs) {
+      const nombre = f === 'contraste' && estudios[i].modalidad === 'mx' ? 'Tipo de mastografía' : ROTULO_FALTA[f]
+      faltantes.push({ clave: `${f}-${k}`, nombre: nombre + deCual, est: { clave: k, campo: campoDeFalta(f, estudios[i]) } })
+    }
+  })
   if (!paciente.trim()) faltantes.push({ clave: 'paciente', nombre: 'Paciente' })
-  if (completos.length === 0) faltantes.push({ clave: 'estudios', nombre: 'un estudio con tipo y región' })
+  if (vivos.length === 0) faltantes.push({ clave: 'estudios', nombre: 'Un estudio con tipo y región', est: { clave: claves[0], campo: 'buscar' } })
 
-  function irA(clave: string) {
-    if (clave === 'paciente') { enfocarYAcercar(pacienteRef.current); return }
-    enfocarYAcercar(formRef.current?.querySelector<HTMLElement>('#imagen-tipo-0') ?? null)
+  function irA(f: Faltante) {
+    if (f.est) { abrirEn(f.est.clave, f.est.campo); return }
+    enfocarYAcercar(pacienteRef.current)
   }
 
   async function imprimir() {
-    // Dos puertas. La del par va primero: es la que evita que un estudio a
-    // medias desaparezca del PDF sin avisar.
-    if (primerIncompleto >= 0) {
-      setIntentado(true)
-      enfocarYAcercar(formRef.current?.querySelector<HTMLElement>(
-        estados[primerIncompleto] === 'faltaRegion'
-          ? `#imagen-region-${primerIncompleto}`
-          : `#imagen-tipo-${primerIncompleto}`,
-      ) ?? null)
-      return
-    }
+    // El primario nunca está gris por faltantes: un botón apagado no enseña qué
+    // falta, el banner sí. Al pulsar con faltantes no emite y lleva al primero.
     if (faltantes.length > 0) {
       setIntentado(true)
-      irA(faltantes[0].clave)
+      irA(faltantes[0])
       return
     }
     flushSync(() => { setErrorGuardado(''); setImprimiendo(true) })
@@ -285,6 +379,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
     // El filtro sobrevive, pero ya no descarta nada en silencio: emitir con un
     // estudio a medias es imposible, y los del todo vacíos se ignoran a
     // propósito (§2.4).
+    const completos = vivos.map(componer)
     const contenido = {
       paciente,
       diagnostico,
@@ -448,8 +543,8 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         msg = `La solicitud quedó registrada${folio ? ` con folio ${folio}` : ''}, pero no se pudo `
           + 'generar el PDF. Búscala en la lista de documentos del paciente y recupérala desde ahí.'
       }
-      toast.error(msg)
       setErrorGuardado(msg)
+      setErrorAbierto(true)
       // eslint-disable-next-line no-console
       console.error('[SolicitudImagenForm] imprimir falló:', err)
     } finally {
@@ -475,7 +570,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         <div className="sp-doc-cardhead">
           <h2 className="sp-label">Datos del paciente</h2>
         </div>
-        <div className="sp-doc-cardbody">
+        <div className="sp-doc-cardbody sp-lab-datos">
           <div className="sp-doc-grid" data-cols="3">
             <div className="sp-doc-field">
               <label htmlFor="imagen-fecha" className="sp-label-field">Fecha</label>
@@ -514,101 +609,58 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </div>
       </section>
 
-      <section className="sp-card sp-doc-card">
+      {/* Solicitud compacta (maqueta `solicitud-imagen.html`, aprobada por el
+          dueño): un estudio abierto, los demás plegados a una línea. El editor
+          pide sólo lo que aplica al tipo y la región. Sin «Frecuentes»
+          (decisión del dueño). Todo local, sin red (lo comparte el búnker). */}
+      <section className="sp-card sp-doc-card sp-rx sp-img">
         <div className="sp-doc-cardhead">
           <div className="sp-icobox sp-icobox--sm"><ScanLine /></div>
           <h2 className="sp-label">Estudios de imagen</h2>
-          <button type="button" onClick={addEstudio} aria-label="Agregar estudio"
-            className="sp-btn sp-btn--compact sp-doc-add">
-            <Plus size={17} /><span className="sp-doc-long">Agregar estudio</span>
-          </button>
         </div>
-        <div className="sp-doc-cardbody">
-          {estudios.map((e, i) => {
-            const estado = estados[i]
-            const roto = intentado && (estado === 'faltaRegion' || estado === 'faltaTipo')
-            return (
-              <div key={i} className={`sp-doc-studyblock ${roto ? 'sp-doc-studyblock--invalid' : ''}`}>
-                <div className="sp-doc-studyhead">
-                  <span className="sp-label" style={{ fontSize: '11.5px', fontWeight: 'var(--sp-fw-black)' }}>
-                    Estudio {i + 1}
-                  </span>
-                  {e.region.trim() && (
-                    <span className="sp-chip sp-chip--meta sp-doc-studychip">{e.region.trim()}</span>
-                  )}
-                  <button type="button" onClick={() => removeEstudio(i)} disabled={estudios.length === 1}
-                    aria-label={`Eliminar estudio ${i + 1}`}
-                    className="sp-doc-iconbtn" style={{ marginLeft: 'auto' }}>
-                    <Trash2 />
-                  </button>
-                </div>
-
-                <div className="sp-doc-studygrid">
-                  <div className="sp-doc-field" data-span="2">
-                    <label htmlFor={`imagen-tipo-${i}`} className="sp-label-field">
-                      Tipo de estudio <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                      <span className="sr-only">obligatorio</span>
-                    </label>
-                    <ComboEscribible
-                      id={`imagen-tipo-${i}`}
-                      value={e.tipo}
-                      onChange={val => updateEstudio(i, 'tipo', val)}
-                      sugerencias={TIPOS_ESTUDIO}
-                      placeholder="Seleccionar o escribir…"
-                      pie="Ninguno encaja: escribe el tipo y se usa tal cual."
-                      invalido={roto && estado === 'faltaTipo'}
-                      claseExtra={roto && estado === 'faltaTipo' ? 'sp-doc-invalid--pair' : ''}
-                    />
-                    {roto && estado === 'faltaTipo' && (
-                      <p className="sp-hint" style={{ color: 'var(--sp-danger)' }}>
-                        Falta el tipo. Complétalo o borra el estudio.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="sp-doc-field" data-span="2">
-                    <label htmlFor={`imagen-region-${i}`} className="sp-label-field">
-                      Región anatómica <span aria-hidden="true" style={{ color: 'var(--sp-danger)' }}>*</span>
-                      <span className="sr-only">obligatorio</span>
-                    </label>
-                    {/* Campo libre y sin sugerencias: lado, nivel y segmento son
-                        lo que más varía y una lista estorbaría más que ayudaría. */}
-                    <input id={`imagen-region-${i}`} type="text" value={e.region}
-                      onChange={ev => updateEstudio(i, 'region', ev.target.value)}
-                      placeholder="Ej: Columna lumbar, rodilla der."
-                      aria-invalid={(roto && estado === 'faltaRegion') || undefined}
-                      className={`sp-input ${roto && estado === 'faltaRegion' ? 'sp-doc-invalid--pair' : ''}`} />
-                    {roto && estado === 'faltaRegion' && (
-                      <p className="sp-hint" style={{ color: 'var(--sp-danger)' }}>
-                        Falta la región. Complétala o borra el estudio.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Siempre visibles: son una línea cada una y son lo que evita
-                      la llamada del radiólogo. Plegarlas cuesta un toque por
-                      estudio y ahorra 74px. */}
-                  <div className="sp-doc-field" data-span="1">
-                    <label htmlFor={`imagen-proyecciones-${i}`} className="sp-label-field">Proyecciones</label>
-                    <input id={`imagen-proyecciones-${i}`} type="text" value={e.proyecciones ?? ''}
-                      onChange={ev => updateEstudio(i, 'proyecciones', ev.target.value)}
-                      placeholder="AP, lateral…" className="sp-input" />
-                  </div>
-
-                  <div className="sp-doc-field" data-span="3">
-                    <label htmlFor={`imagen-indicacion-${i}`} className="sp-label-field">Indicación clínica específica</label>
-                    <input id={`imagen-indicacion-${i}`} type="text" value={e.indicacion ?? ''}
-                      onChange={ev => updateEstudio(i, 'indicacion', ev.target.value)}
-                      placeholder="Ej: Descartar fractura vertebral" className="sp-input" />
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+        <div className="sp-doc-cardbody sp-rx-cuerpo">
+          <div ref={listaRef} className="sp-rx-meds">
+            {estudios.map((e, i) => {
+              const k = claves[i]
+              return k === abierto ? (
+                <EditorEstudioImagen key={k} numero={i + 1} clave={k} estudio={e}
+                  faltas={intentado ? faltasDeCadaUno[i] : []} puedeQuitar={estudios.length > 1}
+                  onCambio={(nuevo, seguir) => cambiar(k, nuevo, seguir)}
+                  onQuitar={() => quitar(k)} onAgregar={agregar} />
+              ) : (
+                <LineaEstudioImagen key={k} numero={i + 1} estudio={e} faltas={faltasDeCadaUno[i]}
+                  onAbrir={() => abrirEn(k)} />
+              )
+            })}
+          </div>
+        </div>
+        <div className="sp-rx-agregar">
+          <button ref={agregarRef} type="button" onClick={agregar} className="k-b k-b-tonal sp-rx-agregar-b">
+            <Plus aria-hidden="true" /> Agregar estudio
+            <span className="sp-rx-atajo" aria-hidden="true"><kbd>Ctrl</kbd><kbd>Enter</kbd></span>
+          </button>
         </div>
       </section>
 
-      {errorGuardado && <p className="sp-banner sp-banner--danger">{errorGuardado}</p>}
+      {/* Un solo mensaje cuando falla el guardado (rediseño B9; CALMA §20): antes
+          salía dos veces, en un aviso y en una banda. El texto se queda en
+          `errorGuardado` mientras la alerta sale, para que no se vacíe a medias. */}
+      <ModalShell
+        open={errorAbierto && errorGuardado !== ''}
+        onClose={() => setErrorAbierto(false)}
+        variante="alerta"
+        tono="destruir"
+        elevated
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="No se pudo guardar"
+        footer={
+          <button type="button" autoFocus data-principal onClick={() => setErrorAbierto(false)} className="k-b k-b-capa k-b-prim">
+            Aceptar
+          </button>
+        }
+      >
+        <p>{errorGuardado}</p>
+      </ModalShell>
 
       {!cargandoPerfil && !medicoInfo && (
         <p className="sp-banner sp-banner--warn">
@@ -618,20 +670,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
         </p>
       )}
 
-      {/* Nombra el ESTUDIO, no el campo: con dos o tres bloques en pantalla,
-          «falta la región» no localiza nada. */}
-      {intentado && primerIncompleto >= 0 && (
-        <p className="sp-banner sp-banner--warn" aria-live="polite">
-          <AlertTriangle size={17} />
-          <span>
-            El estudio {primerIncompleto + 1} tiene{' '}
-            {estados[primerIncompleto] === 'faltaRegion' ? 'tipo sin región' : 'región sin tipo'}:
-            {' '}complétalo o bórralo.
-          </span>
-        </p>
-      )}
-
-      {intentado && primerIncompleto < 0 && faltantes.length > 0 && (
+      {intentado && faltantes.length > 0 && (
         <p className="sp-banner sp-banner--warn" aria-live="polite">
           <AlertTriangle size={17} />
           <span>
@@ -639,7 +678,7 @@ export default function SolicitudImagenForm({ pacienteInicial = '', diagnosticoI
             {faltantes.slice(0, 3).map((f, i) => (
               <span key={f.clave}>
                 {i > 0 && ' · '}
-                <button type="button" onClick={() => irA(f.clave)}
+                <button type="button" onClick={() => irA(f)}
                   className="sp-link-alt" style={{ color: 'var(--sp-warn-strong)' }}>
                   {f.nombre}
                 </button>

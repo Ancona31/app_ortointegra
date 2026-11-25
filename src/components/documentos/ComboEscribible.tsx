@@ -39,6 +39,11 @@ interface Props {
 
 type Caja = { left: number; top: number; width: number; abajo: boolean }
 
+/** Minúsculas y sin acentos: «tomografia» encuentra «Tomografía» y al revés. */
+function sinAcentos(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 export default function ComboEscribible({
   id, value, onChange, sugerencias, placeholder,
   minCaracteres = 0, pie, invalido = false, claseExtra = '',
@@ -51,8 +56,9 @@ export default function ComboEscribible({
   const menuRef = useRef<HTMLDivElement>(null)
 
   const texto = value.trim()
+  const buscado = sinAcentos(texto)
   const filtradas = texto.length >= minCaracteres
-    ? sugerencias.filter(s => s.toLowerCase().includes(texto.toLowerCase())).slice(0, MAX_SUGERENCIAS)
+    ? sugerencias.filter(s => sinAcentos(s).includes(buscado)).slice(0, MAX_SUGERENCIAS)
     : []
   const visible = abierto && filtradas.length > 0
 

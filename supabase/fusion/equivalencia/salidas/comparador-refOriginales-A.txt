@@ -1,0 +1,30 @@
+
+== config ==
+- sólo en ref: rol supabase_functions_admin en (todas) : search_path  [INESPERADA]
+    {"valor": "supabase_functions"}
+- sólo en ref: rol supabase_realtime_admin en (todas) : search_path  [INESPERADA]
+    {"valor": "public, extensions, realtime"}
+- sólo en ref: todos los roles en postgres : app.settings.jwt_exp  [INESPERADA]
+    {"valor": "<oculto>"}
+- sólo en ref: todos los roles en postgres : app.settings.jwt_secret  [INESPERADA]
+    {"valor": "<oculto>"}
+
+== permiso ==
+- sólo en ref: esquema graphql → anon  [INESPERADA]
+    {"privilegios": "USAGE"}
+- sólo en ref: esquema graphql → authenticated  [INESPERADA]
+    {"privilegios": "USAGE"}
+- sólo en ref: esquema graphql → postgres  [INESPERADA]
+    {"privilegios": "USAGE*"}
+- sólo en ref: esquema graphql → service_role  [INESPERADA]
+    {"privilegios": "USAGE"}
+- sólo en ref: esquema graphql_public → anon  [INESPERADA]
+    {"privilegios": "USAGE"}
+- sólo en ref: esquema graphql_public → authenticated  [INESPERADA]
+    {"privilegios": "USAGE"}
+- sólo en ref: esquema graphql_public → postgres  [INESPERADA]
+    {"privilegios": "USAGE*"}
+- sólo en ref: esquema graphql_public → service_role  [INESPERADA]
+    {"privilegios": "USAGE"}
+
+Resumen: 3449 objetos en ref, 3437 en A; 12 diferencias (0 esperadas, 12 inesperadas).

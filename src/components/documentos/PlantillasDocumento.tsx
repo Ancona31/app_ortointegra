@@ -32,11 +32,13 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  ArrowLeft, Check, FileText, Pencil, RefreshCw, Save, Settings2, Trash2, X,
+  AlertTriangle, ArrowLeft, BookmarkPlus, Check, ChevronRight, Eraser, FileText, Layers, MoreHorizontal,
+  Pencil, RefreshCw, Save, SlidersHorizontal, Trash2, X,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import ModalShell from '@/components/ui/ModalShell'
+import CapaMenu, { type OpcionMenu } from '@/components/ui/CapaMenu'
 import { useToast } from '@/components/ui/Toast'
 import { scrollerDe } from '@/lib/scrollDoc'
 import {
@@ -86,6 +88,11 @@ export interface OpcionesPlantillas {
   desactivado?: boolean
   /** El panel oculta el selector de tipo del host mientras está abierto (§3.1). */
   onPanelChange?: (abierto: boolean) => void
+  /**
+   * Opciones propias del formato para el «···» de la cabecera, antes de las de
+   * plantillas. Hoy sólo el consentimiento: «Guardar borrador».
+   */
+  masOpciones?: readonly OpcionMenu[]
 }
 
 export interface PiezasPlantillas {
@@ -101,7 +108,7 @@ export interface PiezasPlantillas {
 }
 
 export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas {
-  const { tipo, vacio, leer, aplicar, desactivado = false, onPanelChange } = op
+  const { tipo, vacio, leer, aplicar, desactivado = false, onPanelChange, masOpciones } = op
   const toast = useToast()
 
   const [lista, setLista] = useState<PlantillaDocumento[]>([])
@@ -262,6 +269,21 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
    */
   const sinContenido = !conContenido
   const guardarApagado = desactivado || errorCarga || sinContenido
+  const pedirGuardar = (): void => setDialogo(lista.length >= TOPE_PLANTILLAS ? 'tope' : 'guardar')
+  const ayudaGuardar = sinContenido && !desactivado && !errorCarga
+    ? 'Llena algún campo de los que la plantilla guarda para poder guardarla.'
+    : undefined
+  /* «Gestionar» y «Vaciar» sólo donde hoy existen: con la lista cargada y no
+     vacía (son los del desplegable). */
+  const conLista = !cargando && !errorCarga && lista.length > 0
+  const opcionesMas: OpcionMenu[] = [
+    ...(masOpciones ?? []),
+    { id: 'tpl-guardar', texto: 'Guardar como plantilla', icono: <BookmarkPlus />, deshabilitada: guardarApagado, detalle: ayudaGuardar, alElegir: pedirGuardar },
+    ...(conLista ? [
+      { id: 'tpl-gestionar', texto: 'Gestionar plantillas', icono: <SlidersHorizontal />, alElegir: abrirPanel },
+      { id: 'tpl-vaciar', texto: 'Vaciar formulario', icono: <Eraser />, deshabilitada: vacio, alElegir: () => alSeleccionar(OPCION_VACIAR) },
+    ] : []),
+  ]
 
   return {
     panelAbierto,
@@ -276,8 +298,9 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
         aviso={aviso}
         onSeleccionar={alSeleccionar}
         onDeshacer={deshacer}
-        onGestionar={origen => { origenRef.current = origen; abrirPanel() }}
         onReintentar={() => void cargar()}
+        guardar={{ apagado: guardarApagado, ayuda: ayudaGuardar, alPedir: pedirGuardar }}
+        mas={<BotonMas opciones={opcionesMas} alAbrir={el => { origenRef.current = el }} />}
       />
     ),
     botonGuardar: desactivado ? null : (
@@ -285,12 +308,10 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
         type="button"
         onClick={e => {
           origenRef.current = e.currentTarget
-          setDialogo(lista.length >= TOPE_PLANTILLAS ? 'tope' : 'guardar')
+          pedirGuardar()
         }}
         disabled={guardarApagado}
-        title={sinContenido && !desactivado && !errorCarga
-          ? 'Llena algún campo de los que la plantilla guarda para poder guardarla.'
-          : undefined}
+        title={ayudaGuardar}
         /* ⚠️ EL REPARTO SALIÓ DEL `style` INLINE A `.sp-tpl-guardar`, Y NO ES
            COSMÉTICA: un estilo en línea gana a CUALQUIER hoja, así que con
            `flex: 0 0 auto` escrito aquí la barra del consentimiento no podía
@@ -330,23 +351,25 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
           onGuardar={guardar}
           onTope={() => setDialogo('tope')}
         />
+        {/* Alerta del catálogo (CALMA §13): «Gestionar» y no «Gestionar
+            plantillas» para que los dos botones queden parejos (§20); el
+            título conserva el nombre completo. */}
         <ModalShell
           open={dialogo === 'tope'}
           onClose={() => setDialogo(null)}
-          spinusGeometry="decide"
+          variante="alerta"
+          tono="avisar"
+          icon={<AlertTriangle aria-hidden="true" />}
           title={`Ya tienes ${TOPE_PLANTILLAS} plantillas de ${etiqueta}`}
           footer={
-            <div className="flex items-center gap-2 p-4 md:px-6">
-              <button onClick={() => setDialogo(null)} className="sp-btn sp-btn--ghost">Cancelar</button>
-              <div className="flex-1" />
-              <button onClick={abrirPanel} className="sp-btn sp-btn--primary">Gestionar plantillas</button>
-            </div>
+            <>
+              <button type="button" onClick={() => setDialogo(null)} className="k-b k-b-capa k-b-quieto">Cancelar</button>
+              <button type="button" autoFocus data-principal onClick={abrirPanel} className="k-b k-b-capa k-b-prim">Gestionar</button>
+            </>
           }
         >
           {/* El formulario se conserva íntegro: el panel lo apaga, no lo tira. */}
-          <p className="sp-body p-4 md:p-6">
-            Es el máximo. Para guardar esta, borra o sobrescribe una de las que ya tienes.
-          </p>
+          <p>Es el máximo. Para guardar esta, borra o sobrescribe una de las que ya tienes.</p>
         </ModalShell>
       </>
     ),
@@ -354,6 +377,11 @@ export function usePlantillasDocumento(op: OpcionesPlantillas): PiezasPlantillas
 }
 
 // ── Card del selector (§1) ──────────────────────────────────────────────────
+/* Rediseño B9 (maquetas `docs-a/b/c`): UNA fila «Plantilla — valor ›». El
+   desplegable sigue siendo el nativo (la rueda del sistema en el iPad), sin
+   caja propia y con el valor a la derecha; el contador va bajo el rótulo.
+   «Gestionar plantillas» pasa al «···» de la cabecera (`BotonMas`), que es
+   también donde está «Guardar como plantilla» y «Vaciar formulario». */
 
 interface PropsSelector {
   etiqueta: string
@@ -366,101 +394,130 @@ interface PropsSelector {
   aviso: { nombre: string | null; previo: ContenidoPlantilla; seleccionPrevia: string } | null
   onSeleccionar: (id: string) => void
   onDeshacer: () => void
-  onGestionar: (origen: HTMLElement) => void
   onReintentar: () => void
+  /** El «···» de la cabecera del formulario: va antes de la fila en el DOM. */
+  mas: ReactNode
+  /** «Guardar esta como plantilla» de la fila vacía en `ih`/`esc` (la misma acción que el pie y el «···»). */
+  guardar: { apagado: boolean; ayuda?: string; alPedir: () => void }
 }
 
 function CardSelector(p: PropsSelector) {
-  const n = p.lista.length
-
   return (
-    <section className="sp-card">
-      {n === 0 && !p.cargando && !p.errorCarga ? (
-        <div className="sp-tpl-empty">
-          <div className="sp-icobox sp-icobox--sm"><FileText /></div>
-          <div style={{ minWidth: 0 }}>
-            <h2 className="sp-title-sec">Sin plantillas de {p.etiqueta}</h2>
-            <p className="sp-hint" style={{ marginTop: 2 }}>
-              Guarda este formulario como plantilla y la próxima vez lo llenas de un toque.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          <h2 className="sp-label" style={{ display: 'block', marginBottom: 'var(--sp-gap-label)' }}>
-            Plantilla
-          </h2>
-          {p.errorCarga ? (
-            <p className="sp-banner sp-banner--warn">
-              <span style={{ flex: 1 }}>No se pudieron cargar tus plantillas.</span>
-              <button type="button" onClick={p.onReintentar} className="sp-btn sp-btn--ghost">
-                Reintentar
-              </button>
-            </p>
-          ) : p.cargando ? (
-            <div className="sp-tpl-skeleton" aria-hidden="true" />
-          ) : (
-            <div className="sp-tpl-row">
-              {/* Nativo a propósito: en el iPad abre la rueda del sistema, que
-                  se maneja con el pulgar. La lista desplegada la dibuja el SO. */}
-              <select
-                aria-label="Plantilla"
-                value={p.seleccion}
-                onChange={e => p.onSeleccionar(e.target.value)}
-                className="sp-input"
-              >
-                {/* Arriba del todo y dentro del desplegable, no como botón: es
-                    la misma decisión —con qué contenido arranco— con una
-                    respuesta más, y abrir y elegir no se hace por accidente.
-                    Apagada con el formulario ya vacío: sería una operación sin
-                    efecto, y la posición de las demás opciones no se mueve. */}
-                <option value={OPCION_VACIAR} disabled={p.vacio}>Vaciar formulario</option>
-                <option value="">— Sin plantilla —</option>
-                {p.lista.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
-              </select>
-              <button
-                type="button"
-                onClick={e => p.onGestionar(e.currentTarget)}
-                className="sp-btn sp-btn--compact sp-tpl-manage"
-              >
-                <Settings2 />
-                {/* ⚠️ ESTE PAR ESTUVO INVERTIDO: `sp-doc-long` llevaba
-                    «Gestionar» y `sp-doc-short` llevaba «Gestionar plantillas»,
-                    o sea que la pantalla estrecha —que es la que conmuta a
-                    `short`— enseñaba el rótulo LARGO, y la ancha el corto,
-                    justo del revés. Las clases dicen qué ancho las enciende,
-                    no cuánto mide el texto que envuelven. */}
-                <span className="sp-doc-long">Gestionar plantillas</span>
-                <span className="sp-doc-short">Gestionar</span>
-              </button>
+    <>
+      {p.mas}
+      <section className="sp-card sp-tpl-card">
+        {p.lista.length === 0 && !p.cargando && !p.errorCarga ? (
+          /* En `ih`/`esc` la tarjeta vacía se pliega a UNA línea (altura
+             compartida de los formularios): el párrafo se oculta y aparece
+             «Guardar esta como plantilla», la misma acción del pie y del «···».
+             En táctil (`ext`/`tel`/`iv`) queda como estaba. Lo decide el CSS. */
+          <div className="sp-tpl-empty">
+            <Layers aria-hidden="true" className="sp-tpl-ic" />
+            <div className="sp-tpl-empty-t">
+              <h2 className="k-t-fila">Sin plantillas de {p.etiqueta}</h2>
+              <p className="k-t-sec sp-tpl-empty-p">
+                Guarda este formulario como plantilla y la próxima vez lo llenas de un toque.
+              </p>
             </div>
-          )}
-          {!p.errorCarga && !p.cargando && n > 0 && (
-            <p
-              className="sp-hint"
-              style={{ marginTop: 'var(--sp-1)', color: n >= TOPE_PLANTILLAS ? 'var(--sp-warn)' : undefined }}
-            >
-              {n >= TOPE_PLANTILLAS
-                ? `${TOPE_PLANTILLAS} de ${TOPE_PLANTILLAS} · el máximo`
-                : `${n} de ${TOPE_PLANTILLAS} guardadas`}
-            </p>
-          )}
-        </>
-      )}
+            <button type="button" onClick={p.guardar.alPedir} disabled={p.guardar.apagado}
+              title={p.guardar.ayuda} className="k-b k-b-texto sp-tpl-empty-b">
+              Guardar esta como plantilla
+            </button>
+          </div>
+        ) : <FilaSelector {...p} />}
 
-      {p.aviso && (
-        <p className="sp-banner sp-banner--info sp-tpl-aviso" aria-live="polite">
-          <span>
-            {p.aviso.nombre === null
-              ? 'Se vació el formulario. Los datos del paciente no cambiaron.'
-              : `Se aplicó «${p.aviso.nombre}». Se reemplazaron los campos del formulario; los datos del paciente no cambiaron.`}
+        {p.aviso && (
+          <p className="sp-banner sp-banner--info sp-tpl-aviso" aria-live="polite">
+            <span>
+              {p.aviso.nombre === null
+                ? 'Se vació el formulario. Los datos del paciente no cambiaron.'
+                : `Se aplicó «${p.aviso.nombre}». Se reemplazaron los campos del formulario; los datos del paciente no cambiaron.`}
+            </span>
+            <button type="button" onClick={p.onDeshacer} className="sp-btn sp-btn--ghost sp-tpl-deshacer">
+              Deshacer
+            </button>
+          </p>
+        )}
+      </section>
+    </>
+  )
+}
+
+/** La fila «Plantilla · n de 10 guardadas — [desplegable] ›». */
+function FilaSelector(p: PropsSelector) {
+  const n = p.lista.length
+  const enTope = n >= TOPE_PLANTILLAS
+  return (
+    <div className="sp-tpl-fila">
+      <Layers aria-hidden="true" className="sp-tpl-ic" />
+      {/* Rótulo VISUAL; el nombre accesible del desplegable sigue siendo su
+          `aria-label`, como antes. */}
+      <span className="sp-tpl-fila-t" aria-hidden="true">
+        <span className="k-t-fila font-normal">Plantilla</span>
+        {!p.errorCarga && !p.cargando && n > 0 && (
+          <span className={`sp-tpl-cuenta${enTope ? ' sp-tpl-cuenta--tope' : ''}`}>
+            {enTope ? `${TOPE_PLANTILLAS} de ${TOPE_PLANTILLAS} · el máximo` : `${n} de ${TOPE_PLANTILLAS} guardadas`}
           </span>
-          <button type="button" onClick={p.onDeshacer} className="sp-btn sp-btn--ghost sp-tpl-deshacer">
-            Deshacer
+        )}
+      </span>
+      {p.errorCarga ? (
+        <p className="sp-banner sp-banner--warn sp-tpl-fila-err">
+          <span style={{ flex: 1 }}>No se pudieron cargar tus plantillas.</span>
+          <button type="button" onClick={p.onReintentar} className="sp-btn sp-btn--ghost">
+            Reintentar
           </button>
         </p>
+      ) : p.cargando ? (
+        <div className="sp-tpl-skeleton" aria-hidden="true" />
+      ) : (
+        <span className="sp-tpl-valor">
+          {/* Nativo a propósito: en el iPad abre la rueda del sistema, que
+              se maneja con el pulgar. La lista desplegada la dibuja el SO. */}
+          <select
+            aria-label="Plantilla"
+            value={p.seleccion}
+            onChange={e => p.onSeleccionar(e.target.value)}
+            className="sp-tpl-select"
+          >
+            {/* Arriba del todo y dentro del desplegable, no como botón: es
+                la misma decisión —con qué contenido arranco— con una
+                respuesta más, y abrir y elegir no se hace por accidente.
+                Apagada con el formulario ya vacío: sería una operación sin
+                efecto, y la posición de las demás opciones no se mueve. */}
+            <option value={OPCION_VACIAR} disabled={p.vacio}>Vaciar formulario</option>
+            <option value="">— Sin plantilla —</option>
+            {p.lista.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+          </select>
+          <ChevronRight aria-hidden="true" className="sp-tpl-chev" />
+        </span>
       )}
-    </section>
+    </div>
+  )
+}
+
+// ── «···» de la cabecera del formulario ─────────────────────────────────────
+/* Lo que se usa poco (CALMA §11): borrador (consentimiento), guardar como
+   plantilla, gestionar y vaciar. Las mismas funciones que la barra del pie y
+   el desplegable; aquí sólo cambia la puerta. Lo coloca `spinus-tokens.css`
+   §26 junto a «Cambiar» de `SelectorTipoDocumento`. */
+function BotonMas({ opciones, alAbrir }: { opciones: readonly OpcionMenu[]; alAbrir: (el: HTMLElement) => void }) {
+  const [abierto, setAbierto] = useState(false)
+  const ref = useRef<HTMLButtonElement>(null)
+  return (
+    <>
+      <button
+        ref={ref}
+        type="button"
+        aria-label="Más opciones"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        onClick={e => { alAbrir(e.currentTarget); setAbierto(a => !a) }}
+        className="k-b k-b-icono sp-doc-mas"
+      >
+        <MoreHorizontal aria-hidden="true" />
+      </button>
+      <CapaMenu abierto={abierto} alCerrar={() => setAbierto(false)} ancla={ref} titulo="Más opciones" opciones={opciones} />
+    </>
   )
 }
 
@@ -509,18 +566,19 @@ function DialogoGuardar(p: PropsGuardar) {
   return (
     <ModalShell
       open={p.open}
+      cierraConVelo={false}
       onClose={p.onCerrar}
       spinusGeometry="wait"
       title="Guardar como plantilla"
       subtitle="Se guarda todo menos los datos del paciente."
       footer={
-        <div className="flex items-center gap-2 p-4 md:px-6">
-          <button onClick={p.onCerrar} disabled={guardando} className="sp-btn sp-btn--ghost">Cancelar</button>
-          <div className="flex-1" />
+        <div className="flex items-center justify-end gap-2 p-4 md:px-6">
+          <button type="button" onClick={p.onCerrar} disabled={guardando} className="k-b k-b-capa k-b-quieto min-w-[104px]">Cancelar</button>
           <button
+            type="button"
             onClick={() => void confirmar()}
             disabled={!limpio || duplicado || guardando}
-            className="sp-btn sp-btn--primary"
+            className="k-b k-b-capa k-b-prim min-w-[104px]"
           >
             {guardando ? <><span className="sp-spinner" /> Guardando…</> : 'Guardar'}
           </button>
@@ -529,8 +587,8 @@ function DialogoGuardar(p: PropsGuardar) {
     >
       <div className="p-4 md:p-6 flex flex-col gap-[var(--sp-gap-label)]">
         <div className="flex items-baseline justify-between gap-2">
-          <label htmlFor="plantilla-nombre" className="sp-label-field">Nombre</label>
-          {nombre.length >= 30 && <span className="sp-hint">{nombre.length}/{MAX_NOMBRE}</span>}
+          <label htmlFor="plantilla-nombre" className="k-etiqueta">Nombre</label>
+          {nombre.length >= 30 && <span className="k-campo-ayuda k-num">{nombre.length}/{MAX_NOMBRE}</span>}
         </div>
         <input
           id="plantilla-nombre"
@@ -542,15 +600,14 @@ function DialogoGuardar(p: PropsGuardar) {
           autoFocus
           placeholder="Prequirúrgico"
           aria-invalid={duplicado || undefined}
-          className="sp-input"
-          style={duplicado ? { borderColor: 'var(--sp-warn)', borderWidth: 'var(--sp-bw-accent)' } : undefined}
+          className="k-campo"
         />
         {duplicado && (
-          <p className="sp-banner sp-banner--warn">
+          <p className="k-campo-error text-aviso-tinta">
             Ya tienes una plantilla con ese nombre. Usa otro, o sobrescríbela desde Gestionar.
           </p>
         )}
-        {errorRed && <p className="sp-banner sp-banner--danger">{errorRed}</p>}
+        {errorRed && <p role="alert" className="k-campo-error">{errorRed}</p>}
       </div>
     </ModalShell>
   )
@@ -643,13 +700,14 @@ function PanelPlantillas(p: PropsPanel) {
           type="button"
           onClick={p.onVolver}
           aria-label="Volver al formulario"
-          className="sp-tpl-back"
+          className="k-b k-b-icono -ml-2"
         >
-          <ArrowLeft />
+          <ArrowLeft aria-hidden="true" />
         </button>
-        <h2 className="sp-title-card">Plantillas de {p.etiqueta}</h2>
+        <h2 className="k-t-tarjeta min-w-0 flex-1">Plantillas de {p.etiqueta}</h2>
+        {/* Contador como número plano (CALMA §3); ámbar en el tope. */}
         {!p.cargando && (
-          <span className={`sp-badge${n >= TOPE_PLANTILLAS ? ' sp-badge--warn' : ''}`}>
+          <span className={`k-num text-[13px] font-semibold ${n >= TOPE_PLANTILLAS ? 'text-aviso-tinta' : 'text-tinta2'}`}>
             {n} / {TOPE_PLANTILLAS}
           </span>
         )}
@@ -685,14 +743,14 @@ function PanelPlantillas(p: PropsPanel) {
         </p>
       ) : n === 0 ? (
         <div className="sp-tpl-panelempty">
-          <div className="sp-icobox sp-icobox--lg"><FileText /></div>
+          <FileText aria-hidden="true" className="h-7 w-7 text-tinta3" />
           <div>
-            <h3 className="sp-title-sec">Todavía no tienes plantillas de {p.etiqueta}</h3>
-            <p className="sp-hint" style={{ marginTop: 'var(--sp-1)' }}>
+            <h3 className="k-t-fila">Todavía no tienes plantillas de {p.etiqueta}</h3>
+            <p className="k-t-sec" style={{ marginTop: 'var(--sp-1)' }}>
               Llena el formulario y usa «Guardar como plantilla», junto al botón de imprimir.
             </p>
           </div>
-          <button type="button" onClick={p.onVolver} className="sp-btn sp-btn--secondary">
+          <button type="button" onClick={p.onVolver} className="k-b k-b-tonal">
             Volver al formulario
           </button>
         </div>
@@ -719,39 +777,40 @@ function PanelPlantillas(p: PropsPanel) {
 
       {/* Las dos NOMBRAN la plantilla: sobrescribir la equivocada no se nota
           hasta la próxima vez que la usas. */}
+      {/* Alerta destructiva del catálogo (CALMA §13). Las dos NOMBRAN la plantilla
+          en el título. */}
       <ModalShell
         open={confirmar !== null}
         onClose={() => setConfirmar(null)}
-        spinusGeometry="decide"
+        variante="alerta"
+        tono="destruir"
+        icon={confirmar?.accion === 'eliminar' ? <Trash2 aria-hidden="true" /> : <RefreshCw aria-hidden="true" />}
         title={confirmar
           ? `${confirmar.accion === 'eliminar' ? '¿Eliminar' : '¿Sobrescribir'} «${truncar(confirmar.plantilla.nombre)}»?`
           : ''}
         footer={
-          <div className="flex items-center gap-2 p-4 md:px-6">
-            <button onClick={() => setConfirmar(null)} className="sp-btn sp-btn--ghost">Cancelar</button>
-            <div className="flex-1" />
+          <>
+            <button type="button" autoFocus onClick={() => setConfirmar(null)} className="k-b k-b-capa k-b-quieto">Cancelar</button>
             <button
+              type="button"
+              data-principal
               onClick={() => confirmar && ejecutarConfirmada(confirmar)}
-              className="sp-btn sp-btn--primary"
+              className="k-b k-b-capa k-b-mal"
             >
               {confirmar?.accion === 'eliminar' ? 'Eliminar' : 'Sobrescribir'}
             </button>
-          </div>
+          </>
         }
       >
-        <div className="p-4 md:p-6">
-          {confirmar?.accion === 'eliminar' ? (
-            <p className="sp-body">
-              Se borra esta plantilla. Los documentos ya emitidos con ella no cambian.
-            </p>
-          ) : (
-            <p className="sp-banner sp-banner--danger">
-              Se reemplaza el contenido guardado de «{confirmar ? truncar(confirmar.plantilla.nombre) : ''}» por
-              lo que hay ahora en el formulario. El nombre y la fecha de creación no cambian.
-              No se puede deshacer.
-            </p>
-          )}
-        </div>
+        {confirmar?.accion === 'eliminar' ? (
+          <p>Se borra esta plantilla. Los documentos ya emitidos con ella no cambian.</p>
+        ) : (
+          <p>
+            Se reemplaza el contenido guardado de «{confirmar ? truncar(confirmar.plantilla.nombre) : ''}» por
+            lo que hay ahora en el formulario. El nombre y la fecha de creación no cambian.
+            No se puede deshacer.
+          </p>
+        )}
       </ModalShell>
     </div>
   )

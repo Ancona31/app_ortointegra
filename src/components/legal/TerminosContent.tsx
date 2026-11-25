@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import LegalLayout from './LegalLayout'
+import SeccionEncargo, { TITULO_ENCARGO } from './SeccionEncargo'
 import {
   FileText,
   ArrowLeft,
@@ -33,9 +34,24 @@ import {
    21→22). Los `id` de ancla NO cambiaron: los enlaces existentes siguen vivos.
    La versión sube porque la sección nueva añade una obligación de Spinus
    —aviso previo y 90 días de exportación— que antes no estaba escrita, no
-   porque se reordenara la numeración. */
-const TERMINOS_VERSION = 'v2.1'
-const TERMINOS_FECHA = '31 de julio de 2026'
+   porque se reordenara la numeración.
+
+   v3.0 (2026-11-24, privacidad 2026-12): entra la sección 23, «Tratamiento de
+   datos personales por cuenta del Usuario» (el acuerdo de encargo, documento 4
+   de `docs/spec/privacidad-2026-12/`). Va AL FINAL para no renumerar las 22
+   que había: los Términos se citan a sí mismos por número («sección 7»,
+   «sección 18») y el aviso de privacidad cita a ésta por su título. Su texto
+   NO está en este archivo: es `textoEncargo.ts`, copia literal, y lo pinta
+   `SeccionEncargo`. En el resto sólo se corrigieron HECHOS: se fueron las
+   menciones a Anthropic/Claude (la app no lo usa) y a una integración de
+   WhatsApp con Meta que no existe, y tres remisiones al aviso de privacidad
+   apuntan ahora a la sección 23 o al aviso del consultorio.
+   ⚠️ §7, §18 y §19 NO se tocaron a propósito aunque conviven con 23.12: eso
+   lo resuelve el abogado, no un editor. */
+/** El número de la sección de encargo: el que sustituye a `[N]` en su texto. */
+const NUM_ENCARGO = '23'
+const TERMINOS_VERSION = 'v3.0'
+const TERMINOS_FECHA = '24 de noviembre de 2026'
 
 interface SectionProps {
   id: string
@@ -85,6 +101,7 @@ const TOC: Array<{ id: string; num: string; title: string }> = [
   { id: 'modificaciones', num: '20', title: 'Modificaciones a los términos' },
   { id: 'jurisdiccion', num: '21', title: 'Legislación aplicable y jurisdicción' },
   { id: 'contacto', num: '22', title: 'Contacto' },
+  { id: 'encargo', num: NUM_ENCARGO, title: TITULO_ENCARGO },
 ]
 
 export default function TerminosContent() {
@@ -160,7 +177,7 @@ export default function TerminosContent() {
               icon={<CheckCircle2 size={14} />}
             >
               <p>
-                Al registrarse y utilizar Spinus® (en adelante, &ldquo;la Plataforma&rdquo;), usted
+                Al registrarse y utilizar Spinus (en adelante, &ldquo;la Plataforma&rdquo;), usted
                 acepta de forma íntegra los presentes Términos y Condiciones, así como el{' '}
                 <Link
                   href="/privacidad"
@@ -181,7 +198,7 @@ export default function TerminosContent() {
               icon={<Briefcase size={14} />}
             >
               <p>
-                Spinus® es una plataforma de expedientes clínicos electrónicos con asistencia de
+                Spinus es una plataforma de expedientes clínicos electrónicos con asistencia de
                 inteligencia artificial, dirigida a profesionales de la salud y clínicas. Incluye:
               </p>
               <ul className="list-disc pl-5 space-y-1 text-[13px]">
@@ -297,12 +314,12 @@ export default function TerminosContent() {
             >
               <ul className="list-disc pl-5 space-y-1.5 text-[13px]">
                 <li>
-                  La Plataforma utiliza modelos de inteligencia artificial de Google (Gemini) y
-                  Anthropic (Claude) como herramientas de apoyo a la documentación clínica.
+                  La Plataforma utiliza modelos de inteligencia artificial de Google (Gemini)
+                  como herramientas de apoyo a la documentación clínica.
                 </li>
                 <li>
                   Los datos enviados a estos servicios son previamente anonimizados conforme se
-                  describe en la sección VI del Aviso de Privacidad.
+                  describe en la sección 23 de estos Términos.
                 </li>
                 <li>
                   Las sugerencias generadas por la IA{' '}
@@ -343,8 +360,8 @@ export default function TerminosContent() {
               </p>
               <p>
                 El paciente conserva en todo momento sus derechos como titular de los datos
-                personales, los cuales podrá ejercer conforme al procedimiento descrito en el Aviso
-                de Privacidad.
+                personales, los cuales podrá ejercer conforme al procedimiento descrito en el aviso
+                de privacidad de su consultorio.
               </p>
             </Section>
 
@@ -620,10 +637,6 @@ export default function TerminosContent() {
                   asistencia de IA y Google Calendar para sincronización opcional de agenda.
                 </li>
                 <li>
-                  <strong className="text-[#1d1d1f]">Anthropic, PBC</strong> — modelo Claude para
-                  extracción estructurada de resultados de laboratorio.
-                </li>
-                <li>
                   <strong className="text-[#1d1d1f]">Resend</strong> — entrega transaccional de
                   correos electrónicos.
                 </li>
@@ -631,18 +644,11 @@ export default function TerminosContent() {
                   <strong className="text-[#1d1d1f]">Sentry</strong> — monitoreo de errores y
                   telemetría de rendimiento.
                 </li>
-                <li>
-                  <strong className="text-[#1d1d1f]">Meta Platforms, Inc.</strong> (próxima
-                  integración) — recordatorios por WhatsApp.
-                </li>
               </ul>
               <p>
                 Spinus aplica filtros de anonimización y minimización de datos antes de cualquier
-                transferencia a estos servicios, conforme se detalla en el{' '}
-                <Link href="/privacidad" className="text-[#1e5fa8] font-medium hover:underline">
-                  Aviso de Privacidad
-                </Link>
-                . No obstante,{' '}
+                transferencia a estos servicios, conforme se detalla en la sección 23 de estos
+                Términos. No obstante,{' '}
                 <strong className="text-[#1d1d1f]">
                   Spinus no controla los términos, las políticas, la disponibilidad ni los cambios
                 </strong>{' '}
@@ -715,7 +721,7 @@ export default function TerminosContent() {
             >
               <p>
                 El código fuente, diseño, marca, identidad visual, logotipos y contenido editorial
-                de la Plataforma son propiedad de Spinus®. La marca <strong>Spinus®</strong> y sus
+                de la Plataforma son propiedad de Spinus. La marca <strong>Spinus</strong> y sus
                 elementos distintivos se encuentran protegidos por la legislación aplicable en
                 materia de propiedad industrial e intelectual.
               </p>
@@ -837,13 +843,18 @@ export default function TerminosContent() {
                 </a>
               </div>
             </Section>
+
+            {/* 23 — el acuerdo de encargo (documento 4). Texto literal: ver `SeccionEncargo`. */}
+            <Section id="encargo" num={NUM_ENCARGO} title={TITULO_ENCARGO} icon={<FileText size={14} />}>
+              <SeccionEncargo num={NUM_ENCARGO} />
+            </Section>
           </div>
 
           {/* Footer */}
           <div className="px-4 sm:px-8 py-5 bg-slate-50/80 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="text-[11px] text-[#86868b]">
               <p className="font-medium text-[#3d3d3f]">
-                Spinus®, operada por Angel Manuel Ancona Pérez
+                Spinus, operada por Angel Manuel Ancona Pérez
               </p>
               <p>Mérida, Yucatán, México</p>
             </div>

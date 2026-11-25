@@ -31,11 +31,12 @@
  *    llevaría NI folio —no existe— ni fecha, y su línea inferior sólo diría el nombre del
  *    paciente. Antes ese papel lo ataba la celda de `EMISIÓN`, que es la que se retira.
  *
- * ⚠ **ES EL ÚNICO FORMATO QUE CARGA LA ITÁLICA, Y NO HAY ITÁLICA DE PESO 500.** Un
- * tramo con negrita **y** cursiva a la vez pediría `IBM Plex Sans 500 italic`, que no
- * está registrada; react-pdf compondría la redonda **sin lanzar nada**. Se resuelve
- * aquí y de forma declarada: **gana la cursiva** —400 itálica—, porque una cursiva
- * perdida cambia el sentido de una cita textual y medio punto de peso no. Reportado.
+ * ⚠ **ES EL ÚNICO FORMATO QUE CARGA LA ITÁLICA Y LA NEGRITA 700 DE LA HUMANISTA.** La
+ * negrita del cuerpo se compone en **700** (`IBM Plex Sans Bold`) y negrita + cursiva en
+ * **700 itálica**; las dos caras están registradas en `fonts.ts` sólo para este formato
+ * (2026-11-23). Antes la negrita iba en 500 y, sin 500 itálica, la combinación cedía el
+ * peso a la cursiva. Si alguien quita una de esas dos caras, react-pdf compone la más
+ * cercana **sin lanzar nada**: la negrita volvería a salir tenue en silencio.
  *
  * ⚠ **LA SEGUNDA EXCEPCIÓN DECLARADA A I.3.2** (prohibición del justificado) vive en
  * este archivo: el médico elige la alineación en la barra del editor y perderla por el
@@ -73,7 +74,7 @@ const PRESENCIA = { encabezado1: 50, encabezado2: 46 } as const
 
 export interface TramoTexto {
   readonly texto: string
-  /** `<strong>` del editor. Peso 500, no 600: 600 es del chasis, no del cuerpo. */
+  /** `<strong>` del editor. Peso 700 (IBM Plex Sans Bold), como la negrita del editor. */
   readonly negrita?: boolean
   /** `<em>` del editor. 400 itálica. */
   readonly cursiva?: boolean
@@ -86,18 +87,44 @@ export interface TramoTexto {
 
 export type AlineacionEscrito = 'left' | 'center' | 'right' | 'justify'
 
+/**
+ * La jerarquía de un ítem de lista (rediseño del escrito): su nivel de sangría y la
+ * marca YA compuesta («—», «3.»). La calcula el traductor (`cuerpoEscrito.ts`), que
+ * es quien sabe dónde empieza cada sublista y con qué número.
+ */
+export interface DetalleItem {
+  readonly nivel: number
+  readonly marca: string
+}
+
 export type NodoEscrito =
   | {
       readonly tipo: 'parrafo'
       readonly tramos: readonly TramoTexto[]
       readonly alineacion?: AlineacionEscrito
     }
-  | { readonly tipo: 'encabezado1'; readonly texto: string; readonly alineacion?: AlineacionEscrito }
-  | { readonly tipo: 'encabezado2'; readonly texto: string; readonly alineacion?: AlineacionEscrito }
+  | {
+      readonly tipo: 'encabezado1'
+      readonly texto: string
+      /** Las marcas de dentro del título, si las hay. Sin ellas, `texto` plano. */
+      readonly tramos?: readonly TramoTexto[]
+      readonly alineacion?: AlineacionEscrito
+    }
+  | {
+      readonly tipo: 'encabezado2'
+      readonly texto: string
+      readonly tramos?: readonly TramoTexto[]
+      readonly alineacion?: AlineacionEscrito
+    }
   | {
       readonly tipo: 'lista'
       readonly marca: 'vineta' | 'numero'
       readonly items: readonly (readonly TramoTexto[])[]
+      /**
+       * Nivel y marca de cada ítem, en paralelo a `items`. Sin él (escritos
+       * antiguos, el camino HTML) la lista es de un nivel y numera desde 1.
+       */
+      readonly detalle?: readonly DetalleItem[]
     }
   | {
       readonly tipo: 'cita'
@@ -182,8 +209,20 @@ const estilos = StyleSheet.create({
     marginTop: ESPACIO[12],
     marginBottom: ESPACIO[4],
   },
+  /*
+   * ⚠ EL SUBTÍTULO YA NO SALE MÁS PEQUEÑO QUE EL TEXTO NI EN GRIS (rediseño del
+   * escrito, aprobado por el dueño). El rol `cuerpo.encabezado2` declara 10 pt en
+   * `tinta.secundaria`, y el texto corrido va a 10.5: impreso, el «Subtítulo» del
+   * editor se leía MENOS que el párrafo que encabeza. Aquí se compone a 11 / 15 en
+   * tinta plena, para una jerarquía clara Título (13) > Subtítulo (11) > texto
+   * (10.5). La familia, el peso y el tracking siguen siendo los del rol, y el techo
+   * de 13 pt del Título —«que no grite más que el membrete»— no se toca.
+   */
   encabezado2: {
     ...estiloTipografico('cuerpo.encabezado2'),
+    fontSize: 11,
+    lineHeight: 15 / 11,
+    color: TINTA.negra,
     marginTop: ESPACIO[10],
     marginBottom: ESPACIO[4],
   },
@@ -208,15 +247,40 @@ const estilos = StyleSheet.create({
 function estiloTramo(tramo: TramoTexto): Style {
   const cursiva = tramo.cursiva === true
   return {
-    // Gana la cursiva: sin cara 500 itálica, la negrita cede el peso y no el sentido.
+    // Negrita 700 y cursiva se acumulan: las dos caras (700 y 700 itálica) están registradas.
     fontFamily: FUENTE.humanista,
     fontStyle: cursiva ? 'italic' : 'normal',
-    fontWeight: cursiva ? 400 : tramo.negrita === true ? 500 : 400,
+    fontWeight: tramo.negrita === true ? 700 : 400,
     ...(tramo.subrayado === true ? { textDecoration: 'underline' } : {}),
   }
 }
 
 /** Los tramos de un párrafo, como hijos de un solo `Text`: así envuelven juntos. */
+/**
+ * Un tramo DENTRO de un título: hereda la familia y el peso del encabezado; sólo
+ * añade lo que el título no tiene. El subrayado se acumula; la cursiva se compone
+ * en la itálica humanista registrada (Archivo no tiene itálica: sin esto se
+ * perdería en silencio).
+ */
+function estiloTramoTitulo(tramo: TramoTexto): Style {
+  return {
+    ...(tramo.cursiva === true ? { fontFamily: FUENTE.humanista, fontStyle: 'italic', fontWeight: 400 } : {}),
+    ...(tramo.subrayado === true ? { textDecoration: 'underline' } : {}),
+  }
+}
+
+/** El contenido de un encabezado: sus tramos con marcas, o el texto plano. */
+function TextoTitulo({ nodo }: {
+  readonly nodo: { readonly texto: string; readonly tramos?: readonly TramoTexto[] }
+}): ReactElement {
+  if (nodo.tramos === undefined) return <>{nodo.texto}</>
+  return (
+    <>
+      {nodo.tramos.map((tramo, i) => <Text key={i} style={estiloTramoTitulo(tramo)}>{tramo.texto}</Text>)}
+    </>
+  )
+}
+
 function Tramos({ tramos }: { readonly tramos: readonly TramoTexto[] }): ReactElement {
   return (
     <>
@@ -285,7 +349,7 @@ export default function EscritoMedico({
                   style={[estilos.encabezado1, { textAlign: nodo.alineacion }]}
                   minPresenceAhead={PRESENCIA.encabezado1}
                 >
-                  {nodo.texto}
+                  <TextoTitulo nodo={nodo} />
                 </Text>
               )
             case 'encabezado2':
@@ -295,7 +359,7 @@ export default function EscritoMedico({
                   style={[estilos.encabezado2, { textAlign: nodo.alineacion }]}
                   minPresenceAhead={PRESENCIA.encabezado2}
                 >
-                  {nodo.texto}
+                  <TextoTitulo nodo={nodo} />
                 </Text>
               )
             case 'parrafo':
@@ -308,9 +372,12 @@ export default function EscritoMedico({
               return (
                 <View key={indice} style={estilos.lista}>
                   {nodo.items.map((item, i) => (
-                    <View key={i} style={estilos.item}>
+                    /* La sangría de una sublista: 18 pt por nivel, el ancho de
+                       la columna de la marca, así que cada nivel alinea su marca
+                       con el texto del ítem de arriba. */
+                    <View key={i} style={[estilos.item, { marginLeft: 18 * (nodo.detalle?.[i]?.nivel ?? 0) }]}>
                       <Text style={estilos.marca}>
-                        {nodo.marca === 'numero' ? `${i + 1}.` : RAYA}
+                        {nodo.detalle?.[i]?.marca ?? (nodo.marca === 'numero' ? `${i + 1}.` : RAYA)}
                       </Text>
                       <Text style={estilos.itemTexto}>
                         <Tramos tramos={item} />

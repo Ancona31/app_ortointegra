@@ -1,0 +1,96 @@
+
+######## agenda_bloqueo_preparar()
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -4,2 +4,2 @@
+#   -  -- reserva del mismo médico a la vez no se cruzan (ver la cabecera).
+#   -  -- Si cambia de médico, los dos candados en orden fijo (sin abrazo mortal, B3).
+#   +  -- reserva del mismo médico a la vez no se cruzan (ver tras la función).
+#   +  -- Si cambia de médico, los dos candados en orden fijo (sin abrazo mortal).
+
+######## cita_confirmacion_contexto(text)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -17,2 +17,2 @@
+#   -  -- Clínica suspendida = no disponible (auditoría de E1, hallazgo 1). Es
+#   -  -- clinica_no_suspendida() con la clínica del enlace en vez de get_clinica_id().
+#   +  -- Clínica suspendida = no disponible. Es clinica_no_suspendida() con la
+#   +  -- clínica del enlace en vez de get_clinica_id().
+
+######## cita_confirmacion_responder(uuid,text,text)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -16 +16 @@
+#   -     -- Suspendida = no disponible, como en contexto (auditoría de E1, hallazgo 1).
+#   +     -- Suspendida = no disponible, como en contexto.
+#   @@ -47 +47 @@
+#   -    -- §2: hasta 1 hora antes. A T-1h exacto ya no.
+#   +    -- Hasta 1 hora antes. A T-1h exacto ya no.
+
+######## cita_proteger_atendida()
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -6 +6 @@
+#   -  -- Tanda I (punto 1): ni estado, ni fecha u hora, ni todo el día; con la v2 encendida o apagada.
+#   +  -- Ni estado, ni fecha u hora, ni todo el día; con la v2 encendida o apagada.
+
+######## cita_proteger_cierre()
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -21,2 +21,2 @@
+#   -  -- (tanda L, punto 9: «Eliminar cita») o con una sustituta VIVA (ni cancelada ni cerrada: sin
+#   -  -- cadenas ni pares que se escondan entre sí) de la misma clínica (tanda I, punto 12).
+#   +  -- («Eliminar cita») o con una sustituta VIVA (ni cancelada ni cerrada: sin cadenas ni
+#   +  -- pares que se escondan entre sí) de la misma clínica.
+
+######## cita_reagendar_clinica(uuid,uuid,uuid,uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -65 +65 @@
+#   -  -- set_config(…, true) dura hasta el fin de la TRANSACCIÓN (E6): se vacía ya.
+#   +  -- set_config(…, true) dura hasta el fin de la TRANSACCIÓN: se vacía ya.
+
+######## cita_reagendar_oferta(uuid,text)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -10 +10 @@
+#   -  -- Suspendida = no disponible (el cierre de E1).
+#   +  -- Suspendida = no disponible.
+
+######## reagendar_por_enlace(text,uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -18 +18 @@
+#   -     -- Suspendida = no disponible (el cierre de E1).
+#   +     -- Suspendida = no disponible.
+#   @@ -59 +59 @@
+#   -    -- D3 reconoció un envío que NO es el reagendado de este origen (ése lo
+#   +    -- reservar_por_enlace reconoció un envío que NO es el reagendado de este origen (ése lo
+#   @@ -64 +64 @@
+#   -    -- Lo hizo la persona por el enlace de su cita (lista blanca de E1).
+#   +    -- Lo hizo la persona por el enlace de su cita (valor de la lista blanca c_vias).
+
+######## reservar_por_enlace(uuid,text,uuid,uuid,timestamp with time zone,text,text,text,text,text,text,text,text,uuid)
+# código sin comentarios ni espacios: IDÉNTICO
+# --- diff textual completo (con comentarios)
+#   --- A
+#   +++ B
+#   @@ -181 +181 @@
+#   -  -- clínica bloqueó a mano ese teléfono (AG-DT-28).
+#   +  -- clínica bloqueó a mano ese teléfono.

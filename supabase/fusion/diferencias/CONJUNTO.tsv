@@ -1,0 +1,151 @@
+# Diferencias A PROPÓSITO del CONJUNTO fundido (los seis de supabase/migrations/20261201*) respecto de la referencia
+# (ref-originales: las 51 migraciones originales; tag fusion-originales). Junta f1, F5, f3, f2 y f4.tsv sin lo
+# colateral de los ensayos por bloque, ni las del ORDEN de columnas de appointments: con el orden final
+# F1 → F5a → F3 → F2 → F4 → F5b las columnas quedan en el mismo orden que en la referencia (d1 < i3: las
+# reserva_* antes que google_asignacion), y la publicación supabase_realtime también.
+# Formato de scripts/produccion/comparar-estructura.sh --esperadas: estado<TAB>tipo<TAB>clave<TAB>razón. A = la
+# referencia, B = el conjunto. Se usa JUNTO con scripts/produccion/esperadas-clon.tsv (las del clon contra su foto).
+# Comprobado 2026-11-22 (agente X, para depurar, no como veredicto): clon de base-main + los seis en orden contra
+# la foto de ref-originales, con este archivo + esperadas-clon.tsv: 108 diferencias, 108 esperadas, 0 inesperadas, y ninguna línea sin aparecer (salvo la del CHECK de tipos_cita de esperadas-clon.tsv, que es del viaje foto → clon).
+# 2.ª vuelta de E0 (2026-11-22, tras las correcciones C1/C3): rehecho desde los .tsv por bloque de hoy. Se añaden
+# las 22 filas de la poda de comentarios (12 de F5.tsv, 10 de f4.tsv) y se toman de f4.tsv las razones de hoy de
+# 4 filas (cita_confirmacion_contexto, cita_confirmacion_responder, cita_reagendar_clinica, COMMENT de cita_correos).
+# Las 3 «colateral del ensayo» de f3.tsv no entran. Comprobado igual que arriba, con los seis de hoy (sin
+# 20261201180000): 130 diferencias, 130 esperadas, 0 inesperadas; sin aparecer sólo líneas de esperadas-clon.tsv.
+
+# ═══ F1 · 20261201120000_agenda_f1_ajustes_tipos_horarios (f1.tsv)
+solo_b	funcion	public.agenda_v2_encendida(p_clinica_id uuid)	pieza común del ENCARGO §5: la única lectura del interruptor; nueva, la crea F1 y la llaman los demás bloques
+solo_b	permiso	funcion public.agenda_v2_encendida(p_clinica_id uuid) → *	EXECUTE de la pieza común: dueño postgres, authenticated (disparadores INVOKER con sesión) y service_role (RPC); sin PUBLIC ni anon
+solo_b	comentario	function public.agenda_v2_encendida(pg_catalog.uuid)	COMMENT de la pieza común nueva (INVOKER a propósito, falla cerrado)
+distinto	funcion	public.log_cita_change()	sólo cambia un comentario DENTRO del cuerpo (md5 80c3556c → e4a4ebdd): «C2 'google' · E1/E6 … · E9 …» nombraba migraciones que ya no existen; ahora dice quién pone cada literal. Misma lógica, mismas listas c_tecnicas y c_vias
+distinto	funcion	public.agenda_restablecer_configuracion(p_clinica_id uuid, p_actor uuid)	sólo cambia un comentario DENTRO del cuerpo (md5 1c390644 → ed0b98f6): quita «G4 (20261119130000)» y «Tanda I (punto 3)». Misma lógica
+distinto	comentario	function public.log_cita_change()	COMMENT sin historia: «google (C2), enlace_paciente (E1/E6), google_rsvp (E9)» → quién pone cada literal. Mismo convenio
+distinto	comentario	function public.agenda_restablecer_configuracion(pg_catalog.uuid,pg_catalog.uuid)	COMMENT sin historia de tandas («tanda H, punto 10», «G4», «tanda I punto 3»); mismo contenido
+distinto	comentario	table public.tipos_cita	COMMENT sin «(agenda B6)»; mismo convenio
+distinto	comentario	table column public.tipos_cita.consultorio_id	COMMENT sin «(agenda G2)»; mismo convenio
+distinto	comentario	table column public.tipos_cita.principal	COMMENT sin «(agenda G2)»; mismo convenio
+distinto	comentario	table column public.appointments.tipo_cita_id	COMMENT sin «(agenda B6)», «D1», «D3»; mismo convenio
+distinto	comentario	table column public.agenda_ajustes.recordatorio_encendido	COMMENT sin «(tanda H, punto 9)»; «policy de UPDATE de B1» → «policy agenda_ajustes_update»
+distinto	comentario	table column public.agenda_ajustes.correo_reserva_clinica	COMMENT sin «Tanda I (punto 20)»; «policy de UPDATE de B1» → «policy agenda_ajustes_update»
+distinto	comentario	table column public.clinicas.timezone	COMMENT sin el prefijo «K3 (punto 12)»; mismo convenio
+distinto	comentario	table column public.consultorios.horario_propio	COMMENT: «Desde 20261119130000 todos…» → «Al crearse esta columna, todos… (respaldo en …)». Conserva el prefijo «false = la disponibilidad» que exige pruebas-sql/b5_horario_propio.sql caso 5
+distinto	comentario	table column public.consultorios.horario_revisado_en	COMMENT sin «(tanda I, punto 3)» ni «en 20261119130000»; mismo convenio
+distinto	comentario	table respaldos.consultorios_horario_20261119	COMMENT: nombra el archivo fundido en vez de «20261119130000, punto 10 de Angel» y la reversa de F1 en vez de «VUELTA ATRÁS en el archivo» · Y ADEMÁS AUDITORÍA RONDA 1, A4: el COMMENT describe las columnas de la primera copia y de la última pasada
+
+# ═══ F5a · 20261201130000_agenda_f5a_bloqueos y F5b · 20261201170000_agenda_f5b_protecciones_cita (F5.tsv)
+distinto	funcion	public.cita_proteger_bloqueo()	ENCARGO §5: el EXISTS en línea sobre agenda_ajustes (… AND j.agenda_v2_encendida) pasa a public.agenda_v2_encendida(NEW.clinica_id) de F1; misma tabla, misma clínica, sin fila = false (clinica_id es único); mismo orden (primero el solape con el bloqueo). Sólo cambia el md5 del cuerpo
+distinto	funcion	public.cita_proteger_borrado()	ENCARGO §5: EXISTS (… agenda_v2_encendida IS TRUE) → public.agenda_v2_encendida(OLD.clinica_id); equivalente (sin fila o NULL = false). Sólo cambia el md5 del cuerpo
+distinto	funcion	public.cita_proteger_eleccion()	ENCARGO §5: NOT EXISTS (… agenda_v2_encendida IS TRUE) → NOT public.agenda_v2_encendida(OLD.clinica_id); equivalente. Sólo cambia el md5 del cuerpo
+distinto	policy	public.agenda_bloqueos.agenda_bloqueos_insert	ENCARGO §5: EXISTS (SELECT 1 FROM agenda_ajustes j WHERE j.clinica_id = get_clinica_id() AND j.agenda_v2_encendida) → agenda_v2_encendida(get_clinica_id()); misma lectura con la RLS de la sesión (INVOKER), sin fila = false
+distinto	policy	public.agenda_bloqueos.agenda_bloqueos_update	ENCARGO §5: la misma sustitución que en agenda_bloqueos_insert
+distinto	comentario	table public.agenda_bloqueos	el COMMENT de k1 decía «dentro de Spinus sólo pide confirmación», falso desde l1 (bloqueo total, CLAUDE.md «Tanda L»); se corrige y se quita «Tanda K (sección A)» (historia) · Y ADEMÁS AUDITORÍA RONDA 1, A7, decisión de Angel: el COMMENT añade el LÍMITE ACEPTADO «el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa». Sólo el comentario; el cuerpo no cambia
+
+# F5a/F5b · poda de comentarios (C1/C3, correcciones previas al ensayo); añadidas por E0, 2.ª vuelta
+distinto	comentario	function public.cita_proteger_atendida()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_bloqueo()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual · Y ADEMÁS AUDITORÍA RONDA 1, A7, decisión de Angel: el COMMENT añade el LÍMITE ACEPTADO «el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa». Sólo el comentario; el cuerpo no cambia
+distinto	comentario	function public.cita_proteger_borrado()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_cierre()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_eleccion()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_proteger_reserva()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_tiene_nota_ligada(pg_catalog.uuid,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table column public.appointments.cerrada_en	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table column public.appointments.sustituida_por	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	funcion	public.agenda_bloqueo_preparar()	C1: poda de dos comentarios del cuerpo («B3», «ver la cabecera»); md5 f1f887ec → dc778b4c. Mismo código
+distinto	funcion	public.cita_proteger_atendida()	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_proteger_cierre()	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+# ═══ F3 · 20261201140000_agenda_f3_reserva_enlace (f3.tsv)
+distinto	comentario	function public.proteger_reserva_enlaces()	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.rate_limit_espera(pg_catalog.text,integer,integer)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.reserva_codigo_verificar(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.reserva_contacto_estado(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.reserva_contexto(pg_catalog.text,pg_catalog.text,pg_catalog.text)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+solo_a	comentario	function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text)	código muerto retirado: reserva_enlace_emitir de 7 argumentos (con el conjunto la de 9 siempre existe)
+distinto	comentario	function public.reserva_enlace_emitir(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.reserva_espera_reenvio(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,integer)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.reserva_ocupacion(pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	function public.reservar_por_enlace(pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador · además (E0, 3.ª vuelta, fundida aquí la fila glob que esta exacta tapaba): AUDITORÍA RONDA 1, A7, decisión de Angel: el COMMENT añade el LÍMITE ACEPTADO «el bloqueo y la reserva son totales salvo carrera de milisegundos, y dentro de Spinus el empalme avisa». Sólo el comentario; el cuerpo no cambia
+distinto	comentario	table column public.appointments.reserva_aviso_version	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.appointments.reserva_canal	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.appointments.reserva_correo_hmac	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.appointments.reserva_enlace_id	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.appointments.reserva_nombre	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.appointments.reserva_reagendados	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.appointments.reserva_tel_hmac	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.reserva_enlaces.agotado_en	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.reserva_enlaces.correo	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.reserva_enlaces.correo_hmac	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.reserva_enlaces.intentos	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table column public.reserva_enlaces.pausado_en	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table public.reserva_enlaces	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	comentario	table public.reserva_incidencias	comentario sin la historia de las tandas (etiquetas D1, j2, K3 punto 14…); mismo contenido técnico. Revisar el texto en el diff del comparador
+distinto	funcion	public.rate_limit_espera(p_ruta text, p_limite integer, p_ventana_seg integer)	cuerpo idéntico salvo comentarios -- (sin historia de tandas; comprobado quitando comentarios y espacios y comparando línea a línea: solo_comentarios.py)
+distinto	funcion	public.reserva_codigo_emitir(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text)	interruptor por public.agenda_v2_encendida(e.clinica_id) dentro del EXISTS en lugar del JOIN a agenda_ajustes: equivalente (clinica_id único en agenda_ajustes, agenda_v2_encendida NOT NULL, sin fila = false, INVOKER llamada por service_role)
+distinto	funcion	public.reserva_codigo_verificar(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_codigo_hmac text, p_ficha_hmac text)	cuerpo idéntico salvo comentarios -- (sin historia de tandas; comprobado quitando comentarios y espacios y comparando línea a línea: solo_comentarios.py)
+distinto	funcion	public.reserva_contacto_estado(p_clinica_id uuid, p_medico_id uuid, p_tel_hmac text, p_correo_hmac text)	cuerpo idéntico salvo comentarios -- (sin historia de tandas; comprobado quitando comentarios y espacios y comparando línea a línea: solo_comentarios.py)
+solo_a	funcion	public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text)	código muerto retirado: la de 7 argumentos sólo la alcanza la caída PGRST202 de src/app/api/agenda/enlaces/route.ts, que con el conjunto fundido no ocurre
+distinto	funcion	public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text, p_correo text, p_correo_hmac text)	cuerpo idéntico salvo comentarios -- (sin historia de tandas; comprobado quitando comentarios y espacios y comparando línea a línea: solo_comentarios.py)
+solo_a	funcion	public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text)	código muerto retirado: 0 llamadores en src/, scripts/ y e2e/; su INSERT con sesión da 42501 desde la emisión por servidor y su papel lo hace reserva_enlace_emitir
+distinto	funcion	public.reserva_espera_reenvio(p_clinica_id uuid, p_enlace_id uuid, p_correo_hmac text, p_segundos integer)	cuerpo idéntico salvo comentarios -- (sin historia de tandas; comprobado quitando comentarios y espacios y comparando línea a línea: solo_comentarios.py)
+distinto	funcion	public.reserva_ocupacion(p_clinica_id uuid, p_enlace_id uuid, p_desde timestamp with time zone, p_hasta timestamp with time zone)	interruptor por public.agenda_v2_encendida(e.clinica_id) en el WHERE en lugar del JOIN a agenda_ajustes: equivalente (a lo más una fila de ajustes por clínica, columna NOT NULL, sin fila = nada)
+distinto	funcion	public.reservar_por_enlace(p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid)	cuerpo idéntico salvo comentarios -- (sin historia de tandas; comprobado quitando comentarios y espacios y comparando línea a línea: solo_comentarios.py)
+solo_a	permiso	funcion public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text) → postgres	permisos de la reserva_enlace_emitir de 7 argumentos, retirada
+solo_a	permiso	funcion public.reserva_enlace_emitir(p_clinica_id uuid, p_actor uuid, p_id uuid, p_medico_id uuid, p_clase text, p_codigo_hash text, p_etiqueta text) → service_role	permisos de la reserva_enlace_emitir de 7 argumentos, retirada
+solo_a	permiso	funcion public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text) → authenticated	permisos de reserva_enlace_regenerar_fijo, retirada
+solo_a	permiso	funcion public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text) → postgres	permisos de reserva_enlace_regenerar_fijo, retirada
+solo_a	permiso	funcion public.reserva_enlace_regenerar_fijo(p_id uuid, p_medico_id uuid, p_codigo_hash text) → service_role	permisos de reserva_enlace_regenerar_fijo, retirada
+solo_a	policy	public.reserva_enlaces.reserva_enlaces_insert	policy retirada: el disparador rechaza todo INSERT que no sea de service_role (que no pasa por la RLS), así que nunca dejaba pasar nada; sin ella la sesión sigue recibiendo el mismo 42501 del disparador, y sin disparador la RLS deniega (comprobado: sin_policy_insert.sql)
+
+# ═══ F2 · 20261201150000_agenda_f2_google (f2.tsv)
+distinto	funcion	public.gcal_sync_tomar(*	interruptor con agenda_v2_encendida(); además el comentario «(B1)» sin la tanda
+distinto	funcion	public.gcal_citas_por_evento(*	interruptor con agenda_v2_encendida(); además el comentario «(D4)» sin la tanda
+distinto	funcion	public.gcal_aplicar_evento(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.gcal_importar_evento(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.reserva_empalmes_registrar(*	interruptor con agenda_v2_encendida(); además sin «(auditoría 2026-11-12, hallazgo 1)» en un comentario
+distinto	funcion	public.cita_rsvp_google(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.cita_movimiento_google_registrar(*	interruptor con agenda_v2_encendida(); además el comentario «(I2)» sin la tanda
+distinto	funcion	public.gcal_bloqueo_aplicar(*	interruptor con agenda_v2_encendida()
+distinto	funcion	public.gcal_sync_clinica_habilitada(*	el HINT del P0001 apunta al archivo fundido y no a C1 (20261113120000), que sale de migrations/; la lógica y la comprobación de FORMA no cambian
+distinto	comentario	function public.cita_asignacion_google(*	COMMENT sin «Agenda (tanda I, punto 10):»; mismo contenido
+distinto	comentario	function public.cita_movimiento_google_registrar(*	COMMENT sin «Tanda J (punto 10):»; mismo contenido
+distinto	comentario	function public.cita_rsvp_google(*	COMMENT sin «Agenda E9:»; mismo contenido
+distinto	comentario	function public.gcal_aplicar_evento(*	COMMENT sin «(C2, ampliado en D4)»; mismo contenido
+distinto	comentario	function public.gcal_bloqueo_aplicar(*	COMMENT sin «Tanda K (punto 6):»; mismo contenido
+distinto	comentario	function public.gcal_citas_por_evento(*	COMMENT sin «(C2, ampliado en D4)»; mismo contenido
+distinto	comentario	function public.gcal_sync_frescura(*	COMMENT sin «D11:»; mismo contenido
+distinto	comentario	function public.reserva_empalmes_registrar(*	COMMENT sin «D11:»; mismo contenido
+distinto	comentario	table column public.appointments.google_asignacion	COMMENT sin «Agenda (tanda I, punto 10):»; mismo contenido
+distinto	comentario	table public.gcal_movimientos_rechazados	COMMENT sin «Tanda J (punto 10):» ni «I2»; mismo contenido
+distinto	comentario	table public.gcal_sync_estado	COMMENT sin «(bloque C)»; mismo contenido
+distinto	comentario	table public.reserva_empalmes_google	COMMENT sin «D11:» ni «(ver la migración 20261116120000)», que deja de existir en migrations/; mismo contenido
+
+# ═══ F4 · 20261201160000_agenda_f4_confirmacion_correos_avisos (f4.tsv)
+distinto	funcion	public.cita_confirmacion_contexto(p_codigo_hash text)	md5_cuerpo: el NOT EXISTS (… agenda_ajustes … AND j.agenda_v2_encendida) pasa a NOT public.agenda_v2_encendida(v_c.clinica_id) (ENCARGO §5); equivalente: agenda_v2_encendida NOT NULL y clinica_id único (lo exige el pre-vuelo); además, md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_confirmacion_emitir(p_clinica_id uuid, p_cita_id uuid, p_id uuid, p_codigo_hash text, p_creado_por uuid)	md5_cuerpo: lectura del interruptor por public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente
+distinto	funcion	public.cita_confirmacion_responder(p_clinica_id uuid, p_codigo_hash text, p_accion text)	md5_cuerpo: lectura del interruptor por public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente; el resto del cuerpo (FOR UPDATE, clock_timestamp, plazo de 1 h, spinus.via) idéntico; además, md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_reagendar_clinica(p_clinica_id uuid, p_actor uuid, p_cita_id uuid, p_consultorio_id uuid, p_inicio timestamp with time zone, p_fin timestamp with time zone, p_esperado timestamp with time zone)	md5_cuerpo: NOT EXISTS (… AND j.agenda_v2_encendida IS TRUE) pasa a NOT public.agenda_v2_encendida(p_clinica_id) (ENCARGO §5), equivalente; además, md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.cita_correo_tomar(p_clinica_id uuid, p_cita_id uuid, p_tipo text, p_testigo uuid)	md5_cuerpo: sólo un comentario dentro del cuerpo: el aviso «la MISMA expresión que cita_correos_pendientes» apunta ahora a cita_recordatorios_pendientes (la retirada ya no existe)
+solo_a	funcion	public.cita_correos_pendientes(p_limite integer)	código muerto retirado (ENCARGO §6): sin llamadores en src, scripts ni e2e (sólo un comentario en src/lib/confirmacion/recordatorios.ts:19) ni en otras funciones; la sustituye cita_recordatorios_pendientes
+solo_a	permiso	funcion public.cita_correos_pendientes(p_limite integer) → postgres	sus permisos se van con la función retirada
+solo_a	permiso	funcion public.cita_correos_pendientes(p_limite integer) → service_role	sus permisos se van con la función retirada
+distinto	comentario	table public.cita_correos	el CONVENIO del destinatario nombraba a cita_correos_pendientes (retirada): ahora dice cita_recordatorios_pendientes; el resto del texto, igual; además, texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_recordatorios_pendientes(integer)	decía «Igual que cita_correos_pendientes (E4) más el interruptor…»: reescrito sin la función retirada, con las tres puertas que mira
+# F4 · poda de comentarios (C1/C3, correcciones previas al ensayo); añadidas por E0, 2.ª vuelta
+distinto	comentario	function public.aviso_clinica_de_confirmacion()	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_nombre_saludo(pg_catalog.uuid,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_reagendar_clinica(pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,timestamp with time zone,timestamp with time zone)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.cita_reagendar_oferta(pg_catalog.uuid,pg_catalog.text)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	function public.reagendar_por_enlace(pg_catalog.text,pg_catalog.uuid,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,timestamp with time zone,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table public.avisos_clinica	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table public.cita_confirmaciones	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	comentario	table public.cita_reagendos	texto: COMMENT podado de referencias a tandas, puntos y documentos (C3, correcciones previas al ensayo); el contenido, igual
+distinto	funcion	public.cita_reagendar_oferta(p_clinica_id uuid, p_codigo_hash text)	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.reagendar_por_enlace(p_confirmacion_hash text, p_clinica_id uuid, p_codigo_hash text, p_consultorio_id uuid, p_tipo_cita_id uuid, p_inicio timestamp with time zone, p_nombre text, p_telefono text, p_correo text, p_tel_hmac text, p_correo_hmac text, p_ficha_hmac text, p_aviso_version text, p_aviso_sha256 text, p_client_id uuid)	md5_cuerpo: sólo comentarios dentro del cuerpo, podados de referencias a tandas y documentos (C3, correcciones previas al ensayo); la lógica, idéntica
+distinto	funcion	public.proteger_reserva_contactos()	AUDITORÍA RONDA 1, A3 (RONDA-1.md; no viene de las 44 originales): el INSERT exige que medico_id sea un médico de clinica_id para todos salvo postgres/supabase_admin, con 23514 idéntico exista o no el perfil ajeno (BEFORE: antes que la FK). md5(prosrc) e9937c888c3fb405fa807dd7b241260e → 7049ecc706757919dd71d7cab608a476. Prueba: pruebas-sql/cb_aislamiento_clinicas.sql
+distinto	comentario	table public.reserva_contactos	AUDITORÍA RONDA 1, A3, y la nota de que es la misma condición que los enlaces (ver f3.tsv)
+solo_b	columna	respaldos.consultorios_horario_20261119.horario_antes	AUDITORÍA RONDA 1, A4 (ver f1.tsv)
+solo_b	columna	respaldos.consultorios_horario_20261119.horario_copiado	AUDITORÍA RONDA 1, A4 (ver f1.tsv)
+solo_b	columna	respaldos.consultorios_horario_20261119.copiado_en	AUDITORÍA RONDA 1, A4 (ver f1.tsv)
+solo_b	comentario	table column public.reserva_empalmes_google.cita_reserva_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.reserva_empalmes_google.cita_otra_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.gcal_movimientos_rechazados.cita_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)
+solo_b	comentario	table column public.avisos_clinica.cita_id	AUDITORÍA RONDA 1, A9, decisión de Angel (sin FK): COMMENT nuevo en la columna con el motivo de no llevar FK a appointments (el de la tabla: un aviso no impide nada sobre la cita)

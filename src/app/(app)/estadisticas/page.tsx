@@ -1,14 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter } from 'next/navigation'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell,
+  AreaChart, Area, PieChart, Pie, Cell, LabelList,
 } from 'recharts'
-import { TrendingUp, Stethoscope, Pill, Users, RefreshCw, Loader2 } from 'lucide-react'
-import { ListSkeleton } from '@/components/ui/Skeleton'
+import { BarChart2, RefreshCw } from 'lucide-react'
+import { Skeleton } from '@/components/ui/Skeleton'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import EstadoError from '@/components/ui/EstadoError'
+import PestanasAdministracion from '@/components/admin/PestanasAdministracion'
 
 type Datos = {
   consultasPorMes: { mes: string; total: number }[]
@@ -18,33 +21,144 @@ type Datos = {
   distribucionEdad: { rango: string; total: number }[]
 }
 
-const CP = '#1e5fa8'
-const CS = '#1a3a5c'
+/* Colores de las gráficas: tokens del kit (maqueta `lectura`, vista 1), que
+   siguen la marca de la clínica y el oscuro sin hex propios. La dona usa los
+   tres tonos de la maqueta por posición; el `color` que trae la API se ignora
+   a propósito (era un azul/rosa/morado fijo que no seguía el tema). */
+const COLORES_SEXO = ['var(--accion)', 'var(--nav-tinta2)', 'var(--tinta3)']
+const EJE = { fontSize: 12, fill: 'var(--tinta2)' }
+const ESTILO_TOOLTIP = {
+  fontSize: 12, borderRadius: 12, border: 0, background: 'var(--sup)',
+  color: 'var(--tinta)', boxShadow: 'var(--sombra-capa)',
+}
 
-function SectionCard({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+function Tarjeta({ titulo, ancha = false, children }: { titulo: string; ancha?: boolean; children: ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-          <Icon size={14} className="text-[#1e5fa8]" />
-        </div>
-        <h2 className="text-sm font-semibold text-[#1d1d1f]">{title}</h2>
-      </div>
+    <section className={`k-tarjeta flex min-w-0 flex-col gap-3.5 ${ancha ? 'col-span-full' : ''}`}>
+      <h2 className="k-t-tarjeta">{titulo}</h2>
       {children}
-    </div>
+    </section>
   )
 }
 
 function Empty() {
-  return <p className="text-center text-[#86868b] text-sm py-8">Sin datos suficientes aún</p>
+  return <EstadoVacio variante="seccion" icono={BarChart2} titulo="Sin datos suficientes aún" />
 }
 
 const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl px-3 py-2 shadow-lg text-xs">
-      <p className="font-medium text-[#3d3d3f]">{label}</p>
-      <p className="text-[#1e5fa8] font-bold mt-0.5">{payload[0].value} {payload[0].value === 1 ? 'vez' : 'veces'}</p>
+    <div className="rounded-xl bg-sup px-3 py-2 text-[12px] leading-4 shadow-[var(--sombra-capa)]">
+      <p className="font-medium text-tinta">{label}</p>
+      <p className="k-num mt-0.5 font-bold text-enlace">{payload[0].value} {payload[0].value === 1 ? 'vez' : 'veces'}</p>
+    </div>
+  )
+}
+
+/* Top 10 en barras horizontales de HTML (maqueta): el nombre entero y el número
+   siempre a la vista, en lugar del eje recortado a 22 caracteres y el número
+   sólo al pasar el ratón. En `esc` cada fila va en una línea: nombre · barra ·
+   número; en el resto, nombre y número arriba y la barra debajo. */
+function Ranking({ filas }: { filas: { nombre: string; total: number }[] }) {
+  const max = Math.max(1, ...filas.map(f => f.total))
+  return (
+    <ol className="flex flex-col gap-3 esc:gap-0">
+      {filas.map(f => (
+        <li key={f.nombre} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5 esc:min-h-9 esc:grid-cols-[176px_minmax(0,1fr)_28px] esc:items-center esc:gap-y-0">
+          <span className="text-[15px] leading-5 font-medium [overflow-wrap:anywhere] esc:text-[14px] esc:leading-[18px]">{f.nombre}</span>
+          <span className="k-num text-right text-[15px] leading-5 font-bold esc:col-start-3 esc:row-start-1 esc:text-[14px]">{f.total}</span>
+          <span aria-hidden="true" className="col-span-full block h-2 overflow-hidden rounded-full bg-sup2 esc:col-span-1 esc:col-start-2 esc:row-start-1">
+            <span className="block h-full rounded-full bg-accion" style={{ width: `${(f.total / max) * 100}%` }} />
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function ConsultasPorMes({ datos }: { datos: Datos['consultasPorMes'] }) {
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <AreaChart data={datos} margin={{ top: 26, right: 16, left: -20, bottom: 0 }}>
+        <CartesianGrid vertical={false} stroke="var(--linea)" />
+        <XAxis dataKey="mes" tick={EJE} tickLine={false} axisLine={{ stroke: 'var(--borde)' }} />
+        <YAxis tick={EJE} tickLine={false} axisLine={false} allowDecimals={false} />
+        <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--borde)' }} />
+        <Area
+          type="monotone"
+          dataKey="total"
+          stroke="var(--accion)"
+          strokeWidth={2.5}
+          fill="var(--accion)"
+          fillOpacity={0.1}
+          dot={{ fill: 'var(--accion)', stroke: 'var(--sup)', strokeWidth: 2, r: 5 }}
+          activeDot={{ r: 7, fill: 'var(--accion)', stroke: 'var(--sup)', strokeWidth: 3 }}
+        >
+          <LabelList dataKey="total" position="top" offset={10} fill="var(--tinta2)" fontSize={12} fontWeight={600} />
+        </Area>
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
+function DistribucionSexo({ datos, total }: { datos: Datos['distribucionSexo']; total: number }) {
+  return (
+    <div className="flex items-center gap-4 tel:gap-7 esc:gap-7">
+      <div className="relative h-[152px] w-[152px] flex-none">
+        <PieChart width={152} height={152}>
+          <Pie data={datos} cx="50%" cy="50%" innerRadius={52} outerRadius={74} paddingAngle={2} dataKey="total" stroke="none">
+            {datos.map((_, i) => <Cell key={i} fill={COLORES_SEXO[i % COLORES_SEXO.length]} />)}
+          </Pie>
+          <Tooltip formatter={(value) => [value, 'pacientes']} contentStyle={ESTILO_TOOLTIP} itemStyle={{ color: 'var(--tinta)' }} />
+        </PieChart>
+        <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="k-num text-[26px] leading-7 font-extrabold tracking-[-0.5px] text-tinta">{total}</span>
+          <span className="text-[12px] leading-4 font-semibold text-tinta2">pacientes</span>
+        </span>
+      </div>
+      <ul className="flex min-w-0 flex-1 flex-col gap-3">
+        {datos.map((s, i) => (
+          <li key={i} className="grid grid-cols-[10px_minmax(0,1fr)] items-center gap-x-2">
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORES_SEXO[i % COLORES_SEXO.length] }} />
+            <p className="text-[15px] leading-5 font-semibold text-tinta">{s.nombre}</p>
+            <p className="k-num col-start-2 text-[13px] leading-[18px] text-tinta2">
+              {s.total} · {total > 0 ? Math.round(s.total / total * 100) : 0}%
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function DistribucionEdad({ datos }: { datos: Datos['distribucionEdad'] }) {
+  return (
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={datos} margin={{ top: 22, right: 0, left: 0, bottom: 0 }}>
+        <XAxis dataKey="rango" tick={EJE} tickLine={false} axisLine={{ stroke: 'var(--borde)' }} interval={0} />
+        <YAxis hide allowDecimals={false} />
+        <Tooltip formatter={(value) => [value, 'pacientes']} contentStyle={ESTILO_TOOLTIP} itemStyle={{ color: 'var(--tinta)' }} cursor={{ fill: 'var(--sup2)' }} />
+        <Bar dataKey="total" fill="var(--accion)" radius={[6, 6, 0, 0]} maxBarSize={48}>
+          <LabelList dataKey="total" position="top" offset={6} fill="var(--tinta)" fontSize={12} fontWeight={600} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  )
+}
+
+/* Primera carga: la forma de la página (maqueta, estado «cargando»). Con la
+   fila de pestañas de verdad (B12): sin ella, el contenido saltaba 60 px al
+   llegar los datos y la navegación de Administración no existía al cargar. */
+function EsqueletoEstadisticas() {
+  return (
+    <div aria-busy="true" className="mx-auto max-w-6xl">
+      <PestanasAdministracion />
+      <Skeleton className="h-8 w-56" />
+      <div className="mt-6 grid grid-cols-1 gap-3 ih:grid-cols-2 iv:grid-cols-2 esc:grid-cols-2 esc:gap-4">
+        <Skeleton className="col-span-full h-[280px] rounded-[20px]" />
+        <Skeleton className="h-[320px] rounded-[20px]" />
+        <Skeleton className="h-[320px] rounded-[20px]" />
+      </div>
     </div>
   )
 }
@@ -63,154 +177,72 @@ export default function EstadisticasPage() {
   async function cargar(isRefresh = false) {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
-    const res = await fetch('/api/me/estadisticas')
-    if (res.ok) setDatos(await res.json())
+    /* Sin red, `fetch` lanza: antes la página se quedaba en el esqueleto para
+       siempre. Ahora cae en el mismo estado de error que una respuesta mala. */
+    try {
+      const res = await fetch('/api/me/estadisticas')
+      if (res.ok) setDatos(await res.json())
+    } catch { /* se queda con lo que había: error si no había nada */ }
     setLoading(false)
     setRefreshing(false)
   }
 
   useEffect(() => { cargar() }, [])
 
-  if (loadingProfile || loading) return <ListSkeleton rows={5} />
+  if (loadingProfile || loading) return <EsqueletoEstadisticas />
 
+  /* Con las pestañas también en el error: «Administración» lleva aquí, y sin
+     ellas no quedaría camino a Usuarios ni a Facturación (B4). «Reintentar»
+     aprobado en CALMA §23.12. */
   if (!datos) return (
-    <div className="text-center text-[#86868b] py-16 text-sm">Error cargando estadísticas.</div>
+    <div className="mx-auto max-w-6xl">
+      <PestanasAdministracion />
+      <div className="k-tarjeta">
+        <EstadoError mensaje="Error cargando estadísticas." alReintentar={() => cargar()} />
+      </div>
+    </div>
   )
 
   const { consultasPorMes, topDiagnosticos, topMedicamentos, distribucionSexo, distribucionEdad } = datos
   const totalPacientes = distribucionSexo.reduce((s, d) => s + d.total, 0)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-5 animate-slide-up">
+    <div className="mx-auto max-w-6xl animate-slide-up">
+      {/* B4: Estadísticas · Usuarios · Facturación (CALMA §30.2). */}
+      <PestanasAdministracion />
 
-      {/* Header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-[11px] font-semibold text-[#86868b] uppercase tracking-widest mb-1">Clínica</p>
-          <h1 className="text-[22px] font-bold tracking-tight text-[#1d1d1f]">Estadísticas clínicas</h1>
+      <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <p className="k-t-rotulo">Administración</p>
+          <h1 className="k-t-pantalla mt-0.5">Estadísticas clínicas</h1>
         </div>
-        <button
-          onClick={() => cargar(true)}
-          disabled={refreshing}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#86868b] hover:text-[#3d3d3f] border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-40"
-        >
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+        <button type="button" onClick={() => cargar(true)} disabled={refreshing} className="k-b k-b-tonal">
+          <RefreshCw size={16} aria-hidden="true" className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''} />
           Actualizar
         </button>
       </div>
 
-      {/* Consultas por mes */}
-      <SectionCard title="Consultas por mes — últimos 6 meses" icon={TrendingUp}>
-        {consultasPorMes.every(c => c.total === 0) ? <Empty /> : (
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={consultasPorMes} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#86868b' }} />
-              <YAxis tick={{ fontSize: 11, fill: '#86868b' }} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke={CP}
-                strokeWidth={2.5}
-                dot={{ fill: CP, r: 4 }}
-                activeDot={{ r: 6, fill: CP }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </SectionCard>
+      <div className={`mt-5 grid grid-cols-1 gap-3 transition-opacity duration-200 ih:grid-cols-2 ih:gap-3.5 iv:grid-cols-2 iv:gap-3.5 esc:grid-cols-2 esc:gap-4 ${refreshing ? 'opacity-45' : ''}`}>
+        <Tarjeta titulo="Consultas por mes — últimos 6 meses" ancha>
+          {consultasPorMes.every(c => c.total === 0) ? <Empty /> : <ConsultasPorMes datos={consultasPorMes} />}
+        </Tarjeta>
 
-      {/* Top diagnósticos + Medicamentos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title="Top 10 diagnósticos" icon={Stethoscope}>
-          {topDiagnosticos.length === 0 ? <Empty /> : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topDiagnosticos} layout="vertical" margin={{ top: 0, right: 24, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#86868b' }} allowDecimals={false} />
-                <YAxis
-                  type="category" dataKey="nombre" width={140}
-                  tick={{ fontSize: 10, fill: '#3d3d3f' }}
-                  tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 22) + '…' : v}
-                />
-                <Tooltip formatter={(value) => [value, 'consultas']} labelStyle={{ color: '#1d1d1f', fontSize: 12 }} contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                <Bar dataKey="total" fill={CP} radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </SectionCard>
+        <Tarjeta titulo="Top 10 diagnósticos">
+          {topDiagnosticos.length === 0 ? <Empty /> : <Ranking filas={topDiagnosticos} />}
+        </Tarjeta>
 
-        <SectionCard title="Top 10 medicamentos recetados" icon={Pill}>
-          {topMedicamentos.length === 0 ? <Empty /> : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topMedicamentos} layout="vertical" margin={{ top: 0, right: 24, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: '#86868b' }} allowDecimals={false} />
-                <YAxis
-                  type="category" dataKey="nombre" width={140}
-                  tick={{ fontSize: 10, fill: '#3d3d3f' }}
-                  tickFormatter={(v: string) => v.length > 22 ? v.slice(0, 22) + '…' : v}
-                />
-                <Tooltip formatter={(value) => [value, 'recetas']} labelStyle={{ color: '#1d1d1f', fontSize: 12 }} contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                <Bar dataKey="total" fill="#7c3aed" radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </SectionCard>
+        <Tarjeta titulo="Top 10 medicamentos recetados">
+          {topMedicamentos.length === 0 ? <Empty /> : <Ranking filas={topMedicamentos} />}
+        </Tarjeta>
+
+        <Tarjeta titulo={`Distribución por sexo — ${totalPacientes} pacientes`}>
+          {totalPacientes === 0 ? <Empty /> : <DistribucionSexo datos={distribucionSexo} total={totalPacientes} />}
+        </Tarjeta>
+
+        <Tarjeta titulo="Distribución por grupo de edad">
+          {distribucionEdad.every(e => e.total === 0) ? <Empty /> : <DistribucionEdad datos={distribucionEdad} />}
+        </Tarjeta>
       </div>
-
-      {/* Demografía */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <SectionCard title={`Distribución por sexo — ${totalPacientes} pacientes`} icon={Users}>
-          {totalPacientes === 0 ? <Empty /> : (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="55%" height={200}>
-                <PieChart>
-                  <Pie data={distribucionSexo} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="total">
-                    {distribucionSexo.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [value, 'pacientes']} contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-3 flex-1">
-                {distribucionSexo.map((s, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold text-[#1d1d1f]">{s.nombre}</p>
-                      <p className="text-[10px] text-[#86868b]">
-                        {s.total} · {totalPacientes > 0 ? Math.round(s.total / totalPacientes * 100) : 0}%
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Distribución por grupo de edad" icon={Users}>
-          {distribucionEdad.every(e => e.total === 0) ? <Empty /> : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={distribucionEdad} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="rango" tick={{ fontSize: 11, fill: '#86868b' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#86868b' }} allowDecimals={false} />
-                <Tooltip formatter={(value) => [value, 'pacientes']} contentStyle={{ fontSize: 12, borderRadius: 12, border: '1px solid #e2e8f0' }} />
-                <Bar dataKey="total" fill={CS} radius={[5, 5, 0, 0]}>
-                  {distribucionEdad.map((_, i) => (
-                    <Cell key={i} fill={`hsl(${210 + i * 8}, 60%, ${45 + i * 3}%)`} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </SectionCard>
-      </div>
-
     </div>
   )
 }

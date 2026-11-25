@@ -193,6 +193,11 @@ export interface Consultorio {
   es_default: boolean
   activo: boolean
   fecha_baja: string | null
+  /** Agenda B5. Opcional: falta mientras la migración 20261112140000 no esté aplicada. */
+  horario_propio?: boolean
+  /** Tanda I (punto 3): cuándo su médico confirmó o guardó el horario; `null` = por revisar.
+      Opcional: falta mientras la migración 20261121141000 no esté aplicada (entonces no hay «por revisar»). */
+  horario_revisado_en?: string | null
   created_at: string
   updated_at: string
 }

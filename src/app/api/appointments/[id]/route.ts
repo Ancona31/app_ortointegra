@@ -6,11 +6,25 @@ import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica, type ConexionGoogle } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
 import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
-         ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
+         propiedadesSpinus, ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante, renderEnTZ } from '@/lib/dates'
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { comprobarEmpalmes, type VeredictoEmpalme } from '@/lib/agenda/empalmesServidor'
+import { bloqueoDelPut, CUERPO_HORARIO_BLOQUEADO, esErrorDeBloqueo } from '@/lib/agenda/bloqueoTotalServidor'
+import { ESTADOS_SIN_EMPALME } from '@/lib/agenda/empalmesCita'
+import { HINT_ATENDIDA_CON_NOTA, pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
+import { tieneNotaLigada } from '@/lib/agenda/notaLigadaServidor'
+import { comprobarTipoDelPut, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
+import { auditarLigado, estaPorLigar, pacienteParaGoogle, pacienteVisible, vetoDeConversion } from '@/lib/agenda/porLigarServidor'
+import { vetoPorEleccion } from '@/lib/agenda/eleccionPaciente'
+import { filaEleccion } from '@/lib/agenda/eleccionServidor'
+import {
+  auditarConflictoEdicion, camposEditados, descripcionV2, parchearConEtag, releerUpdatedAt,
+  type CampoEdicion, type EventoGoogle, type ResultadoParche,
+} from '@/lib/gcalEscritura'
 
 /* Una fecha-solo `YYYY-MM-DD` QUE ADEMÁS EXISTE EN EL CALENDARIO: la forma no
    basta, porque `2026-02-30` la pasa y el motor la DESBORDA al 2 de marzo en vez
@@ -60,6 +74,8 @@ async function fijarEventoCreado(
     googleEventId: string | null
     estado: 'synced' | 'failed'
     calendarId: string | null
+    /** C5, sólo con v2: el `etag` del evento creado. Ausente = no se nombra la columna (apagado). */
+    etag?: string | null
   },
 ): Promise<void> {
   const { data: fijadas, error } = await admin
@@ -68,6 +84,7 @@ async function fijarEventoCreado(
       google_event_id:  datos.googleEventId,
       gcal_sync_status: datos.estado,
       gcal_calendar_id: datos.calendarId,
+      ...(datos.etag !== undefined ? { gcal_etag: datos.etag } : {}),
     })
     .eq('id', datos.appointmentId)
     .eq('clinica_id', datos.clinicaId)
@@ -96,6 +113,123 @@ async function fijarEventoCreado(
       err,
     )
   }
+}
+
+/* ── C5: LA EDICIÓN EN GOOGLE CON EL INTERRUPTOR V2 ─────────────────────────
+   Fuera del cuerpo de la ruta por tamaño. Lo que hace y por qué, en
+   `src/lib/gcalEscritura.ts`. Se llama SÓLO con v2 encendido. */
+interface EdicionV2 {
+  admin: ReturnType<typeof createAdminClient>
+  conexion: ConexionGoogle
+  puedeReparar: boolean
+  userId: string
+  clinicaId: string
+  citaId: string
+  eventId: string
+  etagGuardado: string | null
+  spinusUpdatedAt: string | null
+  sendUpdates: 'all' | 'none'
+  campos: CampoEdicion[]
+  /** Lo que se manda siempre (lo que cambió, como hoy). */
+  base: EventoGoogle
+  /** Lo que se añade si gana Spinus sobre un cambio de Google. */
+  completo: EventoGoogle
+  asistentes: (previos: calendar_v3.Schema$EventAttendee[]) => calendar_v3.Schema$EventAttendee[]
+}
+
+/** Las dos puntas de la fila ya escrita, con la limpieza de la otra forma (ver `puntasParaGoogle`). */
+function puntasCompletas(
+  apt: { all_day?: boolean | null; start_time: string; end_time: string },
+  tz: string,
+): { start: calendar_v3.Schema$EventDateTime; end: calendar_v3.Schema$EventDateTime } {
+  return apt.all_day === true
+    ? puntasParaGoogle({ todoElDia: true, inicio: renderEnTZ(apt.start_time, 'yyyy-MM-dd', tz), fin: renderEnTZ(apt.end_time, 'yyyy-MM-dd', tz), timezone: tz }, { limpiarLaOtraForma: true })
+    : puntasParaGoogle({ todoElDia: false, inicio: apt.start_time, fin: apt.end_time, timezone: tz }, { limpiarLaOtraForma: true })
+}
+
+async function editarEnGoogleV2(e: EdicionV2): Promise<void> {
+  // Otro escritor más nuevo (el sondeo u otra edición) ya pasó: él se encarga.
+  const vigente = await releerUpdatedAt(e.admin, e.citaId, e.clinicaId)
+  if (vigente !== null && e.spinusUpdatedAt !== null && vigente !== e.spinusUpdatedAt) return
+  let calendarIdUsado: string | null = null
+  let resultado: ResultadoParche | null = null
+  try {
+    resultado = await conCalendarioSpinus(e.conexion, e.admin, (calendar, calendarId) => {
+      calendarIdUsado = calendarId
+      return parchearConEtag(calendar, {
+        calendarId, eventId: e.eventId, etagGuardado: e.etagGuardado, spinusUpdatedAt: e.spinusUpdatedAt,
+        componer: (evento, conflicto) => ({
+          sendUpdates: e.sendUpdates,
+          requestBody: {
+            ...e.base, ...(conflicto ? e.completo : {}),
+            attendees: e.asistentes(evento.attendees ?? []),
+            extendedProperties: propiedadesSpinus(e.citaId),
+          },
+        }),
+      })
+    }, { puedeReparar: e.puedeReparar, actorId: e.userId })
+    if (!resultado) {
+      registrarFalloGCal(
+        { operacion: 'events.patch v2 (edición de cita, sin respuesta)', userId: e.userId, conexionId: e.conexion.id, calendarId: calendarIdUsado, eventId: e.eventId },
+        new Error('no se resolvió calendario de clínica (¿modo estricto?)'),
+      )
+    }
+  } catch (err) {
+    registrarFalloGCal({ operacion: 'events.patch v2 (edición de cita)', userId: e.userId, conexionId: e.conexion.id, calendarId: calendarIdUsado, eventId: e.eventId }, err)
+  }
+  // Gana Google: no se escribe nada en Google ni en la fila; el sondeo lo aplica.
+  if (resultado?.tipo === 'gana_google') {
+    await auditarConflictoEdicion({ userId: e.userId, clinicaId: e.clinicaId, citaId: e.citaId, gana: 'google', campos: e.campos })
+    return
+  }
+  const parcheado = resultado?.tipo === 'parcheado' ? resultado : null
+  const { error } = await e.admin
+    .from('appointments')
+    .update({ gcal_sync_status: parcheado ? 'synced' : 'failed', gcal_calendar_id: calendarIdUsado, ...(parcheado ? { gcal_etag: parcheado.etag } : {}) })
+    .eq('id', e.citaId)
+    .eq('clinica_id', e.clinicaId)
+  if (error) registrarFalloGCal({ operacion: 'appointments.update(gcal v2)', userId: e.userId, conexionId: e.conexion.id, calendarId: calendarIdUsado }, error)
+  if (parcheado?.conflicto) {
+    await auditarConflictoEdicion({ userId: e.userId, clinicaId: e.clinicaId, citaId: e.citaId, gana: 'spinus', campos: e.campos })
+  }
+}
+
+/* B7: la comprobación de empalme del PUT, fuera del cuerpo de la ruta para no
+   alargarlo más. `existing` es la fila de ANTES y `updates` lo que se va a
+   escribir; lo que no venga en `updates` se queda como estaba. */
+interface FilaAntes {
+  medico_id: string | null
+  status: string
+  start_time: string
+  end_time: string
+  all_day: boolean | null
+}
+
+async function empalmeDelPut(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clinicaId: string,
+  id: string,
+  existing: FilaAntes,
+  updates: Record<string, unknown>,
+  todoElDia: boolean,
+  aceptados: unknown,
+): Promise<VeredictoEmpalme> {
+  const inicio = typeof updates.start_time === 'string' ? updates.start_time : existing.start_time
+  const fin    = typeof updates.end_time   === 'string' ? updates.end_time   : existing.end_time
+  const medico = typeof updates.medico_id  === 'string' ? updates.medico_id  : existing.medico_id
+  const estado = typeof updates.status     === 'string' ? updates.status     : existing.status
+  if (todoElDia || ESTADOS_SIN_EMPALME.includes(estado) || !medico) return { ok: true }
+
+  const instante = (v: string): number => new Date(v).getTime()
+  const cambia =
+    instante(inicio) !== instante(existing.start_time) ||
+    instante(fin)    !== instante(existing.end_time)   ||
+    medico !== existing.medico_id                      ||
+    ESTADOS_SIN_EMPALME.includes(existing.status)      ||
+    existing.all_day === true
+  if (!cambia) return { ok: true }
+
+  return comprobarEmpalmes(supabase, { clinicaId, medicoId: medico, inicio, fin, excluirId: id }, aceptados)
 }
 
 /* Formato UUID. A nivel de módulo porque lo usan el PUT (consultorio y
@@ -177,13 +311,100 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        sobre los valores EFECTIVOS, y el que no venga en el cuerpo sale de aquí.
        Sin esta columna, un PUT que sólo mandara `paciente_id` sobre una fila que
        ya es de todo el día no vería el conflicto. */
-    const { data: existing } = await supabase
-      .from('appointments')
-      .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day')
-      .eq('id', id)
-      .single()
+    /* El interruptor de la agenda v2 (plan del bloque B §1) va en paralelo con
+       la lectura de la fila: una consulta por clave primaria, sin esperar. */
+    const [{ data: existing }, v2] = await Promise.all([
+      supabase
+        .from('appointments')
+        .select('id, google_event_id, gcal_sync_status, updated_at, medico_id, status, start_time, end_time, paciente_id, consultorio_timezone, all_day, title, notes, origen, gcal_etag')
+        .eq('id', id)
+        .single(),
+      agendaV2Encendida(supabase, profile.clinica_id),
+    ])
 
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
+
+    /* D6: ¿es una cita POR LIGAR? Sólo con v2 (nombra `reserva_canal`) y sólo
+       si no tiene paciente; con paciente ya es una cita y las reglas de abajo
+       la tratan como tal. Una por ligar ES una cita (lista A, punto 7): no
+       puede ser de todo el día, lleva el tope de duración de una cita y puede
+       llevar tipo (P5 ampliado). Si no se puede leer, 500 sin escribir. */
+    const porLigar = v2 && !existing.paciente_id ? await estaPorLigar(supabase, profile.clinica_id, id) : false
+    if (porLigar === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+
+    /* B3: con el interruptor encendido, una cita con paciente no se puede
+       quedar SIN paciente. Sería la puerta de atrás del 409 del DELETE —
+       desligar y luego borrar el «evento» que queda—, y la interfaz nunca lo
+       pide: la X del paciente cancela. Cambiar a OTRO paciente sigue igual. */
+    if (v2 && existing.paciente_id && paciente_id !== undefined && !paciente_id) {
+      return NextResponse.json(
+        { error: 'cita_con_paciente', message: 'Una cita con paciente no se puede quedar sin paciente: cancélala.' },
+        { status: 409 }
+      )
+    }
+
+    /* D7: LIGAR una cita por ligar a un paciente (al iniciar la consulta).
+       La FK de `paciente_id` no mira la clínica: el paciente tiene que ser de
+       ESTA y verlo quien liga (RLS de `pacientes`). Si no, 400 y no se escribe. */
+    const ligando = porLigar && typeof paciente_id === 'string' && paciente_id !== ''
+    if (ligando) {
+      const visible = await pacienteVisible(supabase, profile.clinica_id, paciente_id)
+      if (visible === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      if (!visible) {
+        return NextResponse.json(
+          { error: 'paciente_invalido', message: 'Ese paciente no es de esta clínica o no lo puedes ver.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    /* T3 · CONVERTIR EN CITA un evento sin paciente (§2, AG-DT-29): con v2,
+       colgarle un paciente a una fila que no lo tenía y no está por ligar. Es un
+       alta de cita por un UPDATE: pasa las puertas del alta (suscripción y
+       perfil, las funciones originales por RPC), lleva consultorio y el
+       paciente tiene que ser de ESTA clínica y verlo quien convierte. Ver
+       `vetoDeConversion`. Lo que va a Google lo decide el `after()` de abajo
+       como con cualquier cita con paciente: «Cita médica: <paciente>» y la
+       descripción fija, sin observaciones (S1); C-d impide que el título
+       vuelva desde Google. */
+    const convirtiendo = v2 && !existing.paciente_id && !porLigar && typeof paciente_id === 'string' && paciente_id !== ''
+    if (convirtiendo) {
+      const veto = await vetoDeConversion(supabase, profile.clinica_id, paciente_id, consultorio_id)
+      if (veto) return NextResponse.json(veto.cuerpo, { status: veto.estado })
+    }
+
+    /* G3 (punto 17.3 de la tanda de diseño): con v2, el servidor rechaza lo
+       que no corresponde al ESTADO aunque la tarjeta ya no lo ofrezca. Una
+       atendida no se confirma, no se cancela y no se mueve (también por
+       arrastre); se puede corregir su estado a «Agendada» o «No asistió» desde
+       el formulario. Ver `vetoPorEstado`. Apagada, como siempre. */
+    /* G3 · Decisión de Angel: una atendida CON NOTA CLÍNICA ligada no cambia de
+       estado (con o sin v2: la nota es expediente). Sin nota, sí (corregir un
+       error). Tanda I (punto 1): tampoco se mueve de fecha u hora, también con
+       la v2 apagada (la base lo cierra igual, 20261121140000). Sólo se pregunta
+       a la base cuando el cuerpo cambia el estado o mueve una atendida. Ver
+       `vetoPorNotaLigada` y `notaLigadaServidor.ts`. */
+    const cuerpoVeto = { status, start_time, end_time, all_day }
+    if (pideComprobarNota(existing, cuerpoVeto)) {
+      const vetoNota = vetoPorNotaLigada(existing, cuerpoVeto, await tieneNotaLigada(profile.clinica_id, id))
+      if (vetoNota) return NextResponse.json({ error: 'nota_ligada', message: vetoNota }, { status: 409 })
+    }
+    if (v2) {
+      const vetoEstado = vetoPorEstado(existing, cuerpoVeto)
+      if (vetoEstado) return NextResponse.json({ error: 'estado_no_admite', message: vetoEstado }, { status: 409 })
+    }
+    /* Tanda I, punto 9: en una cita reservada por enlace que aún no empieza, el
+       médico no cambia y consultorio, día y hora sólo con «Reagendar»
+       (`POST …/[id]/reagendar`); la duración sí. Ver `eleccionPaciente.ts`. Sólo
+       con v2 y sólo si el cuerpo nombra esos campos (una lectura más). La base
+       lo cierra también (`cita_proteger_eleccion`). */
+    if (v2 && [start_time, medico_id, consultorio_id, all_day].some(v => v !== undefined)) {
+      const fila = await filaEleccion(supabase, profile.clinica_id, id)
+      if (!fila) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      const veto = vetoPorEleccion({ ...fila, start_time: existing.start_time, medico_id: existing.medico_id, all_day: existing.all_day },
+        { start_time, medico_id, consultorio_id, all_day }, Date.now())
+      if (veto) return NextResponse.json({ error: 'eleccion_paciente', campo: veto.campo, message: veto.mensaje }, { status: 409 })
+    }
 
     if (clientUpdatedAt && existing.updated_at !== clientUpdatedAt) {
       return NextResponse.json(
@@ -232,7 +453,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        cuente como paciente en un sitio y sí en el otro. */
     const todoElDiaEfectivo = all_day !== undefined ? all_day === true : existing.all_day === true
     const pacienteEfectivo  = paciente_id !== undefined ? (paciente_id || null) : existing.paciente_id
-    if (todoElDiaEfectivo && pacienteEfectivo) {
+    // D6: una cita por ligar también es una cita (lleva hora).
+    if (todoElDiaEfectivo && (pacienteEfectivo || porLigar)) {
       return NextResponse.json(
         { error: 'todo_el_dia_con_paciente', message: 'Un evento de todo el día no puede ser una cita: una cita siempre lleva hora.' },
         { status: 400 }
@@ -284,7 +506,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
        recién compuestas. Son dos sitios y no uno a propósito; unificarlos exige
        mover la composición, que es lo que aquel bloque explica que no se puede
        hacer sin conocer antes el huso efectivo. */
-    const errorDeTope = comprobarTopeDuracion(inicioEfectivo, finEfectivo, Boolean(pacienteEfectivo))
+    const errorDeTope = comprobarTopeDuracion(inicioEfectivo, finEfectivo, Boolean(pacienteEfectivo) || porLigar)
     if (errorDeTope) {
       return NextResponse.json(errorDeTope, { status: 400 })
     }
@@ -576,6 +798,46 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       }
     }
 
+    /* ── B6c: EL TIPO DE CITA, CON EL INTERRUPTOR ENCENDIDO ──────────────────
+       Apagado, `tipo_cita_id` se ignora y el update no nombra `tipo_cita_*`.
+       Encendido, se valida el tipo con el que QUEDA la cita (el del cuerpo o el
+       que ya tenía) contra el médico y el paciente EFECTIVOS, y sólo si el
+       cuerpo trae el tipo o cambian el médico o el paciente (ver
+       `comprobarTipoDelPut`). Antes del empalme, como en el POST.
+       ⚠️ CON B3: quitar el paciente de una cita con paciente ya contestó 409
+       `cita_con_paciente` arriba del todo, antes de llegar aquí. Por eso
+       `tipo_sin_paciente` sólo sale al ponerle un tipo a un EVENTO sin
+       paciente; no compite con aquel 409 ni lo sustituye. */
+    if (v2) {
+      const tipoDelCuerpo = leerTipoCitaId(body.tipo_cita_id)
+      if (tipoDelCuerpo === false) return NextResponse.json(CUERPO_TIPO_INVALIDO, { status: 400 })
+      const veredicto = await comprobarTipoDelPut(supabase, {
+        clinicaId: profile.clinica_id, citaId: id, tipoDelCuerpo, antes: existing,
+        medicoEfectivo: typeof updates.medico_id === 'string' ? updates.medico_id : existing.medico_id,
+        pacienteEfectivo, porLigar,
+      })
+      if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
+      if (veredicto.columnas) Object.assign(updates, veredicto.columnas)
+    }
+
+    /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────
+       Sobre los valores EFECTIVOS que va a guardar este PUT, y SÓLO cuando
+       cambian el inicio, el fin o el médico, o la cita vuelve a ocupar su hueco
+       (sale de `cancelled`/`no_show`) o sale de todo el día: editar las notas
+       de una cita que ya estaba empalmada no debe avisar. Una fila que queda
+       `cancelled`, `no_show` o de todo el día no se empalma (P3). La propia
+       cita queda fuera de la búsqueda. */
+    /* Tanda L (L1, punto 6): mover (inicio, fin o médico) a un periodo
+       bloqueado, no. Antes del empalme. Lo que ya estaba dentro y no se mueve,
+       pasa. La base lo repite (`trg_appointments_horario_bloqueado`). */
+    if (v2 && await bloqueoDelPut(supabase, profile.clinica_id, existing, updates)) {
+      return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
+    }
+    if (v2) {
+      const veredicto = await empalmeDelPut(supabase, profile.clinica_id, id, existing, updates, todoElDiaEfectivo, body.empalmes_aceptados)
+      if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
+    }
+
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
       .from('appointments')
@@ -608,7 +870,30 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
         { status: 400 }
       )
     }
+    /* Tanda I (punto 1) · 42501 de `cita_proteger_atendida` (20261121140000):
+       sólo llega en una carrera (la nota se escribió entre el veto de arriba y
+       este UPDATE). El mismo 409 legible que el veto; se reconoce por su HINT,
+       que es nuestro, para no disfrazar otro 42501 (la RLS) de nota ligada. */
+    if (error?.code === '42501' && error.hint === HINT_ATENDIDA_CON_NOTA) {
+      return NextResponse.json(
+        { error: 'nota_ligada', message: 'Esta cita ya tiene una nota clínica: sigue como atendida y no se puede cambiar de estado, de fecha ni de hora.' },
+        { status: 409 }
+      )
+    }
+    // L1: el disparador del bloqueo, en la carrera con un bloqueo recién creado.
+    if (esErrorDeBloqueo(error)) return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    /* D7: el ligado, auditado sólo con NOMBRES de campo. Después de escribir:
+       si la escritura falló, no hubo ligado. Los datos de contacto de la
+       reserva no se tocan: se quedan en la cita (lista A, punto 9). */
+    if (ligando || convirtiendo) {
+      await auditarLigado({
+        userId: user.id, clinicaId: profile.clinica_id, citaId: id,
+        campos: ['paciente_id', ...(title !== undefined ? ['title'] : [])],
+        via: convirtiendo ? 'convertir' : 'ligar',
+      })
+    }
 
     // Google Calendar sync en background con el cliente admin, espejando al
     // POST de /api/appointments.
@@ -700,7 +985,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const clinicaId = profile.clinica_id
       const puedeReparar = canManageClinica(profile)
       const admin = createAdminClient()
-      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      // D7: una por ligar se compone con el nombre de quien reservó (convenio de D4).
+      const pacienteCita: PacienteEnCita = pacienteParaGoogle(apt, v2)
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       const tzCita: string = apt.consultorio_timezone ?? TZ_CLINICA
       const esTodoElDia = apt.all_day === true
@@ -732,12 +1018,18 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       after(async () => {
         let google_event_id: string | null = null
         let calendarIdUsado: string | null = null
+        // C5: el `etag` del evento creado, sólo con v2.
+        let gcal_etag: string | null = null
         try {
           // `null` apaga el ancla de hora en un evento de todo el día, igual que
           // en el alta y en el patch.
           const instanteParaAncla = esTodoElDia ? null : apt.start_time
-          const { summary, description, reminders } =
+          const { summary, description: descripcionFija, reminders } =
             eventoParaGoogle(pacienteCita, clinicaCita, apt.title, instanteParaAncla, tzCita, apt.status)
+          /* S1 con v2: una fila nacida en Google y sin paciente lleva sus notas
+             (que vinieron de Google); cualquier otra, el formato fijo. Apagado,
+             el formato fijo de siempre. */
+          const description = v2 ? (descripcionV2(apt, descripcionFija, true) ?? '') : descripcionFija
 
           /* El médico entra en el mismo `insert`, como en el alta: si tiene la
              cita asignada, tiene que tenerla en su calendario. Si su correo no
@@ -771,11 +1063,13 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
               requestBody: {
                 summary, description, attendees: asistentes,
                 ...INTERRUPTORES_INVITADOS, reminders, ...puntasDelAlta,
+                ...(v2 ? { extendedProperties: propiedadesSpinus(id) } : {}),
               },
             })
           }, { puedeReparar, actorId: userId })
 
           google_event_id = creado?.data.id ?? null
+          gcal_etag = creado?.data.etag ?? null
           if (!google_event_id) {
             registrarFalloGCal(
               { operacion: 'events.insert (reparación, sin respuesta)', userId, conexionId: conexion.id, calendarId: calendarIdUsado },
@@ -796,6 +1090,7 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           googleEventId: google_event_id,
           estado:        google_event_id ? 'synced' : 'failed',
           calendarId:    calendarIdUsado,
+          ...(v2 ? { etag: gcal_etag } : {}),
         })
       })
     }
@@ -811,7 +1106,8 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
       const admin = createAdminClient()
       // El titulo del evento sale del paciente ligado; si la cita no tiene
       // paciente, del titulo libre de la cita.
-      const pacienteCita: PacienteEnCita = apt.pacientes ?? null
+      // D7: una por ligar se compone con el nombre de quien reservó (convenio de D4).
+      const pacienteCita: PacienteEnCita = pacienteParaGoogle(apt, v2)
       const clinicaCita:  ClinicaEnCita  = apt.clinicas  ?? null
       // EL HUSO DEL EVENTO ES EL DEL CONSULTORIO, NO EL DEL CENTRO. Espeja al
       // POST: antes se etiquetaba con una constante fija (Ciudad de Mexico) y
@@ -1001,6 +1297,45 @@ export async function PUT(req: NextRequest, ctx: RouteContext<'/api/appointments
           correoPacienteSaliente = anterior?.email?.trim().toLowerCase() || null
         }
 
+        /* ── C5: CON EL INTERRUPTOR V2 ENCENDIDO, `etag` + `If-Match` ─────────
+           Mismo cuerpo que el camino de siempre, más: la marca privada, el
+           `etag` guardado, «gana el último cambio» y, con S1, la descripción de
+           las filas nacidas en Google. Apagado, no se entra: lo de abajo es el
+           `after()` de siempre, sin una línea cambiada. */
+        if (v2) {
+          const campos = camposEditados(existing, apt)
+          const conPaciente = { origen: apt.origen, paciente_id: apt.paciente_id, notes: apt.notes }
+          const descripcion = descripcionV2(conPaciente, description, campos.includes('notas'))
+          const colorEstado = typeof apt.status === 'string' ? STATUS_COLOR[apt.status] : undefined
+          await editarEnGoogleV2({
+            admin, conexion, puedeReparar, userId, clinicaId, citaId: id, eventId: gcalEventId,
+            etagGuardado: typeof existing.gcal_etag === 'string' ? existing.gcal_etag : null,
+            spinusUpdatedAt: typeof apt.updated_at === 'string' ? apt.updated_at : null,
+            sendUpdates, campos,
+            base: {
+              summary,
+              ...(descripcion !== undefined ? { description: descripcion } : {}),
+              ...INTERRUPTORES_INVITADOS,
+              ...(mandaInicio ? { start: puntasDelPatch.start } : {}),
+              ...(mandaFin    ? { end:   puntasDelPatch.end   } : {}),
+              ...(status !== undefined && STATUS_COLOR[status] ? { colorId: STATUS_COLOR[status] } : {}),
+            },
+            // Gana Spinus sobre un cambio de Google: el estado COMPLETO de la
+            // fila, y `confirmed` deshace un borrado hecho en Google.
+            completo: {
+              ...puntasCompletas(apt, tzCita),
+              description: descripcionV2(conPaciente, description, true) ?? '',
+              status: 'confirmed',
+              ...(colorEstado ? { colorId: colorEstado } : {}),
+            },
+            asistentes: (previos) => componerAsistentes(previos, {
+              medicoActual: correoMedicoActual, medicoSaliente: correoMedicoSaliente,
+              pacienteSaliente: correoPacienteSaliente, nuevos: [],
+            }),
+          })
+          return
+        }
+
         try {
           const parcheado = await conCalendarioSpinus(conexion, admin, async (calendar, calendarId) => {
             calendarIdUsado = calendarId
@@ -1120,15 +1455,76 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<'/api/appointm
 
     const { id } = await ctx.params
 
-    // RLS filtra por clinica_id
-    const { data: existing } = await supabase
-      .from('appointments')
-      .select('id, google_event_id')
-      .eq('id', id)
-      .single()
+    // RLS filtra por clinica_id. El interruptor (B3) va en paralelo con la
+    // lectura de la fila: una consulta por clave primaria más, sin esperar.
+    const [{ data: existing }, v2] = await Promise.all([
+      supabase
+        .from('appointments')
+        .select('id, google_event_id, paciente_id, status')
+        .eq('id', id)
+        .single(),
+      agendaV2Encendida(supabase, profile.clinica_id),
+    ])
     if (!existing) return NextResponse.json({ error: 'Cita no encontrada' }, { status: 404 })
 
-    const { error } = await supabase.from('appointments').delete().eq('id', id)
+    /* G3 · Decisión de Angel: una atendida CON NOTA CLÍNICA no deja de serlo, y
+       borrarla sería lo extremo (la FK de `consultas.appointment_id` es SET
+       NULL: la nota perdería su cita). Con o sin v2, como en el PUT. */
+    if (existing.status === 'attended' && await tieneNotaLigada(profile.clinica_id, id)) {
+      return NextResponse.json(
+        { error: 'nota_ligada', message: 'Esta cita ya tiene una nota clínica: no se puede eliminar.' },
+        { status: 409 }
+      )
+    }
+
+    /* ── B3: UNA CITA CON PACIENTE NO SE BORRA, SE CANCELA ──────────────────
+       Sólo con el interruptor encendido (P2, P4). Va ANTES del borrado y antes
+       de resolver la conexión, así que tampoco se programa el `events.delete`
+       del `after()`: el evento de Google se conserva y lo marca la
+       cancelación (`PUT {status:'cancelled'}`, prefijo «CANCELADA — »). Cubre
+       también la cita ya cancelada: con paciente no se borra nunca.
+       Con el interruptor apagado, o la tabla sin crear, `v2` es `false` y la
+       baja sigue siendo la de siempre. Los eventos sin paciente, igual. */
+    if (v2 && existing.paciente_id) {
+      return NextResponse.json(
+        { error: 'cita_con_paciente', message: 'Una cita con paciente no se elimina: se cancela y queda en la agenda.' },
+        { status: 409 }
+      )
+    }
+    /* D6: una cita POR LIGAR también es una cita (lista A, punto 7): el mismo
+       409, con el mismo código para que la agenda diga el motivo. Era además
+       un 500: si gastó un enlace de un solo uso, la FK RESTRICT
+       `reserva_enlaces_usado_cita_fkey` impide borrarla (y, si se canceló,
+       también `reserva_incidencias_cita_fkey`). Si no se puede saber, no se
+       borra. */
+    if (v2) {
+      const porLigar = await estaPorLigar(supabase, profile.clinica_id, id)
+      if (porLigar === null) return NextResponse.json({ error: 'Error interno' }, { status: 500 })
+      if (porLigar) {
+        return NextResponse.json(
+          { error: 'cita_con_paciente', message: 'Una cita reservada por enlace no se elimina: se cancela y queda en la agenda.' },
+          { status: 409 }
+        )
+      }
+    }
+
+    // `clinica_id` explícito: defensa en profundidad, la RLS ya acota.
+    const { error } = await supabase.from('appointments').delete().eq('id', id).eq('clinica_id', profile.clinica_id)
+    /* 23503: otra fila la sostiene con una FK RESTRICT. Hoy sólo pasa con las
+       tablas de la reserva por enlace (D1, D2) y una cita por enlace: con v2
+       encendido no se llega aquí (409 de arriba); apagado, sólo si la clínica
+       tuvo v2 y lo apagó después. 409 con un texto que se entiende, en vez del
+       500 con el mensaje de Postgres, que nombra tablas.
+       42501: el disparador `cita_proteger_borrado` (corrección de seguridad,
+       punto 3) la protege porque la base sí ve v2 encendido y la cita con
+       paciente o por ligar, aunque arriba la lectura del interruptor saliera
+       apagada (falla cerrado). La RLS de DELETE no da 42501: filtra filas. */
+    if (error?.code === '23503' || error?.code === '42501') {
+      return NextResponse.json(
+        { error: 'cita_con_paciente', message: 'Esta cita no se puede eliminar: cancélala.' },
+        { status: 409 }
+      )
+    }
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
     // Se resuelve antes de responder, con el cliente de sesión, y sólo si la

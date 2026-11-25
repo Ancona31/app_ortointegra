@@ -1,6 +1,9 @@
-import { redirect } from 'next/navigation'
+import { redirect, unstable_rethrow } from 'next/navigation'
 import { SWRConfig } from 'swr'
-import { createClient } from '@/lib/supabase/server'
+import { sesionServidor, type SesionServidor } from '@/lib/supabase/sesionServidor'
+import { CLAVE_CONFIG, type ConfigApp } from '@/lib/configApp'
+import { leerConfigApp } from '@/lib/configAppServidor'
+import { logger } from '@/lib/logger'
 import Sidebar from '@/components/layout/Sidebar'
 import ScriptTema from '@/components/layout/ScriptTema'
 import { ThemeProvider } from '@/components/layout/ThemeProvider'
@@ -15,18 +18,49 @@ import SuscripcionBanner from '@/components/billing/SuscripcionBanner'
 import { SubscriptionGateProvider } from '@/components/billing/SubscriptionGateProvider'
 import { getSubscriptionState } from '@/lib/subscription'
 import { AuthProvider } from '@/lib/auth-context'
+import { analizarPerfilSesion } from '@/lib/perfil/perfilSesion'
 import { ConsultorioActivoProvider } from '@/contexts/ConsultorioActivoContext'
 import { MenuMovilProvider } from '@/contexts/MenuMovilContext'
+import CampanaGlobal from '@/components/avisos/CampanaGlobal'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+
+/**
+ * La configuración de la app sembrada en el documento (A1.6): lo mismo que
+ * `GET /api/me/config` le daría a este usuario, leído con la sesión de
+ * `sesionServidor()` —cliente de sesión, RLS— y la clínica de su perfil. Así
+ * la carga dura no pide la ruta; ver `revalidarConfigAlMontar` en
+ * `lib/configApp.ts`.
+ * `null` = no siembra y el cliente pide como antes: sin clínica (la ruta
+ * respondería 403), perfil ilegible, o una consulta que falló. Sólo relanza
+ * los errores internos de Next (`unstable_rethrow.md`).
+ */
+async function sembrarConfig({ supabase, profile }: SesionServidor): Promise<ConfigApp | null> {
+  if (!profile?.clinica_id) return null
+  try {
+    const lectura = await leerConfigApp(supabase, profile.clinica_id)
+    return lectura.ok ? lectura.config : null
+  } catch (err: unknown) {
+    unstable_rethrow(err)
+    logger.warn('layout', `configuración sin sembrar: ${err instanceof Error ? err.message : 'error'}`)
+    return null
+  }
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  /* ⚠️ A1.4c: el `getUser()` y el `profiles` de este layout salen de
+     `sesionServidor()`, que los comparte con la página de la agenda dentro de
+     la MISMA petición (`React.cache`). La autoridad y el redirect son los de
+     siempre: `getUser()` contra Auth y, si no hay usuario, `/login`. */
+  const sesion = await sesionServidor()
+  const { supabase, user, profile } = sesion
   if (!user) redirect('/login')
 
-  /* ⚠️ LAS TRES COLUMNAS NO SON PARA ESTE LAYOUT: SON PARA
-     `getSubscriptionState`, QUE LAS RECIBE ABAJO. Aquí sólo se mira `role`.
+  /* ⚠️ DESDE A1.2 SE PIDEN LOS 12 CAMPOS DE `Profile` (`COLUMNAS_PERFIL_SESION`)
+     PORQUE EL PERFIL SE SIEMBRA EN EL CLIENTE: viaja a `AuthProvider` como
+     `perfilInicial` y `useProfile` ya no lo pide desde el navegador. Lo de
+     abajo sigue valiendo para tres de ellas.
+     ⚠️ `role`, `clinica_id` Y `es_admin_de_clinica` NO SON SÓLO PARA ESTE
+     LAYOUT: SON PARA `getSubscriptionState`, QUE LAS RECIBE ABAJO.
      Van juntas en este `select` porque pedirlas cuesta LO MISMO que pedir una
      —es la misma fila, el mismo viaje— mientras que dejar que la función las
      pida por su cuenta cuesta un viaje entero MÁS un `auth.getUser()`, que
@@ -64,12 +98,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      El caso vivo está en `expediente/[id]/layout.tsx:40`, que pide `role` a
      secas: por eso `/expediente/[id]` hace CUATRO viajes a Supabase donde
      `/documentos` hace tres. Medido. Registrado como PERF-DT-1 en
-     `DEUDA_TECNICA.md`, junto con por qué no se resolvió estructuralmente. */
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, clinica_id, es_admin_de_clinica')
-    .eq('id', user.id)
-    .single()
+     `DEUDA_TECNICA.md`, junto con por qué no se resolvió estructuralmente.
+     Desde A1.4c ese `select` está en `lib/supabase/sesionServidor.ts`. */
 
   if (profile?.role === 'super_admin') {
     redirect('/super-admin/dashboard')
@@ -87,7 +117,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
      cuenta y caiga en su FAIL_OPEN documentado. Es un camino de error raro
      donde se paga un viaje de más; a cambio, nunca se le entrega un perfil
      vacío como si fuera bueno. */
-  const subscriptionState = await getSubscriptionState(supabase, profile ?? undefined)
+  /* La semilla de configuración va EN PARALELO con la suscripción: son
+     independientes, y encadenadas el layout tardaría la suma. */
+  /* Avisos globales (2026-11-24): el interruptor de la agenda v2 decide si se
+     monta la campana de toda la app. Una consulta por PK, en paralelo, sin
+     viaje a Auth; FALLA CERRADO (`agendaV2Encendida`): sin fila, sin tabla o
+     con error, apagada, y la app es la de antes. Sólo corre en carga completa:
+     en navegación suave este layout no se vuelve a renderizar. */
+  const clinicaId = typeof profile?.clinica_id === 'string' ? profile.clinica_id : null
+  const [subscriptionState, configSembrada, avisosGlobales] = await Promise.all([
+    getSubscriptionState(supabase, profile ?? undefined),
+    sembrarConfig(sesion),
+    clinicaId ? agendaV2Encendida(supabase, clinicaId) : Promise.resolve(false),
+  ])
+
+  /* `null` = no se siembra y `useProfile` lo pide él, como antes de A1.2. */
+  const perfilInicial = analizarPerfilSesion(profile)
 
   return (
     /* Configuracion SWR de toda (app). Antes no habia ninguna, asi que regian
@@ -98,11 +143,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
          en cada alt-tab. Cinco minutos corta el grueso de esas peticiones.
        ⚠ `revalidateOnFocus` se queda ENCENDIDO a proposito. Es una aplicacion
        clinica: un dato rancio despues de cambiar de pestana es peor que una
-       peticion de mas. El throttle da el beneficio sin ese riesgo. */
+       peticion de mas. El throttle da el beneficio sin ese riesgo.
+       - fallback (A1.6): la configuracion sembrada arriba, bajo SU clave. Sin
+         semilla no se pasa y el cliente pide `/api/me/config` como antes. */
     <>
     <ScriptTema />
-    <SWRConfig value={{ keepPreviousData: true, focusThrottleInterval: 300_000 }}>
-    <AuthProvider>
+    <SWRConfig value={{
+      keepPreviousData: true,
+      focusThrottleInterval: 300_000,
+      ...(configSembrada && { fallback: { [CLAVE_CONFIG]: configSembrada } }),
+    }}>
+    <AuthProvider perfilInicial={perfilInicial}>
       <ToastProvider>
         <ThemeProvider>
           <SubscriptionGateProvider initialState={subscriptionState}>
@@ -113,70 +164,39 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Ver la nota del contexto. */}
             <MenuMovilProvider>
               <OfflineAlert />
-              {/* ⚠️ EL ENVOLTORIO ES DEL PASO 10 Y NO ES DECORATIVO. Este
-                  banner es el PRIMER elemento del documento, así que desde que
-                  el viewport es `viewport-fit=cover` sus primeros ~50 px caen
-                  bajo la barra de estado —y bajo la franja navy que los tapa—,
-                  o sea que se perdería media frase y parte del botón de
-                  reactivar. El relleno lo baja hasta debajo del reloj.
-                  ⚠️ `empty:hidden` NO SOBRA: el banner devuelve `null` cuando la
-                  suscripción está al día, que es el caso normal. Sin esto, el
-                  envoltorio seguiría midiendo el área segura y metería esa
-                  altura en blanco arriba de las veinte páginas — el hueco
-                  duplicado clásico. Vacío, desaparece.
-                  ⚠️ SE HACE AQUÍ Y NO EN `SuscripcionBanner.tsx` porque ese
-                  componente lo comparte `(launcher)/inicio`, que tiene otro
-                  cromo; esto es la corrección del layout de `(app)`. */}
-              <div className="empty:hidden pt-[env(safe-area-inset-top,0px)]">
-                <SuscripcionBanner desktopSidebarOffset />
-              </div>
-              <div className="flex h-screen overflow-hidden">
+              {/* ⚠️ EL CONTENEDOR ES DEL REDISEÑO (B4) Y SÓLO CAMBIA SU JSX: el
+                  guarda de arriba no se toca. `h-dvh` y no `h-screen`: en iOS el
+                  `100vh` mide con la barra del navegador escondida y el pie se
+                  iba bajo ella.
+                  ⚠️ LA NAVEGACIÓN SE COLOCA POR FORMATO DESDE `globals.css`
+                  (zona «B4 · Navegación por dispositivo»), NO AQUÍ: los márgenes
+                  de `<main>` (`.app-main`: barra de 248 a la izquierda en `esc`,
+                  barra de 216 a la derecha en `ih`, riel en `ext`) y el relleno
+                  del contenido (`.app-contenido`: encabezado fundido en `tel` e
+                  `iv`, franjas con `var(--it/--ir/--ib/--il)`). Por eso aquí ya
+                  no hay `lg:ml-64` ni números de relleno.
+                  ⚠️ ESE RELLENO VERTICAL ESTÁ REPLICADO A MANO EN LA AGENDA, y
+                  así sigue: `AgendaCliente.tsx` (la altura de `.agenda-raiz`, el
+                  respaldo para cuando `:has()` no existe) y la regla
+                  `main > div:has(.agenda-fc)` de `globals.css`, que lo anula en
+                  esa página. Si cambias los números de `.app-contenido`, cambia
+                  los tres sitios en el mismo commit; el razonamiento largo está
+                  junto a `.app-contenido`. */}
+              <div className="flex h-dvh overflow-hidden">
                 <Sidebar />
-                <main className="flex-1 lg:ml-64 overflow-y-auto">
-                  {/* ⚠️ EL PADDING VERTICAL DE ESTE DIV ESTÁ REPLICADO A MANO EN LA
-                      AGENDA. `src/app/(app)/agenda/page.tsx` acota la altura de su
-                      raíz con `h-[calc(100dvh-88px)] lg:h-[calc(100dvh-64px)]` para
-                      partir la vista en zona fija + rejilla con scroll, y esos dos
-                      números son exactamente pt-16+pb-6 (88px) y lg:pt-8+lg:pb-8
-                      (64px) de aquí.
-
-                      ⚠️⚠️ Y LA AGENDA SE SALTA ESTE PADDING DE `lg` EN ADELANTE.
-                      `globals.css`, en la regla `main > div:has(.agenda-fc)` que
-                      está junto a `.agenda-fc`, lo baja a 16 px SÓLO en esa página:
-                      su hijo es la tarjeta del calendario, que ya trae marco
-                      propio, y esos 64 px le costaban 1,4 horas de rejilla en un
-                      portátil. Las otras 20 páginas del layout NO se tocan y siguen
-                      con los 64 de aquí.
-                      Si cambias el padding de abajo, esa regla y el `lg:` de la
-                      agenda son el respaldo mutuo: mira las dos notas antes.
-                      No pudo resolverse con `h-full` porque este div es
-                      `min-h-full`, y un `min-height` no da altura definida al
-                      porcentaje de un hijo — tocar eso cambiaría el layout de toda
-                      la app, así que la agenda paga la duplicación.
-                      SI CAMBIAS ESTE PADDING, ACTUALIZA ESOS DOS NÚMEROS: la agenda
-                      no falla de forma visible, sólo se desajusta en silencio y le
-                      reaparece un segundo scroll. El razonamiento largo está allí.
-
-                      ⚠️ Y ESO ES LO QUE SE ACABA DE HACER EN EL PASO 10: al sumar
-                      aquí las áreas seguras (ver la nota pegada al `div`), el
-                      `h-[calc(100dvh-88px)]` de la agenda ha pasado a restar
-                      TAMBIÉN los dos `env()`. Los dos lados siguen casando en las
-                      dos ramas. */}
-                  {/* ⚠️ EL RELLENO VERTICAL LLEVA EL ÁREA SEGURA SUMADA
-                      (bloque 6 · paso 10). Los números de diseño son los de
-                      siempre —64/24 en móvil, 32/32 en `lg`— y el `env()` se
-                      SUMA, no los sustituye: en escritorio y en una pestaña de
-                      navegador vale 0 y esto es carácter por carácter el
-                      `pt-16 pb-6 lg:pt-8 lg:pb-8` de antes.
-                      Hace falta porque con `viewport-fit=cover` estos 64 px ya
-                      no se miden desde debajo del reloj sino desde el borde
-                      FÍSICO de la pantalla, y una muesca de iPhone se come
-                      hasta 59 de ellos: al contenido le quedaban 5.
-                      ⚠️ EL HORIZONTAL NO LO LLEVA, Y ES DELIBERADO. Los insets
-                      laterales sólo valen algo en apaisado, y el manifiesto fija
-                      `orientation: portrait-primary`. Si algún día se permite
-                      girar, aquí van `env(safe-area-inset-left/right)`. */}
-                  <div className="min-h-full pt-[calc(4rem+env(safe-area-inset-top,0px))] px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] lg:pt-[calc(2rem+env(safe-area-inset-top,0px))] lg:px-8 lg:pb-[calc(2rem+env(safe-area-inset-bottom,0px))]">
+                <main className="app-main flex-1 min-w-0 overflow-y-auto">
+                  <div className="app-contenido min-h-full">
+                    {/* El aviso de suscripción, como TARJETA dentro del área de
+                        contenido (B4). Antes iba fuera del contenedor, como
+                        banda `sticky`, y con la suscripción bloqueada sumaba su
+                        alto a un `h-screen`: aparecía un segundo scroll de
+                        documento. Aquí ya respeta barra, riel, encabezado y
+                        franjas sin desplazamientos propios.
+                        ⚠️ `empty:hidden`: con la suscripción al día devuelve
+                        `null` y el envoltorio desaparece. */}
+                    <div className="app-banner empty:hidden">
+                      <SuscripcionBanner tarjeta />
+                    </div>
                     <ErrorBoundary>
                       <PageTransition>
                         {children}
@@ -187,6 +207,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </div>
               <CommandPalette />
               <SessionGuard />
+              {/* La campana de avisos de toda la app: sólo con la agenda v2
+                  encendida. Fuera de `<main>`, como el gate: no se desmonta al
+                  navegar. En `/agenda` se calla sola (manda la de la agenda). */}
+              {avisosGlobales && <CampanaGlobal />}
               {/* El gate de perfil (Bloque B5). VA AQUÍ, fuera de `<main>` y de
                   `PageTransition`, con los demás elementos de alcance global:
                   así no se desmonta al navegar y no vuelve a pedir nada. Por

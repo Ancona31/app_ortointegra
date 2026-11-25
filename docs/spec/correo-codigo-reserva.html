@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Tu código para reservar</title>
+<!--
+  Correo con código de verificación para que el PACIENTE continúe su reserva.
+  HTML compatible con clientes de correo (tablas + estilos en línea, sin fuentes web).
+  Variables (sustitúyelas por las de tu plantilla):
+    {{codigo}}               709959  (SIN espacios: el espaciado lo da el CSS, así se copia completo)
+    {{minutos_vigencia}}     10
+    {{medico_nombre}}        Dr. Admin Semilla Uno
+    {{consultorio_nombre}}   Consultorio Centro
+    {{url_continuar}}        Enlace "Continuar mi reserva"
+-->
+</head>
+<body style="margin:0; padding:0; background-color:#edf0f5;">
+
+<!-- Texto de vista previa: el código se ve desde la notificación del celular -->
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#edf0f5;">
+  Tu código es {{codigo}}. Vence en {{minutos_vigencia}} minutos.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#edf0f5;">
+<tr>
+<td align="center" style="padding:32px 16px;">
+
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px; background-color:#ffffff; border:1px solid #e6ebf3; border-radius:14px; border-collapse:separate; overflow:hidden; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
+    <!-- Encabezado -->
+    <tr>
+      <td style="background-color:#1c3551; padding:28px 40px 26px 40px;">
+        <p style="margin:0; font-size:13px; line-height:18px; letter-spacing:1px; text-transform:uppercase; color:#9fb6d3; font-weight:600;">{{consultorio_nombre}}</p>
+        <p style="margin:6px 0 0 0; font-size:22px; line-height:28px; color:#ffffff; font-weight:700;">{{medico_nombre}}</p>
+      </td>
+    </tr>
+
+    <!-- Título -->
+    <tr>
+      <td style="padding:36px 40px 0 40px;">
+        <h1 style="margin:0; font-size:24px; line-height:32px; font-weight:700; color:#1a2438;">Tu código para reservar</h1>
+        <p style="margin:10px 0 0 0; font-size:16px; line-height:25px; color:#3d4759;">
+          Escribe este código en la página de reserva para continuar con tu cita.
+        </p>
+      </td>
+    </tr>
+
+    <!-- Código -->
+    <tr>
+      <td style="padding:24px 40px 0 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f7f9fb; border:1px solid #e6ebf3; border-radius:12px; border-collapse:separate;">
+          <tr>
+            <td align="center" style="padding:26px 16px 10px 16px; font-family:'SF Mono', Menlo, Consolas, 'Courier New', monospace; font-size:40px; line-height:46px; font-weight:700; letter-spacing:12px; color:#1a2438;">
+              <span style="padding-left:12px;">{{codigo}}</span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 16px 22px 16px; font-size:14px; line-height:20px; color:#2b63a6; font-weight:600;">
+              Vence en {{minutos_vigencia}} minutos
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Botón -->
+    <tr>
+      <td style="padding:24px 40px 0 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td align="center" style="background-color:#2b63a6; border-radius:10px;">
+              <a href="{{url_continuar}}" target="_blank" style="display:block; padding:16px 24px; font-size:17px; line-height:22px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px;">Continuar mi reserva</a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:12px 0 0 0; font-size:14px; line-height:21px; color:#5b667a; text-align:center;">
+          ¿Cerraste la página? Este botón te regresa a tu reserva.
+        </p>
+      </td>
+    </tr>
+
+    <!-- Seguridad -->
+    <tr>
+      <td style="padding:28px 40px 36px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #e6ebf3;">
+          <tr>
+            <td style="padding-top:18px; font-size:13px; line-height:20px; color:#7a8597;">
+              No compartas este código con nadie; el consultorio nunca te lo pedirá.<br>
+              Si no lo solicitaste, ignora este correo.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+  </table>
+
+  <!-- Pie -->
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <tr>
+      <td align="center" style="padding:20px 24px 0 24px; font-size:12px; line-height:18px; color:#7a8597;">
+        Este es un mensaje automático; por favor no respondas a este correo.<br>
+        Enviado con <strong style="color:#1c3551;">Spinus</strong>
+      </td>
+    </tr>
+  </table>
+
+</td>
+</tr>
+</table>
+</body>
+</html>

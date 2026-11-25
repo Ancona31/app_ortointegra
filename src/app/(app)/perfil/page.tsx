@@ -4,9 +4,15 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { mutate as revalidar } from 'swr'
 import { useProfile } from '@/hooks/useProfile'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, Save, Upload, X, AlertTriangle, WifiOff } from 'lucide-react'
+import {
+  Loader2, Save, Upload, X, AlertTriangle, Check, UserCircle, Building2, PenLine,
+  Settings, Moon, ShieldCheck, ExternalLink, LogOut,
+} from 'lucide-react'
+import { useCierreSesion } from '@/components/layout/Sidebar'
+import Link from 'next/link'
+import { useTheme } from '@/components/layout/ThemeProvider'
 import { PerfilSkeleton } from '@/components/ui/Skeleton'
-import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
+import EstadoError from '@/components/ui/EstadoError'
 import PestanasPerfil, {
   esPestanaPerfilValida, PESTANA_PERFIL_POR_DEFECTO, type ClavePestanaPerfil,
 } from '@/components/perfil/PestanasPerfil'
@@ -14,7 +20,7 @@ import TarjetaIdentidad from '@/components/perfil/TarjetaIdentidad'
 import PanelConsultorios from '@/components/perfil/PanelConsultorios'
 import PanelGoogleCalendar from '@/components/perfil/PanelGoogleCalendar'
 import {
-  CabeceraCard, MuestraColor, ResumenConsultorios, EstadoGoogleCalendar, VistaPreviaEncabezado,
+  RotuloSeccion, AyudaSeccion, MuestraColor, ResumenConsultorios, EstadoGoogleCalendar, VistaPreviaEncabezado,
 } from '@/components/perfil/piezasDatos'
 import ModalShell from '@/components/ui/ModalShell'
 import Portal from '@/components/ui/Portal'
@@ -62,7 +68,7 @@ type Apariencia = {
 type EstadoGcal = 'conectado' | 'sin_token' | 'error_google'
 
 const PALETAS = [
-  { nombre: 'Spinus® (defecto)', primario: '#1a3a5c', secundario: '#1e5fa8' },
+  { nombre: 'Spinus (defecto)', primario: '#1a3a5c', secundario: '#1e5fa8' },
   { nombre: 'Verde médico',          primario: '#134e4a', secundario: '#0d9488' },
   { nombre: 'Morado',                primario: '#3b0764', secundario: '#7c3aed' },
   { nombre: 'Rojo burdeos',          primario: '#7f1d1d', secundario: '#dc2626' },
@@ -106,39 +112,49 @@ function huellaDatos(f: FormData, esp: string[]): string {
  */
 const ID_FORM = 'perfil-form'
 
-/** La ceja y el título. Sale dos veces —pantalla y estado de error— y son
- *  cuatro líneas: se comparte para que no diverjan, no por ahorrar. */
 /**
- * Etiqueta, control y —cuando lo hay— su error. Existe porque la pestaña tiene
- * ocho campos y los tres trozos tienen que ir SIEMPRE al mismo nivel: `.sp-label-field`,
- * `--sp-gap-label` de separación y el error en `--sp-danger`, que es el rol que
- * el sistema reserva para el asterisco de obligatorio y el aviso de campo.
+ * Una fila «rótulo — campo» de una tarjeta (rediseño B10, maqueta `perfil`):
+ * en teléfono y Duo cerrado el rótulo va ENCIMA del valor; desde 640 px, a la
+ * izquierda en una columna de 168. El campo no lleva caja: es la fila entera
+ * la que se marca con el contorno de foco (`focus-within`). El error, debajo,
+ * en `--mal-tinta`. El `htmlFor` ata el rótulo a su control (antes no lo
+ * estaba: el lector de pantalla no lo nombraba).
  */
-function Campo({ etiqueta, obligatorio, error, children }: {
+function Campo({ etiqueta, obligatorio, error, htmlFor, children }: {
   etiqueta: string
   obligatorio?: boolean
   error?: string | null
+  htmlFor?: string
   children: React.ReactNode
 }) {
   return (
-    <div className="min-w-0">
-      <label className="sp-label-field mb-[var(--sp-gap-label)] block">
+    <div className="-mx-2 grid min-w-0 grid-cols-1 gap-0.5 rounded-[10px] px-2 pt-2.5 pb-1 focus-within:outline-2 focus-within:outline-offset-[-2px] focus-within:outline-enlace sm:grid-cols-[168px_minmax(0,1fr)] sm:items-start sm:gap-4 sm:py-1">
+      <label htmlFor={htmlFor} className="text-[13px] leading-[18px] text-tinta2 sm:pt-[13px]">
         {etiqueta}
-        {obligatorio && <span className="text-[var(--sp-danger)]"> *</span>}
+        {obligatorio && <span className="text-mal-tinta"> *</span>}
       </label>
-      {children}
-      {error && (
-        <p className="mt-[var(--sp-1)] text-[length:var(--sp-fs-legal)] text-[var(--sp-danger)]">{error}</p>
-      )}
+      <div className="min-w-0">
+        {children}
+        {error && <p className="k-campo-error pb-2">{error}</p>}
+      </div>
     </div>
   )
 }
 
+/** El control dentro de una fila: sin caja, a 15 px, alto táctil de 44.
+ *  ⚠️ `k-campo-sin-caja` (sistema.css) gana a la regla `html.dark input`
+ *  (`!important`, ThemeProvider) que en oscuro le ponía la caja `--sup2`. */
+const CAMPO_FILA = 'block w-full min-h-11 border-0 bg-transparent p-0 text-[15px] leading-5 text-tinta placeholder:text-tinta3 outline-none focus:outline-none k-campo-sin-caja'
+
+/** Una tarjeta de filas separadas por la línea fina del kit. */
+const TARJETA_FILAS = 'k-tarjeta flex flex-col divide-y divide-linea py-1'
+
+/** La ceja y el título. Sale dos veces —pantalla y estado de error—. */
 function CabeceraPerfil() {
   return (
-    <div className="mb-[var(--sp-gap-block)]">
-      <p className="sp-label">Cuenta</p>
-      <h1 className="sp-title-page mt-[var(--sp-gap-title-sub)]">Mi perfil</h1>
+    <div className="mb-4">
+      <p className="k-t-rotulo">Cuenta</p>
+      <h1 className="k-t-pantalla mt-0.5">Mi perfil</h1>
     </div>
   )
 }
@@ -187,6 +203,7 @@ export default function PerfilPage() {
   const gcalError = searchParams.get('gcal_error')
   const gcalAviso = gcalError ? AVISOS_GCAL[gcalError] ?? null : null
   const toast = useToast()
+  const { dark, toggle } = useTheme()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState<FormData>({
@@ -203,6 +220,8 @@ export default function PerfilPage() {
      `nombre_display ?? nombre` del repositorio resuelve a éste y editarlo se ve
      en toda la app —recetas, hoja frontal, títulos de evento de Google—. */
   const [nombreClinica, setNombreClinica] = useState('')
+  /* K3 (punto 12): el huso de la clínica, con el que sale propuesto el de un consultorio nuevo. */
+  const [husoClinica, setHusoClinica] = useState<string | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(null)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(true)
@@ -468,6 +487,7 @@ export default function PerfilPage() {
       }
       if (clinicaData.clinica) {
         nombreCargado = clinicaData.clinica.nombre ?? ''
+        setHusoClinica(typeof clinicaData.clinica.timezone === 'string' ? clinicaData.clinica.timezone : null)
         aparienciaCargada = {
           color_primario: clinicaData.clinica.color_primario || COLOR_DEFECTO.primario,
           color_secundario: clinicaData.clinica.color_secundario || COLOR_DEFECTO.secundario,
@@ -798,6 +818,15 @@ export default function PerfilPage() {
     setRecreandoGcal(false)
   }
 
+  /* El engrane «Ajustes» de la barra enlaza a `#perfil-sec-ajustes`. El
+     navegador no puede desplazarse a la sección mientras se pinta el esqueleto:
+     se hace al terminar de cargar, una vez por ancla. */
+  useEffect(() => {
+    if (loading || loadingProfile) return
+    const id = window.location.hash.slice(1)
+    if (id) document.getElementById(id)?.scrollIntoView({ block: 'start' })
+  }, [loading, loadingProfile])
+
   if (loading || loadingProfile) return <PerfilSkeleton />
 
   /* «No pude» tiene pantalla propia, y no es el esqueleto. Reintentar vuelve a
@@ -805,12 +834,11 @@ export default function PerfilPage() {
      propio botón de reintento dentro de su pestaña. */
   if (errorCarga) {
     return (
-      <div className="max-w-[960px] mx-auto animate-slide-up">
+      <div className="mx-auto max-w-[960px]">
         <CabeceraPerfil />
-        <AvisoColumna
-          icono={WifiOff}
+        <EstadoError
           mensaje="No se pudieron cargar tus datos. Revisa tu conexión e inténtalo de nuevo."
-          onReintentar={cargarDatos}
+          alReintentar={cargarDatos}
         />
       </div>
     )
@@ -836,23 +864,21 @@ export default function PerfilPage() {
     apellido_paterno: form.apellido_paterno,
   }).trim()
 
-  const inputClass = "w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:outline-none focus:ring-2 focus:ring-[#1e5fa8]/25 focus:border-[#1e5fa8]/50 focus:bg-white transition-all"
+  const errorCedula = form.cedula_profesional ? validarCedula(form.cedula_profesional) : null
+  const errorCedulaEsp = form.cedula_especialidad ? validarCedula(form.cedula_especialidad) : null
 
   return (
-    /* 960 px: el área útil real a 1280 de ventana —el viewport de referencia—
-       una vez descontado el menú lateral y el relleno del layout. Es la misma
-       medida del expediente rediseñado, no la del mockup (1180) ni la del
-       dashboard (1044). */
-    /* ⚠️ EL RELLENO INFERIOR LE HACE SITIO A LA BARRA, Y HACE FALTA EN LOS DOS
-       ANCHOS: la barra está fuera del flujo (`fixed`) y flota sobre el
-       contenido, así que sin esto taparía la última card al llegar al final.
-       Los números son altos MEDIDOS de la barra más aire: 96 en escritorio (una
-       fila de 72 más los 16 que la separan del borde) y 148 en móvil (140 con
-       las dos líneas de mensaje y los botones de 48), y ahí encima el área
-       segura, porque a sangre la barra llega al borde físico.
+    /* 960 px: la columna de la maqueta (640 de formulario + 264 de la tarjeta
+       de identidad en `esc`, más el hueco), centrada en el área de contenido
+       (CALMA §14). */
+    /* ⚠️ EL RELLENO INFERIOR LE HACE SITIO A LA BARRA, Y HACE FALTA EN TODOS
+       LOS FORMATOS: la barra está fuera del flujo (`fixed`) y flota sobre el
+       contenido, así que sin esto taparía la última tarjeta al llegar al final.
+       Los números son altos MEDIDOS de la barra más aire: 96 en ancho y 148 en
+       teléfono (dos líneas de mensaje y botones de 44), más el área segura.
        Sólo cuando hay cambios: sin ellos la barra está fuera de pantalla y esto
        sería una franja en blanco. */
-    <div className={`max-w-[960px] mx-auto animate-slide-up ${hayCambios ? 'pb-[96px] max-sm:pb-[calc(148px+env(safe-area-inset-bottom,0px))]' : ''}`}>
+    <div className={`mx-auto max-w-[960px] ${hayCambios ? 'pb-[96px] max-sm:pb-[calc(148px+env(safe-area-inset-bottom,0px))]' : ''}`}>
 
       <CabeceraPerfil />
 
@@ -860,38 +886,17 @@ export default function PerfilPage() {
 
       <form id={ID_FORM} onSubmit={handleSubmit}>
 
-        {/* ⚠️ `items-start` ES LO QUE HACE POSIBLE EL `sticky` DE LA COLUMNA.
-            Sin él la celda se estira a la altura de la fila, la columna mide
-            tanto como el cuerpo y no le queda recorrido por el que pegarse.
+        {/* ⚠️ `items-start` ES LO QUE HACE POSIBLE EL `sticky` DE LA COLUMNA DE
+            IDENTIDAD en `esc`: sin él la celda se estira a la altura de la fila
+            y no le queda recorrido por el que pegarse.
+            ⚠️ LA SEGUNDA COLUMNA SÓLO EXISTE EN DATOS. La tarjeta de identidad
+            es el contexto de lo que se edita al lado; en Consultorios y en
+            Google Calendar no acompaña a nada. En `esc` va a la DERECHA (264,
+            maqueta `perfil`); en el resto, arriba, antes de las secciones. */}
+        <div className={`mt-5 grid grid-cols-1 items-start gap-6 ${pestana === 'datos' ? 'esc:grid-cols-[minmax(0,1fr)_264px]' : ''}`}>
 
-            ⚠️ 310 PX, Y ES UN SUELO MEDIDO, NO UN NÚMERO REDONDO. El anexo del
-            spec dice 330; se bajó para dar ese ancho al cuerpo, y no se puede
-            bajar más. Lo que lo fija es la fila de cédulas de la tarjeta de
-            identidad, que necesita 257 px de interior con una fuente tipo Segoe
-            UI (medido: «Céd. profesional» 118 + 18 de separación + «Céd.
-            especialidad» 121) más los 42 de relleno y borde de la card: 299.
-            Con 310 quedan 11 px de margen. A 290 las dos cédulas ya se parten
-            en dos filas.
-            El nombre del médico aguanta en dos líneas hasta 300; por debajo se
-            va a tres.
-
-            ⚠️ Y EL TOTAL DE 960 NO PUEDE CRECER: a 1280 de ventana el
-            contenedor YA ocupa todo lo disponible (1280 − 256 del menú lateral
-            − 64 del relleno de `(app)/layout.tsx` = 960). Todo lo que gane el
-            cuerpo tiene que salir de esta columna, y esta columna no da más. */}
-        {/* ⚠️ LA SEGUNDA COLUMNA SÓLO EXISTE EN DATOS. La tarjeta de identidad
-            es el contexto de los datos que se editan al lado —el nombre, las
-            cédulas, la firma y los colores que se están tocando—; en
-            Consultorios y en Google Calendar no acompaña a nada, y en móvil,
-            donde se apila encima, obligaba a pasarla de largo para llegar al
-            contenido de esas dos pestañas.
-            Al desaparecer la columna, la rejilla se queda en `grid-cols-1` y
-            esas dos pestañas ocupan los 960 px enteros en vez de 628. */}
-        <div className={`mt-[var(--sp-gap-band)] grid grid-cols-1 items-start gap-[var(--sp-5-5)] ${pestana === 'datos' ? 'lg:grid-cols-[310px_minmax(0,1fr)]' : ''}`}>
-
-          {/* ── Región 2 · columna fija ── */}
           {pestana === 'datos' && (
-          <aside className="lg:sticky lg:top-[var(--sp-6)]">
+          <aside className="esc:sticky esc:top-6 esc:order-2">
             <TarjetaIdentidad
               nombre={componerNombreMedicoCompleto(form)}
               especialidad={especialidades.filter(Boolean).join(' · ')}
@@ -907,337 +912,193 @@ export default function PerfilPage() {
           )}
 
           {/* ── Cuerpo de la pestaña activa ── */}
-          <div className="min-w-0 flex flex-col gap-[var(--sp-gap-block)]">
+          <div className="flex min-w-0 flex-col gap-7">
 
             {pestana === 'datos' && (<>
 
               {/* ── §3.1 · Datos profesionales ──────────────────────────── */}
-              <section className="sp-card flex flex-col gap-[var(--sp-4)]">
-                <CabeceraCard
-                  titulo="Datos profesionales"
-                  apoyo="Aparecen en las recetas, solicitudes y documentos que emites."
-                />
-
-                {/* ── LOS CUATRO CAMPOS DEL NOMBRE VAN JUNTOS EN UNA FILA ──
-                    Antes el apellido materno caía a la fila siguiente, al lado
-                    de las cédulas: quedaba separado del nombre y agrupado con
-                    datos que no son suyos, y era fácil dejarlo vacío sin caer
-                    en que forma parte del nombre. Las cédulas bajan a su propia
-                    fila, que es donde pertenecen.
-
-                    REPARTO A 566 px (los 608 de la columna menos el relleno y
-                    el borde de la card), medido con `<select>` real en cuatro
-                    fuentes: 80 px para el título y tres columnas iguales de
-                    149. Los 80 son el mínimo del desplegable —«Dra.» 31 px +
-                    26 de relleno + 2 de borde + ~20 de la flecha nativa—, no un
-                    número redondo; bajarlo recorta la flecha.
-
-                    ⚠️ `items-end` NO ES ADORNO, ES LO QUE MANTIENE LOS CAMPOS
-                    ALINEADOS. Las etiquetas van en mayúsculas y «APELLIDO
-                    MATERNO» mide 131-144 px según la fuente del sistema, contra
-                    149 de columna: el margen es de 5 px y `system-ui` no es la
-                    misma fuente en Windows, macOS y Linux. Si una etiqueta
-                    envuelve a dos líneas, `align-items: end` alinea los campos
-                    por abajo y la fila se mantiene recta —comprobado forzando
-                    el envolvimiento—. Sin esto, un equipo con la fuente un poco
-                    más ancha vería un campo descolgado. */}
-                <div className="grid grid-cols-2 items-end gap-[var(--sp-3)] sm:grid-cols-[80px_repeat(3,minmax(0,1fr))]">
-                  <Campo etiqueta="Título">
+              <section aria-labelledby="perfil-sec-datos">
+                <RotuloSeccion id="perfil-sec-datos" icono={UserCircle} titulo="Datos profesionales" />
+                <div className={TARJETA_FILAS}>
+                  <Campo etiqueta="Título" htmlFor="perfil-titulo">
                     <select
+                      id="perfil-titulo"
                       value={form.titulo}
                       onChange={e => setForm({ ...form, titulo: e.target.value })}
-                      className="sp-input"
+                      className={CAMPO_FILA}
                     >
                       <option value="Dr.">Dr.</option>
                       <option value="Dra.">Dra.</option>
                     </select>
                   </Campo>
-                  <Campo etiqueta="Nombre(s)" obligatorio>
+                  <Campo etiqueta="Nombre(s)" obligatorio htmlFor="perfil-nombres">
                     <input
+                      id="perfil-nombres"
                       type="text"
                       value={form.nombres}
                       onChange={e => setForm({ ...form, nombres: e.target.value })}
                       placeholder="Ej: Juan Carlos"
-                      className="sp-input"
+                      className={CAMPO_FILA}
                     />
                   </Campo>
-                  <Campo etiqueta="Apellido paterno" obligatorio>
+                  <Campo etiqueta="Apellido paterno" obligatorio htmlFor="perfil-paterno">
                     <input
+                      id="perfil-paterno"
                       type="text"
                       value={form.apellido_paterno}
                       onChange={e => setForm({ ...form, apellido_paterno: e.target.value })}
                       placeholder="Ej: García"
-                      className="sp-input"
+                      className={CAMPO_FILA}
                     />
                   </Campo>
-                  <Campo etiqueta="Apellido materno">
+                  <Campo etiqueta="Apellido materno" htmlFor="perfil-materno">
                     <input
+                      id="perfil-materno"
                       type="text"
                       value={form.apellido_materno}
                       onChange={e => setForm({ ...form, apellido_materno: e.target.value })}
                       placeholder="Opcional"
-                      className="sp-input"
+                      className={CAMPO_FILA}
                     />
                   </Campo>
-                </div>
-
-                {/* Las dos cédulas, en su propia fila. Sin `items-end`: aquí sí
-                    hay mensajes de error, y van DEBAJO del campo, así que
-                    alinear por abajo movería el campo del vecino en cuanto uno
-                    de los dos fallara. */}
-                <div className="grid grid-cols-2 gap-[var(--sp-3)]">
-                  <Campo
-                    etiqueta="Cédula profesional"
-                    error={form.cedula_profesional ? validarCedula(form.cedula_profesional) : null}
-                  >
+                  <Campo etiqueta="Cédula profesional" error={errorCedula} htmlFor="perfil-cedula">
                     <input
+                      id="perfil-cedula"
                       type="text"
                       inputMode="numeric"
                       value={form.cedula_profesional}
                       onChange={e => setForm({ ...form, cedula_profesional: e.target.value.replace(/\D/g, '').slice(0, 8) })}
                       placeholder="Ej: 87654321"
-                      className="sp-input"
+                      aria-invalid={errorCedula ? true : undefined}
+                      className={`${CAMPO_FILA} k-num`}
                     />
                   </Campo>
-                  <Campo
-                    etiqueta="Cédula de especialidad"
-                    error={form.cedula_especialidad ? validarCedula(form.cedula_especialidad) : null}
-                  >
+                  <Campo etiqueta="Cédula de especialidad" error={errorCedulaEsp} htmlFor="perfil-cedula-esp">
                     <input
+                      id="perfil-cedula-esp"
                       type="text"
                       inputMode="numeric"
                       value={form.cedula_especialidad}
                       onChange={e => setForm({ ...form, cedula_especialidad: e.target.value.replace(/\D/g, '').slice(0, 8) })}
                       placeholder="Ej: 3890214"
-                      className="sp-input"
+                      aria-invalid={errorCedulaEsp ? true : undefined}
+                      className={`${CAMPO_FILA} k-num`}
+                    />
+                  </Campo>
+                  {/* ⚠️ SIGUEN LOS DOS DESPLEGABLES, NO CHIPS. `EspecialidadSelector`
+                      lo comparten el onboarding y el alta de usuarios; se le pasa
+                      `selectClassName` (su API) y su «Agregar especialidad» se
+                      viste desde aquí con un selector de descendiente, sin tocarlo. */}
+                  <Campo etiqueta="Especialidad">
+                    <div className="pb-1.5 [&>div>button]:min-h-11 [&>div>button]:gap-1.5 [&>div>button]:text-[14px] [&>div>button]:font-semibold [&>div>button]:text-enlace">
+                      <EspecialidadSelector value={especialidades} onChange={setEspecialidades} selectClassName={CAMPO_FILA} />
+                    </div>
+                  </Campo>
+                  <Campo etiqueta="Universidad / Institución" htmlFor="perfil-universidad">
+                    <input
+                      id="perfil-universidad"
+                      type="text"
+                      value={form.universidad}
+                      onChange={e => setForm({ ...form, universidad: e.target.value })}
+                      placeholder="Ej: Universidad Nacional Autónoma de México"
+                      className={CAMPO_FILA}
                     />
                   </Campo>
                 </div>
-
-                {/* ⚠️ SIGUEN LOS DOS DESPLEGABLES, NO LOS CHIPS DEL MOCKUP.
-                    `EspecialidadSelector` lo comparten el onboarding y el alta
-                    de usuarios de la clínica, así que convertirlo en chips los
-                    cambiaría también a ellos. Se le pasa `selectClassName` para
-                    que sus `select` vistan como el resto de campos: es su API,
-                    no una modificación suya. */}
-                <Campo etiqueta="Especialidad">
-                  <EspecialidadSelector value={especialidades} onChange={setEspecialidades} selectClassName="sp-input" />
-                </Campo>
-
-                <Campo etiqueta="Universidad / Institución">
-                  <input
-                    type="text"
-                    value={form.universidad}
-                    onChange={e => setForm({ ...form, universidad: e.target.value })}
-                    placeholder="Ej: Universidad Nacional Autónoma de México"
-                    className="sp-input"
-                  />
-                </Campo>
+                <AyudaSeccion>Aparecen en las recetas, solicitudes y documentos que emites.</AyudaSeccion>
               </section>
 
               {/* ── §3.2 · Nombre de la clínica ─────────────────────────── */}
-              <section className="sp-card flex flex-col gap-[var(--sp-3)]">
-                <CabeceraCard titulo="Nombre de la clínica" />
-
-                {isAdmin ? (
-                  <div>
-                    <input
-                      type="text"
-                      value={nombreClinica}
-                      onChange={e => setNombreClinica(e.target.value)}
-                      maxLength={120}
-                      aria-label="Nombre de la clínica"
-                      placeholder="Ej: Clínica Ortointegra"
-                      className="sp-input"
-                    />
-                    {nombreClinicaVacio && (
-                      <p className="mt-[var(--sp-1)] text-[length:var(--sp-fs-legal)] text-[var(--sp-danger)]">
-                        El nombre de la clínica no puede quedar vacío.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  /* Al invitado se le enseña, pero no se le da un campo que su
-                     rol no puede guardar: `/api/me/clinica` responde 403 a quien
-                     no administra, así que un input editable sería una promesa
-                     que el servidor rompe. */
-                  <p className="truncate text-[length:var(--sp-fs-body)] text-[var(--sp-ink-700)]">
-                    {nombreClinica || '—'}
-                  </p>
-                )}
-
-                <p className="sp-hint">
+              <section aria-labelledby="perfil-sec-clinica">
+                <RotuloSeccion id="perfil-sec-clinica" icono={Building2} titulo="Nombre de la clínica" />
+                <div className={TARJETA_FILAS}>
+                  {isAdmin ? (
+                    <Campo
+                      etiqueta="Nombre de la clínica"
+                      htmlFor="perfil-clinica"
+                      error={nombreClinicaVacio ? 'El nombre de la clínica no puede quedar vacío.' : null}
+                    >
+                      <input
+                        id="perfil-clinica"
+                        type="text"
+                        value={nombreClinica}
+                        onChange={e => setNombreClinica(e.target.value)}
+                        maxLength={120}
+                        placeholder="Ej: Clínica Ortointegra"
+                        aria-invalid={nombreClinicaVacio || undefined}
+                        className={CAMPO_FILA}
+                      />
+                    </Campo>
+                  ) : (
+                    /* Al invitado se le enseña, pero no se le da un campo que su
+                       rol no puede guardar: `/api/me/clinica` responde 403 a quien
+                       no administra, así que un input editable sería una promesa
+                       que el servidor rompe. */
+                    <Campo etiqueta="Nombre de la clínica">
+                      <p className="flex min-h-11 items-center truncate text-[15px] text-tinta">{nombreClinica || '—'}</p>
+                    </Campo>
+                  )}
+                </div>
+                <AyudaSeccion>
                   Es el nombre de la clínica, distinto al de cada consultorio.
                   {!isAdmin && ' Sólo quien administra la clínica puede cambiarlo.'}
-                </p>
+                </AyudaSeccion>
               </section>
 
               {/* ── §3.3 · Firma y logo ─────────────────────────────────────
-                  ⚠️ APILADO, NO EN DOS COLUMNAS COMO EL MOCKUP, Y LA APP MANDA.
-                  El spec dibuja firma y logo lado a lado porque supone una firma
-                  reducida a previsualización más dos botones. La real,
-                  `FirmaCaptura`, es un flujo entero de captura —subir o dibujar,
-                  lienzo, previsualización sobre claro y sobre oscuro— que no
-                  entra en los ~296 px de media columna, y no se puede adaptar
-                  porque lo comparte el onboarding. */}
-              <section className="sp-card flex flex-col gap-[var(--sp-4)]">
-                <CabeceraCard
-                  titulo={isAdmin ? 'Firma y logo' : 'Firma'}
-                  apoyo="Se aplican en tus documentos y PDFs."
-                />
+                  ⚠️ APILADO: `FirmaCaptura` es un flujo entero de captura (subir o
+                  dibujar, lienzo, previsualización sobre claro y oscuro) que
+                  comparte el onboarding; no entra en media columna. */}
+              <section aria-labelledby="perfil-sec-firma">
+                <RotuloSeccion id="perfil-sec-firma" icono={PenLine} titulo={isAdmin ? 'Firma y logo' : 'Firma'} />
+                <div className="k-tarjeta flex flex-col esc:p-5">
+                  <div className="flex flex-col gap-3">
+                    <p className="k-t-fila">Firma autógrafa</p>
+                    {/* La revalidación va AQUÍ y no dentro de `FirmaCaptura`
+                        porque ese componente lo comparte el onboarding, y allí
+                        invalidar esta clave a media captura haría que el gate
+                        recalculara y desmontara el modal antes de tiempo. */}
+                    <FirmaCaptura
+                      firmaActual={firmaUrl}
+                      onFirmaCambiada={url => { setFirmaUrl(url); revalidar(CLAVE_ESTADO_PERFIL) }}
+                    />
+                    <p className="text-[13px] leading-[18px] text-tinta2">
+                      La firma se guarda en cuanto la capturas: no depende del botón de guardar.
+                    </p>
+                  </div>
 
-                <div className="flex flex-col gap-[var(--sp-2-5)]">
-                  <p className="sp-label-field">Firma autógrafa</p>
-                  {/* La revalidación va AQUÍ y no dentro de `FirmaCaptura`
-                      porque ese componente lo comparte el onboarding, y allí
-                      invalidar esta clave a media captura haría que el gate
-                      recalculara y desmontara el modal antes de tiempo. */}
-                  <FirmaCaptura
-                    firmaActual={firmaUrl}
-                    onFirmaCambiada={url => { setFirmaUrl(url); revalidar(CLAVE_ESTADO_PERFIL) }}
-                  />
-                  <p className="sp-hint">
-                    La firma se guarda en cuanto la capturas: no depende del botón de guardar.
-                  </p>
-                </div>
-
-                {isAdmin && (
-                  <div
-                    className="flex flex-col gap-[var(--sp-2-5)] pt-[var(--sp-4)]"
-                    style={{ borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' }}
-                  >
-                    <p className="sp-label-field">Logo del consultorio</p>
-                    <div className="flex items-center gap-[var(--sp-4)]">
-                      <div
-                        className="h-[86px] w-[86px] shrink-0 flex items-center justify-center overflow-hidden rounded-[var(--sp-r-card-inner)] bg-[var(--sp-surface-sunken)]"
-                        style={logoMostrado
-                          ? { border: 'var(--sp-bw-hair) solid var(--sp-line-card)' }
-                          : { border: 'var(--sp-bw-dash) dashed var(--sp-line-dash)' }}
-                      >
-                        {logoMostrado
-                          ? <img src={logoMostrado} alt="Logo del consultorio" className="max-h-[58px] max-w-[58px] object-contain" />
-                          : <Upload size={18} className="text-[var(--sp-ink-150)]" />}
-                      </div>
-
-                      <div className="flex min-w-0 flex-col items-start gap-[var(--sp-2)]">
-                        {/* ⚠️ `data-onboard` ES UN ANCLA DE `OnboardingGuide`, que
-                            lo busca con `querySelector` (OnboardingGuide.tsx:255).
-                            Vive dentro de la pestaña Datos, que es la de entrada y
-                            la que borra `?tab` de la URL, así que un `/perfil` a
-                            secas siempre lo monta. Con `?tab=` de otra pestaña el
-                            consejo sale sin flecha —`HighlightArrow` no encuentra
-                            el nodo y no pinta nada— y la flecha aparece sola al
-                            abrir Datos, porque relee en cada frame. No lo muevas a
-                            otra pestaña. */}
-                        <button
-                          type="button"
-                          onClick={() => fileRef.current?.click()}
-                          data-onboard="subir-logo"
-                          className="sp-btn sp-btn--compact"
-                        >
-                          {logoMostrado ? 'Cambiar logo' : 'Subir logo'}
-                        </button>
-
-                        {/* ⚠️ SÓLO CUANDO HAY UN ARCHIVO ELEGIDO SIN GUARDAR, y
-                            antes no era así. El botón decía «Quitar» también sobre
-                            un logo ya guardado, y ahí no quitaba nada: sólo
-                            limpiaba la previsualización local, porque no existe
-                            endpoint que borre el logo de la clínica —el PUT de
-                            `/api/me/clinica` no toca `logo_url`—. Al recargar
-                            reaparecía. Enseñarlo únicamente sobre una selección
-                            pendiente es lo único que hoy es verdad. Cuando exista
-                            el borrado de verdad, ése es el momento de devolverlo
-                            para el logo guardado. */}
-                        {logoPreview && (
-                          <button type="button" onClick={quitarLogo} className="sp-btn sp-btn--compact">
-                            <X size={12} /> Descartar selección
-                          </button>
-                        )}
-
-                        <p className="sp-hint">PNG, JPG, SVG · se optimiza a máx. 150 KB</p>
-                      </div>
-                    </div>
+                  {isAdmin && (
+                    <SeccionLogo
+                      logoMostrado={logoMostrado}
+                      hayPendiente={Boolean(logoPreview)}
+                      onElegir={() => fileRef.current?.click()}
+                      onDescartar={quitarLogo}
+                    />
+                  )}
+                  {isAdmin && (
                     <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,.svg" onChange={onSelectLogo} className="hidden" />
-                  </div>
-                )}
+                  )}
 
-                {isAdmin && (
-                  <div
-                    className="flex flex-col gap-[var(--sp-3-5)] pt-[var(--sp-4)]"
-                    style={{ borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' }}
-                  >
-                    <div className="flex flex-col gap-[var(--sp-2-5)]">
-                      <p className="sp-label-field">Paleta de colores</p>
-                      <div className="grid grid-cols-2 gap-[var(--sp-2-5)] sm:grid-cols-3">
-                        {PALETAS.map(pa => {
-                          const activa = pa.primario === apariencia.color_primario
-                            && pa.secundario === apariencia.color_secundario
-                          return (
-                            <button
-                              key={pa.nombre}
-                              type="button"
-                              aria-pressed={activa}
-                              onClick={() => setApariencia(a => ({ ...a, color_primario: pa.primario, color_secundario: pa.secundario }))}
-                              className="flex items-center gap-[var(--sp-2)] rounded-[var(--sp-r-icon-md)] px-[13px] py-[11px] text-left transition-colors"
-                              /* El borde de la activa es 1.5 px y el de las demás
-                                 1: con `border-box` la diferencia se come relleno,
-                                 no mueve la retícula. */
-                              style={activa
-                                ? { border: 'var(--sp-bw-accent) solid var(--sp-primary)', background: 'var(--sp-primary-bg-soft)' }
-                                : { border: 'var(--sp-bw-hair) solid var(--sp-line-control)', background: 'var(--sp-surface)' }}
-                            >
-                              <span className="flex shrink-0 gap-[3px]">
-                                <MuestraColor color={pa.primario} />
-                                <MuestraColor color={pa.secundario} />
-                              </span>
-                              <span className="min-w-0 truncate text-[length:var(--sp-fs-hint)] font-semibold text-[var(--sp-ink-700)]">
-                                {pa.nombre}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-[var(--sp-3)]">
-                      {([
-                        { etiqueta: 'Color primario', clave: 'color_primario' as const },
-                        { etiqueta: 'Color secundario', clave: 'color_secundario' as const },
-                      ]).map(({ etiqueta, clave }) => (
-                        <Campo key={clave} etiqueta={etiqueta}>
-                          <div
-                            className="flex min-h-[var(--sp-tap)] items-center gap-[var(--sp-2)] rounded-[var(--sp-r-field)] bg-[var(--sp-surface-sunken)] px-[13px]"
-                            style={{ border: 'var(--sp-bw-hair) solid var(--sp-line-control)' }}
-                          >
-                            <input
-                              type="color"
-                              value={apariencia[clave]}
-                              onChange={e => setApariencia(a => ({ ...a, [clave]: e.target.value }))}
-                              aria-label={etiqueta}
-                              className="h-[22px] w-[22px] shrink-0 cursor-pointer rounded-[var(--sp-r-checkbox)] border-0 bg-transparent p-0"
-                            />
-                            <span className="font-mono text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-600)]">
-                              {apariencia[clave]}
-                            </span>
-                          </div>
-                        </Campo>
-                      ))}
-                    </div>
-
-                    <div>
-                      <p className="sp-label-field mb-[var(--sp-gap-label)]">Vista previa del encabezado en PDFs</p>
-                      <VistaPreviaEncabezado
-                        nombre={componerNombreMedicoCompleto(form)}
-                        especialidad={especialidades.filter(Boolean).join(' · ')}
-                        cedulaProfesional={form.cedula_profesional}
-                        cedulaEspecialidad={form.cedula_especialidad}
-                        logoUrl={logoMostrado}
-                        colorPrimario={apariencia.color_primario}
-                        colorSecundario={apariencia.color_secundario}
-                      />
-                    </div>
-                  </div>
-                )}
+                  {isAdmin && (
+                    <SeccionPaleta
+                      apariencia={apariencia}
+                      onCambiar={(primario, secundario) => setApariencia(a => ({ ...a, color_primario: primario, color_secundario: secundario }))}
+                      onCambiarUno={(clave, valor) => setApariencia(a => ({ ...a, [clave]: valor }))}
+                      vistaPrevia={
+                        <VistaPreviaEncabezado
+                          nombre={componerNombreMedicoCompleto(form)}
+                          especialidad={especialidades.filter(Boolean).join(' · ')}
+                          cedulaProfesional={form.cedula_profesional}
+                          cedulaEspecialidad={form.cedula_especialidad}
+                          logoUrl={logoMostrado}
+                          colorPrimario={apariencia.color_primario}
+                          colorSecundario={apariencia.color_secundario}
+                        />
+                      }
+                    />
+                  )}
+                </div>
+                <AyudaSeccion>Se aplican en tus documentos y PDFs.</AyudaSeccion>
               </section>
 
               {/* ── §3.4 · Mis consultorios (resumen) ───────────────────── */}
@@ -1248,8 +1109,7 @@ export default function PerfilPage() {
 
             </>)}
 
-            {pestana === 'consultorios' && (<>
-
+            {pestana === 'consultorios' && (
               <PanelConsultorios
                 consultorios={consultorios}
                 cargando={loadingConsultorios}
@@ -1262,11 +1122,9 @@ export default function PerfilPage() {
                 puedeBorrar={puedeIniciarBorrado}
                 motivoNoBorrar={tooltipBorrar}
               />
+            )}
 
-            </>)}
-
-            {pestana === 'google' && (<>
-
+            {pestana === 'google' && (
               <PanelGoogleCalendar
                 esAdmin={isAdmin}
                 estado={gcalEstado}
@@ -1280,8 +1138,9 @@ export default function PerfilPage() {
                 onRecrear={() => setConfirmarRecrearGcal(true)}
                 onDesconectar={desconectarGcal}
               />
+            )}
 
-            </>)}
+            <GrupoAjustes dark={dark} alternarTema={toggle} />
 
           </div>
         </div>
@@ -1289,82 +1148,73 @@ export default function PerfilPage() {
       </form>
 
       {/* ── Región 6 · Barra de guardado ────────────────────────────────
-          ⚠️ VA EN UN PORTAL, Y NO ES POR GUSTO: SIN ÉL, `position: fixed` NO
-          SE FIJA A LA VENTANA. El contenedor de esta pantalla lleva
-          `animate-slide-up`, que en `globals.css:866` es
-          `animation: … both` MÁS `will-change: transform, opacity`. Cualquiera
-          de las dos cosas basta para convertir ese div en BLOQUE CONTENEDOR de
-          todo `position: fixed` que cuelgue debajo: la barra se anclaba al
-          contenedor y se iba con el scroll, tapando lo que pasaba por debajo.
-          Es la MISMA trampa que `globals.css:933-937` ya documenta para
-          `.animate-page-enter`, que se arregló cambiando su `both` por
-          `backwards`. Aquí no se toca la hoja compartida —`animate-slide-up` la
-          usa media app— sino que la barra se saca del árbol.
+          ⚠️ VA EN UN PORTAL, Y NO ES POR GUSTO: un ancestro con `transform`,
+          `will-change` o una animación con relleno se convierte en BLOQUE
+          CONTENEDOR de todo `position: fixed` que cuelgue debajo, y la barra se
+          iría con el scroll. Fuera del árbol se fija a la ventana pase lo que
+          pase arriba.
           ⚠️ POR ESO EL BOTÓN LLEVA `form={ID_FORM}`: al portarse a `body` deja
           de ser descendiente del `<form>` y sin ese atributo el envío no
           dispara nada.
 
-          ⚠️ LA ANIMACIÓN ES SÓLO `transform`. Entra deslizándose y sale igual,
-          en los DOS anchos: ya no hay `hidden`, la barra vive siempre montada y
-          se aparta con `translate-y-full`, que la saca entera de la ventana. Es
-          lo que permite animar la salida —un `display:none` no se anima— y de
-          paso no toca layout. `motion-reduce` la apaga.
+          ⚠️ LA ANIMACIÓN ES SÓLO `transform`. Entra deslizándose y sale igual:
+          la barra vive siempre montada y se aparta con `translate-y-full`.
+          `motion-reduce` la apaga.
 
-          ⚠️ LOS 1024 px DEL ENVOLTORIO NO SON UN MÁXIMO CAPRICHOSO: son los 960
-          del contenido MÁS el `lg:px-8` del layout, y con `lg:left-64`
-          —los 256 del menú— hacen que la barra caiga exactamente sobre la
-          columna de contenido a cualquier ancho de ventana. */}
+          ⚠️ LOS BORDES SON `--cromo-izq` / `--cromo-der` (`globals.css`, los
+          márgenes de <main>), NO UN `lg:left-64`: hay riel en `ext` y barra a
+          la derecha en `ih`, y con `inset-x-0` el «Guardar» quedaba debajo de
+          ellos y de la franja, sin poder tocarse. En `ext`/`ih` NADA fijo toca
+          el borde del lado de la franja salvo el cromo navy (regla del Duo
+          real). Abajo suma la franja del sistema (`--ib`). */}
       <Portal>
         <div
           aria-hidden={!hayCambios}
-          className={`fixed inset-x-0 bottom-0 z-30 transition-transform duration-[var(--sp-dur-base)] ease-[var(--sp-ease-out)] motion-reduce:transition-none lg:left-64 ${hayCambios ? 'translate-y-0' : 'pointer-events-none translate-y-full'}`}
+          className={`fixed bottom-0 left-[var(--cromo-izq)] right-[var(--cromo-der)] z-30 transition-transform duration-[var(--dur-entra)] ease-[var(--resorte-entra)] motion-reduce:transition-none ${hayCambios ? 'translate-y-0' : 'pointer-events-none translate-y-full'}`}
         >
-          <div className="mx-auto w-full max-w-[1024px] px-4 pb-[var(--sp-4)] max-sm:px-0 max-sm:pb-0 lg:px-8">
-            <div className="flex items-center gap-[var(--sp-gap-item)] rounded-[var(--sp-r-card)] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-3-5)] shadow-[var(--sp-shadow-raised)] max-sm:flex-col max-sm:items-stretch max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:px-[var(--sp-4)] max-sm:pb-[calc(var(--sp-3-5)+env(safe-area-inset-bottom,0px))]">
+          <div className="mx-auto w-full max-w-[1024px] px-4 pb-[calc(16px+var(--ib))] max-sm:px-0 max-sm:pb-0 lg:px-8">
+            <div className="flex items-center gap-4 rounded-[var(--r-tarjeta)] bg-sup px-5 py-3 shadow-[var(--sombra-capa)] max-sm:flex-col max-sm:items-stretch max-sm:gap-3 max-sm:rounded-none max-sm:px-4 max-sm:pb-[calc(12px+env(safe-area-inset-bottom,0px))]">
 
               <div className="min-w-0 flex-1">
-                <p className="text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-700)]">
+                <p className="text-[14px] font-semibold leading-5 text-tinta">
                   {hayCambios
                     ? `Tienes cambios sin guardar en ${listaSecciones}.`
                     : 'Sin cambios pendientes.'}
                 </p>
                 {/* La advertencia sólo aparece cuando «Descartar» está vivo, que es
                     cuando puede engañar. La firma se guarda al capturarla, así que
-                    descartar no la deshace — decirlo aquí es más barato que el
-                    soporte de quien creyó que sí. */}
+                    descartar no la deshace. */}
                 {hayCambios && (
-                  <p className="sp-hint mt-[2px]">
+                  <p className="mt-0.5 text-[13px] leading-[18px] text-tinta2">
                     La firma se guarda sola al capturarla: «Descartar» no la revierte.
                   </p>
                 )}
               </div>
 
-              <div className="shrink-0 flex items-center gap-[var(--sp-gap-item)] max-sm:grid max-sm:grid-cols-2">
+              {/* Secundario a la izquierda y principal a la DERECHA (CALMA §23.1);
+                  en teléfono, los dos a medias del ancho. */}
+              <div className="flex shrink-0 items-center gap-2 max-sm:grid max-sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={descartarCambios}
                   disabled={!puedeGuardar}
-                  className="sp-btn sp-btn--secondary max-sm:min-h-[var(--sp-ctrl-h-mobile)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="k-b k-b-quieto min-w-[104px]"
                 >
                   Descartar
                 </button>
-                {/* ⚠️ PRIMARIO CUANDO SE PUEDE PULSAR, SECUNDARIO CUANDO NO — y la
-                    condición es `puedeGuardar`, NO `hayCambios`. Con `hayCambios` el
-                    botón se quedaba en primario mientras guardaba, que es cuando
-                    además está `disabled`, y ahí caía en `.sp-btn--primary:disabled`:
-                    texto blanco sobre un gris azulado que no llega al 4.5:1. Atado a
-                    `puedeGuardar`, el inhabilitado es SIEMPRE el secundario
-                    —superficie neutra con tinta secundaria—, que es lo que el spec
-                    pide para que siga leyéndose. */}
+                {/* ⚠️ PRIMARIO CUANDO SE PUEDE PULSAR, QUIETO CUANDO NO — y la
+                    condición es `puedeGuardar`, NO `hayCambios`: mientras guarda
+                    está `disabled`, y un primario apagado (blanco sobre azul
+                    gris) no llega al 4.5:1. */}
                 <button
                   type="submit"
                   form={ID_FORM}
                   disabled={!puedeGuardar}
-                  className={`sp-btn ${puedeGuardar ? 'sp-btn--primary' : 'sp-btn--secondary'} max-sm:min-h-[var(--sp-ctrl-h-mobile)] disabled:cursor-not-allowed`}
+                  className={`k-b ${puedeGuardar ? 'k-b-prim' : 'k-b-quieto'} min-w-[104px]`}
                 >
                   {guardando || subiendoLogo
-                    ? <><Loader2 size={15} className="animate-spin" /> {subiendoLogo ? 'Subiendo logo...' : 'Guardando...'}</>
-                    : <><Save size={15} /> Guardar</>}
+                    ? <><Loader2 size={16} aria-hidden="true" className="animate-spin" /> {subiendoLogo ? 'Subiendo logo...' : 'Guardando...'}</>
+                    : <><Save size={16} aria-hidden="true" /> Guardar</>}
                 </button>
               </div>
 
@@ -1378,6 +1228,7 @@ export default function PerfilPage() {
         open={showAdd}
         onClose={() => setShowAdd(false)}
         onSuccess={handleConsultorioCreado}
+        husoDeFabrica={husoClinica}
       />
 
       {deletingConsultorio && (
@@ -1393,46 +1244,212 @@ export default function PerfilPage() {
       {/* La advertencia dice "se borran los eventos" y no "se borra el espejo"
           a propósito: hoy los eventos del calendario de Spinus son sólo reflejo
           de las citas, pero eso deja de ser cierto en cuanto se pueda agendar
-          desde Google, y para entonces el aviso ya tiene que estar puesto. */}
+          desde Google, y para entonces el aviso ya tiene que estar puesto.
+          Rediseño B10: alerta destructiva del catálogo (CALMA §13), con los
+          rótulos de hoy («Cancelar», «Sí, recrear») lado a lado. */}
       <ModalShell
         open={confirmarRecrearGcal}
         onClose={() => setConfirmarRecrearGcal(false)}
         title="Recrear calendario"
         subtitle="Google Calendar"
-        icon={<AlertTriangle size={18} className="text-red-600" />}
-        iconBg="bg-red-50"
-        maxWidth="max-w-md"
+        icon={<AlertTriangle aria-hidden="true" />}
+        variante="alerta"
+        tono="destruir"
         footer={
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 px-5 py-3.5">
-            <button
-              type="button"
-              onClick={() => setConfirmarRecrearGcal(false)}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
+          <>
+            <button type="button" autoFocus onClick={() => setConfirmarRecrearGcal(false)} className="k-b k-b-capa k-b-quieto">
               Cancelar
             </button>
-            <button
-              type="button"
-              onClick={recrearCalendarioGcal}
-              className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
-            >
+            <button type="button" data-principal onClick={recrearCalendarioGcal} className="k-b k-b-capa k-b-mal">
               Sí, recrear
             </button>
-          </div>
+          </>
         }
       >
-        <div className="px-5 py-5 space-y-3">
-          <p className="text-sm text-slate-700">
-            Se creará un calendario de Spinus nuevo en tu cuenta de Google.
-          </p>
-          <p className="text-sm text-red-800 bg-red-50 border border-red-100 rounded-xl px-4 py-3 leading-relaxed">
-            SE BORRA EL CALENDARIO ACTUAL Y TODOS LOS EVENTOS QUE CONTENGA.
-            Tus citas de Spinus NO se borran, pero las que ya existían dejarán de
-            aparecer en Google: sólo se sincronizarán de aquí en adelante.
-          </p>
-          <p className="text-sm text-slate-700">¿Continuar?</p>
-        </div>
+        <p>Se creará un calendario de Spinus nuevo en tu cuenta de Google.</p>
+        <p className="font-semibold text-mal-tinta">
+          SE BORRA EL CALENDARIO ACTUAL Y TODOS LOS EVENTOS QUE CONTENGA.
+          Tus citas de Spinus NO se borran, pero las que ya existían dejarán de
+          aparecer en Google: sólo se sincronizarán de aquí en adelante.
+        </p>
+        <p>¿Continuar?</p>
       </ModalShell>
     </div>
+  )
+}
+
+/* ── Piezas de la pestaña Datos (sólo presentación; el estado vive arriba) ── */
+
+/** Logo de la clínica, dentro de la tarjeta de firma (sólo quien administra). */
+function SeccionLogo({ logoMostrado, hayPendiente, onElegir, onDescartar }: {
+  logoMostrado: string | null
+  hayPendiente: boolean
+  onElegir: () => void
+  onDescartar: () => void
+}) {
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-linea pt-4">
+      <p className="k-t-fila">Logo del consultorio</p>
+      <div className="flex items-center gap-4">
+        <div
+          className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-tinta3"
+          style={logoMostrado ? { borderStyle: 'solid', borderColor: 'var(--linea)' } : undefined}
+        >
+          {logoMostrado
+            ? <img src={logoMostrado} alt="Logo del consultorio" className="max-h-[56px] max-w-[56px] object-contain" />
+            : <Upload size={18} aria-hidden="true" className="text-tinta2" />}
+        </div>
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* ⚠️ `data-onboard` ES UN ANCLA DE `OnboardingGuide`, que lo busca
+                con `querySelector`. Vive en la pestaña Datos (la de entrada). No
+                lo muevas a otra pestaña. */}
+            <button type="button" onClick={onElegir} data-onboard="subir-logo" className="k-b k-b-tonal">
+              {logoMostrado ? 'Cambiar logo' : 'Subir logo'}
+            </button>
+            {/* ⚠️ SÓLO CON UN ARCHIVO ELEGIDO SIN GUARDAR: no existe endpoint que
+                borre el logo guardado, así que «quitar» sobre él mentiría. */}
+            {hayPendiente && (
+              <button type="button" onClick={onDescartar} className="k-b k-b-texto">
+                <X size={16} aria-hidden="true" /> Descartar selección
+              </button>
+            )}
+          </div>
+          <p className="text-[13px] leading-[18px] text-tinta2">PNG, JPG, SVG · se optimiza a máx. 150 KB</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type ClaveColor = 'color_primario' | 'color_secundario'
+
+/** Paleta, los dos colores libres y la vista previa del encabezado del PDF. */
+function SeccionPaleta({ apariencia, onCambiar, onCambiarUno, vistaPrevia }: {
+  apariencia: Apariencia
+  onCambiar: (primario: string, secundario: string) => void
+  onCambiarUno: (clave: ClaveColor, valor: string) => void
+  vistaPrevia: React.ReactNode
+}) {
+  const colores: { etiqueta: string; clave: ClaveColor }[] = [
+    { etiqueta: 'Color primario', clave: 'color_primario' },
+    { etiqueta: 'Color secundario', clave: 'color_secundario' },
+  ]
+  return (
+    <div className="mt-4 flex flex-col border-t border-linea pt-4">
+      <p className="k-t-fila mb-3">Paleta de colores</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {PALETAS.map(pa => (
+          <BotonPaleta
+            key={pa.nombre}
+            paleta={pa}
+            activa={pa.primario === apariencia.color_primario && pa.secundario === apariencia.color_secundario}
+            onElegir={() => onCambiar(pa.primario, pa.secundario)}
+          />
+        ))}
+      </div>
+      <div className="mt-2 flex flex-col divide-y divide-linea">
+        {colores.map(({ etiqueta, clave }) => (
+          <Campo key={clave} etiqueta={etiqueta} htmlFor={`perfil-${clave}`}>
+            <div className="flex min-h-11 items-center gap-2.5">
+              <input
+                id={`perfil-${clave}`}
+                type="color"
+                value={apariencia[clave]}
+                onChange={e => onCambiarUno(clave, e.target.value)}
+                className="h-6 w-6 shrink-0 cursor-pointer rounded-[7px] border-0 bg-transparent p-0"
+              />
+              <span className="font-mono text-[14px] text-tinta2">{apariencia[clave]}</span>
+            </div>
+          </Campo>
+        ))}
+        <Campo etiqueta="Vista previa del encabezado en PDFs">
+          <div className="pt-1 pb-2 sm:pt-2.5">{vistaPrevia}</div>
+        </Campo>
+      </div>
+    </div>
+  )
+}
+
+/** Una de las seis paletas: los dos colores encimados y su nombre. */
+function BotonPaleta({ paleta, activa, onElegir }: {
+  paleta: { nombre: string; primario: string; secundario: string }
+  activa: boolean
+  onElegir: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={activa}
+      onClick={onElegir}
+      className={`k-pulsable relative flex min-h-[52px] items-center gap-2.5 rounded-[12px] py-2 pr-6 pl-3 text-left ${activa ? 'bg-sup outline-2 -outline-offset-2 outline-accion' : 'bg-sup2'}`}
+    >
+      <span className="flex shrink-0 items-center">
+        <MuestraColor color={paleta.primario} />
+        <MuestraColor color={paleta.secundario} encima />
+      </span>
+      <span className="min-w-0 text-[14px] font-semibold leading-[18px] text-tinta">{paleta.nombre}</span>
+      {activa && <Check size={14} aria-hidden="true" className="absolute top-1.5 right-1.5 text-accion" />}
+    </button>
+  )
+}
+
+/**
+ * Grupo «Ajustes» de Mi perfil (CALMA §23.11, aprobado; maqueta `perfil`):
+ * las mismas filas que el menú de ajustes del pie de la barra, con las mismas
+ * funciones de siempre (`useTheme` y el enlace al aviso).
+ *
+ * «Cerrar sesión» usa el MISMO manejador que la barra (`useCierreSesion`,
+ * exportado de `layout/Sidebar.tsx`): audita con `await`, limpia cachés y vacía
+ * la de configuración al desmontarse. No copies esa lógica aquí. Sin
+ * confirmación (CALMA §29.14); gira y no admite un segundo toque mientras audita.
+ *
+ * ⚠️ El enlace al aviso lleva `prefetch={false}` y `rel="noopener noreferrer"`
+ * por lo mismo que su gemelo de la barra: pestaña nueva, sin `window.opener`.
+ */
+function GrupoAjustes({ dark, alternarTema }: { dark: boolean; alternarTema: () => void }) {
+  const { handleLogout, cerrando } = useCierreSesion()
+  return (
+    <section aria-labelledby="perfil-sec-ajustes">
+      <RotuloSeccion id="perfil-sec-ajustes" icono={Settings} titulo="Ajustes" />
+      <div className="k-tarjeta k-lista py-1">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={dark}
+          onClick={alternarTema}
+          className="flex min-h-12 w-full items-center gap-3 text-left text-[15px] text-tinta"
+        >
+          <Moon size={20} aria-hidden="true" className="shrink-0 text-enlace" />
+          <span className="flex-1">Modo oscuro</span>
+          <span aria-hidden="true" className={`relative h-[30px] w-[50px] shrink-0 rounded-full ${dark ? 'bg-accion' : 'bg-tinta3'}`}>
+            <span className={`absolute top-[3px] left-[3px] h-6 w-6 rounded-full bg-[#fff] shadow-sm transition-transform duration-200 motion-reduce:transition-none ${dark ? 'translate-x-5' : ''}`} />
+          </span>
+        </button>
+        <Link
+          href="/privacidad"
+          target="_blank"
+          rel="noopener noreferrer"
+          prefetch={false}
+          className="flex min-h-12 items-center gap-3 text-[15px] text-tinta"
+        >
+          <ShieldCheck size={20} aria-hidden="true" className="shrink-0 text-enlace" />
+          <span className="flex-1">Aviso de Privacidad</span>
+          <ExternalLink size={16} aria-hidden="true" className="shrink-0 text-tinta2" />
+        </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={cerrando}
+          aria-busy={cerrando}
+          className="flex min-h-12 w-full items-center gap-3 text-left text-[15px] text-mal-tinta disabled:opacity-60"
+        >
+          {cerrando
+            ? <Loader2 size={20} aria-hidden="true" className="shrink-0 animate-spin motion-reduce:animate-none" />
+            : <LogOut size={20} aria-hidden="true" className="shrink-0" />}
+          <span className="flex-1">Cerrar sesión</span>
+        </button>
+      </div>
+    </section>
   )
 }

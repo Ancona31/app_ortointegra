@@ -1,0 +1,319 @@
+/**
+ * D11 · la sincronización con Google antes de reservar por enlace
+ * (`src/lib/reserva/sincronizarReserva.ts`). Todo en dobles: ni base ni
+ * Google. Lo que se prueba es la decisión: umbral de 60 s en turnos, sin tope
+ * al reservar (y espera del candado), ventana de 30 min, tope de tiempo que
+ * aborta la señal, clínicas sin Google y migraciones ausentes.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { OpcionesSincronizacion, ResultadoSincronizacion } from '@/lib/gcalSincronizacion'
+import type { ConexionGoogle } from '@/lib/gcalConexion'
+
+const CLINICA = '33333333-3333-4333-8333-333333333333'
+const OTRA = '99999999-9999-4999-8999-999999999999'
+
+const d = vi.hoisted(() => ({
+  conexion: null as ConexionGoogle | null | 'lanza',
+  /** Lo que devuelve cada pasada, en orden; 'cuelga' = no termina nunca (salvo abortada). */
+  pasadas: [] as Array<ResultadoSincronizacion['estado'] | 'cuelga' | 'controlada'>,
+  /** W: la pasada 'controlada' termina (o lanza) cuando la prueba lo dice. */
+  controlada: null as null | { terminar: (r: ResultadoSincronizacion) => void; lanzar: (e: Error) => void },
+  /** W: lo que la ruta entregó a `after()`; `afterLanza` = fuera de una petición. */
+  despues: [] as Array<() => unknown>,
+  afterLanza: false,
+  opciones: [] as OpcionesSincronizacion[],
+  frescura: { ultimaOk: null as string | null, ocupada: false } as { ultimaOk: string | null; ocupada: boolean } | 'ausente' | 'lanza',
+  /** La señal de la pasada colgada se abortó. */
+  abortada: false,
+  /** seg1: ¿queda cupo de pasadas para la clínica? Y cuántas veces se preguntó. */
+  cupo: true,
+  cupos: [] as unknown[],
+}))
+
+vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => ({}) }))
+vi.mock('next/server', () => ({
+  after: (tarea: () => unknown) => {
+    if (d.afterLanza) throw new Error('`after` was called outside a request scope.')
+    d.despues.push(tarea)
+  },
+}))
+vi.mock('@/lib/reserva/limitesReserva', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/reserva/limitesReserva')>()
+  return { ...real, dentroDeLimites: async (accion: string, s: unknown) => { d.cupos.push([accion, s]); return d.cupo } }
+})
+vi.mock('@/lib/gcalConexion', () => ({
+  resolverConexionClinica: async (_s: unknown, clinicaId: string) => {
+    if (d.conexion === 'lanza') throw new Error('base caída')
+    return d.conexion ? { ...d.conexion, clinicaId: d.conexion.clinicaId || clinicaId } : null
+  },
+}))
+vi.mock('@/lib/gcalSincronizacion', () => ({
+  sincronizarClinica: async (_c: ConexionGoogle, op: OpcionesSincronizacion) => {
+    d.opciones.push(op)
+    const paso = d.pasadas.shift() ?? 'omitida'
+    if (paso === 'controlada') {
+      return new Promise<ResultadoSincronizacion>((terminar, lanzar) => { d.controlada = { terminar, lanzar } })
+    }
+    if (paso === 'cuelga') {
+      return new Promise<ResultadoSincronizacion>(() => {
+        op.senal?.addEventListener('abort', () => { d.abortada = true })
+      })
+    }
+    return { estado: paso, cambios: 0, paginas: 0, errores: 0, restablecer: [] }
+  },
+}))
+vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/lib/gcalSincronizacionBase')>()
+  return {
+    SincronizacionNoDisponible: real.SincronizacionNoDisponible,
+    frescuraSincronizacion: async () => {
+      if (d.frescura === 'ausente') throw new real.SincronizacionNoDisponible('gcal_sync_frescura')
+      if (d.frescura === 'lanza') throw new Error('base caída')
+      return d.frescura
+    },
+  }
+})
+
+import {
+  sincronizarAntesDeReservar, MIN_INTERVALO_TURNOS_SEG, TIEMPO_GOOGLE_MS, VENTANA_TOLERADA_MS,
+} from '@/lib/reserva/sincronizarReserva'
+import { seudonimoClinica } from '@/lib/reserva/limitesReserva'
+
+const AHORA = Date.parse('2031-06-01T12:00:00Z')
+const conexion: ConexionGoogle = {
+  id: 'conexion-1', clinicaId: CLINICA, userId: 'dueno', rol: 'clinica', calendarId: 'cal', estado: 'activa', googleAccountEmail: null,
+}
+/** Reloj fijo; `dormir` no espera de verdad (las pruebas de espera usan su propio reloj). */
+const reloj = { ahora: () => AHORA, dormir: async () => undefined }
+const hace = (ms: number): string => new Date(AHORA - ms).toISOString()
+
+beforeEach(() => {
+  Object.assign(d, { conexion, pasadas: [], opciones: [], frescura: { ultimaOk: null, ocupada: false }, abortada: false, cupo: true, cupos: [], controlada: null, despues: [], afterLanza: false })
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+  vi.spyOn(console, 'error').mockImplementation(() => undefined)
+})
+
+describe('clínicas sin Google: sin cambios', () => {
+  it('sin conexión: seguir, sin pasada', async () => {
+    d.conexion = null
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.opciones).toHaveLength(0)
+  })
+
+  it('conexión sin calendario: seguir, sin pasada', async () => {
+    d.conexion = { ...conexion, calendarId: null }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('seguir')
+    expect(d.opciones).toHaveLength(0)
+  })
+
+  it('una conexión que no es de esa clínica no se sincroniza', async () => {
+    d.conexion = { ...conexion, clinicaId: OTRA }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.opciones).toHaveLength(0)
+  })
+
+  it('migraciones de C ausentes (no_disponible): seguir, como hoy', async () => {
+    d.pasadas = ['no_disponible']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+  })
+})
+
+describe('turnos (GET): umbral de 60 s', () => {
+  it('pasa a la pasada los 60 s mínimos (los impone gcal_sync_tomar)', async () => {
+    d.pasadas = ['ok']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('seguir')
+    expect(MIN_INTERVALO_TURNOS_SEG).toBe(60)
+    expect(d.opciones[0]).toMatchObject({ minIntervaloSeg: 60, actorId: 'reserva' })
+    expect(d.opciones[0].senal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('omitida porque la última buena es reciente: seguir, sin reintentar', async () => {
+    d.pasadas = ['omitida']
+    d.frescura = { ultimaOk: hace(20_000), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('seguir')
+    expect(d.opciones).toHaveLength(1)
+  })
+
+  it('omitida con otra pasada en curso: no espera (sólo el POST espera) y aplica la ventana', async () => {
+    d.pasadas = ['omitida', 'ok']
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS + 1), ocupada: true }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('no_por_ahora')
+    expect(d.opciones).toHaveLength(1)
+  })
+})
+
+describe('reservar (POST): siempre, sin el tope de 60 s', () => {
+  it('minIntervaloSeg 0', async () => {
+    d.pasadas = ['ok']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.opciones[0]).toMatchObject({ minIntervaloSeg: 0 })
+  })
+
+  it('candado ocupado por otra pasada: espera y hace la suya', async () => {
+    d.pasadas = ['omitida', 'omitida', 'ok']
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 10), ocupada: true }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.opciones).toHaveLength(3)
+  })
+
+  it('omitida sin candado tomado (espera creciente tras fallos): no gira, aplica la ventana', async () => {
+    d.pasadas = ['omitida', 'ok']
+    d.frescura = { ultimaOk: hace(5 * 60_000), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.opciones).toHaveLength(1)
+  })
+
+  it('la espera del candado no pasa del tope', async () => {
+    let t = AHORA
+    const lento = { ahora: () => t, dormir: async (ms: number) => { t += ms } }
+    d.pasadas = Array.from({ length: 100 }, () => 'omitida' as const)
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 2), ocupada: true }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', lento)).toBe('no_por_ahora')
+    expect(t - AHORA).toBeLessThanOrEqual(TIEMPO_GOOGLE_MS)
+    expect(d.opciones.length).toBeLessThan(100)
+  })
+})
+
+describe('seg1 (punto 8): tope por clínica de las pasadas que dispara el POST público', () => {
+  it('con cupo: una sola pregunta por petición, con la llave de la clínica, aunque espere el candado', async () => {
+    d.pasadas = ['omitida', 'omitida', 'ok']
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 10), ocupada: true }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.cupos).toEqual([['sincronizar', { clinica: seudonimoClinica(CLINICA) }]])
+    expect(seudonimoClinica(CLINICA)).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('sin cupo: no llama a Google y decide la ventana (reciente: seguir; vieja: no_por_ahora)', async () => {
+    d.cupo = false
+    d.pasadas = ['ok']
+    d.frescura = { ultimaOk: hace(10 * 60_000), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 2), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('no_por_ahora')
+    expect(d.opciones).toHaveLength(0)
+  })
+
+  it('clínica sin Google y GET de turnos: no cuentan contra el tope', async () => {
+    d.conexion = null
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    d.conexion = conexion
+    d.pasadas = ['ok']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('seguir')
+    expect(d.cupos).toEqual([])
+  })
+})
+
+describe('Google falla o tarda: ventana de 30 min', () => {
+  it.each(['error', 'parcial'] as const)('%s con la última buena de hace 10 min: seguir', async (estado) => {
+    d.pasadas = [estado]
+    d.frescura = { ultimaOk: hace(10 * 60_000), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+  })
+
+  it('sin_acceso (S3) con la última buena vieja: seguir (la RPC lo rechaza con su 404 uniforme)', async () => {
+    d.pasadas = ['sin_acceso']
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS * 4), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+  })
+
+  it('error con la última buena de hace 30 min justos o más: no_por_ahora', async () => {
+    d.pasadas = ['error']
+    d.frescura = { ultimaOk: hace(VENTANA_TOLERADA_MS), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('no_por_ahora')
+  })
+
+  it('error y nunca hubo una buena: no_por_ahora', async () => {
+    d.pasadas = ['error']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'turnos', reloj)).toBe('no_por_ahora')
+  })
+
+  it('Google colgado: responde al tope y ABORTA la señal', async () => {
+    vi.useFakeTimers()
+    try {
+      d.pasadas = ['cuelga']
+      d.frescura = { ultimaOk: hace(60 * 60_000), ocupada: false }
+      const v = sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)
+      await vi.advanceTimersByTimeAsync(TIEMPO_GOOGLE_MS)
+      expect(await v).toBe('no_por_ahora')
+      expect(d.abortada).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('el tope elegido es corto (≤ 4 s)', () => {
+    expect(TIEMPO_GOOGLE_MS).toBeLessThanOrEqual(4_000)
+  })
+})
+
+describe('tolerancia y fallos de la base', () => {
+  it('sin la migración de D11 (frescura ausente): seguir, como hoy', async () => {
+    d.pasadas = ['error']
+    d.frescura = 'ausente'
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+  })
+
+  it('no se puede leer la conexión ni la frescura: no_por_ahora (cerrado)', async () => {
+    d.conexion = 'lanza'
+    d.frescura = 'lanza'
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('no_por_ahora')
+  })
+
+  it('no se puede leer la conexión pero la última buena es reciente: seguir', async () => {
+    d.conexion = 'lanza'
+    d.frescura = { ultimaOk: hace(60_000), ocupada: false }
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+  })
+})
+
+describe('W · la pasada que pierde la carrera con el tope sigue dentro de after()', () => {
+  const OK: ResultadoSincronizacion = { estado: 'ok', cambios: 0, paginas: 1, errores: 0, restablecer: [] }
+
+  /** Responde al tope con la pasada aún en curso (temporizadores falsos, sin tiempo real). */
+  async function responderAlTope(): Promise<string> {
+    vi.useFakeTimers()
+    try {
+      d.pasadas = ['controlada']
+      d.frescura = { ultimaOk: hace(60 * 60_000), ocupada: false }
+      const v = sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)
+      await vi.advanceTimersByTimeAsync(TIEMPO_GOOGLE_MS)
+      return await v
+    } finally {
+      vi.useRealTimers()
+    }
+  }
+
+  it('el tope gana: la respuesta no espera, la pasada llega a after() y termina allí', async () => {
+    expect(await responderAlTope()).toBe('no_por_ahora')
+    expect(d.abortada || d.opciones[0].senal?.aborted).toBe(true)
+    expect(d.despues).toHaveLength(1)
+    let terminada = false
+    const tarea = Promise.resolve(d.despues[0]()).then(() => { terminada = true })
+    await Promise.resolve()
+    expect(terminada).toBe(false)
+    d.controlada?.terminar(OK)
+    await tarea
+    expect(terminada).toBe(true)
+  })
+
+  it('la pasada lanza dentro de after(): se atrapa (nada sin atrapar) y queda en el registro', async () => {
+    expect(await responderAlTope()).toBe('no_por_ahora')
+    const tarea = Promise.resolve(d.despues[0]())
+    d.controlada?.lanzar(new Error('base caída'))
+    await expect(tarea).resolves.toBeUndefined()
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('pasada tras el tope fallida'))
+  })
+
+  it('la pasada gana: no se llama a after()', async () => {
+    d.pasadas = ['ok']
+    expect(await sincronizarAntesDeReservar(CLINICA, 'reservar', reloj)).toBe('seguir')
+    expect(d.despues).toHaveLength(0)
+  })
+
+  it('fuera de una petición (after lanza): la respuesta sale igual, sin lanzar', async () => {
+    d.afterLanza = true
+    expect(await responderAlTope()).toBe('no_por_ahora')
+    d.controlada?.terminar(OK)
+    expect(d.despues).toHaveLength(0)
+  })
+})

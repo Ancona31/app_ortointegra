@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<title>Tu cita está confirmada</title>
+<!--
+  Correo de confirmación de cita para PACIENTES.
+  HTML compatible con clientes de correo (tablas + estilos en línea, sin fuentes web).
+  Variables: sustitúyelas por las de tu plantilla.
+    {{paciente_nombre}}      Nombre de pila del paciente
+    {{dia_semana}}           Jueves
+    {{fecha_corta}}          19 de noviembre
+    {{hora}}                 12:00 h
+    {{fecha_completa}}       jueves 19 de noviembre de 2026
+    {{medico_nombre}}        Dr. Admin Semilla Uno
+    {{consultorio_nombre}}   Consultorio Centro
+  Bloques OPCIONALES (bórralos si Spinus no tiene ese dato):
+    {{consultorio_direccion}}, {{consultorio_telefono}}
+-->
+</head>
+<body style="margin:0; padding:0; background-color:#edf0f5;">
+
+<!-- Texto de vista previa (se ve en la bandeja de entrada, no en el correo) -->
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; line-height:1px; color:#edf0f5;">
+  Tu cita con {{medico_nombre}} es el {{fecha_completa}} a las {{hora}}.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#edf0f5;">
+<tr>
+<td align="center" style="padding:32px 16px;">
+
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px; background-color:#ffffff; border:1px solid #e6ebf3; border-radius:14px; border-collapse:separate; overflow:hidden; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
+    <!-- Encabezado -->
+    <tr>
+      <td style="background-color:#1c3551; padding:28px 40px 26px 40px;">
+        <p style="margin:0; font-size:13px; line-height:18px; letter-spacing:1px; text-transform:uppercase; color:#9fb6d3; font-weight:600;">{{consultorio_nombre}}</p>
+        <p style="margin:6px 0 0 0; font-size:22px; line-height:28px; color:#ffffff; font-weight:700;">{{medico_nombre}}</p>
+      </td>
+    </tr>
+
+    <!-- Confirmación -->
+    <tr>
+      <td style="padding:36px 40px 8px 40px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="background-color:#e8f1fa; border-radius:999px; padding:6px 14px; font-size:13px; line-height:18px; font-weight:700; color:#2b63a6;">
+              &#10003;&nbsp; Cita confirmada
+            </td>
+          </tr>
+        </table>
+        <h1 style="margin:20px 0 0 0; font-size:24px; line-height:32px; font-weight:700; color:#1a2438;">Hola, {{paciente_nombre}}</h1>
+        <p style="margin:10px 0 0 0; font-size:16px; line-height:25px; color:#3d4759;">
+          Tu cita quedó registrada. Aquí tienes los datos para que la tengas a la mano.
+        </p>
+      </td>
+    </tr>
+
+    <!-- Fecha y hora (dato principal) -->
+    <tr>
+      <td style="padding:24px 40px 0 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f7f9fb; border:1px solid #e6ebf3; border-left:4px solid #2b63a6; border-radius:10px; border-collapse:separate;">
+          <tr>
+            <td style="padding:22px 24px;">
+              <p style="margin:0; font-size:14px; line-height:20px; font-weight:700; color:#2b63a6; text-transform:uppercase; letter-spacing:0.5px;">{{dia_semana}}</p>
+              <p style="margin:4px 0 0 0; font-size:28px; line-height:34px; font-weight:800; color:#1a2438;">{{fecha_corta}}</p>
+              <p style="margin:2px 0 0 0; font-size:20px; line-height:28px; font-weight:600; color:#1a2438;">{{hora}}</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Detalles -->
+    <tr>
+      <td style="padding:24px 40px 0 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="34%" style="padding:12px 0; border-bottom:1px solid #e6ebf3; font-size:15px; line-height:22px; color:#5b667a; vertical-align:top;">Médico</td>
+            <td style="padding:12px 0; border-bottom:1px solid #e6ebf3; font-size:15px; line-height:22px; color:#1a2438; font-weight:600;">{{medico_nombre}}</td>
+          </tr>
+          <tr>
+            <td width="34%" style="padding:12px 0; border-bottom:1px solid #e6ebf3; font-size:15px; line-height:22px; color:#5b667a; vertical-align:top;">Consultorio</td>
+            <td style="padding:12px 0; border-bottom:1px solid #e6ebf3; font-size:15px; line-height:22px; color:#1a2438; font-weight:600;">{{consultorio_nombre}}</td>
+          </tr>
+          <!-- OPCIONAL: dirección -->
+          <tr>
+            <td width="34%" style="padding:12px 0; border-bottom:1px solid #e6ebf3; font-size:15px; line-height:22px; color:#5b667a; vertical-align:top;">Dirección</td>
+            <td style="padding:12px 0; border-bottom:1px solid #e6ebf3; font-size:15px; line-height:22px; color:#1a2438; font-weight:600;">{{consultorio_direccion}}</td>
+          </tr>
+          <!-- /OPCIONAL -->
+          <tr>
+            <td width="34%" style="padding:12px 0; font-size:15px; line-height:22px; color:#5b667a; vertical-align:top;">Paciente</td>
+            <td style="padding:12px 0; font-size:15px; line-height:22px; color:#1a2438; font-weight:600;">{{paciente_nombre_completo}}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Recomendaciones -->
+    <tr>
+      <td style="padding:28px 40px 0 40px;">
+        <p style="margin:0 0 10px 0; font-size:16px; line-height:22px; font-weight:700; color:#1a2438;">Para tu consulta</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="22" style="font-size:15px; line-height:24px; color:#2b63a6; vertical-align:top; font-weight:700;">&bull;</td>
+            <td style="font-size:15px; line-height:24px; color:#3d4759; padding-bottom:6px;">Llega 10 minutos antes de tu hora.</td>
+          </tr>
+          <tr>
+            <td width="22" style="font-size:15px; line-height:24px; color:#2b63a6; vertical-align:top; font-weight:700;">&bull;</td>
+            <td style="font-size:15px; line-height:24px; color:#3d4759; padding-bottom:6px;">Trae una identificación oficial.</td>
+          </tr>
+          <tr>
+            <td width="22" style="font-size:15px; line-height:24px; color:#2b63a6; vertical-align:top; font-weight:700;">&bull;</td>
+            <td style="font-size:15px; line-height:24px; color:#3d4759; padding-bottom:6px;">Si tienes estudios previos (radiografías, resonancias, análisis) o recetas de tus medicamentos actuales, tráelos.</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- Cambios / cancelación -->
+    <tr>
+      <td style="padding:24px 40px 36px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f7f9fb; border-radius:10px;">
+          <tr>
+            <td style="padding:16px 20px; font-size:14px; line-height:22px; color:#3d4759;">
+              <strong style="color:#1a2438;">¿No puedes asistir?</strong> Avísanos con anticipación para darle el espacio a otro paciente.
+              <!-- OPCIONAL: teléfono -->
+              Llámanos o escríbenos al <a href="tel:{{consultorio_telefono}}" style="color:#2b63a6; font-weight:700; text-decoration:none;">{{consultorio_telefono}}</a>.
+              <!-- /OPCIONAL -->
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+  </table>
+
+  <!-- Pie -->
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%; max-width:600px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <tr>
+      <td align="center" style="padding:20px 24px 0 24px; font-size:12px; line-height:18px; color:#7a8597;">
+        Este es un mensaje automático; por favor no respondas a este correo.<br>
+        Enviado con <strong style="color:#1c3551;">Spinus</strong>
+      </td>
+    </tr>
+  </table>
+
+</td>
+</tr>
+</table>
+</body>
+</html>

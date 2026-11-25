@@ -1,0 +1,197 @@
+'use client'
+
+import { Menu } from 'lucide-react'
+import type { Medico } from '@/components/agenda/AppointmentModal'
+import { vistaEnElOtroFormato, vistaDelFormato } from '@/lib/agenda/vistasAgenda'
+import { NavegacionBandaMovil } from '@/components/agenda/NavegacionBandaMovil'
+import { FiltrosBandaMovil } from '@/components/agenda/FiltrosBandaMovil'
+import type { ReactNode } from 'react'
+import { teclasDeAccion, type AccionAtajo } from '@/lib/agenda/atajosAgenda'
+
+const ATAJO_DE_VISTA: Partial<Record<string, AccionAtajo>> = {
+  dayGridMonth: 'vista-mes', timeGridWeek: 'vista-semana', timeGridDay: 'vista-dia',
+}
+
+/* ═══ BANDA AZUL DEL ENCABEZADO MÓVIL (bloque 6 · paso 8a) ══════════════════
+   Sustituye al encabezado blanco de escritorio por debajo de `ANCHO_MOVIL`, y
+   sólo ahí: el de escritorio no se toca por dentro, se envuelve.
+
+   ⚠️ EL COLOR SALE DEL TOKEN `--ag-navy` DE globals.css, el mismo que pintan el
+   menú lateral y la franja del sistema, para que las tres superficies de cromo
+   no puedan divergir. Aquí estuvo escrita la fórmula
+   —`hsl(from var(--cp) h s 20%)`, «la misma que Sidebar.tsx:248»— y ya no vale
+   por dos motivos: el menú dejó de tenerla en línea y la consume del token, y
+   el token TIENE DOS FÓRMULAS, una por tema (en oscuro se aclara con OKLCH para
+   separarse de la página). Esta banda hereda las dos sin saberlo, que es
+   justamente lo que se buscaba.
+   ⚠️ PLANA, SIN DEGRADADO. El mockup dibuja un `linear-gradient` y AFIRMA que es
+   «el mismo del sidebar de escritorio»; eso es falso hoy —el sidebar es plano— y
+   un degradado que el original no tiene SEPARA las dos superficies en vez de
+   unirlas, que era justo lo que la decisión buscaba. Y los tokens
+   `--sp-nav-from/mid/to` de `spinus-tokens.css` NO se tocan: están comentados
+   con un «no usar» explícito.
+
+   ⚠️ EL SUBTÍTULO ES SÓLO EL CONTEO. Ni el nombre del consultorio —que el mockup
+   escribe («Umán») y que esta página no tiene como concepto— ni el lema
+   «Gestión de citas clínicas», que en 390 px no cabe con nada más.
+
+   ⚠️ EL HAMBURGUESA ABRE EL MENÚ DE VERDAD, vía `MenuMovilContext`. El botón
+   flotante del `Sidebar` se esconde en esta ruta para que no salgan dos.
+
+   ⚠️⚠️ TRES FILAS, Y LA CUARTA SE FUNDIÓ EN LA PRIMERA (paso 8c). La navegación
+   de fecha tenía fila propia y la banda medía 240 px — que son EXACTAMENTE los
+   del mockup, no un crecimiento nuestro: su `.appbar` suma 20 de relleno + 184
+   de cuatro filas + 36 de huecos. En un Android real eso dejaba tres o cuatro
+   citas a la vista, así que hubo que bajar por debajo de lo dibujado.
+   Lo que se hizo, sin perder un control ni bajar un objetivo táctil de 44:
+     · las dos flechas suben a la fila del título, pegadas al subtítulo;
+     · la ETIQUETA DE FECHA baja a ese subtítulo, junto al conteo — son las dos
+       cosas que dicen «qué estás mirando», y juntas se leen incluso mejor;
+     · la pista del conmutador pierde sus 4+4 de relleno (52 → 44);
+     · relleno y huecos bajan de 20/12 a 18/8.
+   Resultado: 114 px sin fila de filtro y 166 con ella, contra 184 y 240.
+   ⚠️ LAS FLECHAS VAN JUNTO AL SUBTÍTULO Y NO JUNTO AL CONMUTADOR, y no es
+   estética: pegadas a las tres pestañas se leerían como «cambia de vista», que
+   es lo que NO hacen. Al lado de la fecha se lee lo que son. */
+
+/* Segmentos del control de vistas. SÓLO TEXTO desde el bloque 4: llevaban un
+   icono lucide cada uno (LayoutGrid / Columns3 / Square) y se retiraron. Tres
+   palabras de una sílaba y media no necesitan pictograma, y los tres iconos
+   —una rejilla, unas columnas, un cuadrado— nombraban la FORMA de la vista, no
+   su periodo, que es lo que el médico elige. Ensanchaban la fila unos 60 px en
+   una zona que ya envuelve a dos líneas en anchos de portátil. */
+export const VIEWS = [
+  { type: 'dayGridMonth', label: 'Mes'    },
+  { type: 'timeGridWeek', label: 'Semana' },
+  { type: 'timeGridDay',  label: 'Día'    },
+] as const
+
+/* B13 · AG2 · Con la v2, cuatro periodos en todos los formatos (CALMA §29.1):
+   «3 días» es una vista más, siempre rejilla. Tipo ANCHO de cada uno, como
+   `VIEWS`; el formato lo pone `vistaDelFormato`. Rótulos enteros: caben a 13 px
+   en el conmutador estirado del teléfono (PIEZAS §12). */
+export const VIEWS_V2 = [
+  { type: 'dayGridMonth',     label: 'Mes'    },
+  { type: 'timeGridWeek',     label: 'Semana' },
+  { type: 'timeGridTresDias', label: '3 días' },
+  { type: 'timeGridDay',      label: 'Día'    },
+] as const
+
+/* ═══ F1.15 · DOS FILAS (eran cuatro y la banda medía ~195 px de 844) ═══════
+   Fila 1: ☰ · fecha (15 px, negrita) con el conteo debajo (12 px) · ‹ · Hoy · ›.
+   Fila 2: segmentado Mes/Semana/Día de ancho fijo · filtro (cede ancho) · los
+   botones de «Compactar» y del engrane cuando los hay.
+   ⚠️ «Agenda» SIGUE SIENDO EL `<h1>`, sólo que `sr-only`: la fecha es lo que
+   nombra la pantalla a la vista, y el título se lo dice al lector de pantalla.
+   ⚠️ LAS FLECHAS SIGUEN JUNTO A LA FECHA y no junto al conmutador (la nota de
+   arriba del paso 8c): pegadas a las pestañas se leerían como «cambia de vista».
+   Todos los controles miden 44 × 44 o más. */
+export function BandaMovil(
+  { conteo, vistaActual, onVista, titulo, onPrev, onNext, onHoy, hoyDeshabilitado, tableta = false, onMenu,
+    medicos, filtroMedico, onFiltroMedico, onHorario, onCompactar, compactado,
+    mesSinTodos, selectorFecha, buscar, atajos = false, engraneConfiguracion = false, campana, engrane, cuatroVistas }: {
+    conteo: string; vistaActual: string; onVista: (tipo: string) => void
+    titulo: string; onPrev: () => void; onNext: () => void
+    /** F1.10 · «Hoy» del teléfono; deshabilitado (aria) si el rango ya lo contiene. */
+    onHoy: () => void; hoyDeshabilitado: boolean
+    /** F1.16 · En tableta «Semana» es la rejilla de tres días y se rotula así. */
+    tableta?: boolean
+    onMenu: () => void
+    medicos: readonly Medico[]; filtroMedico: string
+    onFiltroMedico: (id: string) => void; onHorario: (() => void) | null
+    onCompactar: (() => void) | null; compactado: boolean
+    mesSinTodos: boolean
+    /** T3 · Con la v2, el engrane se nombra «Configuración de la agenda». */
+    engraneConfiguracion?: boolean
+    /** F3 (contrato de interacciones): ranuras opcionales. El minicalendario no
+        va en el teléfono (decisión 21); la ranura existe para que el contrato
+        encaje. `atajos`: `aria-keyshortcuts` en ‹ › Hoy y en las vistas. */
+    selectorFecha?: ReactNode
+    buscar?: ReactNode
+    atajos?: boolean
+    /** I5 (puntos 13, 15 y 18) · La banda de la v2: la campana va en la fila
+        del título, junto a ‹ Hoy ›, y el menú del engrane sustituye en la
+        segunda a «Compactar» y al engrane de configuración. Con `engrane`, el
+        conteo sale del subtítulo. Sin ellos, la banda de siempre. */
+    campana?: ReactNode
+    engrane?: ReactNode
+    /** B13 · AG2 · Con la v2, el conmutador de cuatro y el formato de la sonda
+        (`telefono`: Semana en lista). Sin él, los tres de siempre. */
+    cuatroVistas?: 'telefono' | 'rejilla'
+  },
+) {
+  const bandaV2 = engrane !== undefined
+  /* B13 · La barra por formato (PIEZAS §4), sólo con la v2 (conmutador de cuatro y menú «···»): la de
+     la maqueta, sobre el fondo y no en navy. Mismos controles, nombres y clases que la banda; lo que
+     sale de la barra (médico, candado y, en `ext`/`tel`, la lupa) vive en «Opciones de la agenda». El
+     reparto por formato es de `globals.css` («B13 · CIERRE · LA BARRA POR FORMATO»). */
+  if (bandaV2 && cuatroVistas) {
+    return (
+      <header className="ag-banda-movil" data-barra-v2="">
+        <h1 className="sr-only">Agenda</h1>
+        <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} atajos={atajos} />
+        <span className="ag-banda-movil-titulo">
+          {selectorFecha ?? <span className="ag-banda-movil-fecha">{titulo}</span>}
+        </span>
+        <VistasBanda vistaActual={vistaActual} onVista={onVista} cuatroVistas={cuatroVistas} tableta={tableta} atajos={atajos} />
+        {buscar}
+        {campana}
+        {engrane}
+      </header>
+    )
+  }
+  return (
+    <header className="ag-banda-movil">
+      <h1 className="sr-only">Agenda</h1>
+      <div className="ag-banda-movil-fila">
+        <button type="button" className="ag-banda-movil-ctrl" onClick={onMenu} aria-label="Abrir menú">
+          <Menu size={19} />
+        </button>
+        <span className="ag-banda-movil-titulo">
+          <span className="ag-banda-movil-fecha">{titulo}</span>
+          {!bandaV2 && <span className="ag-banda-movil-sub">{conteo}</span>}
+        </span>
+        {selectorFecha}
+        {campana}
+        <NavegacionBandaMovil onPrev={onPrev} onNext={onNext} onHoy={onHoy} hoyDeshabilitado={hoyDeshabilitado} atajos={atajos} />
+      </div>
+      <div className="ag-banda-movil-filtros">
+        <VistasBanda vistaActual={vistaActual} onVista={onVista} cuatroVistas={cuatroVistas} tableta={tableta} atajos={atajos} />
+        {buscar}
+        <FiltrosBandaMovil
+          medicos={medicos} filtroMedico={filtroMedico}
+          onFiltroMedico={onFiltroMedico}
+          onCompactar={bandaV2 ? null : onCompactar} compactado={compactado}
+          onHorario={bandaV2 ? null : onHorario}
+          mesSinTodos={mesSinTodos} vista={vistaActual} engraneConfiguracion={engraneConfiguracion}
+        />
+        {engrane}
+      </div>
+    </header>
+  )
+}
+
+/* El conmutador de la banda (sacado de `BandaMovil` en B13 para usarlo en las dos formas de la banda). */
+function VistasBanda({ vistaActual, onVista, cuatroVistas, tableta, atajos }: {
+  vistaActual: string; onVista: (tipo: string) => void; cuatroVistas?: 'telefono' | 'rejilla'; tableta: boolean; atajos: boolean
+}) {
+  return (
+    <div className="ag-banda-movil-vistas" role="tablist" aria-label="Vista del calendario">
+      {(cuatroVistas ? VIEWS_V2 : VIEWS).map(v => {
+        /* El mismo traductor que el segmentado de escritorio y que el efecto
+           del ancho: aquí `isMobile` es true por construcción —esta banda sólo
+           se monta en móvil—, así que «Semana» apunta a `listWeek`. Con la v2,
+           la tabla de la v2 (`vistaDelFormato`). */
+        const tipo = cuatroVistas
+          ? vistaDelFormato(v.type, cuatroVistas === 'telefono')
+          : vistaEnElOtroFormato(v.type, true, tableta)
+        const atajo = ATAJO_DE_VISTA[v.type]
+        return (
+          <button key={v.type} type="button" role="tab" aria-selected={vistaActual === tipo}
+            aria-keyshortcuts={atajos && atajo ? teclasDeAccion(atajo) : undefined}
+            onClick={() => onVista(tipo)}>{!cuatroVistas && tipo === 'timeGridTresDias' ? '3 días' : v.label}</button>
+        )
+      })}
+    </div>
+  )
+}

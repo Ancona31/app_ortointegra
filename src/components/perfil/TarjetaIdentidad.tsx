@@ -39,84 +39,62 @@ export default function TarjetaIdentidad({
   /** El nombre de la paleta elegida, o null si los colores son a medida. */
   nombrePaleta: string | null
 }) {
-  const hayCedulas = Boolean(cedulaProfesional || cedulaEspecialidad)
-
+  /* Rediseño B10 (maqueta `perfil`): UNA tarjeta. Arriba quién eres (logo,
+     nombre, especialidad y cédulas en una línea); debajo, firma y colores
+     lado a lado, salvo en `esc`, donde la tarjeta es la columna derecha de 264
+     y van apilados. Sin sombra ni borde (CALMA §3). */
   return (
-    <div className="flex flex-col gap-[var(--sp-gap-block)]">
-
-      {/* ── Identidad + firma ─────────────────────────────── */}
-      <div className="sp-card flex flex-col gap-[var(--sp-4)]">
-
-        <div className="flex flex-col items-center gap-[var(--sp-3)] text-center">
-          <div
-            className="w-[74px] h-[74px] shrink-0 flex items-center justify-center overflow-hidden rounded-[var(--sp-r-card)] bg-[var(--sp-surface-sunken)]"
-            style={logoUrl
-              ? { border: 'var(--sp-bw-hair) solid var(--sp-line-card)' }
-              : { border: 'var(--sp-bw-dash) dashed var(--sp-line-dash)' }}
-          >
-            {logoUrl
-              ? <img src={logoUrl} alt="Logo del consultorio" className="w-full h-full object-contain p-[var(--sp-1)]" />
-              : <IconoImagen size={20} className="text-[var(--sp-ink-150)]" />}
-          </div>
-
-          <div className="min-w-0 w-full">
-            <p className="sp-title-card break-words">{nombre || 'Sin nombre'}</p>
-            {/* ⚠️ DOS LÍNEAS, NO `truncate`, Y ESTÁ MEDIDO. Con `truncate` esta
-                línea se cortaba en el caso más común de todos: a los 288 px
-                útiles de la columna, «Cirugía de Columna · Ortopedia y
-                Traumatología» mide 299-338 px según la fuente del sistema, o sea
-                que perdía «y Traumatología» en las CUATRO fuentes probadas
-                (Liberation, Cantarell, Open Sans, DejaVu). No era un borde: era
-                cualquier médico con dos especialidades.
-                El recorte a dos líneas sí es un tope real —a 288 px caben unos
-                580 px de texto— y de paso iguala el comportamiento del nombre,
-                que envuelve en vez de cortarse. */}
-            {especialidad && (
-              <p className="sp-secondary mt-[var(--sp-gap-title-sub)] line-clamp-2">{especialidad}</p>
-            )}
-          </div>
-        </div>
-
-        {hayCedulas && (
-          <div
-            className="flex flex-wrap gap-x-[var(--sp-4-5)] gap-y-[var(--sp-2)] pt-[var(--sp-3)]"
-            style={{ borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' }}
-          >
-            {cedulaProfesional && <Cedula rotulo="Céd. profesional" valor={cedulaProfesional} />}
-            {cedulaEspecialidad && <Cedula rotulo="Céd. especialidad" valor={cedulaEspecialidad} />}
-          </div>
-        )}
-
+    <div className="k-tarjeta flex flex-col gap-4 esc:p-5">
+      <div className="flex min-w-0 items-center gap-3">
         <div
-          className="flex flex-col gap-[var(--sp-2-5)] pt-[var(--sp-3)]"
-          style={{ borderTop: 'var(--sp-bw-hair) solid var(--sp-line-divider)' }}
+          className="flex h-[52px] w-[52px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-tinta3 bg-sup"
+          style={logoUrl ? { borderStyle: 'solid', borderColor: 'var(--linea)' } : undefined}
         >
-          <p className="sp-label">Firma en documentos</p>
-          <div
-            className="h-[74px] flex items-center justify-center rounded-[var(--sp-r-field)] bg-[var(--sp-surface-sunken)]"
-            style={{ border: 'var(--sp-bw-dash) dashed var(--sp-line-dash)' }}
-          >
-            {firmaUrl
-              ? <img src={firmaUrl} alt="Firma guardada" className="max-h-[58px] max-w-full object-contain" />
-              : <span className="sp-hint">Sin firma</span>}
-          </div>
-          <p className="sp-hint">Se imprime sobre la línea punteada de cada PDF.</p>
+          {logoUrl
+            ? <img src={logoUrl} alt="Logo del consultorio" className="h-full w-full object-contain p-1" />
+            : <IconoImagen size={20} aria-hidden="true" className="text-tinta2" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="k-t-tarjeta break-words">{nombre || 'Sin nombre'}</p>
+          {/* ⚠️ DOS LÍNEAS, NO `truncate`: con dos especialidades la línea se
+              cortaba justo en la segunda (medido antes del rediseño). */}
+          {especialidad && <p className="k-t-sec mt-0.5 line-clamp-2">{especialidad}</p>}
         </div>
       </div>
 
-      {/* ── Colores ───────────────────────────────────────── */}
-      <div className="sp-card flex flex-col gap-[var(--sp-2-5)]">
-        <p className="sp-label">Colores</p>
-        <div className="flex items-center gap-[var(--sp-2-5)] min-w-0">
-          <div className="flex gap-[var(--sp-1-5)] shrink-0">
-            <Muestra color={colorPrimario} rotulo="Color primario" />
-            <Muestra color={colorSecundario} rotulo="Color secundario" />
-          </div>
-          <p className="min-w-0 truncate text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-700)]">
-            {nombrePaleta ?? 'Colores a medida'}
-          </p>
+      {(cedulaProfesional || cedulaEspecialidad) && (
+        <div className="-mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          {cedulaProfesional && <Cedula rotulo="Céd. profesional" valor={cedulaProfesional} />}
+          {cedulaEspecialidad && <Cedula rotulo="Céd. especialidad" valor={cedulaEspecialidad} />}
         </div>
-        <p className="sp-hint">Son el acento de la app y de los documentos que emites.</p>
+      )}
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-4 border-t border-linea pt-4 max-[359px]:grid-cols-1 esc:grid-cols-1">
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className="k-t-rotulo">Firma en documentos</p>
+          <div className="flex h-14 items-center justify-center rounded-[12px] border border-dashed border-tinta3">
+            {firmaUrl
+              /* La firma es tinta negra sobre transparente: va sobre blanco
+                 también en oscuro, como en el papel. */
+              ? <img src={firmaUrl} alt="Firma guardada" className="max-h-[46px] max-w-full rounded-[6px] object-contain p-1" style={{ background: 'white' }} />
+              : <span className="text-[13px] text-tinta2">Sin firma</span>}
+          </div>
+          <p className="text-[13px] leading-[18px] text-tinta2">Se imprime sobre la línea punteada de cada PDF.</p>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className="k-t-rotulo">Colores</p>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex shrink-0 gap-1">
+              <Muestra color={colorPrimario} rotulo="Color primario" />
+              <Muestra color={colorSecundario} rotulo="Color secundario" />
+            </div>
+            <p className="min-w-0 text-[13px] font-semibold leading-[18px] text-tinta">
+              {nombrePaleta ?? 'Colores a medida'}
+            </p>
+          </div>
+          <p className="text-[13px] leading-[18px] text-tinta2">Son el acento de la app y de los documentos que emites.</p>
+        </div>
       </div>
     </div>
   )
@@ -124,25 +102,20 @@ export default function TarjetaIdentidad({
 
 function Cedula({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
-    <div className="min-w-0">
-      <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label-w)] text-[var(--sp-ink-350)]">
-        {rotulo}
-      </p>
-      <p className="truncate text-[length:var(--sp-fs-body-sm)] font-bold text-[var(--sp-ink-700)] tabular-nums">
-        {valor}
-      </p>
-    </div>
+    <p className="min-w-0 text-[13px] leading-[18px] text-tinta2">
+      {rotulo} <span className="k-num font-semibold text-tinta">{valor}</span>
+    </p>
   )
 }
 
-/* El aro claro no es decorativo: sin él, un primario muy oscuro y el borde de
-   la card se funden y la muestra deja de leerse como muestra. */
+/* El aro no es decorativo: sin él, un primario muy oscuro y la tarjeta se
+   funden y la muestra deja de leerse como muestra. */
 function Muestra({ color, rotulo }: { color: string; rotulo: string }) {
   return (
     <span
       title={`${rotulo}: ${color}`}
-      className="w-[26px] h-[26px] block rounded-[var(--sp-r-btn-sm)]"
-      style={{ background: color, boxShadow: '0 0 0 1px var(--sp-line-card)' }}
+      className="block h-6 w-6 rounded-[7px]"
+      style={{ background: color, boxShadow: '0 0 0 1px var(--borde)' }}
     />
   )
 }

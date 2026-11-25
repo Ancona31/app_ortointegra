@@ -18,7 +18,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
               className="object-contain h-9 w-auto"
               priority
             />
-            <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus®</span>
+            <span className="text-[17px] font-bold text-slate-900 tracking-tight">Spinus</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link
@@ -53,7 +53,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
                 className="object-contain h-7 w-auto"
               />
               <span className="text-[13px] text-slate-500">
-                &copy; {year} Spinus®. Todos los derechos reservados.
+                &copy; {year} Spinus. Todos los derechos reservados.
               </span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">

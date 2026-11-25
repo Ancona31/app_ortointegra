@@ -7,7 +7,8 @@ import { useProfile } from '@/hooks/useProfile'
 import {
   tzDispositivo, hoyEnTZ, desplazarFecha, fechaHoraLocalAInstante,
 } from '@/lib/dates'
-import { EncabezadoColumna, AvisoColumna } from './piezasBanda2'
+import { CabeceraTarjeta, AvisoTarjeta } from './piezasBanda2'
+import { TARJETA } from './PiezasCita'
 
 /**
  * Los tres conteos operativos de la vista de la secretaria.
@@ -20,29 +21,30 @@ import { EncabezadoColumna, AvisoColumna } from './piezasBanda2'
  */
 type Conteos = { citas: number | null; confirmadas: number | null; pacientes: number | null }
 
+/* Los conteos como mosaicos (maqueta `dashboard-final`): número 20/700 y
+   rótulo 13, sobre `--fondo` dentro de la tarjeta. Dos columnas en teléfono;
+   en ancho, una fila. */
+const MOSAICOS = 'mt-2 grid grid-cols-2 gap-2 ih:grid-cols-3 iv:grid-cols-3 esc:grid-cols-3'
+
 export function HoyEnConsultorioCargando() {
   return (
-    <div>
-      <EncabezadoColumna titulo="Hoy en el consultorio" />
-      <div className="skeleton mt-[var(--sp-gap-tiles)] h-[132px] rounded-[14px]" />
-    </div>
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Hoy en el consultorio" />
+      <div className={MOSAICOS} aria-hidden="true">
+        {[1, 2, 3].map(i => <div key={i} className="skeleton h-[62px] rounded-[12px]" />)}
+      </div>
+    </section>
   )
 }
 
 function Renglon({ etiqueta, valor, acento }: { etiqueta: string; valor: number; acento?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-[var(--sp-3)] border-t border-[color:var(--sp-line-card)] pt-[var(--sp-3)] first:border-t-0 first:pt-0">
-      <span className="min-w-0 truncate text-[length:var(--sp-fs-meta)] text-[var(--sp-ink-600)]">{etiqueta}</span>
-      <span
-        className="shrink-0 text-[length:var(--sp-fs-vitals)] font-bold tabular-nums"
-        /* El número de confirmadas toma el color del estado «confirmada» que la
-           app ya define, no un verde propio: es la misma cifra que el chip del
-           renglón de arriba. Escrito entero, no interpolado — `StatusChip.tsx:19`. */
-        style={{ color: acento ? 'var(--ag-status-confirmed-text)' : 'var(--sp-ink-800)' }}
-      >
-        {valor}
-      </span>
-    </div>
+    <li className="flex min-h-[62px] flex-col justify-center rounded-[12px] bg-fondo px-3 py-2">
+      {/* El número de confirmadas va en el color del estado «confirmada» del
+          kit (`--tonal-tinta`, el de `IconoEstadoCita`), no en un verde propio. */}
+      <span className={`k-num text-[20px] font-bold leading-6 ${acento ? 'text-tonal-tinta' : 'text-tinta'}`}>{valor}</span>
+      <span className="text-[13px] leading-[18px] text-tinta2">{etiqueta}</span>
+    </li>
   )
 }
 
@@ -118,20 +120,20 @@ export default function HoyEnConsultorio() {
 
   const nada = !conteos || (conteos.citas === null && conteos.confirmadas === null && conteos.pacientes === null)
   if (nada) return (
-    <div>
-      <EncabezadoColumna titulo="Hoy en el consultorio" />
-      <AvisoColumna icono={RotateCw} mensaje="No se pudieron cargar los conteos." onReintentar={() => { setCargando(true); void cargar() }} />
-    </div>
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Hoy en el consultorio" />
+      <AvisoTarjeta icono={RotateCw} mensaje="No se pudieron cargar los conteos." onReintentar={() => { setCargando(true); void cargar() }} />
+    </section>
   )
 
   return (
-    <div>
-      <EncabezadoColumna titulo="Hoy en el consultorio" />
-      <div className="mt-[var(--sp-gap-tiles)] flex flex-col gap-[var(--sp-3)] rounded-[14px] border border-[color:var(--sp-line-card)] bg-[var(--sp-surface)] px-[var(--sp-5)] py-[var(--sp-4-5)]">
+    <section className={TARJETA}>
+      <CabeceraTarjeta titulo="Hoy en el consultorio" />
+      <ul className={MOSAICOS}>
         {conteos.citas !== null && <Renglon etiqueta="Citas de hoy" valor={conteos.citas} />}
         {conteos.confirmadas !== null && <Renglon etiqueta="Confirmadas" valor={conteos.confirmadas} acento />}
         {conteos.pacientes !== null && <Renglon etiqueta="Pacientes registrados este mes" valor={conteos.pacientes} />}
-      </div>
-    </div>
+      </ul>
+    </section>
   )
 }

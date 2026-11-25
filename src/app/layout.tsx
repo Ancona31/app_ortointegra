@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Spinus®',
+  title: 'Spinus',
   description: 'Sistema de gestión clínica — Cirugía de Columna, Traumatología y Ortopedia',
 }
 
@@ -44,8 +44,8 @@ export const viewport: Viewport = {
 
      ⚠️⚠️ ESTOS DOS VALORES SON SÓLO LA PRIMERA APROXIMACIÓN. En cuanto hay
      JavaScript, `ThemeProvider` reescribe el `content` de LAS DOS entradas con
-     el navy del tema que el médico eligió de verdad —y resuelto desde
-     `--ag-navy`, así que además sigue a la marca de la clínica—. Ver
+     el color que pinta de verdad la franja (`body::before`) con el tema que el
+     médico eligió —así que además sigue a la marca de la clínica—. Ver
      `sincronizarBarraDelNavegador` en `layout/ThemeProvider.tsx`.
      Lo de aquí es lo que se ve en el instante antes de que ese código corra, y
      por eso conserva el `media`: sin nada mejor, la preferencia del sistema es
@@ -54,7 +54,14 @@ export const viewport: Viewport = {
      Dónde se nota: Chrome de Android y la barra de direcciones. En la app
      instalada de iOS NO, porque allí la barra es `black-translucent` y lo que
      se ve es el píxel de `body::before`, que sí sale de `--ag-navy` y sí sigue
-     al tema y a la marca. */
+     al tema y a la marca.
+     ⚠️ REDISEÑO: ESTOS DOS SIGUEN EN `--ag-navy` Y NO EN EL `--navy` DEL KIT,
+     a propósito. Son los de las páginas que NO son la app —`/login`, `/`,
+     `/register`, el lanzador—, que el rediseño todavía no toca y cuya franja
+     (`body::before`) sigue en `--ag-navy`. Dentro de `(app)` la franja es
+     `--navy` desde B4 (salvo con la banda de la agenda) y `ThemeProvider` copia
+     a estas dos entradas el color que la franja pinta de verdad (integración
+     B1–B4), así que barra del navegador, franja y cromo coinciden. */
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#163250' },
     { media: '(prefers-color-scheme: dark)',  color: '#2f4f73' },
@@ -84,8 +91,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
        lo toca. `ScriptTema` —que montan `(app)` y `(launcher)`, no este layout—
        le añade la clase `dark` al <html> mientras el documento se analiza, o sea
        antes de hidratar, y sin la supresión React avisa de discrepancia en cada
-       carga de esas rutas. Es el único atributo del documento que cambia, así
-       que la supresión no tapa nada más. */
+       carga de esas rutas. Desde el rediseño (B1) el mismo script escribe
+       también `data-formato` y `data-borde-sistema` (la sonda de
+       `src/lib/formatoPantalla.ts`), así que ya NO es el único atributo: son
+       esos tres, todos en <html>. La supresión sigue sin tapar nada más,
+       porque React sólo la aplica a los atributos de ESTE elemento, no a sus
+       hijos. Ningún componente debe decidir su marcado por el formato en el
+       primer render; eso sí daría discrepancia y esto no la taparía. */
     <html lang="es" className="h-full" suppressHydrationWarning>
       <head>
         {/* ⚠️ `theme-color` YA NO ESTÁ AQUÍ: se mudó al export `viewport` de

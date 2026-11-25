@@ -1,3 +1,4 @@
+import type { Cache } from 'swr'
 import { secureStorage } from '@/lib/secureStorage'
 import { Consultorio } from '@/types'
 
@@ -107,9 +108,69 @@ export async function fetcherConfig(url: string): Promise<ConfigApp> {
     throw error
   }
   const data = (await r.json()) as ConfigApp
+  persistirConfigCifrada(data)
+  return data
+}
+
+/** El último agregado escrito en `secureStorage`, para no cifrar dos veces el
+ *  mismo objeto: la semilla la ven a la vez varias instancias de los hooks. */
+let ultimaPersistida: ConfigApp | undefined
+
+/**
+ * Escribe el respaldo sin conexión de `useClinica` y `useConsultorios`. Lo
+ * llaman el fetcher (cada respuesta de la red) y, desde A1.6, esos dos hooks
+ * cuando pintan la SEMILLA del layout: en carga dura ya no sale la petición, y
+ * sin esto el respaldo dejaría de renovarse — ver `revalidarConfigAlMontar`.
+ */
+export function persistirConfigCifrada(data: ConfigApp): void {
+  if (data === ultimaPersistida) return
+  ultimaPersistida = data
   if (data.clinica) secureStorage.set(CACHE_CLINICA, data.clinica).catch(() => {})
   if (data.consultorios) secureStorage.set(CACHE_CONSULTORIOS, data.consultorios).catch(() => {})
-  return data
+}
+
+/** Lo que `revalidarConfigAlMontar` mira de `useSWRConfig()`. */
+type ConfigSWR = { cache: Cache; fallback: Record<string, unknown> }
+
+/** La semilla de `(app)/layout.tsx` si la hay, o `undefined`. */
+export function semillaConfig({ fallback }: Pick<ConfigSWR, 'fallback'>): unknown {
+  return fallback?.[CLAVE_CONFIG]
+}
+
+/**
+ * `revalidateOnMount` de los TRES `useSWR(CLAVE_CONFIG)` —`useClinica`,
+ * `useConsultorios` y la agenda— (A1.6). Tiene que ir en los tres: basta uno
+ * sin él para que su montaje pida la ruta.
+ *
+ * `false` SÓLO cuando lo que va a pintar esa instancia es la semilla del layout:
+ * hay `fallback` y la caché de SWR aún no tiene la clave. La semilla salió del
+ * servidor en ESTE documento, para ESTA sesión; volver a pedirla al montar es
+ * pagar dos veces lo mismo.
+ * En cualquier otro caso `true`, que es carácter por carácter lo de antes: con
+ * `revalidateIfStale` en su valor por defecto, SWR revalidaba en TODO montaje
+ * (con la deduplicación de `CONFIG_DEDUPE_MS`).
+ *
+ * ⚠️⚠️ NO LO CAMBIES POR `revalidateIfStale: false` FIJO, que parece lo mismo y
+ * es una fuga entre cuentas. Esa opción deja de revalidar CUALQUIER dato en
+ * caché, no sólo la semilla, y la caché de SWR sobrevive a una navegación
+ * suave: si la sesión de A muere y `SessionGuard` lleva a `/login` con
+ * `router.push`, la caché sigue con la clínica de A, y B entra con otro
+ * `router.push`. Antes el montaje de B revalidaba y lo corregía; con ese
+ * `false` la clínica, los consultorios y los médicos de A se quedarían
+ * pintados hasta el siguiente foco. Igual con el `null` que deja el `Sidebar`
+ * al cerrar sesión: no es `undefined`, así que SWR no lo vería «sin datos».
+ *
+ * Lo que cambia, aceptado: mientras se pinte la semilla, montar no revalida
+ * aunque pasen más de cinco minutos; refrescan el foco (mismo tope de 5 min),
+ * la reconexión y los `mutate` explícitos.
+ *
+ * Fuentes: `node_modules/swr/dist/index/index.mjs`, `shouldDoInitialRevalidation`
+ * (`revalidateOnMount` manda en el primer montaje) y `data = cachedData ??
+ * fallback` (la caché le gana a la semilla).
+ */
+export function revalidarConfigAlMontar({ cache, fallback }: ConfigSWR): boolean {
+  if (semillaConfig({ fallback }) === undefined) return true
+  return cache.get(CLAVE_CONFIG)?.data !== undefined
 }
 
 /**

@@ -8,8 +8,9 @@ const ZONAS_IANA_VALIDAS = new Set(Intl.supportedValuesOf('timeZone'))
 
 /**
  * Validador de zona IANA: rechaza cualquier string que no sea zona válida.
+ * Exportado para el huso de la clínica (`PUT /api/me/horario`, K3 punto 12).
  */
-const timezoneSchema = z
+export const timezoneSchema = z
   .string()
   .trim()
   .min(1, 'Zona horaria requerida')
@@ -29,6 +30,9 @@ const nombreCortoSchema = z
 
 /**
  * Validador del horario JSONB. Estructura espejo de clinicas.horario_consulta.
+ * `horarioSchema` sólo mira la forma, no el orden: `HorarioEnOrdenSchema`
+ * (`src/lib/agenda/disponibilidad.ts`) le añade «fin > inicio» en los días
+ * activos, y es el que valida `PUT /api/me/horario` (P8).
  */
 const diaHorarioSchema = z.object({
   activo: z.boolean(),
@@ -36,7 +40,7 @@ const diaHorarioSchema = z.object({
   fin: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Formato HH:MM inválido'),
 })
 
-const horarioSchema = z.object({
+export const horarioSchema = z.object({
   lunes: diaHorarioSchema,
   martes: diaHorarioSchema,
   miercoles: diaHorarioSchema,
@@ -107,6 +111,19 @@ export const EditarConsultorioSchema = z.object({
   telefono: z.string().trim().min(1).nullable().optional(),
   timezone: timezoneSchema.optional(),
   horario: horarioSchema.optional(),
+  /**
+   * Agenda B5: `true` = la disponibilidad de este consultorio es su `horario`;
+   * `false` = la de la clínica. Sólo se escribe con la agenda v2 encendida
+   * (lo decide el handler); con ella apagada se ignora, como hoy. Convenio en
+   * `src/lib/agenda/disponibilidad.ts`.
+   */
+  horario_propio: z.boolean().optional(),
+  /**
+   * Tanda I (punto 3): «Confirmar horario» — su médico revisó el horario de
+   * este consultorio sin cambiarlo. Sólo con la v2 (lo decide el handler, que
+   * pone `horario_revisado_en`); guardar el horario también lo marca.
+   */
+  horario_revisado: z.literal(true).optional(),
 })
 
 export type EditarConsultorioInput = z.infer<typeof EditarConsultorioSchema>

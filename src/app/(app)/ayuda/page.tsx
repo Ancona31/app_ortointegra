@@ -1,10 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import {
-  HelpCircle, ChevronDown, Keyboard, BookOpen, Shield, Calendar,
-  FileText, Brain, Search, Mail, Pill, Users, MonitorCheck,
-  MousePointerClick, ArrowRight, ExternalLink,
+  ChevronDown, Calendar, FilePlus2, Mail, Pill, UserPlus, MonitorCheck,
+  RotateCcw, ExternalLink, type LucideIcon,
 } from 'lucide-react'
 
 /* ── FAQ ──
@@ -88,35 +87,36 @@ const faqs = [
   },
 ]
 
-/* ── Guías rápidas ── */
-const guides = [
+/* ── Guías rápidas ──
+   Iconos de un solo color (`--enlace`) y sin cuadro de fondo (CALMA §1). */
+const guides: { icon: LucideIcon; title: string; steps: string[] }[] = [
   {
-    icon: <Users className="w-5 h-5 text-[#1e5fa8]" />,
+    icon: UserPlus,
     title: 'Registrar un paciente',
     steps: ['Ve a Pacientes → Nuevo paciente', 'Llena nombre, teléfono y datos básicos', 'Haz clic en "Guardar" — el expediente se crea automáticamente'],
   },
   {
-    icon: <FileText className="w-5 h-5 text-violet-600" />,
+    icon: FilePlus2,
     title: 'Crear una nota médica con IA',
     steps: ['Abre el expediente del paciente → "Nueva nota"', 'Llena motivo de consulta y exploración física', 'Haz clic en "Generar con IA" — revisa, edita y guarda', 'Se desbloquean los documentos: receta, laboratorio, imagen, etc.'],
   },
   {
-    icon: <Pill className="w-5 h-5 text-rose-600" />,
+    icon: Pill,
     title: 'Generar una receta',
     steps: ['Desde la nota médica guardada, haz clic en el icono de Receta', 'Agrega medicamentos con el buscador inteligente', 'Haz clic en "Imprimir Receta" — se genera el PDF con QR'],
   },
   {
-    icon: <Calendar className="w-5 h-5 text-emerald-600" />,
+    icon: Calendar,
     title: 'Agendar una cita',
     steps: ['Ve a Agenda → haz clic en el horario deseado', 'Selecciona el paciente y tipo de consulta', 'Guarda — la cita aparece en tu Google Calendar automáticamente'],
   },
   {
-    icon: <MonitorCheck className="w-5 h-5 text-sky-600" />,
+    icon: MonitorCheck,
     title: 'Ver estudios DICOM',
     steps: ['Abre el expediente del paciente → pestaña "Imagen"', 'Arrastra tu archivo DICOM o haz clic para subirlo', 'El visor se abre directamente en el navegador — sin software externo'],
   },
   {
-    icon: <Mail className="w-5 h-5 text-amber-600" />,
+    icon: Mail,
     title: 'Enviar documentos por email',
     steps: ['Genera cualquier documento (receta, solicitud, nota)', 'En la vista del documento, haz clic en "Enviar por email"', 'El paciente recibe el PDF adjunto en su correo'],
   },
@@ -130,168 +130,187 @@ const shortcuts = [
   { keys: ['Enter'], desc: 'Abrir paciente seleccionado o confirmar acción' },
 ]
 
+/* Acordeón: la respuesta se muestra u oculta con `hidden` y, al abrirse, entra
+   con una transición de `translate`/`opacity` desde `@starting-style` (la
+   variante `starting:`). Antes animaba `max-height` (0 ↔ 300 px), que provoca
+   relayout en cada fotograma y cortaba a 300 px cualquier respuesta más larga.
+   Con movimiento reducido, sólo fundido. */
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
+  const id = useId()
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <li className="border-linea [&+&]:border-t">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+        aria-expanded={open}
+        aria-controls={id}
+        className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl py-2.5 text-left text-[15px] leading-[22px] font-semibold text-tinta focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-enlace"
       >
-        <span className="text-sm font-semibold text-slate-800 pr-4">{q}</span>
-        <ChevronDown size={16} className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <span>{q}</span>
+        <ChevronDown size={18} aria-hidden="true" className={`flex-none text-tinta3 transition-transform duration-200 ease-out motion-reduce:transition-none ${open ? 'rotate-180' : ''}`} />
       </button>
       <div
-        className="overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-        style={{ maxHeight: open ? '300px' : '0px', opacity: open ? 1 : 0 }}
+        id={id}
+        hidden={!open}
+        className="pr-[30px] pb-4 transition-[translate,opacity] duration-[var(--dur-entra)] ease-[var(--resorte-entra)] [--recorrido:-6px] motion-reduce:[--recorrido:0px] starting:translate-y-[var(--recorrido)] starting:opacity-0"
       >
-        <p className="px-5 pb-4 text-sm text-slate-500 leading-relaxed">{a}</p>
+        <p className="text-justify text-[15px] leading-[22px] text-tinta2 hyphens-auto">{a}</p>
       </div>
+    </li>
+  )
+}
+
+function Seccion({ titulo, className = '', children }: { titulo: string; className?: string; children: ReactNode }) {
+  return (
+    <section className={`flex min-w-0 flex-col gap-3 ${className}`}>
+      <h2 className="k-t-tarjeta">{titulo}</h2>
+      {children}
+    </section>
+  )
+}
+
+function GuiasRapidas() {
+  return (
+    <div className="grid grid-cols-1 gap-3 ih:grid-cols-2 ih:gap-3.5 iv:grid-cols-2 iv:gap-3.5 esc:grid-cols-2 esc:gap-3.5">
+      {guides.map((g) => (
+        <div key={g.title} className="k-tarjeta flex flex-col gap-3.5">
+          <h3 className="flex items-center gap-2.5 text-[17px] leading-[22px] font-bold text-tinta">
+            <g.icon size={20} aria-hidden="true" className="flex-none text-enlace" />
+            {g.title}
+          </h3>
+          <ol className="flex flex-col gap-2.5">
+            {g.steps.map((step, i) => (
+              <li key={i} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3 text-[15px] leading-[22px] text-tinta">
+                <span aria-hidden="true" className="k-num -mt-px h-6 w-6 rounded-full bg-tonal text-center text-[13px] leading-6 font-bold text-tonal-tinta">{i + 1}</span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
     </div>
   )
 }
 
+function AtajosTeclado() {
+  return (
+    <ul className="k-tarjeta px-4 py-1">
+      {shortcuts.map((s) => (
+        <li key={s.desc} className="flex min-h-[52px] items-center justify-between gap-3 border-linea py-2.5 text-[15px] leading-[22px] text-tinta [&+&]:border-t">
+          <span>{s.desc}</span>
+          <span className="flex flex-none gap-1.5">
+            {s.keys.map((k) => (
+              <kbd key={k} className="h-7 min-w-7 rounded-lg bg-sup2 px-2 text-center font-sans text-[12px] leading-7 font-semibold text-tinta">
+                {k}
+              </kbd>
+            ))}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+const SELLOS = [
+  { label: 'Cifrado AES-256-GCM', desc: 'Datos cifrados en tránsito y en reposo' },
+  { label: 'NOM-004-SSA3', desc: 'Expediente clínico conforme a normativa' },
+  { label: 'LFPDPPP', desc: 'Protección de datos personales' },
+]
+
+function SeguridadPrivacidad() {
+  return (
+    <div className="k-tarjeta flex flex-col px-4 pt-1.5 pb-1">
+      <ul className="ih:grid ih:grid-cols-3 ih:gap-4">
+        {SELLOS.map((item) => (
+          <li key={item.label} className="flex flex-col border-linea py-2.5 [&+&]:border-t ih:[&+&]:border-t-0">
+            <span className="text-[15px] leading-[22px] font-semibold text-tinta">{item.label}</span>
+            <span className="text-[13px] leading-[18px] text-tinta2">{item.desc}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-linea py-0.5 text-[13px] leading-[18px] text-tinta2">
+        Para más detalles, consulta nuestro{' '}
+        <a href="/privacy" target="_blank" className="inline-flex min-h-11 items-center gap-1 font-semibold whitespace-nowrap text-enlace hover:underline ih:min-h-9 esc:min-h-9">
+          Aviso de Privacidad
+          <ExternalLink size={13} aria-hidden="true" />
+        </a>
+      </p>
+    </div>
+  )
+}
+
+function Soporte() {
+  return (
+    <section className="k-tarjeta flex flex-col items-start gap-1 px-4 pt-[18px] pb-4 ih:flex-row ih:items-center ih:justify-between ih:gap-5 ih:px-5 iv:flex-row iv:items-center iv:justify-between iv:gap-5 iv:px-5 esc:flex-row esc:items-center esc:justify-between esc:gap-5 esc:px-5">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 className="k-t-tarjeta">¿No encontraste lo que buscabas?</h2>
+        <p className="text-[15px] leading-[22px] text-tinta2">
+          Escríbenos y te responderemos lo antes posible.
+        </p>
+      </div>
+      <a href="mailto:soporte@spinus.com.mx?subject=Soporte Spinus" className="k-b k-b-prim mt-3 ih:mt-0 iv:mt-0 esc:mt-0">
+        <Mail size={18} aria-hidden="true" />
+        Contactar soporte
+      </a>
+    </section>
+  )
+}
+
+/* Composición (maqueta `lectura`, vista 2): una columna en todos los formatos
+   salvo `esc`, donde van la columna de lectura de 680 (guías, preguntas,
+   soporte) y la de apoyo de 296 (tutorial, atajos, seguridad), fija al
+   desplazar. La columna de apoyo es `contents` fuera de `esc`: sus piezas se
+   ordenan con las demás con `order`, en el orden de siempre. */
 export default function AyudaPage() {
   return (
-    <div className="max-w-4xl mx-auto space-y-10 pb-16">
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] flex items-center justify-center">
-            <HelpCircle className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Centro de ayuda</h1>
-            {/* Sin ® — §7·Global: marca en trámite ante IMPI (exp. 3594483). */}
-            <p className="text-sm text-slate-500">Todo lo que necesitas para sacarle el máximo a Spinus</p>
-          </div>
-        </div>
+    <div lang="es" className="mx-auto w-full max-w-[1000px] pb-16 iv:max-w-[600px]">
+      <div className="mb-5 ih:mb-6 iv:mb-6 esc:mb-6">
+        <h1 className="k-t-pantalla">Centro de ayuda</h1>
+        {/* Sin ® — §7·Global: marca en trámite ante IMPI (exp. 3594483). */}
+        <p className="k-t-sec mt-0.5">Todo lo que necesitas para sacarle el máximo a Spinus</p>
       </div>
 
-      {/* Guías rápidas */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <BookOpen size={16} className="text-[#1e5fa8]" />
-          <h2 className="text-base font-bold text-slate-800">Guías rápidas</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {guides.map((g) => (
-            <div key={g.title} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-[0_4px_20px_rgba(30,95,168,0.08)] hover:border-[#1e5fa8]/15 transition-all duration-200">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center flex-shrink-0">
-                  {g.icon}
-                </div>
-                <h3 className="text-sm font-semibold text-slate-800">{g.title}</h3>
-              </div>
-              <ol className="space-y-2">
-                {g.steps.map((step, i) => (
-                  <li key={i} className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-md bg-gradient-to-br from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-[10px] font-bold text-white">{i + 1}</span>
-                    </span>
-                    <span className="text-[13px] text-slate-600 leading-relaxed">{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ))}
-        </div>
-      </section>
+      <div className="flex flex-col gap-6 esc:grid esc:grid-cols-[minmax(0,680px)_296px] esc:items-start">
+        <Seccion titulo="Guías rápidas" className="order-1 esc:col-start-1 esc:row-start-1">
+          <GuiasRapidas />
+        </Seccion>
 
-      {/* Reiniciar onboarding */}
-      <button
-        onClick={() => {
-          localStorage.removeItem('spinus_onboarding')
-          window.location.reload()
-        }}
-        className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] text-white rounded-xl text-sm font-semibold shadow-[0_4px_24px_rgba(30,95,168,0.3)] hover:shadow-[0_8px_32px_rgba(30,95,168,0.4)] hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
-      >
-        <ArrowRight size={15} className="rotate-180" />
-        Volver a ver el tutorial paso a paso
-      </button>
-
-      {/* Atajos de teclado */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <Keyboard size={16} className="text-[#1e5fa8]" />
-          <h2 className="text-base font-bold text-slate-800">Atajos de teclado</h2>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          {shortcuts.map((s, i) => (
-            <div key={s.desc} className={`flex items-center justify-between px-5 py-3.5 ${i > 0 ? 'border-t border-slate-100' : ''}`}>
-              <span className="text-sm text-slate-600">{s.desc}</span>
-              <div className="flex items-center gap-1.5">
-                {s.keys.map((k) => (
-                  <kbd key={k} className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-600 shadow-sm">
-                    {k}
-                  </kbd>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <MousePointerClick size={16} className="text-[#1e5fa8]" />
-          <h2 className="text-base font-bold text-slate-800">Preguntas frecuentes</h2>
-        </div>
-        <div className="space-y-2">
-          {faqs.map((f) => (
-            <FaqItem key={f.q} q={f.q} a={f.a} />
-          ))}
-        </div>
-      </section>
-
-      {/* Seguridad */}
-      <section>
-        <div className="flex items-center gap-2 mb-5">
-          <Shield size={16} className="text-[#1e5fa8]" />
-          <h2 className="text-base font-bold text-slate-800">Seguridad y privacidad</h2>
-        </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div className="grid sm:grid-cols-3 gap-6">
-            {[
-              { label: 'Cifrado AES-256-GCM', desc: 'Datos cifrados en tránsito y en reposo' },
-              { label: 'NOM-004-SSA3', desc: 'Expediente clínico conforme a normativa' },
-              { label: 'LFPDPPP', desc: 'Protección de datos personales' },
-            ].map((item) => (
-              <div key={item.label} className="text-center">
-                <div className="text-sm font-bold text-[#1e5fa8]">{item.label}</div>
-                <p className="mt-1 text-[12px] text-slate-500">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5 pt-5 border-t border-slate-100 text-center">
-            <p className="text-[13px] text-slate-500">
-              Para más detalles, consulta nuestro{' '}
-              <a href="/privacy" target="_blank" className="text-[#1e5fa8] font-medium hover:underline">
-                Aviso de Privacidad
-              </a>
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Contacto */}
-      <section>
-        <div className="bg-gradient-to-r from-[var(--sp-brand-grad-from)] to-[var(--sp-brand-grad-to)] rounded-2xl p-8 text-center relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
-          <h2 className="relative text-lg font-bold text-white">¿No encontraste lo que buscabas?</h2>
-          <p className="relative mt-2 text-sm text-white/70">
-            Escríbenos y te responderemos lo antes posible.
-          </p>
-          <a
-            href="mailto:soporte@spinus.com.mx?subject=Soporte Spinus"
-            className="relative inline-flex items-center gap-2 mt-5 bg-white text-[#1a3a5c] px-6 py-2.5 rounded-xl text-sm font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-[0.97] transition-all duration-200"
+        <div className="contents esc:sticky esc:top-0 esc:col-start-2 esc:row-span-3 esc:row-start-1 esc:mt-[34px] esc:flex esc:flex-col esc:gap-5">
+          {/* Reiniciar onboarding */}
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem('spinus_onboarding')
+              window.location.reload()
+            }}
+            className="k-b k-b-tonal order-2 h-auto min-h-11 justify-start py-2 text-left whitespace-normal ih:self-start iv:self-start esc:min-h-9"
           >
-            <Mail size={16} />
-            Contactar soporte
-          </a>
+            <RotateCcw size={16} aria-hidden="true" />
+            Volver a ver el tutorial paso a paso
+          </button>
+
+          <Seccion titulo="Atajos de teclado" className="order-3">
+            <AtajosTeclado />
+          </Seccion>
+
+          <Seccion titulo="Seguridad y privacidad" className="order-5">
+            <SeguridadPrivacidad />
+          </Seccion>
         </div>
-      </section>
+
+        <Seccion titulo="Preguntas frecuentes" className="order-4 esc:col-start-1 esc:row-start-2">
+          <ul className="k-tarjeta px-4 py-1">
+            {faqs.map((f) => (
+              <FaqItem key={f.q} q={f.q} a={f.a} />
+            ))}
+          </ul>
+        </Seccion>
+
+        <div className="order-6 esc:col-start-1 esc:row-start-3">
+          <Soporte />
+        </div>
+      </div>
     </div>
   )
 }

@@ -85,3 +85,9 @@ MAPA_AUDITORIA.md
 # Temporales del CLI de Supabase
 supabase/.temp/
 supabase/snippets/
+
+# Playwright (pruebas e2e de agenda)
+/test-results/
+/playwright-report/
+/e2e/.auth/
+/e2e/resultados/

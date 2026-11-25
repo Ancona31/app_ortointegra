@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Burbuja de cita</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 440px; height: 720px; box-sizing: border-box; padding: 32px; background: #EEF2F6; display: flex; align-items: flex-start; justify-content: center; font-family: 'Noto Sans', system-ui, sans-serif; color: #1E293B">
+<div role="dialog" aria-labelledby="ev-name" style="width: 376px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 18px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14); display: flex; flex-direction: column; overflow: hidden">
+<div style="{{stripStyle}}"></div>
+
+<div style="padding: 12px 10px 0 20px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+<span style="{{statusStyle}}"><span style="{{dotStyle}}"></span>{{statusLabel}}</span>
+<div style="display: flex; align-items: center">
+<button type="button" aria-label="Más opciones de la cita" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: 10px; color: #5B6B80; cursor: pointer">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1.2"></circle><circle cx="12" cy="12" r="1.2"></circle><circle cx="12" cy="19" r="1.2"></circle></svg>
+</button>
+<button type="button" aria-label="Cerrar" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; background: none; border: none; border-radius: 10px; color: #5B6B80; cursor: pointer">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 10px; padding-right: 10px">
+<h2 id="ev-name" style="{{nameStyle}}">{{nombre}}</h2>
+<sc-if value="{{sinExp}}" hint-placeholder-val="{{ true }}">
+<div style="position: relative; flex: none">
+<button type="button" aria-label="Sin expediente: este paciente aún no tiene expediente" onMouseEnter="{{showTip}}" onMouseLeave="{{hideTip}}" onFocus="{{showTip}}" onBlur="{{hideTip}}" style="width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; cursor: help; padding: 0">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" stroke="#64748B" stroke-width="1.8"></path><path d="M14 3v5h5" stroke="#64748B" stroke-width="1.8"></path><path d="M3.5 3.5l17 17" stroke="#DC2626" stroke-width="2.4"></path></svg>
+</button>
+<sc-if value="{{tip}}" hint-placeholder-val="{{ false }}">
+<span role="tooltip" style="position: absolute; top: 42px; right: 0; white-space: nowrap; background: #1E293B; color: #FFFFFF; font-size: 13px; font-weight: 600; padding: 6px 10px; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2); z-index: 2">Aún no tiene expediente</span>
+</sc-if>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{deGoogle}}" hint-placeholder-val="{{ true }}">
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #5B6B80">
+<span title="Pon aquí el logo oficial de Google" style="flex: none; width: 20px; height: 20px; box-sizing: border-box; border-radius: 999px; border: 1px solid #CBD5E1; background: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #475569">G</span>
+Llegó de Google Calendar</span>
+</sc-if>
+<sc-if value="{{deEnlace}}" hint-placeholder-val="{{ false }}">
+<span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #5B6B80">
+<span style="flex: none; width: 20px; height: 20px; border-radius: 999px; background: #EAF1FB; display: inline-flex; align-items: center; justify-content: center">
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1D5BA6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1 1"></path><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1-1"></path></svg>
+</span>
+La apartó con tu enlace</span>
+</sc-if>
+</div>
+
+<div style="margin: 14px 20px 0; padding: 14px 16px; background: #F6F8FB; border-radius: 12px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D5BA6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+<div style="display: flex; flex-direction: column; gap: 2px">
+<span style="{{timeStyle}}">16:00 – 16:30 <span style="font-size: 15px; font-weight: 400; color: #5B6B80">· 30 min</span></span>
+<span style="font-size: 15px; color: #334155">Miércoles 18 de noviembre</span>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<span aria-hidden="true" style="flex: none; width: 24px; height: 24px; border-radius: 999px; background: #DCE8F7; color: #1D5BA6; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-left: -2px">AS</span>
+<span style="font-size: 15px; color: #334155">Dr. Admin Semilla Uno</span>
+</div>
+</div>
+
+<div style="padding: 16px 20px 0; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<button type="button" style="{{ctaStyle}}">
+<sc-if value="{{ctaPlay}}" hint-placeholder-val="{{ true }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg>
+</sc-if>
+<sc-if value="{{ctaDoc}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5M9 13h6M9 17h4"></path></svg>
+</sc-if>
+<sc-if value="{{ctaCal}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M3 10h18M10 15h6M14 13l2 2-2 2"></path></svg>
+</sc-if>
+{{ctaLabel}}</button>
+<sc-if value="{{showHelp}}" hint-placeholder-val="{{ true }}">
+<span style="font-size: 13px; color: #5B6B80; text-align: center">{{helpText}}</span>
+</sc-if>
+</div>
+<sc-if value="{{hasActions}}" hint-placeholder-val="{{ true }}">
+<div style="{{gridStyle}}">
+<sc-for list="{{actions}}" as="a" hint-placeholder-count="3">
+<button type="button" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 68px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 600; color: #1E293B; cursor: pointer">
+<sc-if value="{{a.isConfirm}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D5BA6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.7 2.7L16 10"></path></svg>
+</sc-if>
+<sc-if value="{{a.isMove}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D5BA6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M3 10h18M10 15h6M14 13l2 2-2 2"></path></svg>
+</sc-if>
+<sc-if value="{{a.isEdit}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"></path></svg>
+</sc-if>
+<sc-if value="{{a.isNoShow}}" hint-placeholder-val="{{ false }}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 9l5 5M21 9l-5 5"></path></svg>
+</sc-if>
+{{a.label}}</button>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<sc-if value="{{showFooter}}" hint-placeholder-val="{{ true }}">
+<div style="{{footerStyle}}">
+<sc-if value="{{deGoogle}}" hint-placeholder-val="{{ true }}">
+<button type="button" style="min-height: 52px; background: none; border: none; border-right: 1px solid #EEF2F6; font: inherit; font-size: 14px; font-weight: 600; color: #5B6B80; cursor: pointer">No es una cita</button>
+</sc-if>
+<button type="button" style="min-height: 52px; background: none; border: none; font: inherit; font-size: 14px; font-weight: 600; color: #B91C1C; cursor: pointer">Cancelar cita</button>
+</div>
+</sc-if>
+<sc-if value="{{noFooter}}" hint-placeholder-val="{{ false }}">
+<div style="height: 20px"></div>
+</sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"nombre":{"editor":"text","default":"Juan Pérez Hernández (ficticio)"},"expediente":{"editor":"boolean","default":false},"estado":{"editor":"enum","options":["agendada","confirmada","cancelada","noasistio","atendida"],"default":"agendada"},"origen":{"editor":"enum","options":["google","enlace","spinus"],"default":"google"},"$preview":{"width":440,"height":720}}'>
+var STATES = {
+  agendada: { label: 'Agendada', dot: '#D97706', bg: '#FEF3E2', fg: '#B45309' },
+  confirmada: { label: 'Confirmada', dot: '#1D5BA6', bg: '#EAF1FB', fg: '#1D5BA6' },
+  cancelada: { label: 'Cancelada', dot: '#C0392B', bg: '#FDECEA', fg: '#B91C1C' },
+  noasistio: { label: 'No asistió', dot: '#64748B', bg: '#F1F5F9', fg: '#475569' },
+  atendida: { label: 'Atendida', dot: '#16A34A', bg: '#ECFDF3', fg: '#166534' }
+};
+function asBool(v, d) {
+  if (v === undefined || v === null || v === '') return d;
+  return v === true || v === 'true' || v === '1';
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tip: false };
+  }
+  renderVals() {
+    var self = this;
+    var p = this.props;
+    var conExp = asBool(p.expediente, false);
+    var key = STATES[p.estado] ? p.estado : 'agendada';
+    var s = STATES[key];
+    var origen = p.origen || 'google';
+    var activa = key === 'agendada' || key === 'confirmada';
+    var acts = [];
+    if (key === 'agendada') acts = [{ label: 'Confirmar', isConfirm: true }, { label: 'Reagendar', isMove: true }, { label: 'Editar', isEdit: true }];
+    if (key === 'confirmada') acts = [{ label: 'Reagendar', isMove: true }, { label: 'Editar', isEdit: true }, { label: 'No asistió', isNoShow: true }];
+    var ctaKind = activa ? 'play' : (key === 'atendida' ? 'doc' : 'cal');
+    var ctaLabel = activa ? (conExp ? 'Iniciar consulta' : 'Ligar expediente e iniciar') : (key === 'atendida' ? 'Ver la consulta' : 'Darle otra cita');
+    var primary = ctaKind !== 'doc';
+    var helpText = '';
+    if (activa && !conExp) helpText = 'Primero buscas su expediente o le creas uno.';
+    if (key === 'cancelada') helpText = 'Esta cita se canceló. Su horario quedó libre.';
+    if (key === 'noasistio') helpText = 'El paciente no llegó a esta cita.';
+    return {
+      nombre: p.nombre || 'Juan Pérez Hernández (ficticio)',
+      nameStyle: 'margin: 0; flex: 1; min-width: 0; font-size: 21px; line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; color: ' + (key === 'cancelada' ? '#64748B' : '#1E293B'),
+      sinExp: !conExp,
+      deGoogle: origen === 'google',
+      deEnlace: origen === 'enlace',
+      tip: this.state.tip,
+      showTip: function () { self.setState({ tip: true }); },
+      hideTip: function () { self.setState({ tip: false }); },
+      statusLabel: s.label,
+      statusStyle: 'display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: ' + s.bg + '; color: ' + s.fg,
+      dotStyle: 'width: 8px; height: 8px; border-radius: 999px; background: ' + s.dot,
+      stripStyle: 'height: 4px; background: ' + s.dot,
+      timeStyle: 'font-size: 18px; font-weight: 700; line-height: 1.3; ' + (key === 'cancelada' ? 'text-decoration: line-through; color: #64748B' : 'color: #1E293B'),
+      ctaPlay: ctaKind === 'play', ctaDoc: ctaKind === 'doc', ctaCal: ctaKind === 'cal',
+      ctaLabel: ctaLabel,
+      ctaStyle: 'display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 52px; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; ' + (primary ? 'background: #1D5BA6; color: #FFFFFF; border: none' : 'background: #FFFFFF; color: #1D5BA6; border: 2px solid #1D5BA6'),
+      showHelp: !!helpText, helpText: helpText,
+      actions: acts,
+      hasActions: acts.length > 0,
+      gridStyle: 'display: grid; grid-template-columns: repeat(' + Math.max(1, acts.length) + ', minmax(0, 1fr)); gap: 8px',
+      showFooter: activa, noFooter: !activa,
+      footerStyle: 'margin-top: 16px; border-top: 1px solid #EEF2F6; display: grid; grid-template-columns: repeat(' + (origen === 'google' ? 2 : 1) + ', minmax(0, 1fr))'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, RotateCw } from 'lucide-react'
-import Link from 'next/link'
-import type { Paciente, Documento } from '@/types'
+import { AlertTriangle, FileText, Mail } from 'lucide-react'
+import type { Paciente, Documento, MedicoInfo } from '@/types'
+import type { PdfMedicoData } from '@/lib/pdf/PdfStyles'
 import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { puedeComponer } from '@/lib/mobileShare'
 import { folioImpreso } from '@/lib/documentos/folio'
 import { esSinVisor, type TipoDocumentoBD } from '@/lib/documentos/familias'
-import { AvisoColumna } from '@/components/dashboard/piezasBanda2'
+import { ofreceRegenerar } from '@/components/documentos/consentimientoEmbudo'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import EstadoError from '@/components/ui/EstadoError'
 import ModalShell from '@/components/ui/ModalShell'
 import CarrilDocumentos from './CarrilDocumentos'
 import VisorDocumento from './VisorDocumento'
@@ -43,6 +45,102 @@ const FORMATO_POR_DEFECTO = 1
  */
 function nombreDescarga(doc: Documento): string {
   return doc.pdf_url?.split('/').pop()?.trim() || `${doc.tipo}.pdf`
+}
+
+type DocumentoRegenerable = Pick<
+  Documento, 'id' | 'tipo' | 'contenido' | 'formato_version' | 'folio' | 'paciente_id' | 'subido_por'
+>
+
+const NO_REGENERADO = 'El documento no se regeneró: '
+
+/**
+ * El médico de la cabecera, leído DEL SERVIDOR en este momento (AG-DT-276).
+ *
+ * ⚠️ NI `localStorage` NI NINGUNA CACHÉ. Antes salía de
+ * `spinus_doctor_profile`, que sólo llenan los formularios y el perfil: en un
+ * navegador que no los había abierto el PDF se componía sin nombre, cédula ni
+ * firma y sustituía al emitido. La fuente es la de la EMISIÓN,
+ * `/api/me/perfil-medico` (`useMedicoInfo`), que da el perfil de quien tiene la
+ * sesión; por eso sólo regenera quien emitió (`subido_por`): con otra sesión
+ * saldría la cabecera de otro.
+ *
+ * Mínimo de la cabecera: nombre (nombres o apellido, no sólo el título) y
+ * cédula profesional. Sin ellos no se compone: un documento clínico no se
+ * guarda sin el médico que lo firma.
+ */
+async function medicoParaRegenerar(
+  doc: DocumentoRegenerable, usuarioId: string | null,
+): Promise<{ medico: PdfMedicoData; logoUrl?: string } | { motivo: string }> {
+  if (!usuarioId || doc.subido_por !== usuarioId) {
+    return { motivo: `${NO_REGENERADO}solo el médico que emitió el documento puede regenerarlo.` }
+  }
+  let m: MedicoInfo | null = null
+  try {
+    const res = await fetch('/api/me/perfil-medico', { cache: 'no-store' })
+    const cuerpo: { medico?: MedicoInfo | null } = res.ok ? await res.json() : {}
+    m = cuerpo.medico ?? null
+  } catch {
+    m = null
+  }
+  if (!m) return { motivo: `${NO_REGENERADO}no se pudieron leer tus datos de médico. Inténtalo de nuevo.` }
+  const conNombre = [m.nombres, m.apellido_paterno].some(t => !!t?.trim())
+  if (!conNombre || !m.cedula_profesional?.trim()) {
+    return { motivo: `${NO_REGENERADO}a tu perfil le falta el nombre o la cédula profesional. Complétalo en «Perfil».` }
+  }
+  return {
+    medico: {
+      nombre: m.nombre, titulo: m.titulo ?? null, nombres: m.nombres ?? null,
+      apellido_paterno: m.apellido_paterno ?? null, apellido_materno: m.apellido_materno ?? null,
+      especialidad: m.especialidad, cedula_profesional: m.cedula_profesional,
+      cedula_especialidad: m.cedula_especialidad, universidad: m.universidad ?? null,
+      color_primario: m.color_primario, color_secundario: m.color_secundario,
+      direccion_consultorio: m.direccion_consultorio, telefono_consultorio: m.telefono_consultorio,
+      firma_url: m.firma_url ?? null,
+    },
+    logoUrl: m.logo_url?.startsWith('https://') ? m.logo_url : undefined,
+  }
+}
+
+/**
+ * Vuelve a componer el PDF de un documento y, si se subió, lo pone en
+ * `pdf_url`. Sin médico válido (ver `medicoParaRegenerar`) sale ANTES de
+ * componer: ni sube ni toca la fila. Exportada para su prueba
+ * (`regenerarDocumento.test.ts`).
+ */
+export async function regenerarDocumento(
+  doc: DocumentoRegenerable, usuarioId: string | null,
+): Promise<{ guardado: boolean; aviso: string }> {
+  const cabecera = await medicoParaRegenerar(doc, usuarioId)
+  if ('motivo' in cabecera) return { guardado: false, aviso: cabecera.motivo }
+  const { generarPdf } = await import('@/lib/mobileShare')
+  const { generateDocFileName } = await import('@/lib/patientUtils')
+  const { storagePath } = await generarPdf({
+    tipo: doc.tipo,
+    medico: cabecera.medico,
+    data: {
+      ...(doc.contenido as Record<string, unknown>),
+      /* ⚠️ EL FOLIO CON EL QUE SE EMITIÓ, Y EL ORDEN DEL `??` IMPORTA.
+         `contenido.folio` primero: es el que el papel llevaba impreso. Las
+         recetas anteriores a agosto de 2026 guardaron ahí un `R-a3f9…` y
+         caen por la izquierda; las nuevas caen a `folioImpreso()`, que es
+         quien sabe qué formatos imprimen la columna. Invertirlo regeneraría
+         las viejas con un número que su papel no dice. */
+      folio: doc.contenido.folio ?? folioImpreso(doc.tipo, doc.folio),
+    },
+    logoUrl: cabecera.logoUrl,
+    filename: generateDocFileName(
+      (doc.contenido as Record<string, unknown>).paciente as string ?? 'documento',
+      doc.tipo.replace(/_/g, '-'),
+    ),
+    pacienteId: doc.paciente_id ?? undefined,
+    entregar: false,
+    formatoVersion: doc.formato_version ?? FORMATO_POR_DEFECTO,
+  })
+  if (!storagePath) {
+    return { guardado: false, aviso: 'El documento se regeneró, pero no se pudo guardar. Descárgalo antes de salir.' }
+  }
+  await createClient().from('documentos').update({ pdf_url: storagePath }).eq('id', doc.id)
+  return { guardado: true, aviso: 'El documento se regeneró y quedó guardado.' }
 }
 
 export default function PanelDocumentos({
@@ -238,62 +336,18 @@ export default function PanelDocumentos({
 
   /* ── Regenerar ─────────────────────────────────────────────────────────── */
   async function regenerar() {
-    if (!doc?.contenido || regenerando) return
+    if (!doc?.contenido || regenerando || !ofreceRegenerar(doc.tipo, doc.estado)) return
     setRegenerando(true)
     setAviso(null)
     try {
-      const formatoVersion = doc.formato_version ?? FORMATO_POR_DEFECTO
-      const { generarPdf } = await import('@/lib/mobileShare')
-      const { getDoctorProfile } = await import('@/lib/offline/doctorProfile')
-      const { generateDocFileName } = await import('@/lib/patientUtils')
-      const perfil = getDoctorProfile()
-
-      const { storagePath } = await generarPdf({
-        tipo: doc.tipo,
-        medico: perfil ? {
-          nombre: perfil.nombre,
-          especialidad: perfil.especialidad,
-          cedula_profesional: perfil.cedula_profesional,
-          cedula_especialidad: perfil.cedula_especialidad,
-          universidad: perfil.universidad || null,
-          color_primario: perfil.color_primario,
-          color_secundario: perfil.color_secundario,
-          direccion_consultorio: perfil.direccion_consultorio,
-          telefono_consultorio: perfil.telefono_consultorio,
-          firma_url: perfil.firma_base64,
-        } : null,
-        data: {
-          ...(doc.contenido as Record<string, unknown>),
-          /* ⚠️ EL FOLIO CON EL QUE SE EMITIÓ, Y EL ORDEN DEL `??` IMPORTA.
-             `contenido.folio` primero: es el que el papel llevaba impreso. Las
-             recetas anteriores a agosto de 2026 guardaron ahí un `R-a3f9…` y
-             caen por la izquierda; las nuevas caen a `folioImpreso()`, que es
-             quien sabe qué formatos imprimen la columna. Invertirlo regeneraría
-             las viejas con un número que su papel no dice. */
-          folio: doc.contenido.folio ?? folioImpreso(doc.tipo, doc.folio),
-        },
-        logoUrl: perfil?.logo_base64 ?? undefined,
-        filename: generateDocFileName(
-          (doc.contenido as Record<string, unknown>).paciente as string ?? 'documento',
-          doc.tipo.replace(/_/g, '-'),
-        ),
-        pacienteId: doc.paciente_id ?? undefined,
-        entregar: false,
-        formatoVersion,
-      })
-
-      if (storagePath) {
-        await createClient().from('documentos').update({ pdf_url: storagePath }).eq('id', doc.id)
-        /* ⚠️ SE RECARGA LA LISTA EN VEZ DE MUTAR `doc.pdf_url` EN SITIO. Eso
-           último es la deuda técnica #1 del CLAUDE.md: mutaba el objeto por
-           referencia y el botón de descarga no reaparecía hasta refetch manual.
-           Recargando, la url nueva llega por props y la firma vuelve sola a
-           «preparando», que es lo que el §6.2 pide. */
-        onRecargarDocumentos()
-        setAviso('El documento se regeneró y quedó guardado.')
-      } else {
-        setAviso('El documento se regeneró, pero no se pudo guardar. Descárgalo antes de salir.')
-      }
+      const r = await regenerarDocumento(doc, profile?.id ?? null)
+      /* ⚠️ SE RECARGA LA LISTA EN VEZ DE MUTAR `doc.pdf_url` EN SITIO. Eso
+         último es la deuda técnica #1 del CLAUDE.md: mutaba el objeto por
+         referencia y el botón de descarga no reaparecía hasta refetch manual.
+         Recargando, la url nueva llega por props y la firma vuelve sola a
+         «preparando», que es lo que el §6.2 pide. */
+      if (r.guardado) onRecargarDocumentos()
+      setAviso(r.aviso)
     } catch {
       setAviso('No se pudo regenerar el documento.')
     } finally {
@@ -370,42 +424,35 @@ export default function PanelDocumentos({
 
   const bloqueoRegenerar =
     !esComponible ? 'Este archivo se subió; no hay datos con los que componerlo.'
+    : !esAutor ? 'Solo el médico que emitió el documento puede regenerarlo.'
     : doc && !puedeComponer(doc.tipo, doc.formato_version ?? FORMATO_POR_DEFECTO)
       ? 'Se emitió con una plantilla anterior. Se conserva tal cual para que el archivo recuperado sea el que se entregó.'
       : undefined
 
   if (errorActividad) {
-    return <AvisoColumna icono={RotateCw} mensaje="No se pudieron cargar los documentos." onReintentar={onReintentarActividad} />
+    return <EstadoError variante="tarjeta" className="k-tarjeta" mensaje="No se pudieron cargar los documentos." alReintentar={onReintentarActividad} />
   }
   if (cargandoActividad) {
     return (
-      <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
-        <div className="skeleton hidden h-[300px] w-[236px] shrink-0 rounded-[var(--sp-r-card)] lg:block" />
-        <div className="skeleton h-[300px] min-w-0 flex-1 rounded-[var(--sp-r-card)]" />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start" aria-busy="true">
+        <div className="skeleton hidden h-[300px] w-[272px] shrink-0 rounded-[var(--r-tarjeta-ancha)] lg:block" />
+        <div className="skeleton h-[300px] min-w-0 flex-1 rounded-[var(--r-tarjeta-ancha)]" />
       </div>
     )
   }
   if (listables.length === 0 && !doc) {
+    /* Acción tonal: el relleno de la pantalla es «Nueva consulta» de la cabecera. */
     return (
-      <div className="flex flex-col items-center gap-[var(--sp-2-5)] rounded-[var(--sp-r-card)] border border-dashed border-[color:var(--sp-line-card)] px-[var(--sp-pad-row-x)] py-[var(--sp-10)]">
-        <FileText size={20} className="text-[var(--sp-ink-150)]" />
-        <p className="text-center text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-500)]">
-          Este paciente todavía no tiene documentos.
-        </p>
-        <Link
-          href={`/expediente/${paciente.id}/documentos`}
-          prefetch={false}
-          className="sp-btn sp-btn--primary mt-[var(--sp-2)]"
-          style={{ height: 'var(--sp-tap)', paddingTop: 0, paddingBottom: 0, fontSize: 'var(--sp-fs-body-sm)' }}
-        >
-          Crear documento
-        </Link>
-      </div>
+      <EstadoVacio
+        icono={FileText}
+        titulo="Este paciente todavía no tiene documentos."
+        accion={{ etiqueta: 'Crear documento', href: `/expediente/${paciente.id}/documentos` }}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col gap-[var(--sp-4)] lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <CarrilDocumentos
         documentos={listables}
         total={totalDocumentos}
@@ -450,7 +497,16 @@ export default function PanelDocumentos({
                 onPreparar: prepararCompartir,
               },
               enviar: { onClick: () => void enviar(), bloqueo: bloqueoEnviar, ocupada: enviando },
-              regenerar: { onClick: () => void regenerar(), bloqueo: bloqueoRegenerar, ocupada: regenerando },
+              /* ⚠️ UN CONSENTIMIENTO SELLADO NO OFRECE «REGENERAR» (CI-DT-1,
+                 decisión del dueño): recompone sólo desde `contenido`, sin
+                 firmas, sello ni identificaciones, y dejaría en el expediente un
+                 papel que dice que nadie firmó. `onClick: null` → no se dibuja.
+                 El resto de tipos y estados, como siempre. */
+              regenerar: {
+                onClick: ofreceRegenerar(doc.tipo, doc.estado) ? () => void regenerar() : null,
+                bloqueo: bloqueoRegenerar,
+                ocupada: regenerando,
+              },
               eliminar: {
                 onClick: () => setConfirmarBorrado(true),
                 rotulo: esBorrador ? 'Cancelar borrador' : 'Eliminar documento',
@@ -458,79 +514,76 @@ export default function PanelDocumentos({
               },
               /* Solo consentimientos en borrador. En cualquier otro, no se dibuja. */
               seguirEditando: esBorrador && doc.tipo === 'consentimiento_informado'
-                ? () => router.push(`/expediente/${paciente.id}/documentos?tipo=consentimiento&doc=${doc.id}`)
+                /* `borrador=`, que es lo que lee la página (CI-DT-14): con `doc=`
+                   el borrador no se cargaba y salía el diálogo de «a medias». */
+                ? () => router.push(`/expediente/${paciente.id}/documentos?tipo=consentimiento&borrador=${doc.id}`)
                 : null,
             }}
           />
         )}
 
         {aviso && (
-          <p className="mt-[var(--sp-2-5)] flex items-start justify-between gap-[var(--sp-3)] rounded-[var(--sp-r-field-sm)] bg-[var(--sp-surface-muted)] px-[var(--sp-3)] py-[var(--sp-2)] text-[length:var(--sp-fs-hint)] text-[var(--sp-ink-700)]">
+          <p role="status" className="mt-3 flex items-center justify-between gap-3 rounded-[var(--r-control)] bg-sup2 py-1 pl-3 pr-1 text-[14px] leading-5 text-tinta">
             {aviso}
-            <button type="button" onClick={cerrarAviso} className="shrink-0 font-semibold text-[var(--sp-primary-text)]">Cerrar</button>
+            <button type="button" onClick={cerrarAviso} className="k-b k-b-texto shrink-0">Cerrar</button>
           </p>
         )}
       </div>
 
-      {/* ── Confirmación de borrado ─────────────────────────────────────── */}
-      {confirmarBorrado && doc && (
-        <ModalShell
-          open
-          onClose={() => setConfirmarBorrado(false)}
-          title="¿Eliminar documento?"
-          maxWidth="max-w-sm"
-          footer={
-            <div className="flex justify-end gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-3)]">
-              <button type="button" onClick={() => setConfirmarBorrado(false)} className="sp-btn sp-btn--secondary">
-                Cancelar
-              </button>
-              {/* La destructiva, en MENOR peso visual que cancelar. */}
-              <button
-                type="button"
-                onClick={() => void eliminar()}
-                disabled={borrando}
-                className="sp-btn"
-                style={{ background: 'transparent', color: 'var(--sp-danger)', fontSize: 'var(--sp-fs-btn-sm)', padding: '13px 20px' }}
-              >
-                {esBorrador ? 'Cancelar borrador' : 'Eliminar documento'}
-              </button>
-            </div>
-          }
-        >
-          <p className="px-[var(--sp-5)] py-[var(--sp-4)] text-[length:var(--sp-fs-body-sm)] text-[var(--sp-ink-700)]">
-            Esta acción no se puede deshacer.
-          </p>
-        </ModalShell>
-      )}
+      {/* ── Confirmación de borrado: alerta destructiva del catálogo (CALMA
+             §13). El foco entra en «Cancelar». Rótulo largo → apilada. ──── */}
+      <ModalShell
+        open={confirmarBorrado && !!doc}
+        onClose={() => setConfirmarBorrado(false)}
+        variante="alerta"
+        tono="destruir"
+        apilada
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="¿Eliminar documento?"
+        footer={
+          <>
+            <button type="button" autoFocus onClick={() => setConfirmarBorrado(false)} className="k-b k-b-capa k-b-quieto">
+              Cancelar
+            </button>
+            <button type="button" data-principal onClick={() => void eliminar()} disabled={borrando} className="k-b k-b-capa k-b-mal">
+              {esBorrador ? 'Cancelar borrador' : 'Eliminar documento'}
+            </button>
+          </>
+        }
+      >
+        <p>Esta acción no se puede deshacer.</p>
+      </ModalShell>
 
-      {/* ── El correo escrito no coincide con el de la ficha ─────────────── */}
-      {correoAlterno !== null && (
-        <ModalShell
-          open
-          onClose={() => setCorreoAlterno(null)}
-          title="El correo no coincide"
-          maxWidth="max-w-sm"
-          footer={
-            <div className="flex justify-end gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-3)]">
-              <button type="button" onClick={() => setCorreoAlterno(null)} className="sp-btn sp-btn--secondary">Cancelar</button>
-              <button type="button" onClick={() => void enviar(true)} className="sp-btn sp-btn--primary">Enviar de todos modos</button>
-            </div>
-          }
-        >
-          {/* Los dos correos como pares rótulo/valor, NO como campos editables:
-              cambiar el correo del paciente es otra tarea. */}
-          <div className="flex flex-col gap-[var(--sp-2)] px-[var(--sp-5)] py-[var(--sp-4)]">
-            <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-              Se enviará a
-              <span className="ml-[var(--sp-2)] normal-case tracking-normal text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-800)]">{paciente.email}</span>
-            </p>
-            <p className="text-[length:var(--sp-fs-legal)] font-bold uppercase tracking-[var(--sp-ls-label)] text-[var(--sp-ink-350)]">
-              Registrado en la ficha
-              <span className="ml-[var(--sp-2)] normal-case tracking-normal text-[length:var(--sp-fs-meta)] font-semibold text-[var(--sp-ink-800)]">{correoAlterno || '—'}</span>
-            </p>
+      {/* ── El correo escrito no coincide con el de la ficha: alerta de aviso.
+             Rótulo largo («Enviar de todos modos») → apilada, principal arriba. */}
+      <ModalShell
+        open={correoAlterno !== null}
+        onClose={() => setCorreoAlterno(null)}
+        variante="alerta"
+        tono="avisar"
+        apilada
+        icon={<Mail aria-hidden="true" />}
+        title="El correo no coincide"
+        footer={
+          <>
+            <button type="button" onClick={() => setCorreoAlterno(null)} className="k-b k-b-capa k-b-quieto">Cancelar</button>
+            <button type="button" autoFocus data-principal onClick={() => void enviar(true)} className="k-b k-b-capa k-b-prim">Enviar de todos modos</button>
+          </>
+        }
+      >
+        {/* Los dos correos como pares rótulo/valor, NO como campos editables:
+            cambiar el correo del paciente es otra tarea. */}
+        <dl className="k-lista text-left">
+          <div className="py-2">
+            <dt className="text-[13px] text-tinta2">Se enviará a</dt>
+            <dd className="text-[15px] font-semibold text-tinta [overflow-wrap:anywhere]">{paciente.email}</dd>
           </div>
-        </ModalShell>
-      )}
+          <div className="py-2">
+            <dt className="text-[13px] text-tinta2">Registrado en la ficha</dt>
+            <dd className="text-[15px] font-semibold text-tinta [overflow-wrap:anywhere]">{correoAlterno || '—'}</dd>
+          </div>
+        </dl>
+      </ModalShell>
     </div>
   )
 }

@@ -6,8 +6,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useProfile } from '@/hooks/useProfile'
 import { useAuditAccess } from '@/hooks/useAudit'
 import { Paciente, Consulta, Documento } from '@/types'
-import Portal from '@/components/ui/Portal'
-import { Trash2, AlertTriangle, Loader2 } from 'lucide-react'
+import ModalShell from '@/components/ui/ModalShell'
+import { AlertTriangle, Loader2, UserX } from 'lucide-react'
+import EstadoVacio from '@/components/ui/EstadoVacio'
+import { ExpedientePacienteSkeleton } from '@/components/ui/Skeleton'
 
 import CabeceraPaciente from '@/components/expediente/CabeceraPaciente'
 import PestanasExpediente, {
@@ -16,7 +18,7 @@ import PestanasExpediente, {
 import LineaTiempoClinica from '@/components/expediente/LineaTiempoClinica'
 import PanelConsultas from '@/components/expediente/PanelConsultas'
 import PanelDocumentos from '@/components/expediente/PanelDocumentos'
-import FichaClinica, { type ProximaCita } from '@/components/expediente/FichaClinica'
+import FichaClinica, { PlegablesFicha, type ProximaCita } from '@/components/expediente/FichaClinica'
 import PanelLaboratorios from '@/components/labs/PanelLaboratorios'
 /** Límite de registros por query */
 const QUERY_LIMIT = 50
@@ -195,198 +197,145 @@ function ExpedientePacienteContent() {
   }
 
   // ── Loading / not-found guards ─────────────────────────────
-  if (loadingPaciente) {
-    return <div className="text-center py-12 text-slate-400">Cargando expediente...</div>
-  }
+  /* El mismo esqueleto que `loading.tsx`: la forma de la página, no un texto. */
+  if (loadingPaciente) return <ExpedientePacienteSkeleton />
   if (!paciente) {
-    return <div className="text-center py-12 text-slate-400">Paciente no encontrado</div>
+    /* El vacío de página del catálogo (B12): las pantallas vecinas usan
+       EstadoVacio/EstadoError; aquí quedaba un párrafo suelto. Mismo texto, y
+       la salida que tienen sus pantallas hermanas: volver a la lista. */
+    return <EstadoVacio icono={UserX} titulo="Paciente no encontrado" accion={{ etiqueta: 'Volver a Expediente', href: '/expediente' }} />
   }
+
+  const cerrarEliminar = () => { if (!eliminandoPaciente) { setMostrarEliminarPaciente(false); setErrorEliminar('') } }
 
   return (
-    <div className="max-w-[960px] mx-auto animate-slide-up">
+    /* ═══ REDISEÑO B7 (maqueta `final-expediente`) ═══════════════════════════
+       En `esc`, dos columnas: la FICHA a la izquierda (cabecera del paciente y
+       sus plegables de antecedentes y antropometría) y las pestañas a la
+       derecha. En el resto, una columna: cabecera, pestañas y contenido.
+       Todo con variantes de CSS: ningún marcado depende del formato. */
+    <div className="mx-auto w-full max-w-[1120px] esc:grid esc:grid-cols-[280px_minmax(0,1fr)] esc:items-start esc:gap-10">
 
-      {/* ⚠️ AQUÍ VIVÍAN TRES MODALES Y YA NO EXISTE NINGUNO. `ModalConsultas`,
-         `ModalDocumentos` y `ModalVisorDocumento` quedaron sin consumidor al
-         mudarse su contenido a las pestañas: las consultas en el bloque 3, los
-         documentos y su visor en el 4. Los ARCHIVOS siguen en disco a la espera
-         de que Ángel revise el bloque; si ves esta nota y ya los revisó, lo que
-         toca es borrarlos, no volver a montarlos.
-         El único diálogo que se conserva es el de eliminar paciente, de aquí
-         abajo: es una acción sobre el expediente entero, no sobre una pestaña. */}
+      {/* ⚠️ EL ÚNICO DIÁLOGO DE LA PÁGINA ES EL DE ELIMINAR PACIENTE: es una
+         acción sobre el expediente entero, no sobre una pestaña. Alerta
+         destructiva del catálogo (CALMA §13, §15): título «Eliminar paciente»,
+         el foco entra en «Cancelar» y el velo no la cierra. */}
+      <ModalShell
+        open={mostrarEliminarPaciente}
+        onClose={cerrarEliminar}
+        variante="alerta"
+        tono="destruir"
+        icon={<AlertTriangle aria-hidden="true" />}
+        title="Eliminar paciente"
+        footer={
+          <>
+            <button type="button" autoFocus onClick={cerrarEliminar} disabled={eliminandoPaciente} className="k-b k-b-capa k-b-quieto">
+              Cancelar
+            </button>
+            <button type="button" data-principal onClick={eliminarPaciente} disabled={eliminandoPaciente} className="k-b k-b-capa k-b-mal">
+              {eliminandoPaciente
+                ? <><Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> Eliminando...</>
+                : 'Eliminar'}
+            </button>
+          </>
+        }
+      >
+        <p className="font-semibold text-tinta">{paciente.nombre} {paciente.apellidos}</p>
+        <p className="mt-2">
+          Se eliminarán <span className="font-semibold">permanentemente</span> todas las notas, laboratorios, documentos y datos personales del paciente.
+        </p>
+        <p className="mt-2">Esta acción no se puede deshacer.</p>
+        {errorEliminar && <p role="alert" className="k-campo-error mt-3">{errorEliminar}</p>}
+      </ModalShell>
 
-      {/* ── Modal eliminar paciente — macOS alert dialog ── */}
-      {mostrarEliminarPaciente && (
-        <Portal>
-        {/* ⚠️ EL RELLENO DE ABAJO LLEVA LA BARRA DE GESTOS SUMADA (bloque 6 ·
-            paso 10), Y AQUÍ NO ES COSMÉTICO. Por debajo de `sm` este diálogo va
-            anclado al borde inferior (`items-end`), y desde que el viewport es
-            `viewport-fit=cover` esos 16 px de `p-4` se miden contra el borde
-            FÍSICO de la pantalla. La barra de gestos mide ~34: la fila de
-            botones quedaba a medias debajo de ella. Y esa fila es «Cancelar» y
-            «Eliminar» —borrado permanente de un expediente— repartidos al 50 %,
-            o sea que el dedo que falla acierta en el otro.
-            ⚠️ SÓLO POR DEBAJO DE `sm`. De ahí para arriba el diálogo se centra
-            (`sm:items-center`) y no toca ningún borde; sumarle relleno inferior
-            lo descentraría hacia arriba media área segura.
-            ⚠️ EL 16 DE DISEÑO NO SE TOCA: se suma. Donde el sistema no se
-            superpone, `env()` vale 0 y esto es el `p-4` de siempre. */}
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 max-sm:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-[var(--sp-surface-glass)] backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
-            {/* Icon + title */}
-            <div className="px-6 pt-6 pb-4 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ backgroundColor: 'var(--sp-danger-bg)' }}>
-                <AlertTriangle size={22} style={{ color: 'var(--sp-danger)' }} />
-              </div>
-              <h2 className="text-base font-semibold text-[var(--sp-ink-800)]">Eliminar expediente</h2>
-              <p className="text-sm text-[var(--sp-ink-350)] mt-1">
-                {paciente?.nombre} {paciente?.apellidos}
-              </p>
-            </div>
+      {/* ── Ficha: la cabecera del paciente, persistente en las cuatro
+             pestañas. En esc es la columna izquierda. ───────────────────── */}
+      <aside aria-label="Paciente" className="flex flex-col gap-4">
+        <CabeceraPaciente
+          paciente={paciente}
+          isDoctor={isDoctor}
+          onEditar={() => router.push(`/expediente/${id}/editar`)}
+          onNuevoDocumento={() => router.push(`/expediente/${id}/documentos`)}
+          onEliminar={() => setMostrarEliminarPaciente(true)}
+        />
+        <PlegablesFicha paciente={paciente} enColumna />
+      </aside>
 
-            {/* Divider */}
-            <div className="border-t border-[color:var(--sp-line-divider)] mx-4" />
+      <div className="mt-5 min-w-0 esc:mt-0">
+        {/* ── Barra de pestañas ─────────────────────────────────────────── */}
+        <PestanasExpediente activa={pestana} conteos={conteos} onCambiar={cambiarPestana} />
 
-            {/* Body */}
-            <div className="px-6 py-4 text-center">
-              <p className="text-[13px] text-[var(--sp-ink-700)] leading-relaxed">
-                Se eliminarán <span className="font-semibold">permanentemente</span> todas las notas, laboratorios, documentos y datos personales del paciente.
-              </p>
-              <p className="text-[12px] text-[var(--sp-ink-350)] mt-2">Esta acción no se puede deshacer.</p>
-              {errorEliminar && (
-                <p className="text-xs text-[var(--sp-danger)] mt-3 bg-[var(--sp-danger-bg)] px-3 py-2 rounded-lg">{errorEliminar}</p>
-              )}
-            </div>
-
-            {/* Buttons — macOS order: destructive on right */}
-            <div className="border-t border-[color:var(--sp-line-divider)] grid grid-cols-2">
-              <button
-                onClick={() => { setMostrarEliminarPaciente(false); setErrorEliminar('') }}
-                disabled={eliminandoPaciente}
-                className="px-4 py-3.5 text-sm font-medium text-[var(--sp-primary-text)] hover:bg-[var(--sp-surface-sunken)] transition-colors disabled:opacity-40 border-r border-[color:var(--sp-line-divider)]"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={eliminarPaciente}
-                disabled={eliminandoPaciente}
-                className="px-4 py-3.5 text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
-                style={{ color: 'var(--sp-danger)' }}
-              >
-                {eliminandoPaciente
-                  ? <><Loader2 size={14} className="animate-spin" /> Eliminando...</>
-                  : 'Eliminar'
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-        </Portal>
-      )}
-
-      {/* ── Región 1 · Cabecera del paciente, persistente en las cuatro
-             pestañas ────────────────────────────────────────────────────── */}
-      <CabeceraPaciente
-        paciente={paciente}
-        isDoctor={isDoctor}
-        onEditar={() => router.push(`/expediente/${id}/editar`)}
-        onNuevoDocumento={() => router.push(`/expediente/${id}/documentos`)}
-      />
-
-      {/* ── Región 2 · Barra de pestañas ─────────────────────────────────── */}
-      <PestanasExpediente activa={pestana} conteos={conteos} onCambiar={cambiarPestana} />
-
-      {/* ── Cuerpo de la pestaña activa ───────────────────────────────────
-          ⚠️ EL CONTENIDO ES EL DE HOY, MUDADO DE SITIO. Este bloque construye
-          el chasis; el rediseño de cada pestaña llega después. Por eso el
-          Resumen conserva la parrilla de tarjetas y las dos de «Estado», y
-          Consultas y Documentos anuncian lo que falta en vez de fingirlo. */}
-      <div className="mt-[var(--sp-gap-band)]">
-        {pestana === 'resumen' && (
-          /* ⚠️ LOS TRES HIJOS SON DOS COMPONENTES. `FichaClinica` entra al grid
-             como `display: contents` por debajo de `lg`, así que aporta DOS
-             hijos —diagnóstico+alergias y el resto— y la línea de tiempo se
-             cuela entre ellos con `order`, que es el orden móvil del §3.2. En
-             `lg` la ficha vuelve a ser una card entera y las dos columnas se
-             colocan a mano (`col-start`), sin depender del orden del código.
-             `items-start` es lo que impide que una columna estire su altura
-             para igualar a la otra. */
-          <div className="grid grid-cols-1 gap-[var(--sp-gap-band)] lg:grid-cols-[minmax(0,1fr)_330px] lg:items-start">
-            <FichaClinica
-              paciente={paciente}
-              consultas={consultas}
-              totalConsultas={conteos.consultas}
-              proximaCita={proximaCita}
-              cargandoActividad={estadoActividad === 'cargando'}
-              errorActividad={estadoActividad === 'error'}
-              onReintentarActividad={() => { void cargarActividad() }}
-              onIrAPestana={cambiarPestana}
-            />
-            <div className="order-2 min-w-0 lg:order-none lg:col-start-1 lg:row-start-1">
-              <LineaTiempoClinica
-                pacienteId={id}
-                sexo={paciente.sexo}
-                isDoctor={isDoctor}
+        <div className="mt-5 esc:mt-6">
+          {pestana === 'resumen' && (
+            /* ⚠️ `FichaClinica` aporta DOS hijos (`display: contents`) y la línea
+               de tiempo se cuela entre ellos con `order`: teléfono =
+               diagnóstico, actividad, plegables. En ih/iv dos columnas
+               (diagnóstico + plegables | actividad) colocadas con `col-start`.
+               `items-start` impide que una columna estire a la otra. */
+            <div className="grid grid-cols-1 items-start gap-6 ih:grid-cols-2 ih:grid-rows-[auto_1fr] ih:gap-4 iv:grid-cols-2 iv:grid-rows-[auto_1fr] iv:gap-5 esc:gap-7">
+              <FichaClinica
+                paciente={paciente}
                 consultas={consultas}
-                documentos={documentos}
+                totalConsultas={conteos.consultas}
+                proximaCita={proximaCita}
                 cargandoActividad={estadoActividad === 'cargando'}
                 errorActividad={estadoActividad === 'error'}
                 onReintentarActividad={() => { void cargarActividad() }}
                 onIrAPestana={cambiarPestana}
               />
+              <div className="order-2 min-w-0 ih:col-start-2 ih:row-span-2 ih:row-start-1 iv:col-start-2 iv:row-span-2 iv:row-start-1">
+                <LineaTiempoClinica
+                  pacienteId={id}
+                  sexo={paciente.sexo}
+                  isDoctor={isDoctor}
+                  consultas={consultas}
+                  documentos={documentos}
+                  cargandoActividad={estadoActividad === 'cargando'}
+                  errorActividad={estadoActividad === 'error'}
+                  onReintentarActividad={() => { void cargarActividad() }}
+                  onIrAPestana={cambiarPestana}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {pestana === 'consultas' && (
-          <PanelConsultas
-            paciente={paciente}
-            consultas={consultas}
-            totalConsultas={conteos.consultas}
-            cargandoActividad={estadoActividad === 'cargando'}
-            errorActividad={estadoActividad === 'error'}
-            onReintentarActividad={() => { void cargarActividad() }}
-            consultaSolicitadaId={consultaDeUrl}
-            onSeleccionarConsulta={fijarConsulta}
-          />
-        )}
-        {pestana === 'documentos' && (
-          <PanelDocumentos
-            paciente={paciente}
-            documentos={documentos}
-            totalDocumentos={conteos.documentos}
-            cargandoActividad={estadoActividad === 'cargando'}
-            errorActividad={estadoActividad === 'error'}
-            onReintentarActividad={() => { void cargarActividad() }}
-            onRecargarDocumentos={() => { void cargarActividad() }}
-            documentoSolicitadoId={documentoDeUrl}
-            onSeleccionarDocumento={fijarDocumento}
-            onIrAArchivos={() => cambiarPestana('mediciones')}
-          />
-        )}
-        {pestana === 'mediciones' && <PanelLaboratorios paciente={paciente} />}
-      </div>
-
-      {/* Eliminar paciente. Fuera de las pestañas: es una acción sobre el
-          expediente entero, no sobre ninguna de sus secciones. */}
-      {isDoctor && (
-        <div className="mt-[var(--sp-gap-band)] flex justify-end">
-          <button
-            type="button"
-            onClick={() => setMostrarEliminarPaciente(true)}
-            className="flex items-center gap-[var(--sp-1-5)] text-[length:var(--sp-fs-legal)] text-[var(--sp-ink-350)] transition-colors hover:text-[var(--sp-danger)]"
-          >
-            <Trash2 size={12} /> Eliminar paciente
-          </button>
+          {pestana === 'consultas' && (
+            <PanelConsultas
+              paciente={paciente}
+              consultas={consultas}
+              totalConsultas={conteos.consultas}
+              cargandoActividad={estadoActividad === 'cargando'}
+              errorActividad={estadoActividad === 'error'}
+              onReintentarActividad={() => { void cargarActividad() }}
+              consultaSolicitadaId={consultaDeUrl}
+              onSeleccionarConsulta={fijarConsulta}
+            />
+          )}
+          {pestana === 'documentos' && (
+            <PanelDocumentos
+              paciente={paciente}
+              documentos={documentos}
+              totalDocumentos={conteos.documentos}
+              cargandoActividad={estadoActividad === 'cargando'}
+              errorActividad={estadoActividad === 'error'}
+              onReintentarActividad={() => { void cargarActividad() }}
+              onRecargarDocumentos={() => { void cargarActividad() }}
+              documentoSolicitadoId={documentoDeUrl}
+              onSeleccionarDocumento={fijarDocumento}
+              onIrAArchivos={() => cambiarPestana('mediciones')}
+            />
+          )}
+          {pestana === 'mediciones' && <PanelLaboratorios paciente={paciente} />}
         </div>
-      )}
-
+      </div>
     </div>
   )
 }
 
+
 export default function ExpedientePacientePage() {
   return (
-    <Suspense>
+    <Suspense fallback={<ExpedientePacienteSkeleton />}>
       <ExpedientePacienteContent />
     </Suspense>
   )

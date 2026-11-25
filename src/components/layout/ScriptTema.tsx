@@ -30,12 +30,23 @@
  * ⚠️ EL `try` NO SOBRA: `localStorage` lanza en modo privado de algunos
  * navegadores y con cookies de terceros bloqueadas. Si lanza, la app arranca en
  * claro, que es el estado por defecto.
+ *
+ * ⚠️ DESDE EL REDISEÑO (B1) LLEVA TAMBIÉN LA SONDA DEL FORMATO DE PANTALLA, por
+ * la misma razón que el tema: tiene que estar en <html> antes de pintar, y con
+ * el mismo alcance —sólo `(app)` y `(launcher)`, nunca las páginas públicas—.
+ * Escribe `data-formato` y `data-borde-sistema`; la cadena, sus cortes y su
+ * explicación viven en `src/lib/formatoPantalla.ts`. Va DESPUÉS del tema y en
+ * su propio `try`: si la sonda falla, el tema ya está puesto.
  */
+import { SCRIPT_SONDA_FORMATO } from '@/lib/formatoPantalla'
+
+const SCRIPT_TEMA = `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`
+
 export default function ScriptTema() {
   return (
     <script
       dangerouslySetInnerHTML={{
-        __html: `try{if(localStorage.getItem('theme')==='dark')document.documentElement.classList.add('dark')}catch(e){}`,
+        __html: SCRIPT_TEMA + SCRIPT_SONDA_FORMATO,
       }}
     />
   )

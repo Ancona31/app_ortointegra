@@ -86,10 +86,14 @@ export interface EdadPaciente {
  *   - < 1 mes        → "Recién nacido" o "X días"
  *   - 1-23 meses     → "X meses"
  *   - ≥ 2 años       → "X años"
+ *
+ * `referencia` (YYYY-MM-DD) calcula la edad que tenía ese día en vez de hoy.
+ * La usa el consentimiento para saber si la edad de un borrador salió de la
+ * ficha el día en que se guardó (CI-DT-3). Sin ella, hoy en la clínica.
  */
-export function calcularEdad(fechaNacimiento: string): EdadPaciente {
+export function calcularEdad(fechaNacimiento: string, referencia?: string): EdadPaciente {
   const nacimiento = fechaSoloSegura(fechaNacimiento)
-  const hoy = fechaSoloSegura(hoyEnTZ(TZ_CLINICA))
+  const hoy = fechaSoloSegura(referencia ?? hoyEnTZ(TZ_CLINICA))
 
   const anios = differenceInYears(hoy, nacimiento)
   const totalMeses = differenceInMonths(hoy, nacimiento)

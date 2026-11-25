@@ -6,7 +6,7 @@ import { canManageClinica } from '@/lib/permissions'
 /**
  * PUT /api/admin/paciente/[id]/rectificar — Derecho de Rectificación (ARCO)
  *
- * LFPDPPP Art. 31: El titular puede solicitar la corrección de sus datos
+ * LFPDPPP vigente (DOF 20/03/2025): El titular puede solicitar la corrección de sus datos
  * personales cuando sean inexactos o incompletos.
  *
  * Solo permite corregir datos personales (nombre, fecha_nacimiento, email,

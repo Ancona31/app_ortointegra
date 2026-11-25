@@ -66,6 +66,11 @@ export type AuditAccion =
      `audit_log.accion` es `text` sin CHECK, así que esta línea no necesita
      migración. */
   | 'enviar_invitacion_cita'
+  /* G3 (agenda v2) · El correo de confirmación de Spinus que el personal manda
+     desde la agenda (`POST /api/agenda/correo`), con o sin Google. Sin
+     dirección de correo en la descripción (mismo criterio que la de arriba):
+     `registro_id` es la cita. `accion` es `text` sin CHECK: sin migración. */
+  | 'enviar_confirmacion_cita'
   // Autenticación
   | 'login_exitoso'
   | 'login_fallido'
@@ -205,6 +210,59 @@ export type AuditAccion =
   | 'gcal_conexion_baja'
   | 'gcal_calendario_recreado'
   | 'gcal_conexion_revocada'
+  /* `PUT /api/me/horario` (P8 de la agenda): el administrador cambió el
+     horario de consulta de la clínica. `registro_id` es la clínica y NO hay
+     `descripcion`: sólo el hecho, sin el horario de antes ni el de después.
+     `clinicas` no tiene disparador de auditoría y la ruta escribe con el
+     cliente de servicio, así que esta fila es el único rastro. Sin migración
+     (`accion` es `text` sin CHECK). */
+  | 'horario_clinica_editado'
+  /* La sincronización de vuelta desde Google (bloque C de mejora_agendaV2.md),
+     en `src/lib/gcalSincronizacion.ts`. Los cambios ACEPTADOS ya los audita
+     el disparador de citas (`log_cita_change`, con "via":"google"); estas dos
+     son lo que el disparador no puede ver porque no se escribe nada:
+       · `gcal_conflicto_cita` — gana el último cambio, y el otro se pierde:
+         ganó Google sobre una escritura de Spinus pendiente, o ganó Spinus
+         sobre un cambio hecho en Google.
+       · `gcal_cambio_rechazado` — Google movió, editó o borró una cita que ya
+         no admite cambios (attended, no_show, cancelled: decisión C-e), o
+         cambió algo que no se acepta (el título de una cita con paciente, C-d).
+     Igual que el disparador: NOMBRES de campo, nunca valores. `registro_id` es
+     la cita; `user_id`, el dueño de la conexión, con `origen: 'sistema'`, como
+     `gcal_conexion_revocada`. `accion` es `text` sin CHECK: sin migración. */
+  | 'gcal_conflicto_cita'
+  | 'gcal_cambio_rechazado'
+  /* D7 de la agenda (reserva por enlace): una cita POR LIGAR —nacida de una
+     reserva sin paciente— quedó ligada a un paciente al iniciar la consulta.
+     `registro_id` es la cita; `descripcion` lleva la clínica y los NOMBRES de
+     los campos cambiados, nunca valores (ni el paciente ni el nombre de quien
+     reservó). El disparador de citas deja además su `cita_editada`. Sin
+     migración (`accion` es `text` sin CHECK). */
+  | 'cita_ligada'
+  /* I3 de la agenda (punto 10): «¿No es una cita?» sobre un evento de Google
+     «por asignar», que pasa a evento sin paciente para siempre
+     (`POST /api/appointments/[id]/no-es-cita`). `registro_id` es la cita;
+     `descripcion`, la clínica y el NOMBRE del campo. El disparador de citas
+     deja además su `cita_editada`. Sin migración. */
+  | 'cita_no_es_cita'
+  /* Tanda I (punto 12): una cita CANCELADA se sustituyó por otra («Reagendar
+     cita» o «Reasignar» de su tarjeta) y quedó cerrada. `registro_id` es la
+     cancelada; `descripcion`, sólo el id de la sustituta. A nombre de quien
+     pulsó (el disparador de citas deja su `cita_editada` como `system`, porque
+     el cierre lo escribe el servidor). Sin migración (`accion` es `text`). */
+  | 'cita_sustituida'
+  /* Tanda L (punto 9): «Eliminar cita» de una cita CANCELADA la quitó de la
+     agenda sin borrarla: quedó cerrada SIN sustituta
+     (`POST /api/appointments/[id]/quitar`). `registro_id` es la cita;
+     `descripcion`, la clínica y el NOMBRE del campo. A nombre de quien pulsó
+     (el disparador de citas deja además su `cita_editada`). Sin migración
+     (`accion` es `text`). */
+  | 'cita_quitada_de_agenda'
+  /* I5 de la agenda (punto 20): el correo a la clínica por una reserva nueva
+     por enlace, con la opción encendida. `registro_id` es la cita;
+     `descripcion` lleva la clínica y cuántos destinatarios y envíos, nunca el
+     correo ni el nombre. Sin migración (`accion` es `text` sin CHECK). */
+  | 'correo_reserva_clinica'
 
 interface AuditParams {
   userId?: string | null

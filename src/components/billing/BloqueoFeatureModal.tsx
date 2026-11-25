@@ -22,47 +22,45 @@ export default function BloqueoFeatureModal({ isOpen, onClose, role, esAdminDeCl
     router.push('/billing')
   }
 
+  /* Alerta de aviso del catálogo (CALMA §13). Rol `dialog` y no
+     `alertdialog`: así la nombra la e2e `agenda-f-burbuja`. «Reactivar
+     suscripción» no cabe en media alerta: con él, los botones van apilados y
+     el principal arriba (§23.3), sin acortar el rótulo. */
   return (
     <ModalShell
       open={isOpen}
       onClose={onClose}
       title="Función no disponible"
       subtitle="Suscripción terminada"
-      icon={<AlertCircle size={16} className="text-amber-600" />}
-      iconBg="bg-amber-50"
-      maxWidth="max-w-md"
+      icon={<AlertCircle aria-hidden="true" />}
+      variante="alerta"
+      tono="avisar"
+      rol="dialog"
+      apilada={isAdmin}
       elevated
       footer={
-        <div className="flex justify-end gap-2 px-5 py-3.5">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl text-sm font-medium text-[#86868b] hover:bg-slate-100 transition-colors"
-          >
+        <>
+          <button type="button" onClick={onClose} className="k-b k-b-capa k-b-quieto">
             Cerrar
           </button>
           {isAdmin && (
-            <button
-              onClick={handleReactivar}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 transition-colors"
-            >
+            <button type="button" autoFocus data-principal onClick={handleReactivar} className="k-b k-b-capa k-b-prim">
               Reactivar suscripción
             </button>
           )}
-        </div>
+        </>
       }
     >
-      <div className="px-5 py-5 space-y-3">
-        <p className="text-sm text-[#1d1d1f] leading-relaxed">
-          Esta es una característica disponible para suscripciones activas.
-          Tu cuenta excedió el límite del plan gratuito.
+      <p>
+        Esta es una característica disponible para suscripciones activas.
+        Tu cuenta excedió el límite del plan gratuito.
+      </p>
+      {!isAdmin && (
+        <p>
+          Pídele a tu administrador que reactive la suscripción para
+          recuperar el acceso completo.
         </p>
-        {!isAdmin && (
-          <p className="text-sm text-[#86868b] leading-relaxed">
-            Pídele a tu administrador que reactive la suscripción para
-            recuperar el acceso completo.
-          </p>
-        )}
-      </div>
+      )}
     </ModalShell>
   )
 }

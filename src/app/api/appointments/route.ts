@@ -5,13 +5,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { conCalendarioSpinus, registrarFalloGCal } from '@/lib/gcal'
 import { resolverConexionClinica } from '@/lib/gcalConexion'
 import { canManageClinica } from '@/lib/permissions'
-import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS,
+import { APPOINTMENT_SELECT, eventoParaGoogle, puntasParaGoogle, componerAsistentes, INTERRUPTORES_INVITADOS, propiedadesSpinus,
          ICONOS_EVENTO, COLORES_EVENTO, pintaValida,
          type ClinicaEnCita, type PacienteEnCita } from '@/lib/appointments'
 import { correoDelMedico } from '@/lib/medicoCorreo'
 import { TZ_CLINICA, desplazarFecha, fechaHoraLocalAInstante } from '@/lib/dates'
 import { comprobarTopeDuracion } from '@/lib/agenda/topeDuracion'
-import { logger } from '@/lib/logger'
+import { consultaCitas } from '@/lib/agenda/consultaCitas'
+import { agendaV2Encendida } from '@/lib/agenda/ajustesAgenda'
+import { comprobarEmpalmes } from '@/lib/agenda/empalmesServidor'
+import { caeEnBloqueo, CUERPO_HORARIO_BLOQUEADO, esErrorDeBloqueo } from '@/lib/agenda/bloqueoTotalServidor'
+import { comprobarTipoDeCita, leerTipoCitaId, CUERPO_TIPO_INVALIDO } from '@/lib/agenda/tipoCitaServidor'
+import { cerrarSustituida, comprobarSustituible, leerSustituyeA } from '@/lib/agenda/sustitucionServidor'
 
 /* Una fecha-solo `YYYY-MM-DD`, que es lo que manda el modal para un evento de
    todo el día. NO acepta un instante ISO: si llegara uno, `AT TIME ZONE` de la
@@ -50,11 +55,47 @@ async function getProfile(supabase: Awaited<ReturnType<typeof createClient>>) {
   return data ? { ...data, userId: user.id } : null
 }
 
+/**
+ * VELOCIDAD · El perfil para la LECTURA de citas (sólo el GET), con la sesión
+ * verificada en local (`getClaims()`: la firma del JWT, sin viaje a Auth) en
+ * vez de `getUser()`. Quita un salto en serie de la entrada a la agenda:
+ * antes `getUser` → `profiles` → citas, ahora `profiles` → citas.
+ *
+ * ⚠️ POR QUÉ AQUÍ SÍ VALE, Y SÓLO AQUÍ (CLAUDE.md, «Autoridad de sesión»):
+ *  - es una decisión de «dejar pasar», no un redirect: nadie navega según lo
+ *    que esto conteste;
+ *  - el GET lee con el cliente de SESIÓN y la barrera de datos es la RLS, que
+ *    valida el mismo JWT en `profiles` y en `appointments`; una sesión revocada
+ *    ya podía leer esto mismo por PostgREST directo hasta el `exp` del token;
+ *  - el GET no toca `createAdminClient()`.
+ * ⚠️ NO LO USES EN POST/PUT/DELETE NI EN NINGUNA RUTA CON CLIENTE DE SERVICIO:
+ * ésas siguen con `getProfile` (`getUser()`, con red), que es justo lo que la
+ * RLS no cubre (`src/middleware.ts`, «NO LAS "OPTIMICES"»).
+ * Si el proyecto firmara con HS256, `getClaims()` cae solo a `getUser()`: igual
+ * que antes, ni más rápido ni menos seguro.
+ */
+async function getProfileLectura(supabase: Awaited<ReturnType<typeof createClient>>) {
+  let sub: string | null = null
+  try {
+    const { data } = await supabase.auth.getClaims()
+    sub = typeof data?.claims?.sub === 'string' ? data.claims.sub : null
+  } catch {
+    sub = null
+  }
+  if (!sub) return null
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, clinica_id, role, es_admin_de_clinica')
+    .eq('id', sub)
+    .single()
+  return data ? { ...data, userId: sub } : null
+}
+
 /* ── GET /api/appointments ──────────────────────────────── */
 export async function GET(req: NextRequest) {
   try {
     const supabase = await createClient()
-    const profile = await getProfile(supabase)
+    const profile = await getProfileLectura(supabase)
     if (!profile?.clinica_id) return NextResponse.json({ error: 'No autenticado' }, { status: 401 })
 
     const from = req.nextUrl.searchParams.get('from')
@@ -62,94 +103,19 @@ export async function GET(req: NextRequest) {
 
     const medicoFilter = req.nextUrl.searchParams.get('medico_id')
 
-    // RLS filtra por clinica_id
-    /* El `count: 'exact'` NO es una métrica: es la guarda del truncado, y su
-       porqué entero está abajo, junto al `incompleta` que lo consume. */
-    let query = supabase
-      .from('appointments')
-      .select(APPOINTMENT_SELECT, { count: 'exact' })
-      .eq('clinica_id', profile.clinica_id)
-      .order('start_time', { ascending: true })
+    /* La consulta entera —filtros, `select`, `count` e `incompleta`— vive en
+       `lib/agenda/consultaCitas.ts` (A1.4b), con sus notas: la página de la
+       agenda siembra con ella la primera pintura. Cliente de SESIÓN, y la
+       clínica explícita aunque la RLS ya filtre. */
+    const resultado = await consultaCitas(supabase, {
+      clinicaId: profile.clinica_id, from, to, medicoId: medicoFilter,
+    })
+    if (!resultado.ok) return NextResponse.json({ error: resultado.error }, { status: 500 })
+    const { appointments: filas, incompleta, bloqueos } = resultado
 
-    if (medicoFilter) query = query.eq('medico_id', medicoFilter)
-
-    /* ⚠️⚠️ LA VENTANA SE COMPARA POR SOLAPE, NO POR `start_time` DENTRO DEL RANGO,
-       Y ESTO ES UNA CORRECCIÓN, NO UN AFINADO. Filtrando por el inicio —que es lo
-       que había— una fila que EMPEZÓ ANTES de `from` y sigue viva dentro de la
-       ventana no se devolvía, así que un evento de VARIOS DÍAS desaparecía de
-       todas las semanas menos la que lo inicia. Un congreso de lunes a lunes se
-       veía la primera semana y no la segunda, sin error y sin hueco: simplemente
-       no estaba.
-
-       No lo tapaba `rangoQuePedir`: ése encaja la petición a semanas naturales, y
-       en vista Semana el borde ya ES el lunes, o sea margen cero.
-
-       ES EL MISMO CRITERIO QUE /api/google/events, donde está argumentado desde
-       el principio: «filtrar las citas sólo por su inicio dejaría fuera del
-       conjunto a la que empezó antes de `timeMin` y termina dentro». Allí el
-       síntoma era otro —una cita sin restar, que salía duplicada como evento
-       crudo— pero la causa es la misma y la cura también. Hasta ahora las dos
-       rutas leían la misma tabla con dos reglas distintas.
-
-       ⚠️ POR QUÉ EL CORTE DE ARRIBA ES ESTRICTO Y EL DE ABAJO NO. `to` es un fin
-       EXCLUSIVO —lo manda FullCalendar y lo ensancha `rangoQuePedir`—, así que una
-       cita que empieza justo en `to` cae FUERA de la ventana por definición: con
-       `lte` se traía una fila que la vista no llega a pintar. Con `lt` no.
-       Abajo se queda inclusivo a propósito: `end_time = from` también está fuera,
-       pero en `appointments` NO existe un CHECK incondicional de
-       `end_time > start_time` (sólo lo hay para las filas de todo el día), así que
-       pueden quedar filas heredadas de duración cero; con un `gt` estricto una de
-       ellas apoyada en el borde desaparecería. Esta consulta es la RED GRUESA: se
-       permite una fila de más, que no cuesta nada. El corte fino lo hacen el
-       propio FullCalendar al pintar y `contarVisibles` en el cliente, que sí
-       aplica el solape estricto — ver su nota, que es la otra mitad de esto.
-
-       ⚠️ LAS DOS PUNTAS SON OBLIGATORIAS Y VAN EN EL MISMO SENTIDO: `start_time`
-       contra el FIN de la ventana y `end_time` contra su INICIO. Cruzadas, o con
-       las dos contra `start_time`, se vuelve al fallo. */
-    if (to)   query = query.lt('start_time', to)
-    if (from) query = query.gte('end_time', from)
-
-    const { data, error, count } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    const filas = data ?? []
-
-    /* ⚠️⚠️ `incompleta` ES LO ÚNICO QUE SEPARA «no hay citas» DE «no llegaron
-       las citas», Y NO SE PUEDE DEDUCIR DESDE EL CLIENTE.
-
-       El techo de filas del proveedor es DURO y GLOBAL —mil por respuesta—: no
-       se sube desde la consulta y, al alcanzarlo, la respuesta llega RECORTADA
-       sin error, sin cabecera de aviso y con un array perfectamente válido.
-
-       ⚠️ Y LA FORMA DEL RECORTE ES LA PEOR POSIBLE, POR EL `.order()` DE
-       ARRIBA. Se queda con las mil PRIMERAS por fecha, así que un mes cargado
-       vuelve con las dos primeras semanas llenas y el resto EN BLANCO. No hay
-       error que pintar, no hay hueco que se vea, y la banda de vacío tampoco
-       sale porque el conteo no es cero. Parecen semanas libres de verdad, y
-       encima de una de ellas se puede agendar encima de una cita que existe.
-
-       ⚠️ NO LO "ARREGLES" CON UN `.limit()`. Un límite propio no supera el
-       techo: sólo lo baja. La vía es saber CUÁNTAS había, no pedir menos.
-
-       `count: 'exact'` viene del `Content-Range` y cuenta las filas que CUMPLEN
-       el filtro, no las que caben en la respuesta. Si sobran, faltan.
-
-       El `count === null` cuenta como incompleta A PROPÓSITO: sin conteo no se
-       puede afirmar que la traída esté entera, y entre avisar de más y callarse
-       de menos, este defecto se diagnostica tarde precisamente por lo segundo.
-       El coste de equivocarse hacia aquí es una banda visible que alguien
-       reporta el primer día; el de equivocarse hacia el otro lado es la agenda
-       en blanco de arriba. */
-    const incompleta = count === null || count > filas.length
-    if (incompleta) {
-      logger.warn(
-        'agenda',
-        `traída de citas incompleta: la clínica ${profile.clinica_id} tiene ${count ?? 'un conteo que no llegó'} citas en [${from ?? 'sin from'}, ${to ?? 'sin to'}] y llegaron ${filas.length}`,
-      )
-    }
-
-    return NextResponse.json({ appointments: filas, incompleta })
+    /* K1: los bloqueos de horario viajan aparte de las citas (no son filas de
+       `appointments`); sin la migración llegan vacíos. */
+    return NextResponse.json({ appointments: filas, incompleta, bloqueos })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'
     return NextResponse.json({ error: message }, { status: 500 })
@@ -166,11 +132,16 @@ export async function POST(req: NextRequest) {
     // Gate Fase 8.1 (extendido en Fase 8.2): bloquear creación de citas si
     // la clínica está cancelada, no es VIP y ya tiene >5 pacientes activos
     // (ex-cliente pagado). Free de buena fe (≤5 pacientes) NO se ve afectado.
-    const { data: clinicaGate } = await supabase
-      .from('clinicas')
-      .select('suscripcion_estado, es_vip_grant')
-      .eq('id', profile.clinica_id)
-      .single()
+    /* El interruptor de la agenda v2 (plan del bloque B §1) va en paralelo con
+       la lectura del gate: una consulta por clave primaria, sin esperar. */
+    const [{ data: clinicaGate }, v2] = await Promise.all([
+      supabase
+        .from('clinicas')
+        .select('suscripcion_estado, es_vip_grant')
+        .eq('id', profile.clinica_id)
+        .single(),
+      agendaV2Encendida(supabase, profile.clinica_id),
+    ])
     if (clinicaGate?.suscripcion_estado === 'cancelado' && !clinicaGate?.es_vip_grant) {
       const { count: activosCount } = await supabase
         .from('pacientes')
@@ -443,6 +414,60 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(errorDeTope, { status: 400 })
     }
 
+    /* ── B6c: EL TIPO DE CITA, CON EL INTERRUPTOR ENCENDIDO ──────────────────
+       Apagado, `tipo_cita_id` se ignora y el insert no nombra `tipo_cita_*`
+       (las columnas pueden no existir en producción). Va DESPUÉS de resolver el
+       médico y ANTES del empalme: un 400 por tipo no debe llegar después de que
+       el usuario aceptara un empalme. La regla está en `validarTipoParaCita`;
+       sin paciente, un tipo da `tipo_sin_paciente`. */
+    let columnasTipo: { tipo_cita_id: string | null; tipo_cita_nombre: string | null } | null = null
+    if (v2) {
+      const tipoCitaId = leerTipoCitaId(body.tipo_cita_id)
+      if (tipoCitaId === false) return NextResponse.json(CUERPO_TIPO_INVALIDO, { status: 400 })
+      if (tipoCitaId) {
+        const veredicto = await comprobarTipoDeCita(supabase, {
+          clinicaId: profile.clinica_id, tipoCitaId, tipoAnterior: null,
+          medicoId: finalMedicoId, conPaciente: Boolean(paciente_id),
+        })
+        if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
+        columnasTipo = veredicto.columnas
+      }
+    }
+
+    /* Tanda I (punto 12): «Reagendar cita» o «Reasignar» de una CANCELADA. Sólo
+       con la v2 (apagada, el campo se ignora y no se nombran las columnas). La
+       cancelada tiene que verla quien pide, de esta clínica, y seguir cancelada
+       y abierta; si no, 409 sin crear nada. Se cierra DESPUÉS del alta (abajo). */
+    const sustituyeA = v2 ? leerSustituyeA(body.sustituye_a) : undefined
+    if (sustituyeA === false) {
+      return NextResponse.json({ error: 'sustituye_a_invalida', message: 'La cita a sustituir no es válida.' }, { status: 400 })
+    }
+    if (sustituyeA) {
+      const veto = await comprobarSustituible(supabase, profile.clinica_id, sustituyeA, typeof client_id === 'string' ? client_id : null)
+      if (veto) return NextResponse.json(veto.cuerpo, { status: veto.estado })
+    }
+
+    /* ── B7: EL EMPALME, CON EL INTERRUPTOR ENCENDIDO ────────────────────────
+       Después de todas las validaciones y con las puntas ya compuestas, que es
+       lo que se va a guardar. Un evento de todo el día no se empalma (P3). Sin
+       el interruptor, `empalmes_aceptados` se ignora y no se consulta nada. El
+       `client_id` sale de la búsqueda: un reintento del alta que YA entró no
+       debe empalmarse consigo mismo (lo resuelve el 23505 de más abajo). */
+    /* Tanda L (L1, punto 6): el bloqueo es TOTAL —citas y eventos, también de
+       todo el día—, y va ANTES del empalme: no se pregunta por un empalme donde
+       no se puede agendar. La base lo repite (`trg_appointments_horario_bloqueado`). */
+    if (v2 && await caeEnBloqueo(supabase, { clinicaId: profile.clinica_id, medicoId: finalMedicoId, inicio: inicioFila, fin: finFila })) {
+      return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
+    }
+
+    if (v2 && !esTodoElDia) {
+      const veredicto = await comprobarEmpalmes(supabase, {
+        clinicaId: profile.clinica_id, medicoId: finalMedicoId, inicio: inicioFila, fin: finFila,
+        excluirClientId: typeof client_id === 'string' ? client_id : undefined,
+      }, body.empalmes_aceptados)
+      if (!veredicto.ok) return NextResponse.json(veredicto.cuerpo, { status: veredicto.status })
+    }
+
     // RLS filtra por clinica_id
     const { data: apt, error } = await supabase
       .from('appointments')
@@ -463,6 +488,8 @@ export async function POST(req: NextRequest) {
         // corriente y no una carencia.
         icono:            iconoValidado,
         color:            colorValidado,
+        // B6c: sólo con el interruptor encendido y un tipo validado.
+        ...(columnasTipo ?? {}),
         // Snapshot inmutable del consultorio (Fase 2.6).
         consultorio_id:            consultorio.id,
         consultorio_nombre:        consultorio.nombre,
@@ -498,11 +525,24 @@ export async function POST(req: NextRequest) {
           .eq('clinica_id', profile.clinica_id)
           .maybeSingle()
         if (yaExiste) {
-          return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped' })
+          /* Tanda I (punto 12): el reintento también cierra la cancelada si el primero no llegó (idempotente). */
+          const sustituida = sustituyeA && yaExiste.paciente_id
+            ? await cerrarSustituida({ clinicaId: profile.clinica_id, viejaId: sustituyeA, nuevaId: yaExiste.id, userId: profile.userId })
+            : null
+          return NextResponse.json({ appointment: yaExiste, gcalSync: 'skipped', ...(sustituyeA ? { sustituida } : {}) })
         }
       }
+      // L1: el disparador del bloqueo, en la carrera con un bloqueo recién creado.
+      if (esErrorDeBloqueo(error)) return NextResponse.json(CUERPO_HORARIO_BLOQUEADO, { status: 409 })
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
+
+    /* Tanda I (punto 12): la cancelada queda cerrada y ligada a ésta, en la misma
+       petición. Sólo si la nueva es una CITA (con paciente): la sustituta queda
+       sostenida por la FK RESTRICT, y una cita con paciente ya no se borra con la v2. */
+    const sustituida = sustituyeA && apt.paciente_id
+      ? await cerrarSustituida({ clinicaId: profile.clinica_id, viejaId: sustituyeA, nuevaId: apt.id, userId: profile.userId })
+      : null
 
     // Google Calendar sync en background con el cliente admin.
     //
@@ -551,6 +591,8 @@ export async function POST(req: NextRequest) {
         let gcal_sync_status: 'synced' | 'pending' | 'failed' = 'pending'
         let google_event_id: string | null = null
         let calendarIdUsado: string | null = null
+        // C5: el `etag` del evento recién creado, sólo con v2 (ver el update de abajo).
+        let gcal_etag: string | null = null
 
         try {
           // La descripción lleva un formato fijo (clínica y paciente) y NADA
@@ -643,6 +685,10 @@ export async function POST(req: NextRequest) {
                 // Google, ninguna edición posterior desde Spinus se lo reimpone.
                 reminders,
                 ...puntas,
+                /* C5, sólo con v2: la marca privada (nunca `shared`) que liga
+                   el evento con la cita aunque el update de abajo no llegue a
+                   escribir `google_event_id`. */
+                ...(v2 ? { extendedProperties: propiedadesSpinus(apt.id) } : {}),
               },
             })
           }, { puedeReparar, actorId: profile.userId })
@@ -652,6 +698,7 @@ export async function POST(req: NextRequest) {
           // el calendario, o porque Google contestó sin `id`. Esas citas se
           // quedaban en 'synced' sin nada en Google y nadie volvía a mirarlas.
           google_event_id  = creado?.data.id ?? null
+          gcal_etag        = creado?.data.etag ?? null
           if (google_event_id) {
             gcal_sync_status = 'synced'
           } else {
@@ -681,9 +728,13 @@ export async function POST(req: NextRequest) {
         // siguiente pueda arreglar el ámbito de `desvincularCitas`: sin saber en
         // qué calendario vive cada evento, el barrido no puede dejar de acotar
         // por `medico_id` (plan §0.7).
+        //
+        // C5: con v2 se guarda además el `etag`, el primer eslabón del eco y del
+        // conflicto (gcalSincronizacionDecidir.ts, gcalEscritura.ts). Apagado,
+        // el update no nombra la columna: es el de siempre.
         const { error: errEstado } = await admin
           .from('appointments')
-          .update({ google_event_id, gcal_sync_status, gcal_calendar_id: calendarIdUsado })
+          .update({ google_event_id, gcal_sync_status, gcal_calendar_id: calendarIdUsado, ...(v2 ? { gcal_etag } : {}) })
           .eq('id', apt.id)
           .eq('clinica_id', profile.clinica_id)
         if (errEstado) {
@@ -712,6 +763,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       appointment: apt,
       gcalSync:    conexion ? 'pending' : 'disconnected',
+      // Tanda I (punto 12): la cancelada que se cerró (la agenda la quita), o `null`.
+      ...(sustituyeA ? { sustituida } : {}),
     })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Error interno'

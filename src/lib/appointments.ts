@@ -56,7 +56,18 @@ export const GCAL_RECORDATORIO_MINUTOS = 60
  * prefijo — ahi no hay nada que anunciar como cita medica.
  */
 function tituloParaGoogle(paciente: PacienteEnCita, fallback: string): string {
-  return paciente ? `Cita médica: ${paciente.nombre} ${paciente.apellidos}` : fallback
+  return paciente ? `Cita médica: ${nombreCompuesto(paciente)}` : fallback
+}
+
+/* `.trim()` (agenda D8): una cita POR LIGAR se compone con el convenio
+   `{ nombre: reserva_nombre, apellidos: '' }` —el mismo del espejo de Google
+   (D4, `gcal_citas_por_evento`) y de `pacienteParaGoogle` del lado interno
+   (D6)— y sin recortar el título salía «Cita médica: Ana López » con un
+   espacio al final, distinto de lo que compara el sondeo. Aquí, en el único
+   sitio donde se compone, para que Google, el espejo y la agenda den el mismo
+   texto. Para un paciente con los dos campos no cambia nada. */
+function nombreCompuesto(paciente: NonNullable<PacienteEnCita>): string {
+  return `${paciente.nombre} ${paciente.apellidos}`.trim()
 }
 
 /** Nombre de la clinica de cara a Google. `nombre_display` es nullable; `nombre` no. */
@@ -329,7 +340,7 @@ export function eventoParaGoogle(
   // venga de aqui o de un instante corrupto.
   const ancla = startISO === null ? null : anclaDeHora(startISO, timezone)
   const renglones = paciente
-    ? [clinicaNombre, 'Consulta:', `${paciente.nombre} ${paciente.apellidos}`, ancla]
+    ? [clinicaNombre, 'Consulta:', nombreCompuesto(paciente), ancla]
     : [clinicaNombre, ancla]
 
   const titulo = tituloParaGoogle(paciente, fallbackTitulo)
@@ -474,3 +485,19 @@ export const INTERRUPTORES_INVITADOS = {
   guestsCanInviteOthers:   false,
   guestsCanSeeOtherGuests: false,
 } as const
+
+/* ═══ MARCA DE SPINUS EN EL EVENTO (agenda v2, paso C5) ═════════════════════ */
+
+/**
+ * `extendedProperties` que liga un evento de Google con su cita de Spinus. La
+ * lee la sincronización de vuelta (`marcaSpinus` en
+ * `gcalSincronizacionDecidir.ts`): liga el evento aunque el `after()` todavía
+ * no haya escrito `google_event_id`, y evita importarlo como evento de Google.
+ *
+ * ⚠️ SIEMPRE `private`, NUNCA `shared`: `shared` lo ven los invitados en su
+ * copia del evento. Lleva el uuid de la cita y la versión, nada que identifique
+ * a nadie. Sólo se manda con el interruptor v2 encendido.
+ */
+export function propiedadesSpinus(citaId: string): calendar_v3.Schema$Event['extendedProperties'] {
+  return { private: { spinus_cita: citaId, spinus_v: '2' } }
+}
