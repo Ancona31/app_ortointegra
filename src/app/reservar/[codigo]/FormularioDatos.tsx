@@ -1,11 +1,15 @@
 'use client'
 
 import { useState, type FormEvent, type ReactElement, type ReactNode } from 'react'
+import CasillaAviso from './CasillaAviso'
 
 export interface Datos { nombre: string; telefono: string; correo: string }
 
 interface Props {
   aviso: string
+  /** La dirección del aviso integral como va escrita al final del aviso, y la ruta a la que enlaza. */
+  avisoUrl: string
+  avisoRuta: string
   casilla: string
   ocupado: boolean
   textoBoton: string
@@ -29,8 +33,8 @@ interface Props {
   sinCorreo?: boolean
 }
 
-/** Nombre, teléfono y correo, y el aviso con su casilla (nace desmarcada). El texto del aviso NO se toca. */
-export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, sinCorreo = false }: Props): ReactElement {
+/** Nombre, teléfono y correo, y la casilla del aviso (nace desmarcada), que lo abre en una capa. El texto del aviso NO se toca. */
+export default function FormularioDatos({ aviso, avisoUrl, avisoRuta, casilla, ocupado, textoBoton, onEnviar, inicial, onCambio, volver, sinCorreo = false }: Props): ReactElement {
   const [d, setDatos] = useState<Datos>(inicial ?? { nombre: '', telefono: '', correo: '' })
   const setD = (nuevos: Datos) => { setDatos(nuevos); onCambio?.(nuevos) }
   const [acepta, setAcepta] = useState(false)
@@ -53,14 +57,7 @@ export default function FormularioDatos({ aviso, casilla, ocupado, textoBoton, o
             onChange={e => setD({ ...d, correo: e.target.value })} />
         </label>
       )}
-      <details className="rp-aviso-legal">
-        <summary>Aviso de privacidad</summary>
-        <div style={{ marginTop: 'var(--ag-2)', whiteSpace: 'pre-line' }}>{aviso}</div>
-      </details>
-      <label className="rp-acepto">
-        <input type="checkbox" checked={acepta} onChange={e => setAcepta(e.target.checked)} />
-        <span>{casilla}</span>
-      </label>
+      <CasillaAviso casilla={casilla} aviso={aviso} avisoUrl={avisoUrl} avisoRuta={avisoRuta} acepta={acepta} onAcepta={setAcepta} />
       <div className="rp-pie">
         <div className="rp-pie__fila">
           {volver}

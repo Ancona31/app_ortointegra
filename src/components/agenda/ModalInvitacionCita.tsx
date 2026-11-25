@@ -30,7 +30,7 @@ const SELECTOR_FOCO_MODAL =
    salía vacía y el trapo no atrapaba nada. */
 function focusablesDelPanel(raiz: HTMLElement): HTMLElement[] {
   return Array.from(raiz.querySelectorAll<HTMLElement>(SELECTOR_FOCO_MODAL))
-    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+    .filter(el => (el.offsetWidth > 0 || el.offsetHeight > 0) && el.tabIndex >= 0) // auditoría B13 · 5 (`useDialogoModal`)
 }
 
 /**

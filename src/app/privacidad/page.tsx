@@ -2,9 +2,8 @@ import type { Metadata } from 'next'
 import AvisoPrivacidadContent from '@/components/legal/AvisoPrivacidadContent'
 
 export const metadata: Metadata = {
-  title: 'Aviso de Privacidad — Spinus®',
-  description:
-    'Aviso de privacidad integral de Spinus®, conforme a la LFPDPPP, NOM-004-SSA3-2012 y NOM-024-SSA3-2012.',
+  title: 'Aviso de privacidad — Spinus',
+  description: 'Aviso de privacidad integral de Spinus para sus usuarios: profesionales de la salud, personal de consultorios y clínicas, y visitantes.',
 }
 
 export default function PrivacidadPage() {

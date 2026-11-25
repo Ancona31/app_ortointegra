@@ -231,7 +231,7 @@ export default function InicioPage() {
               className="rounded-xl h-14 w-auto"
             />
             <span className={`text-lg font-semibold tracking-wide ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Spinus<span className="align-super text-xs">&reg;</span>
+              Spinus
             </span>
           </div>
           <div className="flex items-center gap-1">

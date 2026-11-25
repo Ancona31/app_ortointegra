@@ -63,7 +63,7 @@ export const FILA = `flex min-h-[48px] items-center justify-between gap-[12px] $
 export const FILA_GRIS = 'flex min-h-[60px] flex-wrap items-center justify-between gap-x-[8px] gap-y-[2px] py-[8px] pl-[16px] pr-[8px] ih:pl-[20px] iv:pl-[20px] esc:pl-[20px] ih:pr-[12px] iv:pr-[12px] esc:pr-[12px]'
 
 /** Una fila entera que es la acción («Cambiar horario», «Crear uno»): texto azul y, si navega, «›». */
-export const FILA_ACCION = `flex min-h-[48px] w-full cursor-pointer items-center gap-[10px] border-0 bg-transparent ${LADOS} text-left text-[15px] font-semibold leading-[20px] text-enlace disabled:cursor-default disabled:text-tinta3 ih:min-h-[44px] esc:min-h-[44px] ih:text-[14px] esc:text-[14px]`
+export const FILA_ACCION = `flex min-h-[48px] w-full cursor-pointer items-center gap-[10px] border-0 bg-transparent ${LADOS} text-left text-[15px] font-semibold leading-[20px] text-enlace disabled:cursor-default disabled:text-tinta2 ih:min-h-[44px] esc:min-h-[44px] ih:text-[14px] esc:text-[14px]`
 
 /** El h1 de la página y de cada paso del asistente (`.k-t-pantalla`: 26/800, 32 en ancho). */
 export const TITULO_PASO = 'm-0 k-t-pantalla'
@@ -83,11 +83,12 @@ export const BOTON_AZUL = 'k-b k-b-prim h-[44px] ih:h-[36px] esc:h-[36px] disabl
 /** El secundario, quieto (`--sup2`): «Cancelar», «Atrás». */
 export const BOTON_BLANCO = 'k-b k-b-quieto h-[44px] ih:h-[36px] esc:h-[36px]'
 
-/** El tonal («Mandar por WhatsApp», «Emitir enlace de un solo uso»). */
-export const BOTON_CHICO = 'k-b k-b-tonal h-[44px] ih:h-[36px] esc:h-[36px]'
+/** El tonal («Mandar por WhatsApp», «Emitir enlace de un solo uso»). Auditoría B13 · 6: deshabilitado, en
+    «quieto» gris y opaco (el 45 % del kit dejaba su nombre en 2,8:1, 2,3:1 en oscuro; así se lee). */
+export const BOTON_CHICO = 'k-b k-b-tonal h-[44px] ih:h-[36px] esc:h-[36px] disabled:bg-sup2 disabled:text-tinta2 disabled:opacity-100'
 
 /** Botón de texto azul («Copiar», «Editar», «Guardar» de una fila). */
-export const BOTON_TEXTO = 'k-b k-b-texto h-[44px] px-[8px] ih:h-[36px] esc:h-[36px] disabled:text-tinta3'
+export const BOTON_TEXTO = 'k-b k-b-texto h-[44px] px-[8px] ih:h-[36px] esc:h-[36px] disabled:text-tinta2'
 
 /** Botón de texto rojo («Apagar», «Quitar», «Revocar»). */
 export const BOTON_TEXTO_ROJO = `${BOTON_TEXTO} text-mal-tinta`

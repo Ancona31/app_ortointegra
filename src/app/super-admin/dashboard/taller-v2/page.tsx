@@ -18,7 +18,7 @@ import type { ReactElement } from 'react'
 import TallerV2 from '@/components/taller-v2/TallerV2'
 
 export const metadata: Metadata = {
-  title: 'Taller de componentes v2 — Spinus®',
+  title: 'Taller de componentes v2 — Spinus',
 }
 
 export default function TallerV2Page(): ReactElement {

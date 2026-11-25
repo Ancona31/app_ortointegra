@@ -128,14 +128,28 @@ Rama `feature/b13-capas`, desde `cbaaa1c1` (+ `ca1c2cf8` fusionado). Maquetas: `
   la maqueta lo quitaba); así no se pierde ningún localizador ni regla de CLAUDE.md.
 * La hoja de la burbuja en `tel` limita su alto al 80 % de lo visible (como antes), no a «pantalla −
   barra de estado − 16».
-* AG6: las filas del formulario siguen con el rótulo ENCIMA del campo en todos los formatos (la maqueta
-  pone en `ih`/`esc` el rótulo a la izquierda en una columna de 150 y fechas/horas como píldoras en línea):
-  hacerlo pide reescribir el marcado de cada campo de un archivo de 2 000 líneas. «Iniciar consulta» y
-  «Expediente» siguen en la cabecera y el pie (la maqueta los pone como filas del grupo Paciente). En `tel`
-  el formulario es pantalla completa (encargo), no la hoja arrastrable de la ficha.
-* AG8: «Huecos disponibles» en `ih`/`iv` NO hecho: la opción del engrane necesita los huecos y el médico
-  elegido, que viven en `AgendaCliente` (línea de vistas); pide una prop nueva a `MenuEngraneAgenda`.
-  La barra por formato de PIEZAS §4, aplazada por el coordinador. «Plegar menú» ya existía (B4).
+* ~~AG6: las filas del formulario siguen con el rótulo ENCIMA del campo~~ **Hecho en el remate (AG-DT-279,
+  cerrada):** fechas y horas en una fila por campo (`.ag-form-fechas`), con la columna de 150 en
+  `ih`/`iv`/`esc`; «Iniciar consulta» y «Expediente» como filas del grupo Paciente (`.ag-form-filas`). Sigue
+  igual: en `tel` el formulario es pantalla completa (encargo), no la hoja arrastrable de la ficha.
+* ~~AG8: «Huecos disponibles» en `ih`/`iv` NO hecho~~ **Hecho en el cierre:** opción de «Opciones de la
+  agenda» (Día, un médico) que abre la tarjeta del panel (`CardHuecos`) en su capa; la barra por formato de
+  PIEZAS §4, también hecha (bloque «B13 · CIERRE · LA BARRA POR FORMATO»). «Plegar menú» ya existía (B4).
+* **Auditoría B13 (2026-11-24), lo que queda sin igualar a la regla o a la maqueta, declarado:**
+  * **Toques del Mes en rejilla (`ih`/`iv`/`esc`).** El número del día crece a 36×27 (44×27 en `iv`) y el
+    «+N» crece 50 px a la derecha y hasta el borde de abajo de la celda (~31 en `esc`, ~40 en `iv`), con
+    `::after`, sin mover nada. No llegan a 36/44 de alto porque el número lleva `z-index: 4`
+    (FullCalendar) y taparía el primer chip, y el «+N» tiene encima el último. Los CHIPS se quedan en 22
+    (`ih`/`esc`) y 34 (`iv`): darles 36/44 cambia cuántos caben en la celda (tres líneas, AG4) o los pisa
+    entre sí. Rutas alternativas: el «+N» (capa del día) y el número (Día). AG-DT-285.
+  * **«Ir a una fecha» en `ext`:** 7 columnas en la capa de 310 dan días de ~38 de ancho; 44 no cabe sin
+    ensanchar la capa por encima del área del Duo cerrado. En `esc` la capa pasa a 306 (días de 36). AG-DT-285.
+  * **Tira de la Semana en `ext`:** días de 38 de ancho (7 en 382 menos el riel); 62 de alto. AG-DT-285.
+  * **Ventana de ligar (`VentanaLigarCita`):** 440 en `ih`/`iv`/`esc` con «¿No es una cita?» en su línea y el
+    pie en una fila (auditoría · 4); en `iv`, centrado como la maqueta. Sin diferencias conocidas.
+  * **Pulsación larga en táctil (auditoría · 1):** la cita queda SELECCIONADA tras la pulsación larga (lo
+    hace FullCalendar y enseña las asas de redimensionar); un toque sobre ella abre la burbuja. Arrastrar
+    la ya seleccionada no pide otra pulsación larga (comportamiento de FullCalendar, se conserva).
 
 ## Rojos comprobados contra la base (`cbaaa1c1`, worktree aparte, mismo puerto y misma base de datos)
 * `reserva-google:275` («GET de turnos…»): FALLA IGUAL en la base → preexistente, no es de esta línea.

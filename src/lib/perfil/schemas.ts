@@ -122,9 +122,17 @@ export type InvitarUsuarioInput = z.infer<typeof InvitarUsuarioSchema>
  * cuenta—. El consultorio es el lugar físico, otra tabla. En el onboarding se
  * piden por separado y con ese nombre.
  */
+/** Lo que se le dice a quien intenta registrarse sin aceptar el aviso y los términos. */
+export const MENSAJE_ACEPTA_LEGAL = 'Debes aceptar el Aviso de privacidad y los Términos y Condiciones para crear tu cuenta.'
+
 export const RegistroSchema = z.object({
   email: z.email('Correo electrónico inválido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  /* Privacidad 2026-12: la casilla «Leí y acepto el Aviso de privacidad y los
+     Términos y Condiciones» del registro. Sólo vale `true`: ausente, `false`
+     o cualquier otra cosa no crea la cuenta. El navegador la exige también,
+     pero la que cuenta es ésta. */
+  acepta_legal: z.literal(true, { error: MENSAJE_ACEPTA_LEGAL }),
 })
 export type RegistroInput = z.infer<typeof RegistroSchema>
 

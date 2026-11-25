@@ -493,9 +493,8 @@ export default function ConsultaRapidaModal({
                     {/* La casilla a la DERECHA de su texto (CALMA §20). */}
                     <label className="flex items-center gap-3 cursor-pointer min-h-11">
                       <span className="flex-1 text-[13px] leading-[18px] text-tinta2">
-                        El paciente ha leído y acepta el{' '}
-                        <a href="/privacidad" target="_blank" className="font-semibold text-enlace underline">Aviso de Privacidad</a>
-                        {' '}(LFPDPPP Art. 9) <span className="text-mal-tinta">*</span>
+                        {/* Privacidad 2026-12: el mismo texto de las cuatro altas, sin enlace y sin artículo. */}
+                        Informé al paciente del aviso de privacidad del consultorio <span className="text-mal-tinta">*</span>
                       </span>
                       <input type="checkbox" checked={formConsentimiento} onChange={e => setFormConsentimiento(e.target.checked)}
                         className="size-5 flex-none accent-[var(--accion)]" />

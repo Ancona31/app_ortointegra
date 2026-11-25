@@ -1,0 +1,12 @@
+Aviso de privacidad simplificado para reservar una cita en línea
+Versión reserva-2026-12-v1
+
+Responsable. {MEDICO}, con domicilio en {DIRECCION} ({CONSULTORIO}), es responsable de los datos personales que proporcionas al reservar tu cita. Spinus es la plataforma con la que el consultorio administra su agenda y trata tus datos por cuenta del consultorio.
+
+Datos que tratamos. Tu nombre, tu teléfono y tu correo electrónico; la fecha, la hora, el consultorio y el tipo de cita que elijas; el historial de las citas que reservas en línea con este médico, incluidas las que se cancelan y aquellas a las que no asistes; y, convertidos en un código que no permite leerlos, la red desde la que te conectas y un identificador de tu navegador (una cookie técnica). No te pedimos datos de salud ni otros datos personales sensibles.
+
+Para qué los usamos. Todo es necesario para la reserva en línea: agendar tu cita, administrarla y comunicarnos contigo sobre ella; verificar tu correo; aplicar las reglas de reserva del consultorio, con las que el sistema puede limitar de forma automática tus reservas en línea después de varias cancelaciones o inasistencias (si te ocurre, podrás agendar por teléfono y pedir al consultorio que revise tu caso); y proteger el servicio contra abusos. No usamos tus datos para publicidad.
+
+Cómo limitar su uso y ejercer tus derechos. Para limitar el uso o la divulgación de tus datos, acceder a ellos, rectificarlos, cancelarlos, oponerte a su uso o revocar tu consentimiento, comunícate con el consultorio al {TELEFONO} o acude a {DIRECCION}. Si revocas tu consentimiento no podrás reservar en línea, pero podrás agendar por teléfono. La autoridad en materia de protección de datos personales es la Secretaría Anticorrupción y Buen Gobierno.
+
+Aviso de privacidad integral. Consúltalo en {URL}

@@ -10,6 +10,8 @@
  *   4. `reserva_contexto` lo resuelve: enlace no revocado, interruptor de la
  *      clínica encendido, aviso aprobado con ESTE sha256, puerta S3 y médico
  *      todavía en la clínica (todo eso lo comprueba la RPC, D3).
+ *   5. el consultorio principal tiene dirección y hay un teléfono de contacto:
+ *      sin ellos los avisos de privacidad saldrían con huecos (`datosDelAviso`).
  * La clínica sale de aquí y de ningún otro sitio.
  */
 import { NextResponse } from 'next/server'
@@ -37,7 +39,12 @@ export async function abrirEnlace(codigo: string): Promise<EnlaceAbierto | null>
   if (!codigoAbrible(codigo)) return null
   const codigoHash = hashDeCodigo(codigo)
   const ctx = await contextoDeEnlace(codigoHash, AVISO_VERSION, hashAviso())
-  return ctx ? { ctx, codigoHash } : null
+  if (!ctx) return null
+  /* Privacidad 2026-12: con consultorios pero sin dirección o sin teléfono, el
+     enlace no abre (mismo 404). Sin NINGÚN consultorio se sigue como antes: lo
+     decide `motivosApertura` («Este enlace ya no está disponible»). */
+  if (ctx.consultorios.length > 0 && !datosDelAviso(ctx)) return null
+  return { ctx, codigoHash }
 }
 
 /** Una respuesta JSON sin caché. */
@@ -84,6 +91,22 @@ export function nombreDelMedico(ctx: ContextoReserva): string {
 export function telefonoDeContacto(ctx: ContextoReserva, consultorioId?: string): string | null {
   const c = ctx.consultorios.find(x => x.id === consultorioId) ?? ctx.consultorios[0]
   return c?.telefono ?? ctx.medico.telefono ?? null
+}
+
+export interface DatosDelAviso { consultorio: string; direccion: string; telefono: string }
+
+/**
+ * Lo que rellena `{CONSULTORIO}`, `{DIRECCION}` y `{TELEFONO}` de los dos avisos
+ * (el simplificado y el integral): el consultorio PRINCIPAL del médico (el
+ * primero de `reserva_contexto`: el predeterminado) y el teléfono de contacto.
+ * `null` si falta la dirección o no hay ningún teléfono: un aviso con huecos
+ * no se publica.
+ */
+export function datosDelAviso(ctx: ContextoReserva): DatosDelAviso | null {
+  const c = ctx.consultorios[0]
+  const direccion = c?.direccion?.trim() ?? ''
+  const telefono = telefonoDeContacto(ctx)?.trim() ?? ''
+  return c && direccion && telefono ? { consultorio: c.nombre, direccion, telefono } : null
 }
 
 /** Lee el cuerpo JSON sin lanzar: null si no es JSON. */

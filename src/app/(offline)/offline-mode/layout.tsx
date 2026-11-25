@@ -13,7 +13,7 @@ export default function OfflineLayout({ children }: { children: ReactNode }) {
               </svg>
             </div>
             <div>
-              <p className="font-bold text-sm tracking-wide">Spinus® Offline</p>
+              <p className="font-bold text-sm tracking-wide">Spinus Offline</p>
               <p className="text-[10px] text-amber-100 font-medium">Captura sin conexión</p>
             </div>
           </div>

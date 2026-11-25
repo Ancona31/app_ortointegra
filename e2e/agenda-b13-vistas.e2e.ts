@@ -127,10 +127,14 @@ test.describe('computadora', () => {
     interruptorAgenda('A', true)
     await abrirAgendaV2(page)
     await pestana(page, 'Mes').click()
-    const mas = page.locator('.fc-dayGridMonth-view .fc-daygrid-more-link').first()
-    await expect(mas).toBeVisible()
-    const celda = mas.locator('xpath=ancestor::td[@data-date][1]')
-    const fecha = await celda.getAttribute('data-date')
+    const primero = page.locator('.fc-dayGridMonth-view .fc-daygrid-more-link').first()
+    await expect(primero).toBeVisible()
+    const fecha = await primero.locator('xpath=ancestor::td[@data-date][1]').getAttribute('data-date')
+    /* Auditoría B13 · El «+N» se fija a SU celda: `.first()` se vuelve a resolver en cada uso y, si mientras
+       tanto llegan citas de otras semanas de la rejilla (la precarga), el primer «+N» pasa a ser el de otro
+       día y la prueba esperaba un Día que no era (2 de 8 corridas). */
+    const celda = page.locator(`.fc-dayGridMonth-view td[data-date="${fecha}"]`)
+    const mas = celda.locator('.fc-daygrid-more-link')
     const enCelda = await celda.locator('.fc-daygrid-event-harness').evaluateAll(hs =>
       hs.filter(h => getComputedStyle(h).visibility !== 'hidden' && (h as HTMLElement).offsetHeight > 0).length)
     await mas.click()

@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Spinus®',
+  title: 'Spinus',
   description: 'Sistema de gestión clínica — Cirugía de Columna, Traumatología y Ortopedia',
 }
 

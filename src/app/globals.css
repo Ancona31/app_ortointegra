@@ -9686,3 +9686,71 @@ html.dark .bg-amber-50\/60           { background-color: rgba(245,158,11,.10) !i
 :root[data-formato="ext"] [role="tablist"][aria-label="Tipo de lo que se va a crear"] > button { padding-inline: 6px !important; gap: 4px; }
 /* El enlace a la configuración también en el aviso de periodo vacío (§29.12): una acción más del aviso. */
 .agenda-raiz[data-agenda-v2="encendida"] .ag-aviso .agc-vacio-config { margin-top: 0; }
+
+/* ═══ AUDITORÍA B13 · 2 · ÁREAS DE TOQUE (44 en `ext`/`tel`/`iv`, 36 en `ih`/`esc`) ═══════════════════
+   Se amplía el área de toque SIN mover el dibujo: un `::after` transparente del propio control (o el
+   relleno que ya lo rodea). Lo que no se puede ampliar sin pisar a un vecino o sin cambiar cuántas
+   cosas caben queda declarado en `docs/spec/rediseno/b13/capas.md` («Diferencias con las maquetas»). */
+/* El conmutador de vistas (barra v2 y segmentado de computadora): la pista ya lleva 3 px alrededor del
+   botón (38 → 44; 30 → 36); el área llega hasta el borde de la pista. */
+.agenda-raiz[data-agenda-v2="encendida"] [role="tablist"][aria-label="Vista del calendario"] > [role="tab"] { position: relative; }
+.agenda-raiz[data-agenda-v2="encendida"] [role="tablist"][aria-label="Vista del calendario"] > [role="tab"]::after {
+  content: ''; position: absolute; inset: -3px -1px;
+}
+/* «Qué vas a crear» (Cita, Evento, Bloqueo) del formulario v2: el botón del conmutador del kit (38 en
+   táctil, 30 en `ih`/`esc`) dentro de su pista de 3 px; el área, hasta el borde de la pista. */
+.ag-modal-panel[data-form-v2] [role="tablist"][aria-label="Tipo de lo que se va a crear"] > button { position: relative; min-height: 38px; }
+:root:is([data-formato="ih"], [data-formato="esc"]) .ag-modal-panel[data-form-v2] [role="tablist"][aria-label="Tipo de lo que se va a crear"] > button { min-height: 30px; }
+.ag-modal-panel[data-form-v2] [role="tablist"][aria-label="Tipo de lo que se va a crear"] > button::after {
+  content: ''; position: absolute; inset: -3px -1px;
+}
+/* «Hoy» de la barra v2: el ancho mínimo del toque (la palabra mide 37). */
+:root:is([data-formato="ext"], [data-formato="tel"], [data-formato="iv"]) .ag-banda-movil[data-barra-v2] .ag-banda-movil-hoy { min-width: 44px; }
+:root[data-formato="ih"] .ag-banda-movil[data-barra-v2] .ag-banda-movil-hoy { min-width: 36px; }
+/* Mes en rejilla (`ih`/`iv`/`esc`): el número del día crece hacia la derecha y hasta el borde de arriba de
+   la celda; hacia abajo NO, porque lleva `z-index: 4` (FullCalendar) y taparía el primer chip. El «+N»
+   crece 50 px a la derecha y hacia el borde de abajo de la celda (encima tiene el último chip). */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-number::after {
+  content: ''; position: absolute; top: -4px; left: -4px; width: 36px; height: 27px;
+}
+:root[data-formato="iv"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-number::after { width: 44px; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-more-link::after {
+  content: ''; position: absolute; top: 0; left: -2px; right: -50px; bottom: -8px;
+}
+:root[data-formato="iv"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-more-link::after { bottom: -18px; }
+/* El enlace trae `overflow: hidden` de FullCalendar, que recortaba el `::after`; su texto («+7», «+6 más») cabe. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-more-link { overflow: visible; }
+/* «Ver día ›» del panel del Mes del teléfono: 44 de alto y 8 de margen a los lados, sin mover la cabecera. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-verdia { position: relative; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .ag-mespanel-verdia::after { content: ''; position: absolute; left: -8px; right: -8px; top: 50%; height: 44px; translate: 0 -50%; }
+/* «Ir a una fecha» en computadora: 7 columnas de 38 (días de 36) en vez de 264 de ancho (días de 30). */
+:root[data-formato="esc"] .ag-capa.ag-capa--fecha { width: 306px; }
+
+/* ═══ AUDITORÍA B13 · 3 · CONTRASTE (≥ 4,5:1 en claro y en oscuro) ═══════════════════════════════════
+   Las capas viven en `body`, donde `--ag-muted` y `--ag-segment-text` siguen en #7c8aa0 (3,09–3,50:1):
+   el formulario v2 y la campana los re-apuntan a `--tinta2`, como la raíz v2 (AG1). */
+.ag-modal-panel[data-form-v2], .ag-capa--campana { --ag-muted: var(--tinta2); --ag-segment-text: var(--tinta2); }
+/* El día sin consulta de la cabecera («DOM»): `--tinta2`; lo inhábil lo sigue diciendo el número. */
+.agenda-raiz[data-agenda-v2="encendida"] .fc-timegrid .ag-dayhead-dow { color: var(--tinta2) !important; }
+/* Los días de otro mes del mini mes (panel del Día e «Ir a una fecha»). */
+.agenda-raiz[data-agenda-v2="encendida"] .ag-minimes-dia[data-fuera="true"],
+.ag-capa .ag-minimes-dia[data-fuera="true"] { color: var(--tinta2); }
+/* Los números de otro mes del Mes en rejilla: FullCalendar los deja al 30 % (1,32:1). Se quedan
+   atenuados por el fondo de la celda (`--fondo` al 55 %) y se leen: `--tinta2` sin transparencia. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-top { opacity: 1; }
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-other .fc-daygrid-day-number { color: var(--tinta2); }
+
+/* ═══ AUDITORÍA B13 · 4 · LA VENTANA DE LIGAR EN `ih`/`iv`/`esc` (maqueta `ag-ligado`) ════════════════
+   440 de ancho; «¿No es una cita?» con su explicación en su propia línea (a la izquierda en `ih`/`esc`,
+   centrada en `iv`) y «Cancelar» + el principal en UNA fila debajo. */
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) .ag-capa--centro[data-ventana-ligar] { width: 440px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) [data-ventana-ligar] .ag-ligar-pie { gap: 8px; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) [data-ventana-ligar] .ag-ligar-pie > span:first-child { flex: 0 0 100%; margin-right: 0; align-items: flex-start; }
+:root:is([data-formato="ih"], [data-formato="iv"], [data-formato="esc"]) [data-ventana-ligar] .ag-ligar-pie > span:first-child > span { text-align: left; }
+:root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie { justify-content: center; }
+:root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie > span:first-child { align-items: center; }
+:root[data-formato="iv"] [data-ventana-ligar] .ag-ligar-pie > span:first-child > span { text-align: center; }
+
+/* ═══ TAREA 8 (auditoría B13) · «Invitar con Google Calendar» del acuse de la burbuja de alta ═══════════
+   Deshabilitado sin Google conectado: la «G» en gris como la letra (el botón ya va al 55 %, legible ≥ 3:1). */
+.ag-invitar-google:disabled > svg { filter: grayscale(1); }

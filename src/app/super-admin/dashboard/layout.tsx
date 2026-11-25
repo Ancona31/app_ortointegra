@@ -6,7 +6,7 @@ import SuperAdminSidebar from '@/components/super-admin/Sidebar'
 import { ToastProvider } from '@/components/ui/Toast'
 
 export const metadata: Metadata = {
-  title: 'Centro de control — Spinus®',
+  title: 'Centro de control — Spinus',
 }
 
 export default async function SuperAdminDashboardLayout({

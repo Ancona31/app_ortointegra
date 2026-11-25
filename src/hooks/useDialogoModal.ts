@@ -41,9 +41,15 @@ const SELECTOR_FOCO_MODAL =
 /* ⚠️ EL FILTRO DE VISIBILIDAD MIDE CAJA Y NO USA `offsetParent`: ése vale null
    bajo cualquier ancestro `position: fixed`, o sea bajo TODO panel de portal, y
    con él la lista salía vacía y el trapo no atrapaba nada. */
+/* AUDITORÍA B13 · 5 · Y SÓLO LO QUE EL TAB ALCANZA (`tabIndex >= 0`). `button:not([disabled])` también
+   casaba con los botones de una barra de foco itinerante (`tabIndex = -1`: la burbuja de la cita, el mini
+   mes de «Ir a una fecha»). Si el último de la lista era uno de ésos, el foco nunca era «el último», el
+   trapo no se cerraba y el Tab salía de la capa al documento (y con el foco fuera, Escape ya no llegaba
+   al panel). Es anterior a B13. La misma línea va en la copia de `ModalInvitacionCita`; la de
+   `ModalShell` (fuera de la agenda) queda anotada como deuda. */
 export function focusablesDelPanel(raiz: HTMLElement): HTMLElement[] {
   return Array.from(raiz.querySelectorAll<HTMLElement>(SELECTOR_FOCO_MODAL))
-    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0)
+    .filter(el => (el.offsetWidth > 0 || el.offsetHeight > 0) && el.tabIndex >= 0)
 }
 
 /**

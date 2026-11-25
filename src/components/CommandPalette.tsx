@@ -523,9 +523,8 @@ function CamposRegistro(c: CamposRegistroProps) {
         <input type="checkbox" checked={c.consentimiento} onChange={e => c.alConsentimiento(e.target.checked)}
           className="mt-0.5 h-5 w-5 flex-none accent-[var(--accion)]" />
         <span className="text-[13px] leading-[18px] text-tinta2">
-          El paciente ha leído y acepta el{' '}
-          <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="text-enlace underline">Aviso de Privacidad</a>
-          {' '}(LFPDPPP Art. 9) <span className="text-mal-tinta">*</span>
+          {/* Privacidad 2026-12: el mismo texto de las cuatro altas, sin enlace y sin artículo. */}
+          Informé al paciente del aviso de privacidad del consultorio <span className="text-mal-tinta">*</span>
         </span>
       </label>
     </div>

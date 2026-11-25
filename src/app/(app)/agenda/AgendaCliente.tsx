@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { logger } from '@/lib/logger'
 import FullCalendar from '@fullcalendar/react'
-import type { DateClickArg, EventResizeDoneArg } from '@fullcalendar/interaction'
+import type { DateClickArg, EventResizeDoneArg, EventDragStartArg, EventDragStopArg } from '@fullcalendar/interaction'
 import type { DatesSetArg, EventClickArg, EventDropArg, DateSelectArg, EventApi, EventContentArg, DayHeaderContentArg, EventInput } from '@fullcalendar/core'
 import { Calendar as CalendarioFC } from '@fullcalendar/core'
 import esLocale from '@fullcalendar/core/locales/es'
@@ -258,6 +258,29 @@ function tablaDeVistas(formatoV2: 'ancho' | 'tableta' | 'telefono' | null, isMob
    Mismo patrón que la barra plegada de `Sidebar` (copiado a propósito, dos usos):
    `useSyncExternalStore` con `false` en el servidor, así que no hay desajuste de
    hidratación. Sin datos de nadie: sólo «compacta» o no. */
+/* AUDITORÍA B13 · 1 · EL TOQUE SOBRE UNA CITA YA SELECCIONADA EN TÁCTIL.
+   La pulsación larga SELECCIONA la cita (`SELECT_EVENT`,
+   @fullcalendar/interaction/index.js:1274-1280) y FullCalendar la deja así.
+   Sobre una seleccionada el arrastre empieza sin espera y sin distancia
+   (:1249-1254): un toque ya es un arrastre, pinta el espejo encima y el clic
+   cae en `.fc-event-mirror`, que `EventClicking` descarta
+   (`isValidSegDownEl`, core/internal-common.js:5834). Así que tocarla otra vez
+   no abría nada. Un arrastre que termina antes de la pulsación larga (1000 ms,
+   `longPressDelay` por omisión) sólo pudo empezar sin espera, o sea sobre la
+   seleccionada; si además no se movió y no hubo `eventDrop`, fue ese toque.
+   La selección SE QUEDA a propósito: es lo que enseña las asas para
+   redimensionar con el dedo (EventResizing, :1584-1585). */
+type Toque = { t: number; x: number; y: number }
+function toqueDe(ev: Event): Toque | null {
+  if (typeof TouchEvent === 'undefined' || !(ev instanceof TouchEvent)) return null
+  const p = ev.changedTouches[0] ?? ev.touches[0]
+  return p ? { t: ev.timeStamp, x: p.clientX, y: p.clientY } : null
+}
+function esToqueSinArrastre(ini: Toque | null, fin: Toque | null): boolean {
+  if (!ini || !fin) return false
+  return fin.t - ini.t < 1000 && Math.hypot(fin.x - ini.x, fin.y - ini.y) < 10
+}
+
 const CLAVE_DENSIDAD = 'spinus.agenda.densidad'
 const EVENTO_DENSIDAD = 'spinus:agenda-densidad'
 function leerDensidadCompacta(): boolean {
@@ -1441,19 +1464,23 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
     if (b) { calendarRef.current?.getApi().unselect(); setModalBloqueo({ tipo: 'editar', bloqueo: b }); return }
     handleSelect(arg)
   }
-  function alPulsarEvento(arg: EventClickArg) {
+  function alPulsarEvento(arg: Omit<EventClickArg, 'event'> & { event: EventApi }) {
     const b = bloqueoDe(arg.event)
     if (b) setModalBloqueo({ tipo: 'editar', bloqueo: b })
     else handleEventClick(arg)
   }
+  /* AUDITORÍA B13 · 1 · El toque sobre la cita ya seleccionada es el clic. */
+  function alSoltarArrastre(arg: EventDragStopArg) {
+    if (agendaV2) alPulsarEvento({ el: arg.el, event: arg.event, jsEvent: arg.jsEvent, view: arg.view })
+  }
 
   const manejadoresFcRef = useRef({
     alCambiarFechas, alCambiarEventos, alPulsarNumeroDeDia, alCambiarCarga,
-    handleDateClick: alPulsarHueco, handleSelect: alSeleccionar, handleEventClick: alPulsarEvento, handleEventDrop, handleEventResize,
+    handleDateClick: alPulsarHueco, handleSelect: alSeleccionar, handleEventClick: alPulsarEvento, alSoltarArrastre, handleEventDrop, handleEventResize,
   })
   manejadoresFcRef.current = {
     alCambiarFechas, alCambiarEventos, alPulsarNumeroDeDia, alCambiarCarga,
-    handleDateClick: alPulsarHueco, handleSelect: alSeleccionar, handleEventClick: alPulsarEvento, handleEventDrop, handleEventResize,
+    handleDateClick: alPulsarHueco, handleSelect: alSeleccionar, handleEventClick: alPulsarEvento, alSoltarArrastre, handleEventDrop, handleEventResize,
   }
   /* K1 · Estable: lee la vista de un ref, así la prop no cambia de identidad. */
   const transformarEventoFc = useCallback((ev: EventInput): EventInput => {
@@ -1470,7 +1497,32 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
   /* L1 (punto 7) · Una selección no puede pisar un bloqueo visible: ni se pinta
      el resaltado ni nace la burbuja; el clic suelto lo atiende `alPulsarHueco`. */
   const seleccionSinBloqueoFc = useCallback((ev: EventApi) => !(esBloqueo(ev) && ev.display !== 'none'), [])
-  const eventDropFc = useCallback((arg: EventDropArg) => { void manejadoresFcRef.current.handleEventDrop(arg) }, [])
+  /* AUDITORÍA B13 · 1 · ver `esToqueSinArrastre`. `eventDragStop` y
+     `eventDrop` salen seguidos en el mismo `handleDragEnd` (interaction
+     :1371-1384): el toque se decide en una microtarea, cuando ya se sabe si
+     hubo `eventDrop`. Sólo con la v2 (`alSoltarArrastre`). */
+  const inicioToqueRef = useRef<Toque | null>(null)
+  const toquePendienteRef = useRef<EventDragStopArg | null>(null)
+  const eventDragStartFc = useCallback((arg: EventDragStartArg) => {
+    alEmpezarGesto()
+    inicioToqueRef.current = toqueDe(arg.jsEvent)
+  }, [alEmpezarGesto])
+  const eventDragStopFc = useCallback((arg: EventDragStopArg) => {
+    alTerminarGesto()
+    const ini = inicioToqueRef.current
+    inicioToqueRef.current = null
+    if (!esToqueSinArrastre(ini, toqueDe(arg.jsEvent))) return
+    toquePendienteRef.current = arg
+    queueMicrotask(() => {
+      const pendiente = toquePendienteRef.current
+      toquePendienteRef.current = null
+      if (pendiente) manejadoresFcRef.current.alSoltarArrastre(pendiente)
+    })
+  }, [alTerminarGesto])
+  const eventDropFc = useCallback((arg: EventDropArg) => {
+    toquePendienteRef.current = null
+    void manejadoresFcRef.current.handleEventDrop(arg)
+  }, [])
   const eventResizeFc = useCallback((arg: EventResizeDoneArg) => { void manejadoresFcRef.current.handleEventResize(arg) }, [])
 
   /* `businessHours` era `horarioToBusinessHours(horario)` en el JSX: un array
@@ -2210,8 +2262,8 @@ export default function AgendaCliente({ semillaCitas, interruptor, consultoriosR
              está también por qué la marca caduca sola en vez de ser un booleano.
              Arrastre y redimensionado comparten el mismo par de manejadores
              porque comparten el defecto. */
-          eventDragStart={alEmpezarGesto}
-          eventDragStop={alTerminarGesto}
+          eventDragStart={eventDragStartFc}
+          eventDragStop={eventDragStopFc}
           eventResizeStart={alEmpezarGesto}
           eventResizeStop={alTerminarGesto}
           /* ⚠️ `100%` Y NO `auto`, y de aquí cuelga todo lo demás. Con `auto` el

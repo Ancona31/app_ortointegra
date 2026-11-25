@@ -362,10 +362,9 @@ export default function QuickPatientModal({
                 {/* La casilla a la DERECHA de su texto (CALMA §20). */}
                 <label className="flex items-center gap-3 cursor-pointer min-h-11">
                   <span className="flex-1 text-[13px] leading-[18px] text-tinta2">
-                    Paciente informado del{' '}
-                    <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-enlace hover:underline">
-                      aviso de privacidad
-                    </a>
+                    {/* Privacidad 2026-12: el mismo texto de las cuatro altas, sin enlace
+                        (`/privacidad` es el aviso de Spinus para sus usuarios, no el del consultorio). */}
+                    Informé al paciente del aviso de privacidad del consultorio
                   </span>
                   <input type="checkbox" checked={consentimiento} onChange={e => setConsentimiento(e.target.checked)}
                     className="size-5 flex-none accent-[var(--accion)]" />

@@ -146,7 +146,7 @@ function BillingContent() {
             <div>
               <p className="text-[15px] font-semibold leading-5 text-ok-tinta">¡Suscripción activada!</p>
               <p className="text-[14px] leading-5 text-ok-tinta">
-                Tu plan {newPlan ? PLANS[newPlan]?.nombre : ''} está activo. Bienvenido a Spinus® Pro.
+                Tu plan {newPlan ? PLANS[newPlan]?.nombre : ''} está activo. Bienvenido a Spinus Pro.
               </p>
             </div>
           </div>
@@ -248,7 +248,7 @@ function BillingContent() {
 
         {/* Seguridad de pagos */}
         <p className="flex items-start gap-2 px-1 text-[13px] leading-[18px] text-tinta2">
-          <CreditCard size={16} aria-hidden="true" className="mt-px shrink-0" /> Pagos procesados de forma segura por Stripe. Spinus® no almacena datos de tarjetas.
+          <CreditCard size={16} aria-hidden="true" className="mt-px shrink-0" /> Pagos procesados de forma segura por Stripe. Spinus no almacena datos de tarjetas.
         </p>
       </div>
     </div>
@@ -267,7 +267,7 @@ function PlanVip({ tieneSuscripcionStripe, openingPortal, onPortal }: {
           <h2 id="billing-plan" className="k-t-seccion">Plan VIP</h2>
           <span className="k-etq k-etq-tonal"><Sparkles aria-hidden="true" /> Acceso completo</span>
         </div>
-        <p className="k-t-sec mt-1">Tienes acceso a todas las funciones de Spinus®.</p>
+        <p className="k-t-sec mt-1">Tienes acceso a todas las funciones de Spinus.</p>
         {tieneSuscripcionStripe && (
           <p className="k-t-sec mt-2">
             Tienes una suscripción Stripe activa adicional. Puedes cancelarla desde el portal de Stripe.

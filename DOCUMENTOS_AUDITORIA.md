@@ -1,4 +1,4 @@
-# Auditoría del sistema de documentos PDF — Spinus®
+# Auditoría del sistema de documentos PDF — Spinus
 
 Fase de reconocimiento. **Solo lectura.** Ningún archivo de código fue modificado.
 Fecha del análisis: 2026-08-03. Rama: `main`, commit base `b83cc49`.

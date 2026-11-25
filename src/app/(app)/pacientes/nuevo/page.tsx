@@ -517,10 +517,10 @@ export default function NuevoPacientePage() {
             <ShieldCheck size={16} />
           </span>
           <span className="min-w-0 flex-1 text-[15px] leading-5 text-tinta">
-            Paciente informado del{' '}
-            <a href="/privacidad" target="_blank" rel="noopener noreferrer" className="font-semibold text-enlace hover:underline">
-              aviso de privacidad
-            </a>
+            {/* Privacidad 2026-12: un solo texto en las cuatro altas, y SIN enlace:
+                `/privacidad` es ahora el aviso de Spinus para sus usuarios, no
+                el del consultorio para sus pacientes. */}
+            Informé al paciente del aviso de privacidad del consultorio
             <span aria-hidden="true" className="text-mal-tinta"> *</span>
           </span>
           <input

@@ -133,7 +133,7 @@ export default function SuperAdminSidebar(): ReactElement {
           priority
         />
         <div className="flex flex-col leading-none">
-          <span className="text-[14px] font-bold text-slate-100">Spinus®</span>
+          <span className="text-[14px] font-bold text-slate-100">Spinus</span>
           <span className="text-[10px] uppercase tracking-wider text-slate-500">
             Centro de control
           </span>
