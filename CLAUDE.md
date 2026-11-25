@@ -752,7 +752,7 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   verifica con código. **El único lo admite vacío** (tanda I; hoy en `20261201140000`): sin correo no hay
   comprobante ni recordatorio, pero sí el aviso a la clínica. (Sustituye a «obligatorio en los dos».)
 * **La configuración va en pestañas** (desde B13, `PestanasConfiguracion.tsx`: pestañas de TEXTO en todos los
-  formatos, en `ext`/`tel` en una pista que se desliza; ya no iconos) (`MenuConfiguracion.tsx`, patrón APG): abre en «Primeros pasos» mientras falte
+  formatos, en `ext`/`tel` en una pista que se desliza; ya no iconos; patrón APG. `MenuConfiguracion.tsx` es el de la página vieja, sin montar): abre en «Primeros pasos» mientras falte
   algo y si no en la primera; todos los paneles montados, sólo uno visible. Un enlace interno a otra sección va con
   `href="#config-…"` y `PESTANA_DE_ANCLA` lo convierte en cambio de pestaña: si añades una sección, añádela ahí. Los
   enlaces de los médicos invitados van plegados (punto 6).

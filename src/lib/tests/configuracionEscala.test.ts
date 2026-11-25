@@ -59,9 +59,20 @@ function altos(linea: string): { variante: string; px: number }[] {
   return [...linea.matchAll(/(?<![\w-])(?:(ih|iv|esc|ext|tel):)?(?:min-h|h)-\[(\d+)px\]/g)].map(m => ({ variante: m[1] ?? '', px: Number(m[2]) }))
 }
 
-/** Lo que falla en una línea de control: 44 en táctil; si lleva la escala de computadora, `ih:` y `esc:` con 36 o más. */
+/** Lo que el área de toque crece fuera del dibujo por arriba y por abajo (`before:-inset-y-[9px]` → 18), en la
+    variante dada o, si no la lleva, la de todos los formatos (la que Tailwind aplica sin variante). */
+function crecimiento(linea: string, variante: string): number {
+  const propia = variante === '' ? null : linea.match(new RegExp(`\\b${variante}:before:-inset-y-\\[(\\d+)px\\]`))
+  const comun = linea.match(/(?<![\w:-])before:-inset-y-\[(\d+)px\]/)
+  const m = propia ?? comun
+  return m ? 2 * Number(m[1]) : 0
+}
+
+/** Lo que falla en una línea de control: 44 en táctil; si lleva la escala de computadora, `ih:` y `esc:` con 36 o más.
+    AUDITORÍA B13 · 6: cuenta TODO alto, también uno sin variante por debajo de 40 (antes se ignoraba y un control
+    táctil de 36 pasaba); el área que crece fuera del dibujo (`before:-inset-y-[…]`) se suma. */
 function fallosDeControl(linea: string): string[] {
-  const a = altos(linea).filter(x => x.variante !== '' || x.px >= 40)
+  const a = altos(linea).map(x => ({ ...x, px: x.px + crecimiento(linea, x.variante) }))
   if (!esControl(linea) || a.length === 0) return []
   const fallos: string[] = []
   const base = a.filter(x => x.variante === '' || x.variante === 'iv' || x.variante === 'ext' || x.variante === 'tel')
@@ -104,7 +115,10 @@ describe('las dos escalas de toque de la configuración (por formato: táctil 44
     expect(fallosDeControl('cursor-pointer min-h-[44px] ih:min-h-[36px]')).toEqual(['la escala de computadora va en ih: y esc: a la vez'])
     expect(fallosDeControl('cursor-pointer h-[44px] ih:h-[32px] esc:h-[32px]')).toEqual(['computadora por debajo de 36'])
     expect(fallosDeControl('cursor-pointer h-[44px] iv:h-[40px]')).toEqual(['táctil 44/40 px de alto'])
-    expect(fallosDeControl('h-[30px] w-[52px] cursor-pointer')).toEqual([])
+    expect(fallosDeControl('h-[30px] w-[52px] cursor-pointer')).toEqual(['táctil 30 px de alto'])
+    expect(fallosDeControl('cursor-pointer h-[36px]')).toEqual(['táctil 36 px de alto'])
+    expect(fallosDeControl('h-[30px] w-[52px] cursor-pointer before:-inset-y-[9px] ih:before:-inset-y-[6px]')).toEqual([])
+    expect(fallosDeControl('h-[30px] cursor-pointer before:-inset-y-[5px]')).toEqual(['táctil 40 px de alto'])
     expect(POR_ANCHO.test('min-h-[44px] sm:min-h-[40px]')).toBe(true)
     expect(POR_ANCHO.test('min-h-[44px] esc:min-h-[40px]')).toBe(false)
   })

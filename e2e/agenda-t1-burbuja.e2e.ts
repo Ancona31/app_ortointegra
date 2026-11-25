@@ -12,7 +12,7 @@ import { fechaHoraLocalAInstante } from '../src/lib/dates'
  *   · 13 y 14: tras Guardar, la burbuja enseña «Cita agendada», el foco va a
  *     «Listo» (la principal) y ofrece «Enviar confirmación» (WhatsApp, con el
  *     logo en su verde; G3, punto 15), «Por correo» (el correo de Spinus, con o
- *     sin Google; G3, punto 14) e «Invitar por correo» (sólo si habrá evento de
+ *     sin Google; G3, punto 14) e «Invitar con Google Calendar» (tarea 8; deshabilitada sin Google; antes «Invitar por correo»; sólo si habrá evento de
  *     Google), con «Más opciones» al pie.
  *   · 4: el botón de WhatsApp no sale en una cita pasada, atendida o de todo el
  *     día; y si aun así se llega al error (la cita cambió con la tarjeta
@@ -125,7 +125,7 @@ test('punto 2: un paciente que no existe se registra desde la burbuja (con conse
 /* G3 (puntos 14, 15 y 17): «Listo» a todo el ancho; debajo, en dos columnas
    iguales, «Enviar confirmación» (WhatsApp) y «Por correo» (el correo de
    Spinus, que sale SIN Google); «Más opciones» al pie. */
-test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco), WhatsApp con su logo y el correo de Spinus; sin Google, sin invitar', async ({ page }) => {
+test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco), WhatsApp con su logo y el correo de Spinus; sin Google, la invitación deshabilitada', async ({ page }) => {
   interruptorAgenda('A', true)
   await abrirAgendaV2(page)
   await aLaSemanaMasTres(page)
@@ -145,6 +145,15 @@ test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco), What
   await expect(wa.locator('svg path[fill="#25D366"]')).toHaveCount(1)
   const correo = b.getByRole('button', { name: 'Enviar confirmación por correo', exact: true })
   await expect(correo).toBeVisible()
+  /* Tarea 8 (auditoría B13): sin Google conectado (la semilla local), la invitación de Google se ENSEÑA
+     deshabilitada, con su motivo a la vista y como descripción accesible. */
+  const invitar = b.getByRole('button', { name: 'Invitar con Google Calendar', exact: true })
+  await expect(invitar).toBeVisible()
+  await expect(invitar).toBeDisabled()
+  await expect(invitar).toHaveAttribute('aria-disabled', 'true')
+  await expect(invitar).toHaveAccessibleDescription('Conecta Google Calendar para invitar.')
+  await expect(invitar).not.toHaveAttribute('title', /.+/)
+  await expect(b.getByText('Conecta Google Calendar para invitar.')).toBeVisible()
   await expect(b.getByRole('button', { name: 'Invitar por correo' })).toHaveCount(0)
   // Simetría: WhatsApp y correo en la misma fila, del mismo ancho y alto; «Listo» a todo el ancho encima.
   const [l, w, c] = [await listo.boundingBox(), await wa.boundingBox(), await correo.boundingBox()]
@@ -155,7 +164,7 @@ test('puntos 13 y 14: tras Guardar, «Cita agendada» con «Listo» (foco), What
   await expect(b).toHaveCount(0)
 })
 
-test('punto 13: con el evento de Google en camino, «Invitar por correo» abre la invitación y cierra la burbuja', async ({ page }) => {
+test('punto 13: con el evento de Google en camino, «Invitar con Google Calendar» abre la invitación y cierra la burbuja', async ({ page }) => {
   interruptorAgenda('A', true)
   /* Sin Google conectado en local, la respuesta se marca `pending` como la de
      una clínica conectada: lo que se prueba es la burbuja, no Google. */
@@ -177,7 +186,11 @@ test('punto 13: con el evento de Google en camino, «Invitar por correo» abre l
   await expect(page.getByRole('dialog', { name: 'Invitar por correo' })).toHaveCount(0)
   // G3: con Google, el correo de Spinus sigue ahí y la invitación es un extra.
   await expect(b.getByRole('button', { name: 'Enviar confirmación por correo', exact: true })).toBeVisible()
-  await b.getByRole('button', { name: 'Invitar por correo' }).click()
+  const invitar = b.getByRole('button', { name: 'Invitar con Google Calendar', exact: true })
+  await expect(invitar).toBeEnabled()
+  await expect(invitar.locator('svg path[fill="#4285F4"]')).toHaveCount(1) // la «G» de Google (`GoogleGIcon`)
+  await invitar.click()
+  // El diálogo que abre (`ModalInvitacionCita`) conserva su título.
   await expect(page.getByRole('dialog', { name: 'Invitar por correo' })).toBeVisible()
   await expect(b).toHaveCount(0)
 })

@@ -224,6 +224,7 @@ function usePanelTarjeta(ancla: Caja | null, punto: Punto | undefined, comoHoja:
     colocarSeguido(nodo)
   }, [montarPanel, colocarSeguido])
   useCerrarAlTocarFuera(panel, salir)
+  useEscapeEnDocumento(panel, salir, true)
   return { saliendo, salir, alTerminar, alPulsarTecla, montar, velo, alPulsarPuntero }
 }
 
@@ -233,16 +234,20 @@ function Contenido({ props, idTitulo, salir, autoFoco }: { props: Props; idTitul
 }
 
 /** T3 · Escape cierra la tarjeta abierta al pasar aunque el foco esté fuera de
-    ella; no si hay un diálogo modal encima (el Escape es suyo). */
-function useEscapeEnDocumento(panel: { current: HTMLElement | null }, salir: () => void): void {
+    ella; no si hay un diálogo modal encima (el Escape es suyo). Auditoría B13 · 5:
+    también la de siempre (`TarjetaModal`), y ahí sólo con el foco FUERA: dentro
+    ya la cierra `useDialogoModal` (o el desplegable de «Confirmar», que para la
+    tecla antes). */
+function useEscapeEnDocumento(panel: { current: HTMLElement | null }, salir: () => void, soloFuera = false): void {
   useEffect(() => {
     function alTeclear(e: globalThis.KeyboardEvent): void {
       if (e.key !== 'Escape' || (panel.current && hayOtroDialogoModal(panel.current))) return
+      if (soloFuera && panel.current?.contains(document.activeElement)) return
       salir()
     }
     document.addEventListener('keydown', alTeclear)
     return () => document.removeEventListener('keydown', alTeclear)
-  }, [panel, salir])
+  }, [panel, salir, soloFuera])
 }
 
 /** T3 · La abierta al pasar el ratón: capa NO modal, sin tocar el foco. */

@@ -7765,3 +7765,38 @@ después sin abrirse. Lo destapó `reserva-google` prueba 4 en el `next dev` de 
 contar el plazo desde el fin de la carga (`loading` de FullCalendar) o reintentar en cada `eventsSet` hasta que
 la carga termine. ~10 líneas; toca código de la v2, va en su rama.
 
+
+### AG-DT-284 — `agenda-f-tableta:56` depende de la hora a la que corre
+
+**Estado:** 🟡 abierta, menor (prueba, anterior a B13; auditoría de B13, 2026-11-24) ·
+**Archivos:** `e2e/agenda-f-tableta.e2e.ts` («el arrastre con pulsación larga mueve una cita (PUT)», con la v2
+apagada, y `arrastrarConPulsacionLarga`)
+
+La prueba arrastra «la primera cita FUTURA a la vista» (`.fc-timegrid-event:not(.fc-event-past)`) de la semana
+visible. Corrida tarde en el día (o en fin de semana) no queda ninguna y lanza «sin cita futura a la vista que
+arrastrar». Contradice la regla de CLAUDE.md «Ninguna e2e depende del día ni de la hora en que se corre». Arreglo
+propuesto: abrir la semana siguiente (`pasarASemanaSiguiente`) como ya hace la variante «con la v2» del mismo
+archivo, o sembrar su propia cita en `DIA_FUTURO_LIBRE`. No se arregla en la auditoría: es la prueba de la v2
+APAGADA y cambiarla no es de B13.
+
+### AG-DT-285 — Áreas de toque del rediseño que no llegan a 44/36 sin cambiar el dibujo
+
+**Estado:** 🟡 abierta, menor (presentación; auditoría de B13 · hallazgo 2, 2026-11-24) ·
+**Archivos:** `src/app/globals.css` (bloque «AUDITORÍA B13 · 2 · ÁREAS DE TOQUE»), `docs/spec/rediseno/b13/capas.md`
+
+La auditoría amplió con `::after` (o con el relleno que ya rodeaba al control) el conmutador de vistas, «Qué vas a
+crear», «Hoy», «Ver día ›», el número del día y el «+N» del Mes, y ensanchó «Ir a una fecha» en `esc`. Quedan por
+debajo, sabido: los chips del Mes (22 en `ih`/`esc`, 34 en `iv`; más alto = menos líneas por celda), el número del
+día y el «+N» del Mes en alto (los limita el chip de al lado: el número lleva `z-index: 4` de FullCalendar), los días
+de «Ir a una fecha» en `ext` (~38 de ancho) y la tira de la Semana en `ext` (38 de ancho). Pide una decisión de
+maqueta (celdas más altas, menos chips o capa más ancha), no un parche.
+
+### AG-DT-286 — `ModalShell` cuenta como enfocables los botones con `tabIndex = -1`
+
+**Estado:** 🟡 abierta, menor (accesibilidad; fuera de la agenda; auditoría de B13 · hallazgo 5, 2026-11-24) ·
+**Archivos:** `src/components/ui/ModalShell.tsx` (`focusablesDelPanel`)
+
+`useDialogoModal` y `ModalInvitacionCita` ya filtran `el.tabIndex >= 0` (un botón de foco itinerante, con
+`tabIndex = -1`, hacía que el trapo no viera nunca «el último» y el Tab salía de la capa). La tercera copia, la de
+`ModalShell` (toda la app), no se tocó en la auditoría por estar fuera de la agenda: hoy no se sabe de ningún modal
+de `ModalShell` con foco itinerante, pero la regla de las tres copias dice que el arreglo va en las tres.
