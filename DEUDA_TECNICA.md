@@ -7841,11 +7841,11 @@ de `ModalShell` con foco itinerante, pero la regla de las tres copias dice que e
 M3 enciende la agenda v2 por omisión (DEFAULT, función común, una fila por clínica y un disparador en `clinicas`).
 Lo que no cierra, por decisión de alcance:
 
-* **«¿Asistió el paciente?» no tiene límite hacia atrás** (`src/lib/agenda/asistenciaServidor.ts`: toda cita
-  agendada o confirmada, con paciente, de hace más de 48 h y sin nota; 50 por vez). Una clínica que usó años la
-  agenda vieja sin cerrar sus citas verá la ventana cada vez que abra la agenda hasta contestarlas. Cuántas son lo
-  dice la fila C.5 de `supabase/produccion/conteos/conteos-agenda-para-todos.sql`. Arreglo posible (no hecho): no
-  preguntar por citas anteriores a la fecha en que la clínica se encendió.
+* ~~«¿Asistió el paciente?» no tiene límite hacia atrás.~~ **Cerrado (decisión de Angel, 2026-11-25):** sólo
+  pregunta por las citas de los últimos 30 días (`DIAS_QUE_SE_PREGUNTAN`, `src/lib/agenda/asistenciaServidor.ts`;
+  sin migración). Las anteriores no se preguntan ni se tocan: siguen agendadas o confirmadas para siempre, salvo
+  que alguien las cierre a mano; nada las marca solas. Cuántas quedan dentro y fuera lo dice la fila C.5 de
+  `supabase/produccion/conteos/conteos-agenda-para-todos.sql`.
 * **Una clínica puede quedar sin fila en `agenda_ajustes`** si el alta de la fila falla al crearse la clínica (el
   disparador avisa con WARNING y no lo impide) o si alguien la borra: queda encendida para `agenda_v2_encendida()`
   y apagada para las ocho funciones que leen la fila (`REPASO-AUTOR-M3.md`, §1.1). Nada lo repara solo; lo enseña

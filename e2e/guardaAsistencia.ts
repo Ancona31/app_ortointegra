@@ -7,7 +7,9 @@ import { execFileSync } from 'node:child_process'
  *
  * La ventana (`src/lib/agenda/asistenciaServidor.ts`) pregunta por las citas
  * agendadas o confirmadas, con hora, con paciente o reserva y sin nota ligada,
- * que empezaron hace más de 48 h. Una cita que una prueba crea el miércoles de
+ * que empezaron hace más de 48 h y hace 30 días como mucho (por lo anterior ya
+ * no se pregunta: la guarda mira desde 30 días antes de AHORA, lo más atrás que
+ * la ventana alcanza en lo que queda de semana). Una cita que una prueba crea el miércoles de
  * la semana visible no la dispara de lunes a jueves y sí de viernes a domingo:
  * tapa la rejilla y tumba las pruebas de la v2 que vienen después.
  *
@@ -45,6 +47,7 @@ const SQL_CANDIDATAS = `
   where a.status in ('scheduled', 'confirmed') and not a.all_day
     and (a.paciente_id is not null or a.reserva_canal is not null)
     and a.start_time < (:'lunes_siguiente'::timestamp at time zone :'zona') - interval '48 hours'
+    and a.start_time >= now() - interval '30 days'
     and not exists (select 1 from public.consultas c where c.appointment_id = a.id)
   order by a.created_at;`
 

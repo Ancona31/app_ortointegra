@@ -141,9 +141,11 @@ SELECT 32, 'C.3', 'M3', 'citas con paciente, de hoy en adelante, en clínicas qu
            AND NOT EXISTS (SELECT 1 FROM public.agenda_ajustes a WHERE a.clinica_id = ap.clinica_id AND a.agenda_v2_encendida)),
        NULL, NULL, 'INFO'
 UNION ALL
-SELECT 33, 'C.5', 'M3', 'citas agendadas o confirmadas, con paciente, de hace más de 48 h y sin nota, en clínicas que M3 va a encender: total / la clínica que más tiene (la agenda nueva preguntará «¿Asistió el paciente?» por ellas, de 50 en 50)',
-       (SELECT coalesce(sum(x.n), 0)::text || ' / ' || coalesce(max(x.n), 0)::text
-          FROM (SELECT count(*) AS n FROM public.appointments ap
+SELECT 33, 'C.5', 'M3', 'citas agendadas o confirmadas, con paciente, de hace más de 48 h y sin nota, en clínicas que M3 va a encender: por las que la agenda nueva preguntará «¿Asistió el paciente?» (últimos 30 días, de 50 en 50) / las de la clínica que más tiene / las anteriores a 30 días, que quedan FUERA (no se preguntan ni se tocan) / las de la clínica que más tiene fuera',
+       (SELECT coalesce(sum(x.n), 0)::text || ' / ' || coalesce(max(x.n), 0)::text || ' / ' || coalesce(sum(x.fuera), 0)::text || ' / ' || coalesce(max(x.fuera), 0)::text
+          FROM (SELECT count(*) FILTER (WHERE ap.start_time >= now() - interval '30 days') AS n,
+                       count(*) FILTER (WHERE ap.start_time < now() - interval '30 days') AS fuera
+                  FROM public.appointments ap
                  WHERE ap.status IN ('scheduled', 'confirmed') AND NOT ap.all_day AND ap.paciente_id IS NOT NULL
                    AND ap.start_time < now() - interval '48 hours'
                    AND NOT EXISTS (SELECT 1 FROM public.consultas k WHERE k.appointment_id = ap.id)

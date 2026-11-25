@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => { throw new Error('sin red en pruebas') } }))
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => { throw new Error('sin red en pruebas') } }))
 
-import { alcanceDeAsistencia, corteDeAsistencia, HORAS_SIN_PREGUNTAR } from '@/lib/agenda/asistenciaServidor'
+import { alcanceDeAsistencia, corteDeAsistencia, inicioDeAsistencia, leerAsistenciaPendiente, DIAS_QUE_SE_PREGUNTAN, HORAS_SIN_PREGUNTAR } from '@/lib/agenda/asistenciaServidor'
 import { comprobarSustituible, leerSustituyeA } from '@/lib/agenda/sustitucionServidor'
 import { altaParaReagendar, burbujaParaReasignar } from '@/components/agenda/InteraccionesV2'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
@@ -25,6 +25,20 @@ describe('punto 11 · a quién se pregunta y desde cuándo', () => {
     const ahora = Date.parse('2026-11-17T12:00:00.000Z')
     expect(HORAS_SIN_PREGUNTAR).toBe(48)
     expect(corteDeAsistencia(ahora)).toBe('2026-11-15T12:00:00.000Z')
+  })
+  it('y hacia atrás, 30 días: la consulta lleva los dos cortes', async () => {
+    const ahora = Date.parse('2026-11-17T12:00:00.000Z')
+    expect(DIAS_QUE_SE_PREGUNTAN).toBe(30)
+    expect(inicioDeAsistencia(ahora)).toBe('2026-10-18T12:00:00.000Z')
+    const filtros: string[] = []
+    const q: Record<string, unknown> = {}
+    for (const m of ['select', 'eq', 'in', 'or', 'order', 'limit']) q[m] = () => q
+    q.lt = (c: string, v: string) => { filtros.push(`${c}<${v}`); return q }
+    q.gte = (c: string, v: string) => { filtros.push(`${c}>=${v}`); return q }
+    q.then = (ok: (r: { data: never[]; error: null }) => unknown) => Promise.resolve({ data: [], error: null }).then(ok)
+    const cliente = { from: () => q } as unknown as Parameters<typeof leerAsistenciaPendiente>[0]
+    expect(await leerAsistenciaPendiente(cliente, { ...PERFIL, role: 'medico' }, ahora)).toEqual([])
+    expect(filtros).toEqual(['start_time<2026-11-15T12:00:00.000Z', 'start_time>=2026-10-18T12:00:00.000Z'])
   })
 })
 

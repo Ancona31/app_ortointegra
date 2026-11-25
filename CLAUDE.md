@@ -955,7 +955,9 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   reintenta sin ella.
 * Pregunta de asistencia: `asistenciaServidor.ts` (servidor, viaja con la
   página; `createAdminClient` sólo para saber qué citas tienen nota, filtrado por
-  clínica). Más de 48 h desde el inicio, sin nota. Nada marca `no_show` solo. La
+  clínica). Más de 48 h desde el inicio y 30 días como mucho
+  (`DIAS_QUE_SE_PREGUNTAN`; decisión de Angel, 2026-11-25: lo anterior no se
+  pregunta ni se toca), sin nota. Nada marca `no_show` solo. La
   e2e que siembre una agendada de hace más de 48 h y abra la agenda v2 cierra la
   ventana (`decidirDespues` de `e2e/interaccionesAyudas.ts`).
 * **Cancelada cerrada:** `appointments.cerrada_en` + `sustituida_por` (FK

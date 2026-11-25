@@ -457,6 +457,6 @@ Mismo mecanismo y mismas variables (`CONTEOS_*`, `IMAGEN_PG`); guarda
 | C.1 INFO | Clínicas con Google conectado: las que empezará a recorrer `/api/cron/google-sync` (hasta 15 s cada una, 45 s por pasada, cada 10 min). |
 | C.2 INFO | Clínicas suspendidas: M3 las enciende igual. |
 | C.3 INFO | Citas futuras con paciente que dejarán de poder borrarse (se cancelan). |
-| C.5 INFO | Citas viejas sin cerrar por las que la agenda nueva preguntará «¿Asistió el paciente?» (de 50 en 50, las más recientes primero). Si el número es grande, decidir antes de aplicar. |
+| C.5 INFO | Citas viejas sin cerrar por las que la agenda nueva preguntará «¿Asistió el paciente?» (sólo las de los últimos 30 días, de 50 en 50, las más recientes primero) y, aparte, las anteriores a 30 días, que quedan fuera: no se preguntan ni se tocan (decisión de Angel, 2026-11-25). Cuatro números: dentro / la clínica con más dentro / fuera / la clínica con más fuera. |
 | C.4 **AVISO** | Alguien tiene un candado fuerte sobre `clinicas` o `agenda_ajustes`: esperar y repetir. |
 

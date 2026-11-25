@@ -61,7 +61,7 @@ todos (M3)». Los números que sólo salen de aquí (huecos de este documento):
 | B.4 | filas apagadas que alguien tocó (¿a propósito?) | _(pendiente; esperado 0)_ |
 | C.1 | clínicas con Google conectado: total / ya encendidas | _(pendiente)_ |
 | C.3 | citas futuras con paciente que dejarán de poder borrarse | _(pendiente)_ |
-| C.5 | citas viejas por las que se preguntará «¿Asistió?»: total / la clínica con más | _(pendiente)_ |
+| C.5 | citas viejas sin cerrar: por las que se preguntará «¿Asistió?» (últimos 30 días) / la clínica con más / las anteriores a 30 días, que quedan fuera / la clínica con más fuera | _(pendiente)_ |
 | A.3 | huella de `agenda_v2_encendida` (la exige el pre-vuelo de M3) | _(pendiente; esperado OK)_ |
 | D.3 | huellas de las tres funciones de M1 que MA reescribe | _(pendiente; esperado 3)_ |
 | D.4 | quien aplica ve las transacciones de las demás sesiones | _(pendiente; esperado true)_ |

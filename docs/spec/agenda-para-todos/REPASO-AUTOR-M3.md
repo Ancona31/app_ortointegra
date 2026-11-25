@@ -102,7 +102,7 @@ la base en su listado.
 | Confirmación por correo, «Por confirmar» | no | sí (manda el personal). El recordatorio AUTOMÁTICO sigue apagado (`recordatorio_encendido = false`), y el correo a la clínica también |
 | Avisos (campana, M1) | no se escriben | los disparadores de M1 y F4 empiezan a escribir avisos en todas las clínicas |
 | Google, con conexión | Spinus → Google | en los dos sentidos: lo creado en el calendario de Spinus en Google entra como «por asignar» (30 días atrás la primera vez) y deja aviso; el título de una cita con paciente no se acepta desde Google |
-| «¿Asistió el paciente?» | no | al abrir la agenda pregunta por las citas agendadas o confirmadas, con paciente, de hace más de 48 h y sin nota (hasta 50, las más recientes primero; **sin límite hacia atrás**) |
+| «¿Asistió el paciente?» | no | al abrir la agenda pregunta por las citas agendadas o confirmadas, con paciente, de hace más de 48 h y sin nota (hasta 50, las más recientes primero; **sólo las de los últimos 30 días**) |
 | Rutas que dan 404 `no_disponible` | tipos de cita, bloqueos, ajustes, enlaces | dejan de darlo |
 
 ### 2.1 Tareas programadas
@@ -136,9 +136,11 @@ la base en su listado.
 
 ### 2.3 Lo que conviene que Angel decida antes de aplicar
 
-1. **«¿Asistió el paciente?» sin límite hacia atrás.** En una clínica con años de citas viejas sin
-   cerrar, la ventana saldrá cada vez que abran la agenda hasta que las contesten. El conteo C.5
-   dice cuántas son. No se tocó (fuera del alcance de M3).
+1. ~~«¿Asistió el paciente?» sin límite hacia atrás.~~ **Decidido por Angel (2026-11-25) y hecho:**
+   sólo se pregunta por las citas de los últimos 30 días (`DIAS_QUE_SE_PREGUNTAN`,
+   `asistenciaServidor.ts`; sin migración: la regla vive en el servidor, no en la base). Lo anterior
+   no se pregunta ni se toca: sigue agendado o confirmado en la base, la rejilla, el buscador y las
+   estadísticas, como antes. El conteo C.5 dice cuántas quedan dentro y cuántas fuera.
 2. **AG-DT-274 y AG-DT-264** dicen «resolver antes de encender la v2 en otras clínicas», y M3 es
    exactamente eso. La 274 (códigos de la reserva) no puede crecer mientras los enlaces no abran al
    público; la 264 (reflejos hacia Google y avisos que se pierden sin reintento) sí aplica desde el
