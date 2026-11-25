@@ -315,6 +315,7 @@ const RechazoRsvpSchema = z.object({
   r_medico: NombreMedicoSchema.nullable(),
   r_consultorio: z.object({ nombre: z.string().nullable(), direccion: z.string().nullable(), telefono: z.string().nullable() }).nullable(),
   r_gcal_etag: z.string().nullable(),
+  r_medico_id: z.guid().nullable(),
 })
 export type RechazoRsvp = z.infer<typeof RechazoRsvpSchema>
 

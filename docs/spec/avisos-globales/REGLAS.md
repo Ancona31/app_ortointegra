@@ -4,9 +4,9 @@ Bloque «avisos globales» (rama `feature/avisos-globales`, 2026-11-24/25). Plan
 `PLAN.md` (§10 manda). Migraciones: `20261202120000_avisos_globales_modelo.sql` (M1) y
 `20261202130000_avisos_globales_rsvp_rechazo.sql` (M2), **sólo escritas**: las aplica Angel.
 
-> **Propuesta para `CLAUDE.md`.** Este archivo está escrito para pegarse como sección «Avisos
-> globales» de `CLAUDE.md`, junto a las demás tandas de la agenda. No lo pegué yo: `CLAUDE.md` son
-> las instrucciones del dueño del proyecto y esa edición la decide Angel.
+> **Para `CLAUDE.md`, todavía no.** Este archivo está escrito para pegarse como sección «Avisos
+> globales» de `CLAUDE.md`. Decisión de Angel (2026-11-25): se pega cuando M1 y M2 estén aplicadas en
+> producción y el bloque fusionado. Hasta entonces vive aquí.
 
 * **Toda eventualidad de la agenda avisa en la campana y en la burbuja, con el nombre del paciente**
   (decisión de Angel). `textoEmergente` dice lo mismo que `textoAviso`. Nada clínico: ni tipo de
@@ -22,9 +22,10 @@ Bloque «avisos globales» (rama `feature/avisos-globales`, 2026-11-24/25). Plan
   eso no importa nada de servidor). Es «dejar ver», no un redirect: la barrera es la RLS. Su botón
   va por portal a las ranuras `[data-ranura-campana]` de la navegación.
 * **Se entera de lo nuevo releyendo cada 2 minutos con la pestaña a la vista y al volver a ella**
-  (`SONDEO_MS`, que no puede ser mayor que `AVISO_RECIENTE_MS`). Realtime no garantiza la entrega
-  (en la prueba un suscriptor se quedó sin un aviso): si se añade, se SUMA a la relectura, no la
-  sustituye.
+  (`SONDEO_MS`, que no puede ser mayor que `AVISO_RECIENTE_MS`). **Sin Realtime, por decisión de
+  Angel (rendimiento):** `avisos_clinica` NO está en la publicación `supabase_realtime` y no debe
+  entrar sin decidirlo de nuevo (una conexión abierta por pestaña en toda la app, y los DELETE de una
+  publicación llegan a todo suscrito sin pasar por la RLS).
 * **«Revisado» es POR USUARIO** (`avisos_vistos`). Pendiente para mí = sin fila mía, o
   `visto_en < creado_en`. Se lee con `avisos_pendientes` (INVOKER). `revisado_en`/`revisado_por`
   significan «cerrado para todos» y el código nuevo ya no los escribe. **No metas «no visto por mí»
@@ -51,7 +52,8 @@ Bloque «avisos globales» (rama `feature/avisos-globales`, 2026-11-24/25). Plan
 * **El único dato de persona en `avisos_clinica.datos` es el nombre tecleado en `reserva_frenada`**
   (120 como mucho; lo impone un CHECK). Ni teléfono ni correo. Puede no ser real.
 * **El «No» de Google** (`cita_rsvp_google_rechazo`, detrás de `AGENDA_RSVP_GOOGLE`): con más de 1
-  hora cancela, avisa y manda el correo (`correoCancelacionPorRsvp`, una vez, con llave por cita); en
+  hora cancela, avisa y manda el correo (`correoCancelacionPorRsvp`, una vez, con llave por cita, con el
+  enlace de reserva del médico sólo si ABRE: `enlaceDeReservaDelMedico` en `gcalRsvpRechazo.ts`); en
   la última hora NO cancela y deja «indicó que no asistirá». El umbral es el del enlace de
   confirmación, copiado: si cambia `cita_confirmacion_responder`, cambia esta función (lo vigila
   `av2_rsvp_rechazo.sql`, caso 8) y `PLAZO_CANCELAR`. Una cancelada no se reabre con un «Sí».

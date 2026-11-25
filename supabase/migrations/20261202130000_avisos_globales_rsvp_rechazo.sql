@@ -86,7 +86,7 @@ END $$;
 
 CREATE FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[])
  RETURNS TABLE(r_resultado text, r_para text, r_nombre text, r_inicio timestamp with time zone, r_fin timestamp with time zone,
-               r_zona text, r_medico jsonb, r_consultorio jsonb, r_gcal_etag text)
+               r_zona text, r_medico jsonb, r_consultorio jsonb, r_gcal_etag text, r_medico_id uuid)
  LANGUAGE plpgsql
  SECURITY INVOKER
  SET search_path TO ''
@@ -155,6 +155,8 @@ BEGIN
   r_fin := v_a.end_time;
   r_zona := v_a.consultorio_timezone;
   r_gcal_etag := v_a.gcal_etag;
+  -- Para que el servidor busque el enlace de reserva de ESE médico y lo ponga en el correo.
+  r_medico_id := v_a.medico_id;
   r_medico := (SELECT jsonb_build_object('titulo', pr.titulo, 'nombres', pr.nombres, 'apellido_paterno', pr.apellido_paterno,
                                          'apellido_materno', pr.apellido_materno)
                  FROM public.profiles pr WHERE pr.id = v_a.medico_id AND pr.clinica_id = p_clinica_id);

@@ -14,6 +14,20 @@ Migraciones: **M1** `20261202120000_avisos_globales_modelo.sql` y **M2**
 > Realtime como paso separable. La tabla de abajo se escribió para la primera versión; lo que
 > cambia va en «Añadido con la versión corregida».
 
+## Versión DEFINITIVA (2026-11-25): lo que cambió respecto a lo de abajo
+
+- **Realtime fuera.** M1 ya no toca la publicación `supabase_realtime` (decisión de Angel). Todo lo
+  que más abajo habla del dueño de la publicación, del paso «separable» y del DELETE por Realtime
+  deja de aplicar: no hay publicación que auditar. La rejilla (fila 9) comprueba que la tabla NO está.
+- **La reversa de M1 se NIEGA con datos**, como las demás (antes «nunca se negaba»): marcas en
+  `avisos_vistos` o avisos con la forma de M1. Con `spinus.reversa_con_datos = 'si'` borra
+  `avisos_vistos` CON sus marcas (es la única pérdida) y conserva la forma de M1 si quedan avisos
+  que la usen; no borra avisos. Su guarda está copiada en `reversa-previa.sql` (dimensión 31).
+- **M2 devuelve `r_medico_id`** para que el servidor busque el enlace de reserva de ese médico.
+- **`aplicar.sh` ya conoce M1 y M2**; el guion del clon es `ENSAYO-EN-EL-CLON.md`.
+- Pendiente sin cambio: ensayo sobre el clon, auditoría independiente, y ampliar
+  `cb_aislamiento_clinicas.sql`.
+
 ## Añadido con la versión corregida
 
 - **`avisos_vistos` (dimensiones 10, 20 y 30).** Sin FK a `avisos_clinica` ni a `profiles`; FK

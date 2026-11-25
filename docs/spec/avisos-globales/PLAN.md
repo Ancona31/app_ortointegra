@@ -445,3 +445,28 @@ de Supabase la comparte `appointments`); la mitigación es que nadie puede borra
   1,13–1,43, mover 1,22–1,24, cancelar 1,16–1,18 (igual que antes de M1); secretaria en agenda ajena,
   alta 1,55–1,77, mover 1,91–1,94, cancelar 1,87–1,92 (+0,2 a +0,4 ms sobre la línea base).
 - Realtime y RLS: otra corrida con cuatro sesiones, sin fugas.
+
+---
+
+## 11. Decisiones FINALES de Angel (2026-11-25) — M1 queda definitiva (manda sobre §3, §8 y §10)
+
+Criterio de Angel: la solución más eficiente y que menos pese en el rendimiento.
+
+| # | Decisión | Qué cambió |
+|---|---|---|
+| 1 | **Sin Realtime en la campana.** Se queda la relectura cada 2 minutos con la pestaña a la vista y al volver a ella. El paso 4 no se hace | M1 **ya no añade** `avisos_clinica` a la publicación `supabase_realtime`: nada la iba a escuchar, así que era carga y superficie sin uso (y los DELETE de una publicación llegan a todo suscrito sin pasar por la RLS). Fuera también de la reversa, de la rejilla (la fila 9 ahora comprueba que NO está), de la prueba y del guion `scripts/local/avisos-realtime-rls.mjs`, que se borró. Lo que §8 y §10 cuentan de Realtime queda como historia de la prueba |
+| 2 | El interruptor «Solo mis avisos» va **por dispositivo** (`localStorage`). Sin columna | Nada: ya estaba así |
+| 3 | El nombre en `reserva_frenada` se queda guardado, sin purga por ahora. Lo revisa su abogado | Nada en el código. No se tocaron los textos legales |
+| 4 | El correo de cancelación por «No» de Google lleva el **enlace de reserva del médico** | M2 devuelve además `r_medico_id`. La pasada busca el enlace FIJO de ese médico, sin revocar ni pausar, y sólo lo pone si ABRE de verdad (`abrirEnlace`, las mismas comprobaciones que la oferta de reagendar) en esa clínica y con algo que ofrecer. La URL sale de `urlDeReserva` (misma base `NEXT_PUBLIC_APP_URL` que las demás). Sin enlace que abra, el correo sale con el teléfono, como antes |
+| 5 | `REGLAS.md` se pega en `CLAUDE.md` cuando M1/M2 estén en producción y el bloque fusionado | Queda listo en `REGLAS.md`; `CLAUDE.md` no se tocó |
+
+Además:
+
+- **La reversa de M1 sigue el contrato de las demás** (para que `aplicar.sh` la pueda conducir): con
+  marcas en `avisos_vistos` o avisos con la forma de M1 SE NIEGA sin tocar nada; con
+  `spinus.reversa_con_datos = 'si'` borra `avisos_vistos` con sus marcas y CONSERVA la forma de M1
+  mientras queden avisos que la usen (no borra avisos). Sustituye a lo que dicen §8 y §10 de «dos partes».
+- **`aplicar.sh` conoce M1 y M2** (listas, testigos, orden de reversas con M2 y M1 primero,
+  `huellas.sha256`, `reversa-previa.sql`). Ensayado en modo ensayo contra la base local. El guion para
+  el clon está en `ENSAYO-EN-EL-CLON.md`.
+- **Fusión con `feature/privacidad-beta` (`c865591`)**: entró sin conflictos.

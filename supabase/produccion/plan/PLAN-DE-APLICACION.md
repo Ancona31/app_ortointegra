@@ -35,7 +35,7 @@ Archivos de esta carpeta:
 | Archivo | Para qué |
 |---|---|
 | `aplicar.sh` | El único comando del día: `estado`, `respaldo`, `aplicar`, `reversa`, `reversa-truncate`. |
-| `huellas.sha256` | sha256 de las 9 migraciones y sus 9 reversas, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
+| `huellas.sha256` | sha256 de las 11 migraciones (las 9 de la agenda v2 y las 2 de «avisos globales», 2026-11-25) y sus 11 reversas, tal como están hoy. `aplicar.sh` se niega a correr un archivo cuya huella no coincida. |
 | `reversa-previa.sql` | Sólo lee. `aplicar.sh reversa` la corre antes de la primera reversa: reúne las negativas de toda la cadena (§10.1). |
 | `rejillas-del-ensayo.txt` | La rejilla final de cada archivo, literal, del ensayo de punta a punta sobre el clon de la foto (§11). |
 | `diferencias-antes-despues.clon-foto.tsv` | Las 965 diferencias de estructura antes → después de ese ensayo (claves: estado, tipo, esquema, clave, campo). |
@@ -100,8 +100,8 @@ repo, en la rama que va a desplegar:
 
 ```bash
 sha256sum supabase/produccion/plan/aplicar.sh
-# tiene que dar: 67ec5d149065f0723ca1397591a8e024adb1000960a338dabe497767d2e3e571
-sha256sum -c supabase/produccion/plan/huellas.sha256   # las 18 de SQL y reversa-previa.sql: todas OK
+# tiene que dar: b530194de92dc21765666076234ad454375d83af852056c994f7402df0232834
+sha256sum -c supabase/produccion/plan/huellas.sha256   # las 22 de SQL (11 migraciones y 11 reversas) y reversa-previa.sql: todas OK
 ```
 
 Si `aplicar.sh` da otra cosa, alguien lo cambió después de este plan: no se

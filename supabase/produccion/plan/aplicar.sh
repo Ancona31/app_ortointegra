@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # supabase/produccion/plan/aplicar.sh
 #
-# Aplica las 9 migraciones nuevas («agenda v2 lista para producción») UNA A
+# Aplica las 11 migraciones nuevas (las 11 de «agenda v2 lista para producción»,
+# ya aplicadas en producción el 2026-11-23, y las 2 de «avisos globales») UNA A
 # UNA, con psql y confirmación escrita antes de cada una, y registra cada
 # versión en supabase_migrations.schema_migrations con
 # `supabase migration repair --status applied` (CLI 2.117.0). Lo corre Angel,
@@ -9,8 +10,8 @@
 #
 #   bash supabase/produccion/plan/aplicar.sh estado            # sólo lee: versión, ida y vuelta, cuentas, historial, qué falta
 #   bash supabase/produccion/plan/aplicar.sh respaldo          # volcado lógico CIFRADO (estructura + datos)
-#   bash supabase/produccion/plan/aplicar.sh aplicar           # las 9, una a una
-#   bash supabase/produccion/plan/aplicar.sh reversa           # las 7 reversas de la agenda (T, F5b … F1), en orden inverso
+#   bash supabase/produccion/plan/aplicar.sh aplicar           # las 11, una a una (las ya registradas y aplicadas se saltan)
+#   bash supabase/produccion/plan/aplicar.sh reversa           # las 11 reversas de la agenda (M2, M1, T, F5b … F1), en orden inverso
 #   bash supabase/produccion/plan/aplicar.sh reversa-truncate  # las 2 de TRUNCATE (20261126, luego 20261125); reabre el hueco
 #
 # CÓMO VIAJA CADA ARCHIVO (hallazgo A1 de auditoria/RONDA-1.md): ENTERO, EN UNA
@@ -90,9 +91,15 @@ MIGRACIONES=(
   20261201160000_agenda_f4_confirmacion_correos_avisos
   20261201170000_agenda_f5b_protecciones_cita
   20261201180000_agenda_sin_truncate
+  20261202120000_avisos_globales_modelo
+  20261202130000_avisos_globales_rsvp_rechazo
 )
-# Orden inverso: T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
+# Orden inverso: M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
+# M2 antes que M1 (M2 exige M1) y M1 antes que T y F4 (la de F4 borra avisos_clinica, de la que
+# cuelgan los escritores de M1).
 REVERSAS=(
+  20261202130000_avisos_globales_rsvp_rechazo
+  20261202120000_avisos_globales_modelo
   20261201180000_agenda_sin_truncate
   20261201170000_agenda_f5b_protecciones_cita
   20261201160000_agenda_f4_confirmacion_correos_avisos
@@ -201,6 +208,9 @@ testigo_sql() {
     20261201160000) echo "to_regclass('public.avisos_clinica') is not null" ;;
     20261201170000) echo "exists(select 1 from pg_trigger where tgrelid = to_regclass('public.appointments') and tgname = 'trg_appointments_proteger_borrado' and not tgisinternal)" ;;
     20261201180000) echo "exists(select 1 from pg_trigger where tgrelid = to_regclass('public.agenda_bloqueos') and tgname = 'trg_agenda_bloqueos_sin_truncate' and not tgisinternal)" ;;
+    # M1: la RPC (su reversa SIEMPRE la quita; avisos_vistos no serviría de testigo en una base a medias).
+    20261202120000) echo "to_regprocedure('public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)') is not null" ;;
+    20261202130000) echo "to_regprocedure('public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])') is not null" ;;
     *) return 1 ;;
   esac
 }
@@ -215,6 +225,8 @@ testigo_nombre() {
     20261201160000) echo "tabla public.avisos_clinica" ;;
     20261201170000) echo "disparador trg_appointments_proteger_borrado" ;;
     20261201180000) echo "disparador trg_agenda_bloqueos_sin_truncate" ;;
+    20261202120000) echo "función public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)" ;;
+    20261202130000) echo "función public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])" ;;
   esac
 }
 
@@ -235,18 +247,18 @@ aplicada() {  # $1 = versión
   echo nose
 }
 
-# Las 9, historial frente a catálogo (G1 y G4, ronda 2 del guion). Imprime una
+# Las 11, historial frente a catálogo (G1 y G4, ronda 2 del guion). Imprime una
 # línea por migración y deja en INCOHERENTES cuántas no cuadran:
 #   pendiente                  (ni registrada ni aplicada)
 #   aplicada y registrada
 #   ALTO aplicada SIN registrar (testigo sí, historial no)
 #   ALTO registrada SIN aplicar (historial sí, testigo no): el historial miente
 # $1 = historial ya leído. Si no puede preguntar al catálogo, DETIENE.
-testigos_todos() {  # una línea «versión|si|no» por cada una de las 9
+testigos_todos() {  # una línea «versión|si|no» por cada una de las 11
   local v filas=()
   for v in "${MIGRACIONES[@]}"; do v="${v%%_*}"; filas+=("('$v', $(testigo_sql "$v"))"); done
   q "select v || '|' || case when c then 'si' else 'no' end from (values $(IFS=,; echo "${filas[*]}")) x(v, c) order by v" \
-    || die "no pude preguntar al catálogo por los testigos de las 9. No sigo. Mira el error de arriba."
+    || die "no pude preguntar al catálogo por los testigos de las 11. No sigo. Mira el error de arriba."
 }
 coherencia() {  # $1 = historial
   local t linea v a r m
@@ -320,10 +332,10 @@ estado() {
   local v
   FALTA_MAIN=0
   for v in "${MAIN[@]}"; do en_historial "$v" "$hist" || { echo "FALTA de main: $v"; FALTA_MAIN=1; }; done
-  echo "── las 9: historial frente a catálogo (su objeto testigo)"
+  echo "── las 11: historial frente a catálogo (su objeto testigo)"
   coherencia "$hist"
   # Sale ≠ 0 si algo no está bien: falta main, la prueba de humo no pasó (G3) o
-  # alguna de las 9 no cuadra entre historial y catálogo (G1/G4).
+  # alguna de las 11 no cuadra entre historial y catálogo (G1/G4).
   (( FALTA_MAIN == 0 && HUMO_OK == 1 && INCOHERENTES == 0 ))
 }
 
@@ -455,17 +467,17 @@ aplicar_una() {  # $1 = nombre sin .sql
 aplicar() {
   estado || true
   (( HUMO_OK == 1 )) || die "la prueba de humo de petición grande NO pasó (arriba): no ofrezco ninguna migración (G3). Plan §2."
-  (( INCOHERENTES == 0 )) || die "historial y catálogo no cuadran en alguna de las 9 (arriba, «ALTO …»). No ofrezco ninguna migración hasta que cuadren. Plan §8."
+  (( INCOHERENTES == 0 )) || die "historial y catálogo no cuadran en alguna de las 11 (arriba, «ALTO …»). No ofrezco ninguna migración hasta que cuadren. Plan §8."
   if (( FALTA_MAIN )); then
     leer "Faltan versiones de main en el historial (plan §1). Escribe SEGUIR si ya lo decidiste: "; [[ "$RESP" == SEGUIR ]] || die "parado."
   fi
   local m; for m in "${MIGRACIONES[@]}"; do aplicar_una "$m"; done
-  # Antes de decir «las 9»: que de verdad estén las 9 en el historial Y en el catálogo (G1).
+  # Antes de decir «las 11»: que de verdad estén las 11 en el historial Y en el catálogo (G1).
   local hist; hist="$(registradas)" || exit 1
-  echo; echo "── comprobación final: las 9, historial frente a catálogo"
+  echo; echo "── comprobación final: las 11, historial frente a catálogo"
   coherencia "$hist"
-  (( INCOHERENTES == 0 && PENDIENTES == 0 )) || die "al terminar, historial y catálogo NO cuadran (arriba). No están las 9. Plan §8."
-  echo; echo "Las 9 aplicadas y registradas (historial y catálogo coinciden). Sigue con COMPROBACION-POSTERIOR.md."
+  (( INCOHERENTES == 0 && PENDIENTES == 0 )) || die "al terminar, historial y catálogo NO cuadran (arriba). No están las 11. Plan §8."
+  echo; echo "Las 11 aplicadas y registradas (historial y catálogo coinciden). Sigue con COMPROBACION-POSTERIOR.md."
 }
 
 # Tras un fallo de una REVERSA: pregunta al catálogo (A2).
@@ -540,12 +552,12 @@ reversa_previa() {  # imprime CON_DATOS=si|no en la última línea si se puede s
   fi
 }
 
-# Antes de la primera reversa: historial y catálogo cuadran para las 9 (A5,
+# Antes de la primera reversa: historial y catálogo cuadran para las 11 (A5,
 # ronda 2 del guion). Las guardas de ORDEN de las reversas (F5a: «funciones que
 # nombran agenda_bloqueos»; F3: «sigue F2»; F2: «quedan disparadores de F4»; F1:
 # «quedan objetos de bloques posteriores»; las de TRUNCATE: la nº 2 antes que la
 # nº 1 y T antes que la nº 2) no están en reversa-previa.sql a propósito: con el
-# historial coherente, el orden fijo de la cadena (T, F5b, F4, F2, F3, F5a, F1;
+# historial coherente, el orden fijo de la cadena (M2, M1, T, F5b, F4, F2, F3, F5a, F1;
 # luego 20261126, 20261125) las cumple siempre. Lo que las rompería es una
 # versión aplicada sin registrar o registrada sin aplicar, y eso se para aquí.
 exigir_coherencia() {

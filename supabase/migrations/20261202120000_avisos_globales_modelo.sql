@@ -45,9 +45,11 @@
 --      servidor escribe sin sesión de base: la reserva frenada (con el nombre
 --      que tecleó la persona), el «Reagendar» del personal y el «No» de Google
 --      en la última hora.
---  10. avisos_clinica entra en la publicación supabase_realtime, SI quien
---      aplica es dueño de la publicación; si no, el resto se aplica igual y la
---      rejilla lo deja como PENDIENTE (fila 9), con la sentencia que falta.
+--   NO toca Realtime: avisos_clinica NO entra en la publicación supabase_realtime
+--   (decisión de Angel, 2026-11-25: la campana se entera releyendo cada 2
+--   minutos con la pestaña a la vista; nada la escucha, así que publicarla
+--   sería carga y superficie sin uso, y los DELETE de una publicación llegan a
+--   todo suscrito sin pasar por la RLS).
 --   NO toca: los seis escritores de F4, reservar_por_enlace, cita_rsvp_google,
 --   log_cita_change, ninguna policy de otra tabla, ni el índice
 --   avisos_clinica_pendiente_key.
@@ -136,8 +138,6 @@ BEGIN
      OR to_regprocedure('auth.uid()') IS NULL OR to_regprocedure('public.prohibir_truncate()') IS NULL THEN
     RAISE EXCEPTION 'PRE-VUELO FALLÓ: falta agenda_v2_encendida(uuid), get_clinica_id(), get_my_role(), soy_admin_de_clinica(), auth.uid() o prohibir_truncate() (20261126120000).';
   END IF;
-  -- La publicación NO se comprueba aquí: si quien aplica no es su dueño, ese paso se salta solo
-  -- (sección 5) y queda PENDIENTE en la rejilla. El resto de la migración no depende de ella.
 END $$;
 
 -- ---------------------------------------------------------------------
@@ -619,35 +619,7 @@ BEGIN
 END $triggers$;
 
 -- ---------------------------------------------------------------------
--- 5 · Realtime, SEPARABLE: la campana se entera sin sondear. Si quien aplica
---     no es dueño de la publicación (o no existe, o es FOR ALL TABLES), este
---     paso SE SALTA y el resto de la migración queda aplicado: la rejilla lo
---     dice en la fila 9 y la campana sigue con su relectura cada 2 minutos.
---     Realtime entrega cada alta o cambio SÓLO a quien puede leer la fila con
---     su sesión (RLS de SELECT). ⚠️ Un DELETE no pasa por la RLS: llega a todo
---     suscrito, de cualquier clínica, con la llave primaria nada más (identidad
---     de réplica por omisión). Una publicación no deja excluir DELETE por
---     tabla. Mitigación: nadie borra avisos (authenticated y service_role no
---     tienen DELETE); sólo postgres, a mano, y lo que viaja es un uuid.
--- ---------------------------------------------------------------------
-DROP TABLE IF EXISTS pg_temp._m1_realtime;
-CREATE TEMP TABLE _m1_realtime (estado text NOT NULL);
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public'
-                AND tablename = 'avisos_clinica') THEN
-    INSERT INTO pg_temp._m1_realtime VALUES ('ya estaba');
-  ELSIF EXISTS (SELECT 1 FROM pg_publication p WHERE p.pubname = 'supabase_realtime' AND NOT p.puballtables
-                   AND pg_has_role(current_user, p.pubowner, 'USAGE')) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.avisos_clinica;
-    INSERT INTO pg_temp._m1_realtime VALUES ('añadida');
-  ELSE
-    INSERT INTO pg_temp._m1_realtime VALUES ('PENDIENTE: como dueño de la publicación, ALTER PUBLICATION supabase_realtime ADD TABLE public.avisos_clinica;');
-  END IF;
-END $$;
-
--- ---------------------------------------------------------------------
--- 6 · Post-vuelo, ANTES del COMMIT. Si algo no quedó, aborta y no queda nada.
+-- 5 · Post-vuelo, ANTES del COMMIT. Si algo no quedó, aborta y no queda nada.
 -- ---------------------------------------------------------------------
 DO $$
 DECLARE
@@ -746,7 +718,7 @@ END $$;
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- 7 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
+-- 6 · Veredicto en la rejilla. UN SOLO SELECT, y nada detrás.
 -- ---------------------------------------------------------------------
 SELECT t.n, t.comprobacion, t.valor, t.esperado,
        CASE WHEN t.esperado IS NULL THEN 'INFO' WHEN t.valor = t.esperado THEN 'OK' ELSE 'REVISAR' END AS estado
@@ -797,11 +769,11 @@ FROM (
              AND g.tgname IN ('trg_avisos_clinica_reabrir', 'trg_avisos_vistos_sellar', 'trg_avisos_vistos_sin_truncate')),
          '3'
   UNION ALL
-  -- «añadida» o «ya estaba» = OK. «PENDIENTE: …» sale como REVISAR y trae la sentencia que falta:
-  -- el resto de la migración quedó aplicado y la campana sigue con su relectura cada 2 minutos.
-  SELECT 9, 'Realtime: avisos_clinica en la publicación supabase_realtime',
-         (SELECT estado FROM pg_temp._m1_realtime LIMIT 1),
-         (SELECT CASE WHEN estado LIKE 'PENDIENTE%' THEN 'añadida' ELSE estado END FROM pg_temp._m1_realtime LIMIT 1)
+  -- Realtime NO se toca (decisión de Angel: la campana relee cada 2 minutos, no escucha).
+  SELECT 9, 'avisos_clinica en la publicación supabase_realtime (esta migración no la añade)',
+         (SELECT count(*)::text FROM pg_publication_tables
+           WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'avisos_clinica'),
+         '0'
   UNION ALL
   SELECT 10, 'filas de avisos_clinica (ninguna cambia con esta migración)',
          (SELECT count(*)::text FROM public.avisos_clinica), NULL

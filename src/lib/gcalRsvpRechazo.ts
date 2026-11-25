@@ -13,7 +13,8 @@
  *
  * ⚠️ UNA VEZ: la base cancela una sola vez (la pasada siguiente ve la cita cancelada y devuelve
  * `sin_cambio`), así que el correo sale una vez; además lleva llave de idempotencia por cita.
- * ⚠️ El correo va al que RECHAZÓ (lo devuelve la base), a nombre del médico, sin nada clínico. Si no
+ * ⚠️ El correo va al que RECHAZÓ (lo devuelve la base), a nombre del médico, sin nada clínico, con el
+ * enlace de reserva de ESE médico si tiene uno que abre (si no, el teléfono). Si no
  * sale, la cancelación NO se deshace: queda en el log, sin la dirección.
  * ⚠️ Si después responde «Sí», nada: `cita_rsvp_google` sólo confirma lo agendado y una cancelada no
  * se reabre. El correo ya le dice que agende de nuevo.
@@ -24,18 +25,47 @@ import { rechazaronDe } from '@/lib/gcalRsvp'
 import { reflejarEnGoogle } from '@/lib/confirmacion/googleConfirmacion'
 import { correoCancelacionPorRsvp } from '@/lib/confirmacion/correosCita'
 import { enviarCorreo } from '@/lib/correo/transporte'
+import { urlDeReserva } from '@/lib/confirmacion/enlaceConfirmacion'
+import { codigoDeEnlace } from '@/lib/reserva/secretos'
+import { abrirEnlace } from '@/lib/reserva/puertaReserva'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import { logger } from '@/lib/logger'
 
 export interface TareaRsvp { evento: EventoGoogle; fila: FilaEspejo | null }
 
+/**
+ * El enlace de reserva del médico de la cita, para «Agendar de nuevo» (decisión de Angel). Con el
+ * MISMO cuidado que la oferta de reagendar (`ofertaReagendar`): su enlace FIJO, sin revocar ni
+ * pausar, y sólo si ABRE de verdad (`abrirEnlace`: secreto, interruptor, aviso, suscripción) en ESA
+ * clínica y con algo que ofrecer. Si no, null: el correo sale con el teléfono. Nunca lanza.
+ * ⚠️ `createAdminClient()`: filtra por `clinica_id` y por el médico de la cita.
+ */
+async function enlaceDeReservaDelMedico(clinicaId: string, medicoId: string | null): Promise<string | null> {
+  if (!medicoId) return null
+  try {
+    const { data, error } = await createAdminClient().from('reserva_enlaces').select('id')
+      .eq('clinica_id', clinicaId).eq('medico_id', medicoId).eq('clase', 'fijo')
+      .is('revocado_en', null).is('pausado_en', null).order('created_at', { ascending: false }).limit(1)
+    const id: unknown = error ? null : data?.[0]?.id
+    const fijo = typeof id === 'string' ? codigoDeEnlace(id) : null
+    const abierto = fijo ? await abrirEnlace(fijo) : null
+    if (!fijo || !abierto || abierto.ctx.clinica_id !== clinicaId || abierto.ctx.estado !== 'vigente'
+        || abierto.ctx.consultorios.length === 0 || abierto.ctx.tipos.length === 0) return null
+    return urlDeReserva(fijo)
+  } catch {
+    return null
+  }
+}
+
 /** El correo «tu cita fue cancelada porque indicaste que no asistirás». Nunca lanza. */
-async function escribirAlPaciente(citaId: string, r: RechazoRsvp): Promise<void> {
+async function escribirAlPaciente(clinicaId: string, citaId: string, r: RechazoRsvp): Promise<void> {
   if (!r.r_para || !r.r_inicio) return
   try {
     const c = correoCancelacionPorRsvp({
       inicio: r.r_inicio, zona: r.r_zona, medico: r.r_medico ? componerNombreMedicoCompleto(r.r_medico) : '',
       consultorio: r.r_consultorio ?? { nombre: null, direccion: null, telefono: null },
+      urlReserva: await enlaceDeReservaDelMedico(clinicaId, r.r_medico_id),
     }, r.r_nombre)
     const envio = await enviarCorreo({ para: r.r_para, asunto: c.asunto, texto: c.texto, html: c.html, remitente: c.remitente,
       etiqueta: 'cancelacion-rsvp', idempotencia: `cancelacion-rsvp/${citaId}` })
@@ -60,7 +90,7 @@ export async function rechazarPorRsvps(clinicaId: string, calendarId: string, ta
       const r = await rechazarPorRsvp(clinicaId, calendarId, fila.id, evento.id, rechazaron)
       if (r?.r_resultado !== 'cancelada') continue
       cambios += 1
-      await escribirAlPaciente(fila.id, r)
+      await escribirAlPaciente(clinicaId, fila.id, r)
       // El evento sigue en Google como estaba: se le pone el estado de Spinus (cancelada), sin avisar a los invitados.
       await reflejarEnGoogle({ clinicaId, citaId: fila.id, eventId: evento.id, etag: evento.etag ?? r.r_gcal_etag }, 'google_rsvp')
     } catch {

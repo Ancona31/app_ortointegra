@@ -411,8 +411,9 @@ end $$;
 select pg_temp.esperar('caso 15 privilegios', (select string_agg(r || ':' || p, ',' order by r, p)
   from unnest(array['anon', 'authenticated', 'service_role']) r cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) p
   where has_table_privilege(r, 'public.avisos_clinica', p)), 'authenticated:SELECT');
-select pg_temp.esperar('caso 15 publicación', (select count(*)::text from pg_publication_tables
-  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'avisos_clinica'), '1');
+-- Realtime no se toca: la campana relee, no escucha (decisión de Angel).
+select pg_temp.esperar('caso 15 fuera de Realtime', (select count(*)::text from pg_publication_tables
+  where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'avisos_clinica'), '0');
 
 -- ── Caso 16: «REVISADO» POR USUARIO. Que uno lo vea no se lo quita a nadie; un hecho nuevo lo reabre ──
 -- (los dos avisos del caso 4, de toda la clínica: los tienen pendientes el administrador y la secretaria.)

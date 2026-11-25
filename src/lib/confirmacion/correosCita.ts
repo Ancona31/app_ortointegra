@@ -181,13 +181,17 @@ export function correoCambio(d: DatosRecordatorio, nombre: string | null = null)
 }
 
 /** Lo que necesita el correo de «tu cita fue cancelada» (el «No» a la invitación de Google). */
-export type DatosCancelacion = Pick<DatosRecordatorio, 'inicio' | 'zona' | 'medico' | 'consultorio'>
+export type DatosCancelacion = Pick<DatosRecordatorio, 'inicio' | 'zona' | 'medico' | 'consultorio'> & {
+  /** El enlace de reserva del médico (`https://…/reservar/<código>`), si tiene uno que abre; si no, null y el correo da el teléfono. */
+  urlReserva: string | null
+}
 
 /**
  * Avisos globales (decisión de Angel, 2026-11-24) · El paciente respondió «No» a la invitación de
  * Google con más de una hora de anticipación y la cita se canceló: se le dice POR QUÉ y qué hacer si
- * fue un error. Sin botones: una cancelada no se reabre (regla de G); si quiere otra, agenda de nuevo
- * o llama. Determinista y sin nada clínico, como los demás. Lanza sólo si `inicio` no es una fecha.
+ * fue un error. Una cancelada no se reabre (regla de G): con `urlReserva`, un botón «Agendar de
+ * nuevo» al enlace de reserva del médico (decisión de Angel, 2026-11-25); sin él, sólo el teléfono.
+ * Determinista y sin nada clínico, como los demás. Lanza sólo si `inicio` no es una fecha.
  */
 export function correoCancelacionPorRsvp(d: DatosCancelacion, nombre: string | null = null): CorreoRecordatorio {
   if (Number.isNaN(new Date(d.inicio).getTime())) throw new Error('correoCancelacionPorRsvp: inicio inválido')
@@ -202,8 +206,13 @@ export function correoCancelacionPorRsvp(d: DatosCancelacion, nombre: string | n
       { tipo: 'entrada', pildora: { texto: 'Cita cancelada' }, encabezado: saludoDe(nombre) ?? 'Hola:',
         parrafos: ['Tu cita fue cancelada porque indicaste que no asistirás.'] },
       { tipo: 'fecha', fecha: f },
-      { tipo: 'recuadro', fuerte: '¿Fue un error?', texto: 'Agenda de nuevo cuando quieras.',
-        llamada: { frase: 'O llámanos al', telefono: d.consultorio.telefono } },
+      d.urlReserva
+        ? { tipo: 'botones', antes: '¿Fue un error? Puedes agendar de nuevo cuando quieras.',
+          botones: [{ texto: 'Agendar de nuevo', url: d.urlReserva }],
+          llamada: { frase: 'O llámanos al', telefono: d.consultorio.telefono },
+          enTexto: [`¿Fue un error? Agenda de nuevo: ${d.urlReserva}`] }
+        : { tipo: 'recuadro', fuerte: '¿Fue un error?', texto: 'Agenda de nuevo cuando quieras.',
+          llamada: { frase: 'O llámanos al', telefono: d.consultorio.telefono } },
       { tipo: 'datos', arriba: 28, raya: true, filas: [
         { etiqueta: 'Médico', valor: medico }, { etiqueta: 'Consultorio', valor: d.consultorio.nombre },
         { etiqueta: 'Teléfono', valor: d.consultorio.telefono, telefono: true },

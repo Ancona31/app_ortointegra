@@ -107,6 +107,16 @@ export function urlDeConfirmacion(codigo: string): string | null {
 }
 
 /**
+ * Avisos globales: la URL pública del enlace de reserva de un médico (`/reservar/<código>`), para
+ * el correo de «tu cita fue cancelada» (agenda de nuevo). Misma base de URL que las demás; null si
+ * el código no tiene forma o no hay base válida. Que el enlace ABRA lo comprueba quien la pide.
+ */
+export function urlDeReserva(enlace: string): string | null {
+  const base = baseUrl()
+  return base && esCodigoDeEnlace(enlace) ? `${base}/reservar/${enlace}` : null
+}
+
+/**
  * K2 (punto 9 de Angel): «Continuar mi reserva» del correo del código. El
  * código de 6 dígitos va en el FRAGMENTO (`#codigo=`), que el navegador no
  * manda al servidor: no queda en registros. Abrirlo no reserva nada (la página

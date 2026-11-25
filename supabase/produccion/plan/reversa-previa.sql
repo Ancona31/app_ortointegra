@@ -2,7 +2,7 @@
 --
 -- SÓLO LEE. La corre `aplicar.sh reversa` ANTES de deshacer la primera reversa
 -- de la cadena (hallazgo A5 de auditoria/RONDA-1.md): reúne por adelantado
--- todas las negativas de las 7 reversas de la agenda, para no quitar T y F5b y
+-- todas las negativas de las 9 reversas de la agenda (M2 no tiene ninguna), para no quitar T y F5b y
 -- descubrir después que F4 no puede seguir.
 --
 -- Una fila por motivo, separada por «|»:   versión | clase | qué
@@ -25,6 +25,13 @@
 BEGIN TRANSACTION READ ONLY;
 
 WITH c(version, clase, que, tabla, columnas, consulta) AS (VALUES
+  -- M1 (20261202120000_avisos_globales_modelo_reversa.sql): las marcas de visto se perderían, y los
+  -- avisos con la forma de M1 impedirían volver a la de F4.
+  ('20261202120000', 'DATOS', 'avisos_vistos (marcas de «revisado» por usuario)', 'public.avisos_vistos', ARRAY[]::text[],
+     'SELECT count(*) AS n FROM public.avisos_vistos'),
+  ('20261202120000', 'DATOS', 'avisos_clinica con la forma de M1 (sin cita, dirigidos, con actor o de un tipo nuevo)',
+     'public.avisos_clinica', ARRAY['destinatario_id', 'actor_id', 'medico_id', 'datos'],
+     'SELECT count(*) AS n FROM public.avisos_clinica WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL OR medico_id IS NOT NULL OR datos IS NOT NULL OR tipo NOT IN (''reserva_enlace'', ''cancelacion_paciente'', ''reagendado_paciente'', ''google_por_asignar'', ''empalme_google'', ''google_movimiento_rechazado'', ''confirmacion_paciente'')'),
   -- F5b (20261201170000_agenda_f5b_protecciones_cita_reversa.sql)
   ('20261201170000', 'DATOS', 'citas canceladas cerradas (cerrada_en/sustituida_por; reaparecerían en la agenda)',
      'public.appointments', ARRAY['cerrada_en', 'sustituida_por'],
