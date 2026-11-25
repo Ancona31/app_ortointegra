@@ -42,7 +42,7 @@ import {
   decidirEvento, marcaSpinus, type ContextoDecision, type Decision, type EventoGoogle, type FilaEspejo,
 } from '@/lib/gcalSincronizacionDecidir'
 import {
-  aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, registrarEmpalmesReserva,
+  aplicarEvento, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, procesarEmpalmesPendientes, registrarEmpalmesReserva,
   reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, registrarMovimientoRechazado, type Candado,
   esFalloPasajeroDeLaBase,
 } from '@/lib/gcalSincronizacionBase'
@@ -107,8 +107,10 @@ interface Pasada {
   ahora: () => number
   limite: number
   r: ResultadoSincronizacion
-  /** D11: citas importadas o movidas desde Google en la página en curso. */
+  /** D11: citas importadas o movidas desde Google en la página en curso. Con la cola de M5 sólo se usa si la cola no existe. */
   movidas: string[]
+  /** AG-DT-264: `true` = esta base no tiene la cola de M5 (`gcal_empalmes_pendientes`); se usa la lista en memoria, como antes. */
+  sinCola: boolean
 }
 
 /** El estado HTTP de un error de googleapis (gaxios), si lo trae. */
@@ -157,7 +159,7 @@ export async function sincronizarClinica(
     // Sonda de C2 ANTES de Google: con C1 aplicada y C2 no, se sale aquí
     // (no_disponible, candado suelto) sin haber llamado a events.list.
     await citasDeEventos(conexion.clinicaId, [], [])
-    const pasada: Pasada = { conexion, candado, op, ahora, limite: ahora() + op.presupuestoMs, r, movidas: [] }
+    const pasada: Pasada = { conexion, candado, op, ahora, limite: ahora() + op.presupuestoMs, r, movidas: [], sinCola: false }
     const hecho = await conCalendarioSpinus(conexion, createAdminClient(),
       (calendar, calendarId) => recorrer(pasada, calendar, calendarId),
       { puedeReparar: false, actorId: op.actorId })
@@ -238,6 +240,8 @@ async function recorrer(pasada: Pasada, calendar: GCalCliente, calendarId: strin
     r.estado = 'error'
     return true
   }
+  // AG-DT-264: lo que una pasada anterior dejó apuntado y no llegó a registrar, antes de leer nada nuevo.
+  await procesarColaAlEmpezar(pasada)
   const token = candado.fase === 'incremental' ? candado.syncToken : null
   const c: Cursor = {
     token, pagina: candado.pageToken, reintento410: false, reintentoPagina: false,
@@ -307,9 +311,11 @@ async function procesarPagina(
   })
   /* Un borrado llega SIN marca: el que no es de ninguna cita puede ser de un bloqueo. */
   const borradosSinFila = tareas.filter((t) => t.evento.status === 'cancelled' && !t.fila).map((t) => t.evento)
-  pasada.r.errores += await aplicarBloqueosDePagina(conexion.clinicaId, pagina.calendarId, deBloqueo, borradosSinFila)
+  const bloqueos = await aplicarBloqueosDePagina(conexion.clinicaId, pagina.calendarId, deBloqueo, borradosSinFila)
+  pasada.r.errores += bloqueos.errores
   const pendientes: PorRestablecer[] = []
-  let sinAplicarPasajeros = 0
+  // AG-DT-264 (C): un bloqueo que la base no pudo aplicar por algo pasajero tampoco deja avanzar la página.
+  let sinAplicarPasajeros = bloqueos.pasajeros
   for (let i = 0; i < tareas.length; i += LOTE) {
     const lote = tareas.slice(i, i + LOTE)
     const hechos = await Promise.allSettled(lote.map((t) => ejecutar(pasada, pagina.calendarId, t.decision)))
@@ -378,16 +384,34 @@ async function confirmarPorRsvps(
  * que prendió): repetir una página o resincronizar no vuelve a avisar. Un
  * fallo no tumba la página; sin la migración de D11, no hace nada.
  *
- * W · como el par no se vuelve a detectar en otra pasada, un fallo se
- * reintenta `REINTENTOS_EMPALMES` veces con una pausa corta, sólo si queda
- * presupuesto (el de la reserva pública es `TIEMPO_GOOGLE_MS`) y la señal no
- * se abortó. Si aun así falla: `errores`, el registro (con los ids, para
- * recuperarlo a mano) y Sentry. El arreglo de fondo es AG-DT-264.
+ * AG-DT-264 (M5) · CON LA COLA (`gcal_empalmes_pendientes`): la cita quedó
+ * apuntada en la base en la misma transacción que la escribió, así que aquí
+ * sólo se le pide a la base que procese sus apuntes. Si falla, cuenta en
+ * `errores` y los apuntes SIGUEN ahí: los toma la pasada siguiente, al empezar
+ * (`procesarColaAlEmpezar`). Nada se pierde y no hace falta reintentar.
+ *
+ * SIN LA COLA (base sin M5): el camino de antes, con la lista en memoria (W):
+ * un fallo se reintenta `REINTENTOS_EMPALMES` veces con una pausa corta, sólo
+ * si queda presupuesto y la señal no se abortó; si aun así falla, `errores`,
+ * el registro (con los ids) y Sentry.
  */
 async function avisarEmpalmes(pasada: Pasada): Promise<void> {
   const ids = pasada.movidas.splice(0)
-  if (ids.length === 0) return
   const clinica = pasada.conexion.clinicaId
+  if (!pasada.sinCola) {
+    try {
+      await procesarEmpalmesPendientes(clinica)
+      return
+    } catch (err) {
+      if (!(err instanceof SincronizacionNoDisponible)) {
+        pasada.r.errores += 1
+        logger.warn('GCalSync', `empalmes con reservas sin procesar (siguen en la cola) ${JSON.stringify({ clinica })}`)
+        return
+      }
+      pasada.sinCola = true
+    }
+  }
+  if (ids.length === 0) return
   for (let intento = 0; ; intento += 1) {
     try {
       await registrarEmpalmesReserva(clinica, ids)
@@ -402,6 +426,28 @@ async function avisarEmpalmes(pasada: Pasada): Promise<void> {
   pasada.r.errores += 1
   logger.warn('GCalSync', `empalmes con reservas sin registrar ${JSON.stringify({ clinica, citas: ids })}`)
   await avisarSentryEmpalmes(clinica, ids)
+}
+
+/**
+ * AG-DT-264 (M5) · al empezar la pasada: los apuntes que quedaron de una
+ * anterior (su registro falló, o la función se cortó). Hasta `VUELTAS_COLA`
+ * lotes de 500. Sin la migración, se anota y se sigue con la lista en memoria.
+ * ⚠️ UN FALLO AQUÍ SÍ TUMBA LA PASADA, a propósito: es la señal. La pasada
+ * cuenta como fallida (`errores_seguidos`), y a la tercera seguida la clínica
+ * recibe el aviso «Google no sincroniza» de M1. Un consumidor que fallara en
+ * silencio dejaría empalmes sin avisar sin que nadie se enterara.
+ */
+const VUELTAS_COLA = 4
+async function procesarColaAlEmpezar(pasada: Pasada): Promise<void> {
+  try {
+    for (let i = 0; i < VUELTAS_COLA; i += 1) {
+      const { quedan } = await procesarEmpalmesPendientes(pasada.conexion.clinicaId)
+      if (!quedan) return
+    }
+  } catch (err) {
+    if (!(err instanceof SincronizacionNoDisponible)) throw err
+    pasada.sinCola = true
+  }
 }
 
 /**
@@ -475,9 +521,11 @@ async function aplicarORechazar(pasada: Pasada, calendarId: string, d: Extract<D
     return await aplicarEvento(pasada.conexion.clinicaId, calendarId, d)
   } catch (err) {
     if (!(err instanceof CambioRechazadoPorLaBase)) throw err
+    // AG-DT-264 (C): el aviso va ANTES de auditar y de anotar el restablecimiento: si la base falla por
+    // algo pasajero lanza, la página no avanza (arreglo 3 de la oleada 3) y al repetirla no hay nada duplicado.
+    await avisarMovimientoRechazado(pasada, d.citaId, d.actualizado)
     pasada.r.restablecer.push(d.citaId)
     await auditar(pasada.conexion, d.citaId, 'gcal_cambio_rechazado', { gana: 'spinus', motivo: 'eleccion_paciente', campos: d.campos })
-    await avisarMovimientoRechazado(pasada, d.citaId, d.actualizado)
     return 'rechazado'
   }
 }
@@ -486,9 +534,11 @@ async function aplicarORechazar(pasada: Pasada, calendarId: string, d: Extract<D
  * Tanda J, punto 10 · el aviso de la campana («Desde Google no se pueden
  * mover…»). Un aviso por INTENTO: la base deduplica por (cita, `updated` del
  * evento), así que repetir la página no avisa otra vez. Sin `updated` no hay
- * con qué distinguir intentos y no se avisa. Un fallo cuenta en `errores` y no
- * tumba la página (el rechazo y el restablecimiento siguen); sin la migración
- * de J4, no hace nada.
+ * con qué distinguir intentos y no se avisa. Un fallo DEFINITIVO cuenta en
+ * `errores` y no tumba la página (el rechazo y el restablecimiento siguen); uno
+ * PASAJERO de la base se lanza: la página no avanza y la pasada siguiente lo
+ * repite (AG-DT-264, C: antes el aviso se perdía). Sin la migración de J4, no
+ * hace nada.
  */
 async function avisarMovimientoRechazado(pasada: Pasada, citaId: string, actualizado: string | null): Promise<void> {
   if (!actualizado) return
@@ -496,6 +546,7 @@ async function avisarMovimientoRechazado(pasada: Pasada, citaId: string, actuali
     await registrarMovimientoRechazado(pasada.conexion.clinicaId, citaId, actualizado)
   } catch (err) {
     if (err instanceof SincronizacionNoDisponible) return
+    if (esFalloPasajeroDeLaBase(err)) throw err
     pasada.r.errores += 1
     logger.warn('GCalSync', `aviso de movimiento rechazado sin registrar ${JSON.stringify({ clinica: pasada.conexion.clinicaId })}`)
   }

@@ -211,6 +211,10 @@ function limpiarReserva(clinicas: string[], cuando: 'antes' | 'despues'): void {
     if to_regclass('public.gcal_movimientos_rechazados') is not null then
       delete from public.gcal_movimientos_rechazados where clinica_id = any (v_c);
     end if;
+    -- M5 (AG-DT-264): la cola de empalmes de Google (FK RESTRICT a la clínica; sólo SELECT/DELETE para el rol de servicio).
+    if to_regclass('public.gcal_empalmes_pendientes') is not null then
+      delete from public.gcal_empalmes_pendientes where clinica_id = any (v_c);
+    end if;
     -- K1: los bloqueos de horario (FK RESTRICT a la clínica y al médico).
     if to_regclass('public.agenda_bloqueos') is not null then
       delete from public.agenda_bloqueos where clinica_id = any (v_c);

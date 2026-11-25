@@ -137,7 +137,12 @@ const db = vi.hoisted(() => ({
   espejoFalla: false,
   /** Tanda J, punto 10: las llamadas a `registrarMovimientoRechazado` y su comportamiento. */
   movimientos: [] as { citaId: string; actualizado: string }[],
-  movimientosFalla: null as null | 'lanza' | 'ausente',
+  movimientosFalla: null as null | 'lanza' | 'ausente' | 'pasajero',
+  /** AG-DT-264 (M5): la cola de empalmes. 'ausente' = base sin M5 (la lista en memoria, como antes). */
+  cola: 'ausente' as 'ausente' | 'ok' | 'lanza',
+  /** Cuántas llamadas al consumidor de la cola funcionan antes de que `cola: 'lanza'` empiece a fallar. */
+  colaBuenas: 0,
+  colaLlamadas: 0,
 }))
 
 vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
@@ -194,9 +199,16 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       if (db.empalmesFallan > 0) { db.empalmesFallan -= 1; throw new Error('la base falló') }
       return 1
     },
+    procesarEmpalmesPendientes: async () => {
+      if (db.cola === 'ausente') throw new real.SincronizacionNoDisponible('reserva_empalmes_pendientes_procesar')
+      db.colaLlamadas += 1
+      if (db.cola === 'lanza' && db.colaLlamadas > db.colaBuenas) throw new real.FalloDeLaBase('reserva_empalmes_pendientes_procesar', 'XX000', 500, 'la base falló')
+      return { procesados: 0, pares: 0, quedan: false }
+    },
     registrarMovimientoRechazado: async (_c: string, citaId: string, actualizado: string) => {
       db.movimientos.push({ citaId, actualizado })
       if (db.movimientosFalla === 'ausente') throw new real.SincronizacionNoDisponible('cita_movimiento_google_registrar')
+      if (db.movimientosFalla === 'pasajero') throw new real.FalloDeLaBase('cita_movimiento_google_registrar', '57014', 500, 'canceling statement')
       if (db.movimientosFalla === 'lanza') throw new Error('la base falló')
       return true
     },
@@ -246,6 +258,7 @@ beforeEach(() => {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), errorAplicar: null, rechazarAplicar: new Set(),
     aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, empalmesFallan: 0, espejoFalla: false, movimientos: [], movimientosFalla: null,
+    cola: 'ausente', colaBuenas: 0, colaLlamadas: 0,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
   h.estado.rpc = { data: null, error: null, args: [], status: undefined }
@@ -463,6 +476,23 @@ describe('cada decisión llega a su RPC', () => {
     db.movimientosFalla = 'ausente'
     h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't2' })]
     expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
+  })
+
+  it('AG-DT-264 (C): si el aviso del rechazo falla por algo PASAJERO de la base, la página no avanza y nada queda a medias', async () => {
+    db.filas = [fila({ conPaciente: true, tituloSinPaciente: null, paciente: { nombre: 'Ana', apellidos: 'Pérez' } })]
+    db.rechazarAplicar.add(CITA)
+    db.movimientosFalla = 'pasajero'
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r).toMatchObject({ estado: 'error', restablecer: [] })
+    expect(db.syncToken).toBeNull()
+    expect(vi.mocked(logAudit)).not.toHaveBeenCalled()
+    // La pasada siguiente repite la página y, con la base ya bien, avisa y avanza.
+    db.movimientosFalla = null
+    h.estado.guion = [pagina([evento({ summary: 'Ana Pérez' })], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0, restablecer: [CITA] })
+    expect(db.syncToken).toBe('t')
+    expect(db.movimientos).toHaveLength(2)
   })
 
   it('un evento que falla no tumba la página', async () => {
@@ -755,6 +785,35 @@ describe('D11 · señal de la reserva pública y empalmes con reservas por enlac
     h.estado.guion = [pagina([nuevo, evento()], { nextSyncToken: 't' })]
     expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
     expect(db.empalmes).toEqual([[IMPORTADA, CITA]])
+  })
+
+  it('AG-DT-264 (M5) · con la cola: la base procesa sus apuntes al empezar y al acabar la página; la lista en memoria no se usa', async () => {
+    db.cola = 'ok'
+    h.estado.guion = [pagina([nuevo, evento()], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0 })
+    expect(db.colaLlamadas).toBe(2)
+    expect(db.empalmes).toEqual([])
+  })
+
+  it('AG-DT-264 (M5) · con la cola: si procesarla falla al acabar la página, cuenta un error, la página avanza y NO se reintenta ni se avisa a Sentry (los apuntes siguen en la base)', async () => {
+    db.cola = 'lanza'
+    db.colaBuenas = 1
+    h.estado.guion = [pagina([nuevo, evento()], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 1 })
+    expect(db.syncToken).toBe('t')
+    expect(db.colaLlamadas).toBe(2)
+    expect(db.empalmes).toEqual([])
+    expect(vi.mocked(captureMessage)).not.toHaveBeenCalled()
+  })
+
+  it('AG-DT-264 (M5) · con la cola: si procesarla falla AL EMPEZAR, la pasada falla (la señal: errores seguidos → «Google no sincroniza») sin pedir nada a Google', async () => {
+    db.cola = 'lanza'
+    h.estado.guion = [pagina([nuevo], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'error' })
+    expect(h.estado.llamadas).toEqual([])
+    expect(db.soltados).toHaveLength(1)
+    expect(db.soltados[0]).not.toBeNull()
+    expect(db.syncToken).toBeNull()
   })
 
   it('sin cambios de hora (sólo el título) ni importaciones: no se llama', async () => {
