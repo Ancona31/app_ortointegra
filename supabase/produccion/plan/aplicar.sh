@@ -95,15 +95,18 @@ MIGRACIONES=(
   20261202120000_avisos_globales_modelo
   20261202130000_avisos_globales_rsvp_rechazo
   20261203120000_agenda_para_todos
+  20261203130000_avisos_globales_cierre_auditoria
 )
-# Orden inverso: M3, M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
-# M3 la primera (su disparador de clinicas escribe agenda_ajustes, que borra la de F1; no depende de
+# Orden inverso: MA, M3, M2, M1, T, F5b, F4, F2, F3, F5a, F1. Las dos de TRUNCATE van aparte (reversa-truncate).
+# MA (cierre de la auditoría de M1) antes que M2 y M1: reescribe tres funciones de M1.
+# M3 antes que F1 (su disparador de clinicas escribe agenda_ajustes, que borra la de F1; no depende de
 # M1 ni de M2). M2 antes que M1 (M2 exige M1) y M1 antes que T y F4 (la de F4 borra avisos_clinica,
 # de la que cuelgan los escritores de M1).
 # OJO con M3: toda reversa exige la v2 APAGADA en todas las clínicas (correr_sql), y M3 la enciende
 # en todas. Para deshacerla hay que apagarla antes, fila a fila, como postgres: ver
 # docs/spec/agenda-para-todos/ENSAYO-M3.md, «Deshacer M3».
 REVERSAS=(
+  20261203130000_avisos_globales_cierre_auditoria
   20261203120000_agenda_para_todos
   20261202130000_avisos_globales_rsvp_rechazo
   20261202120000_avisos_globales_modelo
@@ -225,6 +228,7 @@ testigo_sql() {
     20261202130000) echo "to_regprocedure('public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])') is not null" ;;
     # M3: la función del disparador de clinicas (su reversa la quita; el DEFAULT y las filas no sirven de testigo).
     20261203120000) echo "to_regprocedure('public.agenda_ajustes_de_clinica_nueva()') is not null" ;;
+    20261203130000) echo "to_regprocedure('public.avisos_transaccion_mas_antigua()') is not null" ;;
     *) return 1 ;;
   esac
 }
@@ -242,6 +246,7 @@ testigo_nombre() {
     20261202120000) echo "función public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text)" ;;
     20261202130000) echo "función public.cita_rsvp_google_rechazo(uuid, uuid, text, text, text[])" ;;
     20261203120000) echo "función public.agenda_ajustes_de_clinica_nueva()" ;;
+    20261203130000) echo "función public.avisos_transaccion_mas_antigua()" ;;
   esac
 }
 

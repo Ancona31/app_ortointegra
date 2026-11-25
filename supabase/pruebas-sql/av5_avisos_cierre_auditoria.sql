@@ -4,8 +4,8 @@
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en rollback.
 -- Lo que necesita DOS sesiones (el aviso que confirma después de la marca; la fila del aviso tomada
 -- por otro) está en scripts/avisos-carrera.sh.
--- Mutaciones comprobadas en rojo: quitar el recorte de aviso_visto_hasta_sellar → caso 2; quitar el
--- marcado uno a uno de avisos_revisar_todos → caso 3.
+-- El recorte de la marca y el marcado uno a uno sólo se ven con otra transacción abierta: su prueba
+-- en rojo es el control del guion de carreras (con el cuerpo de M1, el aviso se pierde).
 begin;
 
 -- Caso 0: lo que deja MA está.
