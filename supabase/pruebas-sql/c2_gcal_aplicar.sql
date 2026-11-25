@@ -24,7 +24,8 @@ update public.profiles p set clinica_id = ('00000000-0000-4000-8000-00000000c2c'
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-00000000c2ca', true), ('00000000-0000-4000-8000-00000000c2cb', true),
   ('00000000-0000-4000-8000-00000000c2cd', true), ('00000000-0000-4000-8000-00000000c2ce', false),
-  ('00000000-0000-4000-8000-00000000c2cf', true);
+  ('00000000-0000-4000-8000-00000000c2cf', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.clinica_conexiones_google (clinica_id, user_id, rol, calendar_id, estado)
 select ('00000000-0000-4000-8000-00000000c2c' || x)::uuid, ('00000000-0000-4000-8000-00000000c2a' || x)::uuid,
        'clinica', 'cal-' || x, 'activa'

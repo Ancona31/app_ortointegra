@@ -22,7 +22,8 @@ insert into auth.users (id, instance_id, aud, role, email, created_at, updated_a
 update public.profiles set clinica_id = '00000000-0000-4000-8000-00000a12c001', es_admin_de_clinica = true,
                            nombres = 'Médico', apellido_paterno = 'Idos', especialidad = 'Ortopedia'
  where id = '00000000-0000-4000-8000-00000a12b001';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000a12c001', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-00000a12c001', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion, activo, timezone) values
   ('00000000-0000-4000-8000-00000a12d001', '00000000-0000-4000-8000-00000a12c001', '00000000-0000-4000-8000-00000a12b001',
    'Consultorio i2', 'Idos', 'Calle 2', true, 'America/Mexico_City');

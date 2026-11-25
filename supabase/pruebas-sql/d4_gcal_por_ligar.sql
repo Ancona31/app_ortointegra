@@ -16,7 +16,8 @@ insert into auth.users (id, instance_id, aud, role, email, created_at, updated_a
    'd4-b1@prueba.local', now(), now());
 update public.profiles set clinica_id = '00000000-0000-4000-8000-000000d4c001', es_admin_de_clinica = true
  where id = '00000000-0000-4000-8000-000000d4b001';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-000000d4c001', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-000000d4c001', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.clinica_conexiones_google (clinica_id, user_id, rol, calendar_id, estado) values
   ('00000000-0000-4000-8000-000000d4c001', '00000000-0000-4000-8000-000000d4b001', 'clinica', 'cal-d4', 'activa');
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values

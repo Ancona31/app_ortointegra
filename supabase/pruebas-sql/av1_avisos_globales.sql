@@ -26,7 +26,8 @@ insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto
 select ('00000000-0000-4000-8000-0000001a050' || n)::uuid, pr.clinica_id, pr.id, 'Consultorio ' || n, 'C' || n, 'Calle falsa ' || n, true, 'America/Merida'
   from (values (1), (2), (3), (6)) x(n) join public.profiles pr on pr.id = ('00000000-0000-4000-8000-0000001a0b0' || x.n)::uuid;
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
-  ('00000000-0000-4000-8000-0000001a0c01', true), ('00000000-0000-4000-8000-0000001a0c02', false);
+  ('00000000-0000-4000-8000-0000001a0c01', true), ('00000000-0000-4000-8000-0000001a0c02', false)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-0000001a0f01', '00000000-0000-4000-8000-0000001a0c01', 'Paciente', 'Uno'),
   ('00000000-0000-4000-8000-0000001a0f02', '00000000-0000-4000-8000-0000001a0c02', 'Paciente', 'Dos');

@@ -20,7 +20,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000a43c1', 
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000a43c1', role = 'secretaria' where id = '00000000-0000-4000-8000-0000000a43d1';
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000a43c2', es_admin_de_clinica = true where id = '00000000-0000-4000-8000-0000000a43a2';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
-  ('00000000-0000-4000-8000-0000000a43c1', true), ('00000000-0000-4000-8000-0000000a43c2', true);
+  ('00000000-0000-4000-8000-0000000a43c1', true), ('00000000-0000-4000-8000-0000000a43c2', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion, activo, horario_propio, horario) values
   ('00000000-0000-4000-8000-00000a43cc01', '00000000-0000-4000-8000-0000000a43c1', '00000000-0000-4000-8000-0000000a43a1', 'Uno', 'Uno', 'Calle 1', true, true,
    '{"lunes":{"activo":true,"inicio":"08:00","fin":"12:00"}}'::jsonb),

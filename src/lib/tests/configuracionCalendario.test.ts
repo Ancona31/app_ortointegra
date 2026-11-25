@@ -43,7 +43,6 @@ class Consulta implements PromiseLike<unknown> {
     const { tabla, verbo, valores } = this.op
     if (tabla === 'profiles') return Promise.resolve({ data: h.perfil, error: null })
     if (verbo === 'update') return Promise.resolve(h.errorUpdate ? { data: null, error: h.errorUpdate } : { data: valores, error: null })
-    if (tabla === 'agenda_ajustes') return Promise.resolve({ data: { agenda_v2_encendida: h.interruptor }, error: null })
     return Promise.resolve({ data: null, error: null })
   }
 }
@@ -52,6 +51,8 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
     from: (tabla: string) => new Consulta('sesion', tabla),
+    /* Agenda para todos (M3): el interruptor lo contesta la función de la base. */
+    rpc: async () => ({ data: h.interruptor, error: null }),
   }),
 }))
 vi.mock('@/lib/supabase/admin', () => ({

@@ -10,7 +10,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-interface Respuesta { data: Record<string, unknown> | null; error: { message: string } | null }
+interface Respuesta { data: Record<string, unknown> | boolean | string | null; error: { message: string } | null }
 
 const h = vi.hoisted(() => {
   const estado: { llamadas: unknown[][]; respuesta: Respuesta | Error } = {
@@ -29,7 +29,14 @@ class ConsultaFalsa {
 }
 
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: async () => ({ from: (tabla: string) => new ConsultaFalsa(tabla) }),
+  createClient: async () => ({
+    from: (tabla: string) => new ConsultaFalsa(tabla),
+    /* El interruptor de la v2 se le pregunta a la función de la base (M3). */
+    rpc: (nombre: string, args: unknown) => {
+      h.llamadas.push(['rpc', nombre, args])
+      return h.respuesta instanceof Error ? Promise.reject(h.respuesta) : Promise.resolve(h.respuesta)
+    },
+  }),
 }))
 vi.mock('@/lib/logger', () => ({ logger: { warn: vi.fn() } }))
 
@@ -118,19 +125,21 @@ describe('leerAjustesAgenda', () => {
   })
 })
 
-describe('agendaV2Encendida (falla cerrado)', () => {
-  it('true sólo cuando la fila dice true', async () => {
-    h.respuesta = { data: { agenda_v2_encendida: true }, error: null }
+describe('agendaV2Encendida (agenda para todos: lo contesta la base; un error falla cerrado)', () => {
+  it('true cuando la base contesta true, y se lo pregunta a la función común, por clínica, sin leer la tabla', async () => {
+    h.respuesta = { data: true, error: null }
     expect(await agendaV2Encendida(await createClient(), CLINICA)).toBe(true)
-    expect(h.llamadas).toContainEqual(['eq', 'clinica_id', CLINICA])
+    expect(h.llamadas).toEqual([['rpc', 'agenda_v2_encendida', { p_clinica_id: CLINICA }]])
   })
 
   it.each<[string, Respuesta | Error]>([
-    ['la fila dice false', { data: { agenda_v2_encendida: false }, error: null }],
-    ['no hay fila', { data: null, error: null }],
-    ['hay error', { data: null, error: { message: 'relation "public.agenda_ajustes" does not exist' } }],
+    ['la base contesta false (una fila que la apaga a propósito)', { data: false, error: null }],
+    ['la tabla no existe', { data: null, error: { message: 'relation "public.agenda_ajustes" does not exist' } }],
+    ['la función no existe (PGRST202)', { data: null, error: { message: 'Could not find the function public.agenda_v2_encendida' } }],
+    ['hay un error de red contestado como error', { data: null, error: { message: 'fetch failed' } }],
     ['la promesa rechaza', new Error('red caída')],
-    ['el valor no es booleano', { data: { agenda_v2_encendida: 'true' }, error: null }],
+    ['no llega respuesta', { data: null, error: null }],
+    ['el valor no es booleano', { data: 'true', error: null }],
   ])('apagado cuando %s', async (_caso, respuesta) => {
     h.respuesta = respuesta
     expect(await agendaV2Encendida(await createClient(), CLINICA)).toBe(false)

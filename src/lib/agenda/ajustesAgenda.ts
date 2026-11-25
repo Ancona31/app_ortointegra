@@ -12,10 +12,11 @@
  * ⚠️⚠️ LOS LÍMITES ESTÁN DOS VECES: aquí y en los CHECK de la tabla. Si cambias
  * uno, cambia el otro (lo dice también el COMMENT ON TABLE).
  *
- * ⚠️⚠️ FALLA CERRADO. Sin fila, con un error de red, con la tabla todavía sin
- * crear o con una fila que no cuadra: valores de fábrica e interruptor
- * APAGADO. Lo nuevo sólo se ve cuando la base dice, sin duda, que está
- * encendido.
+ * ⚠️⚠️ FALLA CERRADO. Con un error de red, con la tabla todavía sin crear o con
+ * una fila que no cuadra: valores de fábrica e interruptor APAGADO. Lo nuevo
+ * sólo se ve cuando la base dice, sin duda, que está encendido. Desde «agenda
+ * para todos» (M3) «sin fila» ya no es apagado: lo decide la base
+ * (`agendaV2Encendida`, abajo).
  *
  * ⚠️ CLIENTE DE SESIÓN, NUNCA `createAdminClient()`: la RLS de
  * `agenda_ajustes` deja leer a los miembros de la clínica, y el
@@ -188,16 +189,28 @@ export async function leerCorreoReservaClinica(supabase: ClienteSesion, clinicaI
   }
 }
 
-/** ¿Está encendida la agenda v2 para esta clínica? Sólo `true` si la base lo dice sin duda. */
+/**
+ * ¿Está encendida la agenda v2 para esta clínica?
+ *
+ * AGENDA PARA TODOS (2026-11-25, decisión de Angel): la v2 está encendida de
+ * fábrica; sólo una fila que diga `false` la apaga. La regla NO se escribe
+ * aquí: se le PREGUNTA A LA BASE, a la misma función que usan sus
+ * disparadores y sus RPC (`public.agenda_v2_encendida(uuid)`, de F1; M3
+ * `20261203120000` cambia su «sin fila» de false a true). Así la app y la base
+ * contestan siempre lo mismo, antes y después de aplicar M3.
+ *
+ * ⚠️ SIGUE FALLANDO CERRADO: un error de red, la función o la tabla ausentes,
+ * o una respuesta que no sea `true`, cuentan como APAGADA. «Sin fila» no es un
+ * error (lo contesta la base); un fallo de lectura sí, y no enciende nada.
+ */
 export async function agendaV2Encendida(supabase: ClienteSesion, clinicaId: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
-      .from('agenda_ajustes').select('agenda_v2_encendida').eq('clinica_id', clinicaId).maybeSingle()
+    const { data, error } = await supabase.rpc('agenda_v2_encendida', { p_clinica_id: clinicaId })
     if (error) {
       logger.warn('agenda', `interruptor de la agenda sin leer (cuenta como apagado): ${error.message}`)
       return false
     }
-    return data?.agenda_v2_encendida === true
+    return data === true
   } catch (err: unknown) {
     logger.warn('agenda', `interruptor de la agenda sin leer (cuenta como apagado): ${err instanceof Error ? err.message : 'error'}`)
     return false

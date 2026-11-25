@@ -112,7 +112,8 @@ insert into public.clinicas (id, nombre, es_vip_grant) values ('$C', 'Carrera D3
 insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at)
 values ('$U', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'carrera-d3@prueba.local', now(), now());
 update public.profiles set clinica_id = '$C', es_admin_de_clinica = true where id = '$U';
-insert into public.agenda_ajustes (id, clinica_id, agenda_v2_encendida) values ('$J', '$C', true);
+insert into public.agenda_ajustes (id, clinica_id, agenda_v2_encendida) values ('$J', '$C', true)
+  on conflict (clinica_id) do update set id = excluded.id, agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion) values ('$K', '$C', '$U', 'C', 'C', 'Calle');
 insert into public.tipos_cita (id, clinica_id, nombre, duracion_min) values ('$T', '$C', 'Consulta', 30);
 insert into public.reserva_avisos (version, texto_sha256, aprobado, aprobado_en)

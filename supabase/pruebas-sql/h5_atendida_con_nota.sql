@@ -29,7 +29,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000a5c002', 
  where id = '00000000-0000-4000-8000-000000a5a002';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-000000a5c001', true),
-  ('00000000-0000-4000-8000-000000a5c002', false);
+  ('00000000-0000-4000-8000-000000a5c002', false)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-000000a5f001', '00000000-0000-4000-8000-000000a5c001', 'Paciente', 'Uno'),
   ('00000000-0000-4000-8000-000000a5f002', '00000000-0000-4000-8000-000000a5c002', 'Paciente', 'Dos');

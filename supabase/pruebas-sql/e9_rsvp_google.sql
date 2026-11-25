@@ -20,7 +20,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000e9c002', 
 update public.profiles set clinica_id = '00000000-0000-4000-8000-000000e9c003', es_admin_de_clinica = true where id = '00000000-0000-4000-8000-000000e9b003';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-000000e9c001', true), ('00000000-0000-4000-8000-000000e9c002', true),
-  ('00000000-0000-4000-8000-000000e9c003', false);
+  ('00000000-0000-4000-8000-000000e9c003', false)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.clinica_conexiones_google (clinica_id, user_id, rol, calendar_id, estado) values
   ('00000000-0000-4000-8000-000000e9c001', '00000000-0000-4000-8000-000000e9b001', 'clinica', 'cal-e9-1', 'activa'),
   ('00000000-0000-4000-8000-000000e9c002', '00000000-0000-4000-8000-000000e9b002', 'clinica', 'cal-e9-2', 'activa'),

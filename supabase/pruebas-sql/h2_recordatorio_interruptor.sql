@@ -25,10 +25,12 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000072c1' w
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000072c1', role = 'secretaria' where id = '00000000-0000-4000-8000-0000000072d1';
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000072c2', es_admin_de_clinica = true where id = '00000000-0000-4000-8000-0000000072a2';
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000072c3', es_admin_de_clinica = true where id = '00000000-0000-4000-8000-0000000072a3';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000072c1', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000072c1', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida, recordatorio_encendido) values
   ('00000000-0000-4000-8000-0000000072c2', true, true),
-  ('00000000-0000-4000-8000-0000000072c3', false, true);
+  ('00000000-0000-4000-8000-0000000072c3', false, true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida, recordatorio_encendido = excluded.recordatorio_encendido;
 insert into public.pacientes (id, clinica_id, nombre, apellidos, email, activo) values
   ('00000000-0000-4000-8000-0000000072f1', '00000000-0000-4000-8000-0000000072c1', 'Paciente', 'Uno', 'uno.h2@prueba.local', true),
   ('00000000-0000-4000-8000-0000000072f2', '00000000-0000-4000-8000-0000000072c2', 'Paciente', 'Dos', 'dos.h2@prueba.local', true),

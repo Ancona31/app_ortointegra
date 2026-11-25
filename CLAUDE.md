@@ -488,11 +488,30 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
 
 **Reglas que un editor futuro no debe romper:**
 
-* **Interruptor por clínica** `agenda_ajustes.agenda_v2_encendida`: nace en
-  `false` y sólo `postgres`/`supabase_admin` lo cambian
+* **Interruptor por clínica** `agenda_ajustes.agenda_v2_encendida`: ~~nace en
+  `false`~~ sólo `postgres`/`supabase_admin` lo cambian
   (`trg_agenda_ajustes_proteger`). **Falla cerrado:** un error al leerlo o la
   tabla ausente cuentan como apagado, y apagado la agenda es la de antes. No
   quites esa tolerancia, ni la de las RPC ausentes (PGRST202/42P01).
+  **Agenda para todos (M3, `20261203120000`; decisión de Angel, 2026-11-25;
+  escrita, sin aplicar en producción):** la v2 está ENCENDIDA de fábrica en
+  todas las clínicas; sólo una fila que diga `false` la apaga. Lo que no se
+  debe romper:
+  * **La app no decide: PREGUNTA a la base** (`rpc('agenda_v2_encendida')`, en
+    `agendaV2Encendida` y en `ProximasCitas`). No vuelvas a leer la columna
+    para decidir, ni escribas «sin fila = encendida» en la app: la app y los
+    disparadores tienen que contestar lo mismo antes y después de M3.
+  * **Toda clínica tiene su fila** (`trg_clinicas_agenda_ajustes` en
+    `clinicas`). Ocho funciones de la agenda leen la FILA, no la función común:
+    sin fila la clínica queda a medias. Para borrar una clínica se borra antes
+    su fila (FK RESTRICT; no la cambies a CASCADE).
+  * **«Sin fila» ya no es «apagada».** Quien necesite la v2 apagada (la
+    semilla, una prueba, la limpieza de citas) escribe `false` como postgres;
+    borrar la fila la deja ENCENDIDA.
+  * **Orden de despliegue: el código primero, M3 después** (`main` borra citas
+    con DELETE y `trg_appointments_proteger_borrado` actuaría en todas).
+  * Deshacer M3 = apagar en todas y luego su reversa
+    (`docs/spec/agenda-para-todos/ENSAYO-M3.md`, §4).
 * **Rutas públicas nuevas en `src/middleware.ts`**, cada una en su línea:
   * `/reservar/` y `/confirmar/` con prefijo y barra final;
   * `/api/reservar/` con prefijo;
@@ -533,8 +552,10 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
   `trg_appointments_proteger_borrado` (`cita_proteger_borrado()`,
   `20261201170000`) da 42501 a todo rol salvo `postgres`/`supabase_admin`,
   **también a `service_role`**. Un borrado de citas del servidor con v2
-  encendida falla; quien limpie citas (semilla, scripts) borra antes la fila de
-  `agenda_ajustes` o lo hace como `postgres`.
+  encendida falla; quien limpie citas (semilla, scripts) ~~borra antes la fila de
+  `agenda_ajustes`~~ APAGA antes la v2 (escribe `false` en la fila, como
+  `postgres`: desde M3 borrar la fila la deja encendida) o lo hace como
+  `postgres`.
 * **Las columnas `reserva_*` de `appointments` sólo las escribe el servidor**
   (`trg_appointments_proteger_reserva`, `20261201170000`): para todo rol que no
   sea `service_role`/`postgres`/`supabase_admin`, al crear van todas NULL

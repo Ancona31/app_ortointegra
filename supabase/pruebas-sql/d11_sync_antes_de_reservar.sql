@@ -22,7 +22,8 @@ update public.profiles set clinica_id = '00000000-0000-4000-8000-000000d1c002', 
 update public.profiles set clinica_id = '00000000-0000-4000-8000-000000d1c003', es_admin_de_clinica = true where id = '00000000-0000-4000-8000-000000d1b003';
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values
   ('00000000-0000-4000-8000-000000d1c001', true), ('00000000-0000-4000-8000-000000d1c002', true),
-  ('00000000-0000-4000-8000-000000d1c003', false);
+  ('00000000-0000-4000-8000-000000d1c003', false)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 
 create function pg_temp.h(p text) returns text language sql as $$
   select encode(sha256(convert_to(p, 'UTF8')), 'hex');

@@ -16,7 +16,8 @@ insert into auth.users (id, instance_id, aud, role, email, created_at, updated_a
    'k2-b1@prueba.local', now(), now());
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000000b2c01', es_admin_de_clinica = true
  where id = '00000000-0000-4000-8000-0000000b2b01';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000b2c01', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000b2c01', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 
 create function pg_temp.h(p text) returns text language sql as $$
   select encode(sha256(convert_to(p, 'UTF8')), 'hex');

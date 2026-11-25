@@ -32,7 +32,8 @@ select ('00000000-0000-4000-8000-0000004a0b0' || k)::uuid, '00000000-0000-0000-0
 update public.profiles set clinica_id = '00000000-0000-4000-8000-0000004a0c01', role = 'medico', es_admin_de_clinica = (id::text like '%b01'),
                            nombres = 'Médico', especialidad = 'Ortopedia', cedula_profesional = '1234567'
  where id::text ~ '4a0b0[123]$';
-insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000004a0c01', true);
+insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000004a0c01', true)
+  on conflict (clinica_id) do update set agenda_v2_encendida = excluded.agenda_v2_encendida;
 insert into public.pacientes (id, clinica_id, nombre, apellidos) values
   ('00000000-0000-4000-8000-0000004a0f01', '00000000-0000-4000-8000-0000004a0c01', 'Paciente', 'Medición');
 

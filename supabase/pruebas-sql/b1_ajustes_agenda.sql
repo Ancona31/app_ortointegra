@@ -1,5 +1,8 @@
 -- Agenda B1 — agenda_ajustes: fábrica, rangos, RLS, candado e interruptor
 -- (20261112130000_agenda_b1_ajustes_interruptor.sql).
+-- Agenda para todos (M3, 20261203120000): la fila de cada clínica la crea el disparador de
+-- clinicas, el interruptor nace ENCENDIDO, y la sesión ya no da de alta la fila (el alta con el
+-- interruptor encendido es sólo de postgres: proteger_agenda_ajustes(), que M3 no toca).
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en
 -- rollback: no deja nada en la base ni depende de la semilla.
 begin;
@@ -29,15 +32,15 @@ create function pg_temp.como(p_id uuid) returns void language sql as $$
   select set_config('request.jwt.claims', json_build_object('sub', p_id, 'role', 'authenticated')::text, true);
 $$;
 
--- Caso 1: valores por omisión = fábrica de §2, candado 1/2/3/60 e interruptor apagado (insert como postgres)
-insert into public.agenda_ajustes (clinica_id) values ('00000000-0000-4000-8000-0000000001c2');
+-- Caso 1: valores por omisión = fábrica de §2, candado 1/2/3/60 e interruptor ENCENDIDO. La fila la
+-- creó trg_clinicas_agenda_ajustes al nacer la clínica (M3); aquí no se inserta nada.
 do $$
 declare r public.agenda_ajustes;
 begin
   select * into r from public.agenda_ajustes where clinica_id = '00000000-0000-4000-8000-0000000001c2';
   if (r.recordatorio_horas, r.anticipacion_min_horas, r.horizonte_dias, r.vigencia_enlace_unico_dias,
       r.candado_citas_activas, r.candado_reagendados, r.candado_cancelaciones, r.candado_ventana_dias,
-      r.agenda_v2_encendida) is distinct from (24, 2, 60, 7, 1, 2, 3, 60, false) then
+      r.agenda_v2_encendida) is distinct from (24, 2, 60, 7, 1, 2, 3, 60, true) then
     raise exception 'B1 caso 1: valores por omisión inesperados %', r;
   end if;
   if (select count(*) from public.audit_log
@@ -80,11 +83,11 @@ begin
    where clinica_id = '00000000-0000-4000-8000-0000000001c2';
 end $$;
 
--- Caso 3: el administrador inserta su fila y actualiza los 4 ajustes; cada cambio queda en audit_log
+-- Caso 3: el administrador actualiza los 4 ajustes de la fila de su clínica (dos veces); cada cambio
+-- queda en audit_log
 select pg_temp.como('00000000-0000-4000-8000-0000000001a1');
 set local role authenticated;
-insert into public.agenda_ajustes (clinica_id, recordatorio_horas)
-values ('00000000-0000-4000-8000-0000000001c1', 48);
+update public.agenda_ajustes set recordatorio_horas = 48 where clinica_id = '00000000-0000-4000-8000-0000000001c1';
 update public.agenda_ajustes
    set recordatorio_horas = 12, anticipacion_min_horas = 4, horizonte_dias = 90, vigencia_enlace_unico_dias = 14
  where clinica_id = '00000000-0000-4000-8000-0000000001c1';
@@ -99,8 +102,8 @@ begin
   end if;
   if (select count(*) from public.audit_log
        where tabla = 'agenda_ajustes' and registro_id = r.id and user_id = '00000000-0000-4000-8000-0000000001a1'
-         and accion in ('INSERT', 'UPDATE')) <> 2 then
-    raise exception 'B1 caso 3: esperaba INSERT y UPDATE del administrador en audit_log';
+         and accion = 'UPDATE') <> 2 then
+    raise exception 'B1 caso 3: esperaba los dos UPDATE del administrador en audit_log';
   end if;
 end $$;
 
@@ -149,7 +152,7 @@ do $$
 declare v_cambio text;
 begin
   perform pg_temp.como('00000000-0000-4000-8000-0000000001a1');
-  foreach v_cambio in array array['agenda_v2_encendida = true', 'candado_citas_activas = 5',
+  foreach v_cambio in array array['agenda_v2_encendida = false', 'candado_citas_activas = 5',
                                   'candado_reagendados = 0', 'candado_cancelaciones = 9', 'candado_ventana_dias = 30',
                                   'clinica_id = ''00000000-0000-4000-8000-0000000001c2''',
                                   'id = gen_random_uuid()', 'created_at = now() - interval ''1 day''']
@@ -179,8 +182,16 @@ begin
   exception when insufficient_privilege then
     null;
   end;
-  insert into public.agenda_ajustes (clinica_id) values ('00000000-0000-4000-8000-0000000001c1');
+  -- M3: sin decir el interruptor la fila nacería ENCENDIDA (DEFAULT true), y eso es sólo de postgres.
+  begin
+    insert into public.agenda_ajustes (clinica_id) values ('00000000-0000-4000-8000-0000000001c1');
+    raise exception 'B1 caso 5: el administrador dio de alta la fila de fábrica (nace encendida)';
+  exception when insufficient_privilege then
+    null;
+  end;
   reset role;
+  -- La deja apagada postgres, para que el caso 5b pruebe quién la enciende.
+  insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000000001c1', false);
 end $$;
 
 -- Caso 5b: service_role tampoco cambia el interruptor; postgres sí

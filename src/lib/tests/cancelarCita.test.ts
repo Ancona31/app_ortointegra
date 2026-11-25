@@ -64,10 +64,6 @@ class Consulta implements PromiseLike<unknown> {
     if (tabla === 'profiles') {
       return Promise.resolve({ data: { id: 'u1', clinica_id: 'clinica-1', role: 'medico', es_admin_de_clinica: true } })
     }
-    if (tabla === 'agenda_ajustes') {
-      if (h.estado.interruptor === null) return Promise.resolve({ data: null, error: { message: 'relation does not exist' } })
-      return Promise.resolve({ data: { agenda_v2_encendida: h.estado.interruptor }, error: null })
-    }
     if (tabla === 'appointments' && verbo === 'select') return Promise.resolve({ data: h.estado.fila, error: null })
     if (tabla === 'appointments' && verbo === 'delete') return Promise.resolve({ error: null })
     if (tabla === 'appointments' && verbo === 'update') {
@@ -86,6 +82,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: 'u1' } } }) },
     from: (tabla: string) => new Consulta(tabla),
+    /* Agenda para todos (M3): el interruptor lo contesta la función de la base; `null` = error (falla cerrado). */
+    rpc: async () => (h.estado.interruptor === null
+      ? { data: null, error: { message: 'relation does not exist' } }
+      : { data: h.estado.interruptor, error: null }),
   }),
 }))
 

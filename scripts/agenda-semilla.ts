@@ -230,6 +230,32 @@ end $$;
     '-v', `clinicas=${clinicas.join(',')}`], { input: sql, encoding: 'utf8' })
 }
 
+/**
+ * Apaga la agenda v2 de estas clínicas escribiendo `false` en su fila de
+ * `agenda_ajustes`, como postgres (el único que puede: `trg_agenda_ajustes_proteger`).
+ * Agenda para todos (M3): una clínica nace con la v2 ENCENDIDA; la semilla la
+ * deja APAGADA de forma explícita, que es de donde parten las e2e y la guía de
+ * pruebas a mano (quien la quiere encendida la enciende: `interruptorAgenda`).
+ * Sin la tabla (base sólo con las migraciones de `main`) no hace nada.
+ */
+function apagarAgendaV2(clinicas: string[]): void {
+  if (!clinicas.length) return
+  const sql = `\\set ON_ERROR_STOP on
+select set_config('semilla.clinicas', :'clinicas', false);
+do $$
+declare v_c uuid[] := string_to_array(current_setting('semilla.clinicas'), ',')::uuid[];
+begin
+  if to_regclass('public.agenda_ajustes') is not null then
+    insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida)
+    select c.id, false from public.clinicas c where c.id = any (v_c)
+    on conflict (clinica_id) do update set agenda_v2_encendida = false;
+  end if;
+end $$;
+`
+  execFileSync('docker', ['exec', '-i', CONTENEDOR_DB, 'psql', '-U', 'postgres', '-q', '-o', '/dev/null',
+    '-v', `clinicas=${clinicas.join(',')}`], { input: sql, encoding: 'utf8' })
+}
+
 async function borrar(): Promise<void> {
   const usuarios = await usuariosSembrados()
   const clinicas = await clinicasSembradas(usuarios)
@@ -238,18 +264,13 @@ async function borrar(): Promise<void> {
   const pacIds = pacientes.map(p => p.id)
   await exigirSinExpediente(pacIds)
   if (clinicas.length) {
-    /* La FK de `agenda_ajustes` a `clinicas` es RESTRICT (migración B1): una
-       prueba que encendió el interruptor deja su fila, y sin esto el borrado de
-       la clínica de abajo falla. Con el rol de servicio: el disparador que
-       protege el interruptor no mira los DELETE. La tabla puede no existir sin
-       la migración B1 (base local sólo con las migraciones de `main`, la de la
-       prueba de tolerancia del cierre): mismo trato que `tipos_cita`.
-       ANTES que las citas: con v2 encendido, la base no deja borrar una cita
-       con paciente ni por ligar, tampoco al rol de servicio (corrección de
-       seguridad, punto 3, `cita_proteger_borrado`). Sin la fila, v2 está
-       apagado y las citas se borran como siempre. */
-    const ajustes = await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas)
-    if (ajustes.error && ajustes.error.code !== '42P01' && ajustes.error.code !== 'PGRST205') sinError(ajustes, 'borrar ajustes de la agenda')
+    /* ANTES que las citas, la agenda v2 de estas clínicas se APAGA (fila con
+       `false`, como postgres: `apagarAgendaV2`): con la v2 encendida la base
+       no deja borrar una cita con paciente ni por ligar, tampoco al rol de
+       servicio (`cita_proteger_borrado`). Agenda para todos (M3,
+       `20261203120000`): ya no vale borrar la fila de `agenda_ajustes` para
+       apagarla, porque sin fila la v2 está ENCENDIDA. */
+    apagarAgendaV2(clinicas)
     limpiarReserva(clinicas, 'antes')
     sinError(await admin.from('appointments').delete().in('clinica_id', clinicas), 'borrar citas')
     limpiarReserva(clinicas, 'despues')
@@ -267,7 +288,16 @@ async function borrar(): Promise<void> {
     const { error } = await admin.auth.admin.deleteUser(id)
     if (error) throw new Error(`borrar usuario: ${error.message}`)
   }
-  if (clinicas.length) sinError(await admin.from('clinicas').delete().in('id', clinicas), 'borrar clínicas')
+  if (clinicas.length) {
+    /* La FK de `agenda_ajustes` a `clinicas` es RESTRICT (F1) y desde M3 toda
+       clínica tiene su fila: se borra justo antes que la clínica. Con el rol de
+       servicio: el disparador que protege el interruptor no mira los DELETE.
+       La tabla puede no existir (base local sólo con las migraciones de
+       `main`): mismo trato que `tipos_cita`. */
+    const ajustes = await admin.from('agenda_ajustes').delete().in('clinica_id', clinicas)
+    if (ajustes.error && ajustes.error.code !== '42P01' && ajustes.error.code !== 'PGRST205') sinError(ajustes, 'borrar ajustes de la agenda')
+    sinError(await admin.from('clinicas').delete().in('id', clinicas), 'borrar clínicas')
+  }
   console.log(`Borrado: ${usuarios.length} usuarios, ${clinicas.length} clínicas, ${pacIds.length} pacientes (y sus citas y consultorios).`)
 }
 
@@ -301,6 +331,7 @@ async function crearDueno(p: Persona, nombreClinica: string): Promise<Sesion> {
     nombre: nombreClinica, tipo: 'independiente', plan: 'free', suscripcion_estado: 'free',
     max_medicos: limites.max_medicos, max_secretarias: limites.max_secretarias, max_pacientes: limites.max_pacientes,
   }).select('id').single(), 'alta de clínica')
+  apagarAgendaV2([clinica.id])
   sinError(await admin.from('profiles').update({ clinica_id: clinica.id, es_admin_de_clinica: true }).eq('id', id), 'dueño de clínica')
   const sesion = { id, cliente: await iniciarSesion(p.email), clinicaId: clinica.id }
   await completarPerfil(sesion, p)

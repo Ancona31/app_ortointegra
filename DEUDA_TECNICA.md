@@ -7800,3 +7800,32 @@ maqueta (celdas más altas, menos chips o capa más ancha), no un parche.
 `tabIndex = -1`, hacía que el trapo no viera nunca «el último» y el Tab salía de la capa). La tercera copia, la de
 `ModalShell` (toda la app), no se tocó en la auditoría por estar fuera de la agenda: hoy no se sabe de ningún modal
 de `ModalShell` con foco itinerante, pero la regla de las tres copias dice que el arreglo va en las tres.
+
+### AG-DT-287 — Agenda para todos (M3): lo que queda abierto al encender la v2 en todas las clínicas
+
+**Estado:** 🟡 abierta (2026-11-25; rama `feature/agenda-para-todos`) · **Archivos:**
+`supabase/migrations/20261203120000_agenda_para_todos.sql`, `docs/spec/agenda-para-todos/`
+
+M3 enciende la agenda v2 por omisión (DEFAULT, función común, una fila por clínica y un disparador en `clinicas`).
+Lo que no cierra, por decisión de alcance:
+
+* **«¿Asistió el paciente?» no tiene límite hacia atrás** (`src/lib/agenda/asistenciaServidor.ts`: toda cita
+  agendada o confirmada, con paciente, de hace más de 48 h y sin nota; 50 por vez). Una clínica que usó años la
+  agenda vieja sin cerrar sus citas verá la ventana cada vez que abra la agenda hasta contestarlas. Cuántas son lo
+  dice la fila C.5 de `supabase/produccion/conteos/conteos-agenda-para-todos.sql`. Arreglo posible (no hecho): no
+  preguntar por citas anteriores a la fecha en que la clínica se encendió.
+* **Una clínica puede quedar sin fila en `agenda_ajustes`** si el alta de la fila falla al crearse la clínica (el
+  disparador avisa con WARNING y no lo impide) o si alguien la borra: queda encendida para `agenda_v2_encendida()`
+  y apagada para las ocho funciones que leen la fila (`REPASO-AUTOR-M3.md`, §1.1). Nada lo repara solo; lo enseña
+  el conteo «clínicas sin fila». Arreglo de fondo (no hecho, y no pequeño): que esas ocho funciones toleren «sin
+  fila», o retirar el interruptor con la agenda v1.
+* **`proteger_agenda_ajustes()` no se tocó:** su rama de INSERT rechaza una fila que nace con el interruptor en
+  `true` a quien no sea `postgres`/`supabase_admin`. Con el DEFAULT nuevo, la sesión y `service_role` ya no pueden
+  dar de alta una fila sin decir el interruptor (42501), pero sí con `false` explícito si la clínica no tuviera
+  fila (el administrador de una clínica sin fila podría apagarse la v2 por PostgREST; volver a encenderla es de
+  postgres). Con una fila por clínica no ocurre.
+* **`spinus-consola`** (otro repositorio): si borra clínicas, tiene que borrar antes su fila de `agenda_ajustes`
+  (FK RESTRICT). Sin comprobar.
+* **AG-DT-264 y AG-DT-274** decían «resolver antes de encender la v2 en otras clínicas»: M3 es ese encendido.
+* **`PLAN-DE-APLICACION.md` y `COMPROBACION-POSTERIOR.md`** (`supabase/produccion/plan/`) siguen describiendo las 11
+  migraciones anteriores; el guion de M3 es `docs/spec/agenda-para-todos/ENSAYO-M3.md`.
