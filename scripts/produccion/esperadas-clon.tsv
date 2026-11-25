@@ -1,10 +1,10 @@
 # Diferencias esperadas entre una FOTO (05-catalogo.jsonl) y el CLON que levanta clonar-desde-foto.sh.
 # Formato: estado<TAB>tipo<TAB>clave<TAB>razón. estado: solo_a | solo_b | distinto | *. Glob (*, ?) en tipo y clave.
 # A = la foto, B = el clon. Comprobado con la foto de la base local (2026-11-22).
-# Con la foto REAL de producción (2026-11-22) no aparecían «rol * en (todas)» (línea 7 de este archivo: los roles reservados ya existen en la imagen) ni la de tipos_cita (línea 10: no había tipos_cita); se quedan para las fotos locales.
-# Con la foto del 2026-11-24 (ya con las 9 de la agenda; primer ensayo de «avisos globales», equipo de Angel): 14 diferencias, 14 esperadas, 0 inesperadas, y dos avisos «no apareció» para las líneas 7 y 11.
-#   · línea 11 (authenticator · session_preload_libraries): Supabase la cambió en producción de «safeupdate» a «supautils, safeupdate» al reiniciar el proyecto (Nano→Micro); ahora coincide con la imagen local y deja de salir. Se queda para las fotos anteriores.
-#   · línea 7 («rol * en (todas)»): sigue sin aparecer con las fotos reales, como con la del 22.
+# Con la foto REAL de producción (2026-11-22) no aparecían «rol * en (todas)» ni la de tipos_cita (no había tipos_cita); se quedan para las fotos locales. El comparador cita las esperadas por su NÚMERO DE LÍNEA EN ESTE ARCHIVO: al cambiar la cabecera cambian; búscalas por su clave.
+# Con la foto del 2026-11-24 (ya con las 9 de la agenda): 14 diferencias, 14 esperadas, 0 inesperadas, y dos avisos «no apareció». En el segundo ensayo de «avisos globales» (sobre 7cac5d49, con ESTE archivo) son las líneas 11 y 15; en el primero (sobre 0a7ebe2, con la cabecera de antes), 7 y 11: las mismas dos claves.
+#   · «rol authenticator en (todas) : session_preload_libraries» (hoy línea 15): Supabase lo cambió en producción de «safeupdate» a «supautils, safeupdate» al reiniciar el proyecto (Nano→Micro); ahora coincide con la imagen local y deja de salir. Se queda para las fotos anteriores.
+#   · «rol * en (todas) : *» (hoy línea 11): sigue sin aparecer con las fotos reales, como con la del 22.
 # NO se borran líneas: una esperada que no aparece sólo da un aviso; borrarla haría «inesperada» esa diferencia en fotos viejas o locales.
 
 solo_a	config	todos los roles en postgres : *	pg_dump sin --create no vuelca ALTER DATABASE … SET (app.settings.jwt_*); el clon no los necesita y el secreto no viaja

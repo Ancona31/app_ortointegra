@@ -3,27 +3,31 @@
 -- NO es una migración: vive fuera de supabase/migrations/. Se corre a mano (o
 -- con supabase/produccion/plan/aplicar.sh reversa) y SÓLO si Angel lo pide.
 -- ═══════════════════════════════════════════════════════════════════════
--- QUÉ HACE: quita TODO lo que creó M1 y sólo eso: sus 7 disparadores, sus 5
+-- VERSIÓN 3 · 2026-11-24 en Mérida (2026-11-25 UTC), la de la versión 3 de M1.
+-- QUÉ HACE: quita TODO lo que creó M1 y sólo eso: sus 8 disparadores, sus 6
 --   funciones de disparador, la RPC aviso_clinica_registrar, el disparador de
---   reabrir y su función, las lecturas avisos_pendientes y avisos_mas_antiguos, la tabla avisos_vistos
---   (con su función y sus disparadores) y devuelve avisos_clinica a la forma de
---   F4 (sus dos policies, cita_id NOT NULL, el CHECK de 7 tipos; fuera el
---   índice, los dos CHECK y las 4 columnas). Los 7 escritores de F4 no se tocan.
+--   reabrir y su función, las lecturas avisos_candidatos, avisos_pendientes y
+--   avisos_mas_antiguos, el gesto avisos_revisar_todos, las tablas avisos_vistos y
+--   avisos_vistos_hasta (con sus funciones y disparadores) y devuelve avisos_clinica
+--   a la forma de F4 (sus dos policies, cita_id NOT NULL, el CHECK de 7 tipos; fuera
+--   los tres índices, los dos CHECK y las 4 columnas). Los 7 escritores de F4 no se
+--   tocan.
 -- QUÉ SE PIERDE MIENTRAS TANTO: los avisos del personal, de Google («Sí», «No»,
 --   mover, borrar, desconexión), de correos fallidos y de reservas frenadas, y
 --   el «revisado» por usuario (vuelve a ser por clínica). El código nuevo lo
 --   tolera: sin avisos_pendientes ni avisos_vistos (PGRST202 / PGRST205) lee y
 --   marca como antes; sin la RPC, no avisa y sigue.
--- DATOS: si hay marcas de visto (avisos_vistos) o avisos con la forma de M1
---   (sin cita, dirigidos, con actor, con datos o de un tipo nuevo), la reversa
+-- DATOS: si hay marcas de visto (avisos_vistos o avisos_vistos_hasta) o avisos con
+--   la forma de M1 (sin cita, dirigidos, con actor, con datos o de un tipo nuevo),
+--   la reversa
 --   SE NIEGA sin tocar nada: deshacerla los perdería o dejaría la tabla en una
 --   forma que F4 no admite. Para seguir de todos modos (tras respaldar), la
 --   misma confirmación que las demás reversas, en la MISMA transacción:
 --       BEGIN;
 --       SET LOCAL spinus.reversa_con_datos = 'si';
 --       \i supabase/reversas/20261202120000_avisos_globales_modelo_reversa.sql
---   Con ella: avisos_vistos se borra CON sus filas (las marcas de visto se
---   pierden) y los avisos con la forma de M1 NO SE BORRAN: avisos_clinica
+--   Con ella: avisos_vistos y avisos_vistos_hasta se borran CON sus filas (las
+--   marcas de visto y los «Marcar todos» se pierden) y los avisos con la forma de M1 NO SE BORRAN: avisos_clinica
 --   CONSERVA la forma de M1 (columnas, CHECK de 19 tipos y sus policies, que
 --   siguen ocultando lo dirigido) y la rejilla lo dice. Es un superconjunto de
 --   la de F4 y sigue siendo seguro; en la cadena completa, la reversa de F4
@@ -44,30 +48,48 @@
 --     SELECT 'M1: ' || t AS motivo, n FROM (
 --       SELECT 'avisos_vistos' AS t, count(*) AS n FROM public.avisos_vistos
 --       UNION ALL
+--       SELECT 'avisos_vistos_hasta', count(*) FROM public.avisos_vistos_hasta
+--       UNION ALL
 --       SELECT 'avisos_clinica con la forma de M1', count(*) FROM public.avisos_clinica
---        WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL OR medico_id IS NOT NULL
+--        WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL
 --           OR datos IS NOT NULL
 --           OR tipo NOT IN ('reserva_enlace', 'cancelacion_paciente', 'reagendado_paciente', 'google_por_asignar',
 --                           'empalme_google', 'google_movimiento_rechazado', 'confirmacion_paciente')) x
 --      WHERE n > 0;
 --   Ojo: los avisos confirmacion_paciente/cancelacion_paciente que nacieron del
---   «Sí»/«No» de Google tienen la forma de F4 y no cuentan: se quedan.
+--   «Sí»/«No» de Google tienen la forma de F4 y no cuentan: se quedan. Tampoco
+--   cuenta medico_id en un aviso CON cita: es una copia del médico de la cita
+--   (derivada, se recalcula) y se pierde sin perder nada.
 -- ORDEN EN LA CADENA: después de la de M2 (que exige M1) y ANTES que la de
 --   20261201180000 y las de F5b … F1: la de F4 borra avisos_clinica y los
 --   disparadores de M1 en otras tablas quedarían escribiendo en una tabla que no
 --   existe (cada uno dejaría un WARNING por escritura; ninguna escritura fallaría).
 -- RIESGO / BLOQUEOS: ACCESS EXCLUSIVE (lo que pide DROP TRIGGER: frena también
 --   las lecturas) sobre appointments, agenda_bloqueos, cita_correos,
---   clinica_conexiones_google y gcal_sync_estado, y sobre avisos_clinica y
---   avisos_vistos, hasta el COMMIT. Se piden TODOS AL PRINCIPIO y EN EL ORDEN DE
---   LOS ESCRITORES (primero las tablas de origen, luego avisos_clinica, al final
---   avisos_vistos), el mismo de la ida: una reserva en curso tiene appointments y
---   pide avisos_clinica, y pedirlos al revés es un interbloqueo posible.
---   lock_timeout 5 s (si no los obtiene, aborta sin cambiar nada); lo que el
---   orden no cubra (una lectura de la campana toma avisos_clinica y luego
---   avisos_vistos; marcar visto, al revés) lo resuelve el detector de
---   interbloqueos abortando ESTA reversa, sin dejar nada. Una sola transacción.
---   Se corre con la v2 APAGADA en todas las clínicas (aplicar.sh lo exige).
+--   clinica_conexiones_google y gcal_sync_estado, y sobre avisos_clinica,
+--   avisos_vistos y avisos_vistos_hasta, hasta el COMMIT. Se piden TODOS AL
+--   PRINCIPIO y EN EL ORDEN DE LOS ESCRITORES (primero las tablas de origen, luego
+--   avisos_clinica, al final las de vistos), el mismo de la ida.
+--   QUÉ PUEDE ABORTAR, exactamente:
+--   · Contra un ESCRITOR (una reserva, una confirmación, una cita): ninguno de los
+--     dos. Los dos piden appointments antes que avisos_clinica; el que llega
+--     segundo ESPERA. Si la reversa espera más de 5 s (lock_timeout), aborta
+--     ella, limpia, sin tocar nada; la reserva nunca.
+--   · Contra un LECTOR de la campana: los órdenes son INCOMPATIBLES por
+--     naturaleza. El lector toma avisos_clinica y después appointments (lo pide la
+--     policy al cruzar con la cita); la reversa, al revés, que es el orden que
+--     protege a los escritores y no se cambia. Si una lectura llega ENTRE los dos
+--     LOCK, hay interbloqueo y el detector aborta a UNO, el primero que lleve
+--     deadlock_timeout esperando (1 s; no se puede cambiar sin superusuario):
+--     casi siempre el LECTOR, que empezó a esperar antes. Esa lectura falla y la
+--     campana repite a los 2 min; no se pierde nada. Si por el reparto de tiempos
+--     el elegido es la reversa, aborta limpia y se repite. En los dos casos nada
+--     queda a medias.
+--   · Marcar visto (avisos_vistos y, por su policy, avisos_clinica) igual que el
+--     lector: uno de los dos aborta limpio.
+--   Con la v2 APAGADA en todas las clínicas (aplicar.sh lo exige) no hay
+--   escritores de avisos ni lectores de la campana en marcha: lo anterior es el
+--   caso de una pestaña que quedó abierta. Una sola transacción.
 -- SEGUNDA PASADA: no hace nada y sale bien (IF EXISTS).
 -- Ensayo: stack local, 2026-11-25: ida → reversa → ida; con datos, se niega; con
 --   la confirmación, sigue, conserva la forma y la ida vuelve a entrar. También
@@ -84,6 +106,7 @@ CREATE TEMP TABLE _reversa_m1 (forma text NOT NULL);
 DO $$
 DECLARE
   v_vistos integer := 0;
+  v_hasta  integer := 0;
   v_forma  integer := 0;
   v_con    boolean := coalesce(current_setting('spinus.reversa_con_datos', true), '') = 'si';
   v_tiene  boolean := to_regclass('public.avisos_clinica') IS NOT NULL
@@ -103,28 +126,33 @@ BEGIN
   IF to_regclass('public.gcal_sync_estado') IS NOT NULL THEN LOCK TABLE public.gcal_sync_estado IN ACCESS EXCLUSIVE MODE; END IF;
   IF to_regclass('public.avisos_clinica') IS NOT NULL THEN LOCK TABLE public.avisos_clinica IN ACCESS EXCLUSIVE MODE; END IF;
   IF to_regclass('public.avisos_vistos') IS NOT NULL THEN LOCK TABLE public.avisos_vistos IN ACCESS EXCLUSIVE MODE; END IF;
+  IF to_regclass('public.avisos_vistos_hasta') IS NOT NULL THEN LOCK TABLE public.avisos_vistos_hasta IN ACCESS EXCLUSIVE MODE; END IF;
 
   -- ── Guarda de datos, ANTES de tocar nada, con las tablas ya bloqueadas ──
   IF to_regclass('public.avisos_vistos') IS NOT NULL THEN
     EXECUTE 'SELECT count(*) FROM public.avisos_vistos' INTO v_vistos;
   END IF;
+  IF to_regclass('public.avisos_vistos_hasta') IS NOT NULL THEN
+    EXECUTE 'SELECT count(*) FROM public.avisos_vistos_hasta' INTO v_hasta;
+  END IF;
   IF v_tiene THEN
     EXECUTE $q$SELECT count(*) FROM public.avisos_clinica
-                WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL OR medico_id IS NOT NULL
+                WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL
                    OR datos IS NOT NULL
                    OR tipo NOT IN ('reserva_enlace', 'cancelacion_paciente', 'reagendado_paciente', 'google_por_asignar',
                                    'empalme_google', 'google_movimiento_rechazado', 'confirmacion_paciente')$q$ INTO v_forma;
   END IF;
-  IF v_vistos + v_forma > 0 THEN
+  IF v_vistos + v_hasta + v_forma > 0 THEN
     IF NOT v_con THEN
-      RAISE EXCEPTION 'REVERSA ABORTADA: hay datos de los avisos que se perderían (avisos_vistos: %; avisos_clinica con la forma de M1: %). Respáldalos y, si aun así quieres seguir, repite con SET LOCAL spinus.reversa_con_datos = ''si'' en la misma transacción (ver la cabecera).', v_vistos, v_forma;
+      RAISE EXCEPTION 'REVERSA ABORTADA: hay datos de los avisos que se perderían (avisos_vistos: %; avisos_vistos_hasta: %; avisos_clinica con la forma de M1: %). Respáldalos y, si aun así quieres seguir, repite con SET LOCAL spinus.reversa_con_datos = ''si'' en la misma transacción (ver la cabecera).', v_vistos, v_hasta, v_forma;
     END IF;
-    RAISE WARNING 'REVERSA CON DATOS (spinus.reversa_con_datos = si): se borran % marca(s) de avisos_vistos; % aviso(s) con la forma de M1 se CONSERVAN (la tabla no vuelve a la forma de F4; la ida de M1 se puede volver a aplicar desde ahí).', v_vistos, v_forma;
+    RAISE WARNING 'REVERSA CON DATOS (spinus.reversa_con_datos = si): se borran % marca(s) de avisos_vistos y % de avisos_vistos_hasta; % aviso(s) con la forma de M1 se CONSERVAN (la tabla no vuelve a la forma de F4; la ida de M1 se puede volver a aplicar desde ahí).', v_vistos, v_hasta, v_forma;
   END IF;
 
   -- ── Lo que escribe y lo que lee ──
   DROP TRIGGER IF EXISTS trg_appointments_aviso_alta_personal ON public.appointments;
   DROP TRIGGER IF EXISTS trg_appointments_aviso_cambio ON public.appointments;
+  DROP TRIGGER IF EXISTS trg_appointments_aviso_medico ON public.appointments;
   IF to_regclass('public.agenda_bloqueos') IS NOT NULL THEN
     DROP TRIGGER IF EXISTS trg_agenda_bloqueos_aviso_alta ON public.agenda_bloqueos;
     DROP TRIGGER IF EXISTS trg_agenda_bloqueos_aviso_baja ON public.agenda_bloqueos;
@@ -146,10 +174,16 @@ BEGIN
   DROP FUNCTION IF EXISTS public.aviso_clinica_de_correo();
   DROP FUNCTION IF EXISTS public.aviso_clinica_de_conexion_google();
   DROP FUNCTION IF EXISTS public.aviso_clinica_de_sync_google();
+  DROP FUNCTION IF EXISTS public.aviso_clinica_de_cambio_medico();
   DROP FUNCTION IF EXISTS public.aviso_clinica_registrar(uuid, text, uuid, uuid, uuid, text);
   DROP FUNCTION IF EXISTS public.aviso_clinica_reabrir();
   DROP FUNCTION IF EXISTS public.avisos_pendientes(text[], integer);
   DROP FUNCTION IF EXISTS public.avisos_mas_antiguos(text[]);
+  DROP FUNCTION IF EXISTS public.avisos_candidatos(text[], timestamptz, timestamptz, integer, integer, boolean, integer);
+  DROP FUNCTION IF EXISTS public.avisos_vistos_hasta_mia();
+  DROP FUNCTION IF EXISTS public.avisos_revisar_todos(timestamptz);
+  DROP TABLE IF EXISTS public.avisos_vistos_hasta;
+  DROP FUNCTION IF EXISTS public.aviso_visto_hasta_sellar();
   DROP TABLE IF EXISTS public.avisos_vistos;
   DROP FUNCTION IF EXISTS public.aviso_visto_sellar();
 
@@ -165,6 +199,8 @@ BEGIN
   DROP POLICY IF EXISTS avisos_clinica_select ON public.avisos_clinica;
   DROP POLICY IF EXISTS avisos_clinica_update ON public.avisos_clinica;
   DROP INDEX IF EXISTS public.avisos_clinica_sin_cita_key;
+  DROP INDEX IF EXISTS public.avisos_clinica_cita_idx;
+  DROP INDEX IF EXISTS public.avisos_clinica_medico_pendientes_idx;
   ALTER TABLE public.avisos_clinica
     DROP CONSTRAINT IF EXISTS avisos_clinica_cita_tipo_check,
     DROP CONSTRAINT IF EXISTS avisos_clinica_datos_check,
@@ -200,7 +236,7 @@ SELECT t.n, t.comprobacion, t.valor, t.esperado,
 FROM (
   SELECT 1 AS n, 'disparadores de M1 que quedan' AS comprobacion,
          (SELECT count(*)::text FROM pg_trigger g WHERE NOT g.tgisinternal
-             AND g.tgname IN ('trg_appointments_aviso_alta_personal', 'trg_appointments_aviso_cambio',
+             AND g.tgname IN ('trg_appointments_aviso_alta_personal', 'trg_appointments_aviso_cambio', 'trg_appointments_aviso_medico',
                               'trg_agenda_bloqueos_aviso_alta', 'trg_agenda_bloqueos_aviso_baja',
                               'trg_cita_correos_aviso_clinica', 'trg_conexiones_google_aviso_clinica',
                               'trg_gcal_sync_estado_aviso_clinica', 'trg_avisos_clinica_reabrir')) AS valor,
@@ -210,14 +246,16 @@ FROM (
          (SELECT count(*)::text FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
              AND p.proname IN ('aviso_clinica_de_cambio_cita', 'aviso_clinica_de_bloqueo', 'aviso_clinica_de_correo',
                                'aviso_clinica_de_conexion_google', 'aviso_clinica_de_sync_google', 'aviso_clinica_registrar',
-                               'aviso_clinica_reabrir', 'avisos_pendientes', 'avisos_mas_antiguos', 'aviso_visto_sellar')),
+                               'aviso_clinica_reabrir', 'avisos_pendientes', 'avisos_mas_antiguos', 'aviso_visto_sellar',
+                               'aviso_clinica_de_cambio_medico', 'avisos_candidatos', 'avisos_revisar_todos', 'aviso_visto_hasta_sellar', 'avisos_vistos_hasta_mia')),
          '0'
   UNION ALL
   SELECT 3, 'escritores de F4, intactos (6 DEFINER + aviso_clinica_revisar)',
          (SELECT count(*)::text FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname LIKE 'aviso\_clinica\_%'),
          CASE WHEN to_regclass('public.avisos_clinica') IS NULL THEN NULL ELSE '7' END
   UNION ALL
-  SELECT 4, 'tabla avisos_vistos', (to_regclass('public.avisos_vistos') IS NOT NULL)::text, 'false'
+  SELECT 4, 'tablas avisos_vistos y avisos_vistos_hasta', ((to_regclass('public.avisos_vistos') IS NOT NULL)
+                                                          OR (to_regclass('public.avisos_vistos_hasta') IS NOT NULL))::text, 'false'
   UNION ALL
   SELECT 5, 'forma de avisos_clinica', (SELECT forma FROM pg_temp._reversa_m1 LIMIT 1),
          (SELECT CASE WHEN forma = 'la de F4' THEN 'la de F4' END FROM pg_temp._reversa_m1 LIMIT 1)

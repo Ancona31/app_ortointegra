@@ -88,9 +88,9 @@ describe('la burbuja de la campana (tanda L, punto 14)', () => {
     expect(etiquetaCampana({ n: 2, m: 1 })).toBe('Por confirmar (2) y avisos (1): 3 pendientes')
     expect(etiquetaCampana({ n: 7, m: 5 })).toBe('Por confirmar (7) y avisos (5): 12 pendientes')
   })
-  it('con avisos más antiguos fuera de la lista: «3+» y se dice en el nombre', () => {
+  it('con avisos sin ver fuera de la lista: «3+» y se dice en el nombre', () => {
     expect([textoBurbuja(3, true), textoBurbuja(12, true), textoBurbuja(3, false)]).toEqual(['3+', '9+', '3'])
-    expect(etiquetaCampana({ n: 2, m: 1 }, true)).toBe('Por confirmar (2) y avisos (1): 3 pendientes; hay avisos más antiguos')
-    expect(etiquetaCampana({ n: 0, m: 0 }, true)).toBe('Por confirmar (0) y avisos (0); hay avisos más antiguos')
+    expect(etiquetaCampana({ n: 2, m: 1 }, true)).toBe('Por confirmar (2) y avisos (1): 3 pendientes; hay más avisos sin revisar')
+    expect(etiquetaCampana({ n: 0, m: 0 }, true)).toBe('Por confirmar (0) y avisos (0); hay más avisos sin revisar')
   })
 })

@@ -404,7 +404,8 @@ bash supabase/produccion/conteos/correr-conteos-avisos.sh
 ```
 
 Mismo mecanismo y mismas variables (`CONTEOS_*`, `IMAGEN_PG`) que `correr-conteos.sh`; guarda
-`conteos-avisos-<fecha>.txt`. Salida: 0 = todo OK/INFO · 1 = algún ALTO · 4 = sin ALTO pero con
+`conteos-avisos-<fecha>.txt` en `~/spinus-produccion-conteos-avisos/` (carpeta propia, 700; ni la de
+la foto vieja ni la de una nueva), salvo `CONTEOS_DESTINO`. Salida: 0 = todo OK/INFO · 1 = algún ALTO · 4 = sin ALTO pero con
 AVISO · 3 = psql falló.
 
 **Cuándo:** antes de aplicar M1, y otra vez justo antes (A.12 mira la actividad de ese momento). Con
@@ -419,7 +420,7 @@ ANTES.
 | A.1, A.2, A.3 | tablas, dueño y funciones que M1 necesita | ALTO: M1 abortaría en su pre-vuelo |
 | **A.4** | avisos sin cita o de un tipo que no es de F4 | ALTO: M1 abortaría limpia; mirar esas filas (no deberían existir) |
 | **A.5** | las dos policies de F4 y ninguna más | ALTO: alguien tocó las policies; M1 abortaría |
-| **A.6** | nada de M1 existe todavía | ALTO: M1 ya aplicada o a medias. `0 / 0 / 4 / false` es la «forma conservada» por su reversa y es OK (A.6b lo dice): M1 se puede aplicar |
+| **A.6** | nada de M1 existe todavía (funciones / disparadores / columnas / tablas `avisos_vistos` y `avisos_vistos_hasta`) | ALTO: M1 ya aplicada o a medias. `0 / 0 / 4 / false` es la «forma conservada» por su reversa y es OK (A.6b lo dice): M1 se puede aplicar, si sus cuatro columnas siguen como las dejó (su pre-vuelo lo comprueba) |
 | A.7, A.8 | el CHECK de tipos y el índice de F4 | ALTO: falta algo de F4 |
 | A.9 | `avisos_clinica` fuera de la publicación de Realtime | AVISO: alguien la publicó; M1 no la toca, pero la decisión de Angel es que no esté |
 | A.10, A.11 | cuántos avisos hay; cuántas clínicas con la v2 | sólo informan |

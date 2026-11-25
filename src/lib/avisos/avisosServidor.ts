@@ -125,9 +125,9 @@ const DatosDeAviso: z.ZodType<DatosAviso> = z.object({
   zona: z.string().nullable().optional(),
 })
 
-/** MIS pendientes (M1) o, sin M1, los sin revisar de la clínica. `null` = no se pudo leer. */
+/** MIS pendientes (M1) o, sin M1, los sin revisar de la clínica: uno MÁS del tope, para saber si hay más. `null` = no se pudo leer. */
 async function leerFilas(supabase: ClienteSesion, clinicaId: string): Promise<FilaAviso[] | null> {
-  const nuevo = await supabase.rpc('avisos_pendientes', { p_tipos: [...TIPOS_AVISO], p_limite: TOPE_AVISOS })
+  const nuevo = await supabase.rpc('avisos_pendientes', { p_tipos: [...TIPOS_AVISO], p_limite: TOPE_AVISOS + 1 })
   if (!nuevo.error) return conTipoConocido(nuevo.data)
   if (!(nuevo.error.code && AUSENTE.has(nuevo.error.code))) {
     logger.error('avisos', `avisos pendientes sin leer: ${nuevo.error.code ?? ''}`)
@@ -137,7 +137,7 @@ async function leerFilas(supabase: ClienteSesion, clinicaId: string): Promise<Fi
     .eq('clinica_id', clinicaId).is('revisado_en', null)
     /* Sólo los tipos que este código conoce: si no, 50 sin revisar de un tipo nuevo taparían a los demás. */
     .in('tipo', [...TIPOS_AVISO])
-    .order('creado_en', { ascending: false }).limit(TOPE_AVISOS)
+    .order('creado_en', { ascending: false }).limit(TOPE_AVISOS + 1)
   if (error) {
     if (!(error.code && AUSENTE.has(error.code))) logger.error('avisos', `avisos sin leer: ${error.code ?? ''}`)
     return null
@@ -146,22 +146,32 @@ async function leerFilas(supabase: ClienteSesion, clinicaId: string): Promise<Fi
 }
 
 /**
- * ¿Quedan avisos FUERA de la lectura acotada de la base (más de 60 días, o más de 500 recientes)?
- * `avisos_mas_antiguos` (M1), con la sesión y bajo RLS. Sin la función, o si falla, `false`: la
- * lista sale igual, sólo que sin la nota.
+ * ¿Queda algo SIN VER fuera de la lectura acotada de la base (más de 500 recientes, o de hace 60 a
+ * 120 días)? `avisos_mas_antiguos` (M1), con la sesión y bajo RLS. Sin la función, o si falla,
+ * `false`: la lista sale igual, sólo que sin la nota.
  */
 async function hayMasAntiguos(supabase: ClienteSesion): Promise<boolean> {
   const { data, error } = await supabase.rpc('avisos_mas_antiguos', { p_tipos: [...TIPOS_AVISO] })
   return !error && data === true
 }
 
+/**
+ * ¿Hay avisos sin ver que la lista no trae? Si la base devolvió MÁS del tope, sí, sin preguntar más.
+ * Si no, se pregunta a `avisos_mas_antiguos`: sólo entonces hace falta (con 51 la nota ya es cierta),
+ * y así la base no paga en cada relectura saltarse los 500 primeros.
+ */
+async function masDeLosQueSeVen(supabase: ClienteSesion, filas: readonly FilaAviso[]): Promise<boolean> {
+  if (filas.length > TOPE_AVISOS) return true
+  return hayMasAntiguos(supabase).catch(() => false)
+}
+
 /** Mis avisos pendientes, los más nuevos primero, con su cita y quién lo hizo. Nunca lanza. */
 export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: string): Promise<RespuestaAvisos> {
   try {
-    const [filas, fuera] = await Promise.all([leerFilas(supabase, clinicaId), hayMasAntiguos(supabase).catch(() => false)])
-    if (filas === null) return { disponible: false, avisos: [] }
-    /* Pasó del tope de la respuesta (lo demás sale al revisar lo de arriba) o la base dice que hay más atrás. */
-    const mas_antiguos = fuera || filas.length >= TOPE_AVISOS
+    const todas = await leerFilas(supabase, clinicaId)
+    if (todas === null) return { disponible: false, avisos: [] }
+    const mas_antiguos = await masDeLosQueSeVen(supabase, todas)
+    const filas = todas.slice(0, TOPE_AVISOS)
     if (filas.length === 0) return { disponible: true, avisos: [], mas_antiguos }
     const unicos = (ids: (string | null | undefined)[]): string[] => [...new Set(ids.filter((x): x is string => !!x))]
     const [citas, actores] = await Promise.all([
@@ -177,6 +187,25 @@ export async function leerAvisosClinica(supabase: ClienteSesion, clinicaId: stri
 }
 
 export type ResultadoRevisar = { ok: true; revisados: string[] } | { ok: false; motivo: 'no_disponible' | 'error' }
+
+/**
+ * M1 · «Marcar todos como revisados» PARA MÍ: mi marca de agua (`avisos_revisar_todos`); cubre también
+ * lo que la lista no enseña. `hasta` = el `creado_en` del aviso más nuevo que tenía a la vista (para no
+ * marcar uno que llegó después); `null` = ahora. Devuelve `null` si la base no tiene la función
+ * (quien llama marca uno a uno, como antes). Nunca lanza.
+ */
+export async function marcarTodosRevisados(supabase: ClienteSesion, hasta: string | null): Promise<boolean | null> {
+  try {
+    const { error } = await supabase.rpc('avisos_revisar_todos', { p_hasta: hasta })
+    if (!error) return true
+    if (error.code && AUSENTE.has(error.code)) return null
+    logger.error('avisos', `avisos sin marcar todos: ${error.code ?? ''}`)
+    return false
+  } catch (err: unknown) {
+    logger.error('avisos', `avisos sin marcar todos: ${err instanceof Error ? err.name : 'error'}`)
+    return false
+  }
+}
 
 /**
  * M1 · Marca vistos POR MÍ los avisos dados: mi fila en `avisos_vistos` (la hora la pone la base).

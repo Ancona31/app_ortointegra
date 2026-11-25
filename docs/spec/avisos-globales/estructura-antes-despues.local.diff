@@ -1,4 +1,4 @@
-389a390,479
+389a390,501
 > -- Name: aviso_clinica_de_bloqueo(); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -89,7 +89,29 @@
 > ALTER FUNCTION public.aviso_clinica_de_cambio_cita() OWNER TO postgres;
 > 
 > --
-408a499,526
+> -- Name: aviso_clinica_de_cambio_medico(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_clinica_de_cambio_medico() RETURNS trigger
+>     LANGUAGE plpgsql SECURITY DEFINER
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   BEGIN
+>     UPDATE public.avisos_clinica a SET medico_id = NEW.medico_id
+>      WHERE a.cita_id = NEW.id AND a.clinica_id = NEW.clinica_id AND a.medico_id IS DISTINCT FROM NEW.medico_id;
+>   EXCEPTION WHEN OTHERS THEN
+>     RAISE WARNING 'aviso_clinica_de_cambio_medico: médico de los avisos no actualizado (SQLSTATE %)', SQLSTATE;
+>   END;
+>   RETURN NULL;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_clinica_de_cambio_medico() OWNER TO postgres;
+> 
+> --
+408a521,548
 > -- Name: aviso_clinica_de_conexion_google(); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -118,7 +140,7 @@
 > ALTER FUNCTION public.aviso_clinica_de_conexion_google() OWNER TO postgres;
 > 
 > --
-427a546,569
+427a568,591
 > -- Name: aviso_clinica_de_correo(); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -143,7 +165,7 @@
 > ALTER FUNCTION public.aviso_clinica_de_correo() OWNER TO postgres;
 > 
 > --
-509a652,770
+509a674,799
 > -- Name: aviso_clinica_de_sync_google(); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -181,6 +203,13 @@
 >     AS $$
 > BEGIN
 >   BEGIN
+>     -- La copia del médico de la cita (sólo para leer rápido: avisos_candidatos). Si esta lectura
+>     -- falla, el aviso nace sin médico y se lee por la rama «sin médico», filtrado por la RLS: igual de
+>     -- correcto, sólo más lento.
+>     IF NEW.medico_id IS NULL THEN
+>       SELECT ap.medico_id INTO NEW.medico_id FROM public.appointments ap
+>        WHERE ap.id = NEW.cita_id AND ap.clinica_id = NEW.clinica_id;
+>     END IF;
 >     -- ¿Hay ya uno sin cerrar? Lectura sin candado: lo ve aunque otra transacción lo esté refrescando.
 >     IF EXISTS (SELECT 1 FROM public.avisos_clinica b
 >                 WHERE b.tipo = NEW.tipo AND b.cita_id = NEW.cita_id AND b.revisado_en IS NULL) THEN
@@ -263,7 +292,25 @@
 > ALTER FUNCTION public.aviso_clinica_registrar(p_clinica_id uuid, p_tipo text, p_cita_id uuid, p_medico_id uuid, p_actor_id uuid, p_nombre text) OWNER TO postgres;
 > 
 > --
-531a793,896
+531a822,999
+> -- Name: aviso_visto_hasta_sellar(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.aviso_visto_hasta_sellar() RETURNS trigger
+>     LANGUAGE plpgsql
+>     SET search_path TO ''
+>     AS $$
+> BEGIN
+>   NEW.hasta := least(coalesce(NEW.hasta, clock_timestamp()), clock_timestamp());
+>   IF TG_OP = 'UPDATE' THEN NEW.hasta := greatest(OLD.hasta, NEW.hasta); END IF;
+>   RETURN NEW;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.aviso_visto_hasta_sellar() OWNER TO postgres;
+> 
+> --
 > -- Name: aviso_visto_sellar(); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -280,34 +327,6 @@
 > 
 > 
 > ALTER FUNCTION public.aviso_visto_sellar() OWNER TO postgres;
-> 
-> --
-> -- Name: avisos_mas_antiguos(text[]); Type: FUNCTION; Schema: public; Owner: postgres
-> --
-> 
-> CREATE FUNCTION public.avisos_mas_antiguos(p_tipos text[]) RETURNS boolean
->     LANGUAGE sql STABLE
->     SET search_path TO ''
->     AS $$
->   SELECT EXISTS (SELECT 1 FROM public.avisos_clinica c
->                   WHERE c.clinica_id = public.get_clinica_id()
->                     AND c.revisado_en IS NULL
->                     AND c.creado_en >= now() - interval '60 days'
->                     AND c.tipo = ANY (coalesce(p_tipos, ARRAY[]::text[]))
->                   ORDER BY c.creado_en DESC
->                  OFFSET 500 LIMIT 1)
->       OR EXISTS (SELECT 1 FROM public.avisos_clinica c
->                   WHERE c.clinica_id = public.get_clinica_id()
->                     AND c.revisado_en IS NULL
->                     AND c.creado_en < now() - interval '60 days'
->                     AND c.creado_en >= now() - interval '120 days'
->                     AND c.tipo = ANY (coalesce(p_tipos, ARRAY[]::text[]))
->                     AND coalesce((SELECT v.visto_en FROM public.avisos_vistos v
->                                    WHERE v.aviso_id = c.id AND v.usuario_id = auth.uid()) < c.creado_en, true))
-> $$;
-> 
-> 
-> ALTER FUNCTION public.avisos_mas_antiguos(p_tipos text[]) OWNER TO postgres;
 > 
 > SET default_tablespace = '';
 > 
@@ -339,6 +358,71 @@
 > ALTER TABLE public.avisos_clinica OWNER TO postgres;
 > 
 > --
+> -- Name: avisos_candidatos(text[], timestamp with time zone, timestamp with time zone, integer, integer, boolean, integer); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.avisos_candidatos(p_tipos text[], p_desde timestamp with time zone, p_antes timestamp with time zone, p_tope integer, p_saltar integer, p_sin_ver boolean, p_limite integer) RETURNS SETOF public.avisos_clinica
+>     LANGUAGE plpgsql STABLE
+>     SET search_path TO ''
+>     SET plan_cache_mode TO 'force_custom_plan'
+>     AS $$
+> DECLARE
+>   v_yo    uuid := auth.uid();
+>   v_cl    uuid := public.get_clinica_id();
+>   v_todo  boolean := coalesce(public.soy_admin_de_clinica() OR public.get_my_role() = 'secretaria', false);
+>   v_tipos text[] := coalesce(p_tipos, ARRAY[]::text[]);
+> BEGIN
+>   IF v_cl IS NULL OR v_yo IS NULL THEN RETURN; END IF;
+>   IF v_todo THEN
+>     RETURN QUERY
+>       SELECT a.* FROM (SELECT c.* FROM public.avisos_clinica c
+>                         WHERE c.clinica_id = v_cl AND c.revisado_en IS NULL AND c.creado_en > p_desde AND c.creado_en <= p_antes
+>                           AND c.tipo = ANY (v_tipos)
+>                         ORDER BY c.creado_en DESC, c.id DESC LIMIT p_tope OFFSET p_saltar) a
+>        WHERE NOT p_sin_ver OR coalesce((SELECT v.visto_en FROM public.avisos_vistos v
+>                                          WHERE v.aviso_id = a.id AND v.usuario_id = v_yo) < a.creado_en, true)
+>        ORDER BY a.creado_en DESC, a.id DESC LIMIT p_limite;
+>     RETURN;
+>   END IF;
+>   RETURN QUERY
+>     SELECT a.* FROM (SELECT u.* FROM (
+>                        (SELECT c.* FROM public.avisos_clinica c
+>                          WHERE c.clinica_id = v_cl AND c.medico_id = v_yo AND c.revisado_en IS NULL
+>                            AND c.creado_en > p_desde AND c.creado_en <= p_antes AND c.tipo = ANY (v_tipos)
+>                          ORDER BY c.creado_en DESC, c.id DESC LIMIT p_tope)
+>                        UNION ALL
+>                        (SELECT c.* FROM public.avisos_clinica c
+>                          WHERE c.clinica_id = v_cl AND c.medico_id IS NULL AND c.revisado_en IS NULL
+>                            AND c.creado_en > p_desde AND c.creado_en <= p_antes AND c.tipo = ANY (v_tipos)
+>                          ORDER BY c.creado_en DESC, c.id DESC LIMIT p_tope)) u
+>                      ORDER BY u.creado_en DESC, u.id DESC LIMIT p_tope OFFSET p_saltar) a
+>      WHERE NOT p_sin_ver OR coalesce((SELECT v.visto_en FROM public.avisos_vistos v
+>                                        WHERE v.aviso_id = a.id AND v.usuario_id = v_yo) < a.creado_en, true)
+>      ORDER BY a.creado_en DESC, a.id DESC LIMIT p_limite;
+> END
+> $$;
+> 
+> 
+> ALTER FUNCTION public.avisos_candidatos(p_tipos text[], p_desde timestamp with time zone, p_antes timestamp with time zone, p_tope integer, p_saltar integer, p_sin_ver boolean, p_limite integer) OWNER TO postgres;
+> 
+> --
+> -- Name: avisos_mas_antiguos(text[]); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.avisos_mas_antiguos(p_tipos text[]) RETURNS boolean
+>     LANGUAGE sql STABLE
+>     SET search_path TO ''
+>     AS $$
+>   SELECT EXISTS (SELECT 1 FROM public.avisos_candidatos(p_tipos, greatest(now() - interval '60 days', public.avisos_vistos_hasta_mia()),
+>                                                          'infinity', 600, 500, true, 1))
+>       OR EXISTS (SELECT 1 FROM public.avisos_candidatos(p_tipos, greatest(now() - interval '120 days', public.avisos_vistos_hasta_mia()),
+>                                                          now() - interval '60 days', 500, 0, true, 1))
+> $$;
+> 
+> 
+> ALTER FUNCTION public.avisos_mas_antiguos(p_tipos text[]) OWNER TO postgres;
+> 
+> --
 > -- Name: avisos_pendientes(text[], integer); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -346,29 +430,48 @@
 >     LANGUAGE sql STABLE
 >     SET search_path TO ''
 >     AS $$
->   SELECT a.*
->     FROM (SELECT c.*
->             FROM public.avisos_clinica c
->            WHERE c.clinica_id = public.get_clinica_id()
->              AND c.revisado_en IS NULL
->              AND c.creado_en >= now() - interval '60 days'
->              AND c.tipo = ANY (coalesce(p_tipos, ARRAY[]::text[]))
->            ORDER BY c.creado_en DESC
->            LIMIT 500) a
->    -- Mi marca de ESE aviso, buscada por su llave (aviso_id, usuario_id). Va como subconsulta
->    -- escalar a propósito: con NOT EXISTS Postgres puede cargar TODAS mis marcas de siempre
->    -- para cruzarlas, y esa tabla tampoco deja de crecer. Sin marca (NULL) = pendiente.
->    WHERE coalesce((SELECT v.visto_en FROM public.avisos_vistos v
->                     WHERE v.aviso_id = a.id AND v.usuario_id = auth.uid()) < a.creado_en, true)
->    ORDER BY a.creado_en DESC
->    LIMIT least(greatest(coalesce(p_limite, 50), 1), 200)
+>   SELECT a.* FROM public.avisos_candidatos(p_tipos, greatest(now() - interval '60 days', public.avisos_vistos_hasta_mia()),
+>                                             'infinity', 500, 0, true, least(greatest(coalesce(p_limite, 50), 1), 200)) a
+>    ORDER BY a.creado_en DESC, a.id DESC
 > $$;
 > 
 > 
 > ALTER FUNCTION public.avisos_pendientes(p_tipos text[], p_limite integer) OWNER TO postgres;
 > 
 > --
-1395a1761,1846
+> -- Name: avisos_revisar_todos(timestamp with time zone); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.avisos_revisar_todos(p_hasta timestamp with time zone) RETURNS boolean
+>     LANGUAGE sql
+>     SET search_path TO ''
+>     AS $$
+>   INSERT INTO public.avisos_vistos_hasta AS x (usuario_id, clinica_id, hasta)
+>   VALUES (auth.uid(), public.get_clinica_id(), p_hasta)
+>   ON CONFLICT (usuario_id) DO UPDATE SET clinica_id = EXCLUDED.clinica_id, hasta = EXCLUDED.hasta
+>   RETURNING true
+> $$;
+> 
+> 
+> ALTER FUNCTION public.avisos_revisar_todos(p_hasta timestamp with time zone) OWNER TO postgres;
+> 
+> --
+> -- Name: avisos_vistos_hasta_mia(); Type: FUNCTION; Schema: public; Owner: postgres
+> --
+> 
+> CREATE FUNCTION public.avisos_vistos_hasta_mia() RETURNS timestamp with time zone
+>     LANGUAGE sql STABLE
+>     SET search_path TO ''
+>     AS $$
+>   SELECT coalesce((SELECT x.hasta FROM public.avisos_vistos_hasta x
+>                     WHERE x.usuario_id = auth.uid() AND x.clinica_id = public.get_clinica_id()), '-infinity')
+> $$;
+> 
+> 
+> ALTER FUNCTION public.avisos_vistos_hasta_mia() OWNER TO postgres;
+> 
+> --
+1395a1864,1949
 > -- Name: cita_rsvp_google_rechazo(uuid, uuid, text, text, text[]); Type: FUNCTION; Schema: public; Owner: postgres
 > --
 > 
@@ -455,23 +558,23 @@
 > ALTER FUNCTION public.cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]) OWNER TO postgres;
 > 
 > --
-2932,2935d3382
+2932,2935d3485
 < SET default_tablespace = '';
 < 
 < SET default_table_access_method = heap;
 < 
-4901c5348
+4901c5451
 < -- Name: avisos_clinica; Type: TABLE; Schema: public; Owner: postgres
 ---
 > -- Name: avisos_vistos; Type: TABLE; Schema: public; Owner: postgres
-4904,4905c5351,5353
+4904,4905c5454,5456
 < CREATE TABLE public.avisos_clinica (
 <     id uuid DEFAULT gen_random_uuid() NOT NULL,
 ---
 > CREATE TABLE public.avisos_vistos (
 >     aviso_id uuid NOT NULL,
 >     usuario_id uuid NOT NULL,
-4907,4913c5355
+4907,4913c5458
 <     tipo text NOT NULL,
 <     cita_id uuid NOT NULL,
 <     creado_en timestamp with time zone DEFAULT now() NOT NULL,
@@ -481,11 +584,32 @@
 <     CONSTRAINT avisos_clinica_tipo_check CHECK ((tipo = ANY (ARRAY['reserva_enlace'::text, 'cancelacion_paciente'::text, 'reagendado_paciente'::text, 'google_por_asignar'::text, 'empalme_google'::text, 'google_movimiento_rechazado'::text, 'confirmacion_paciente'::text])))
 ---
 >     visto_en timestamp with time zone DEFAULT now() NOT NULL
-4917c5359
+4917c5462,5475
 < ALTER TABLE public.avisos_clinica OWNER TO postgres;
 ---
 > ALTER TABLE public.avisos_vistos OWNER TO postgres;
-5811a6254,6261
+> 
+> --
+> -- Name: avisos_vistos_hasta; Type: TABLE; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TABLE public.avisos_vistos_hasta (
+>     usuario_id uuid NOT NULL,
+>     clinica_id uuid NOT NULL,
+>     hasta timestamp with time zone DEFAULT now() NOT NULL
+> );
+> 
+> 
+> ALTER TABLE public.avisos_vistos_hasta OWNER TO postgres;
+5811a6370,6385
+> -- Name: avisos_vistos_hasta avisos_vistos_hasta_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+> --
+> 
+> ALTER TABLE ONLY public.avisos_vistos_hasta
+>     ADD CONSTRAINT avisos_vistos_hasta_pkey PRIMARY KEY (usuario_id);
+> 
+> 
+> --
 > -- Name: avisos_vistos avisos_vistos_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 > --
 > 
@@ -494,7 +618,23 @@
 > 
 > 
 > --
-6291a6742,6762
+6270a6845,6851
+> -- Name: avisos_clinica_cita_idx; Type: INDEX; Schema: public; Owner: postgres
+> --
+> 
+> CREATE INDEX avisos_clinica_cita_idx ON public.avisos_clinica USING btree (cita_id) WHERE (cita_id IS NOT NULL);
+> 
+> 
+> --
+6277a6859,6865
+> -- Name: avisos_clinica_medico_pendientes_idx; Type: INDEX; Schema: public; Owner: postgres
+> --
+> 
+> CREATE INDEX avisos_clinica_medico_pendientes_idx ON public.avisos_clinica USING btree (clinica_id, medico_id, creado_en DESC) WHERE (revisado_en IS NULL);
+> 
+> 
+> --
+6291a6880,6907
 > -- Name: avisos_clinica_sin_cita_key; Type: INDEX; Schema: public; Owner: postgres
 > --
 > 
@@ -509,6 +649,13 @@
 > 
 > 
 > --
+> -- Name: avisos_vistos_hasta_clinica_idx; Type: INDEX; Schema: public; Owner: postgres
+> --
+> 
+> CREATE INDEX avisos_vistos_hasta_clinica_idx ON public.avisos_vistos_hasta USING btree (clinica_id);
+> 
+> 
+> --
 > -- Name: avisos_vistos_usuario_idx; Type: INDEX; Schema: public; Owner: postgres
 > --
 > 
@@ -516,7 +663,7 @@
 > 
 > 
 > --
-7152a7624,7637
+7152a7769,7782
 > -- Name: agenda_bloqueos trg_agenda_bloqueos_aviso_alta; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -531,7 +678,7 @@
 > 
 > 
 > --
-7173a7659,7672
+7173a7804,7817
 > -- Name: appointments trg_appointments_aviso_alta_personal; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -546,7 +693,15 @@
 > 
 > 
 > --
-7250a7750,7756
+7180a7825,7831
+> -- Name: appointments trg_appointments_aviso_medico; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_appointments_aviso_medico AFTER UPDATE OF medico_id ON public.appointments FOR EACH ROW WHEN ((old.medico_id IS DISTINCT FROM new.medico_id)) EXECUTE FUNCTION public.aviso_clinica_de_cambio_medico();
+> 
+> 
+> --
+7250a7902,7908
 > -- Name: avisos_clinica trg_avisos_clinica_reabrir; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -554,7 +709,21 @@
 > 
 > 
 > --
-7264a7771,7784
+7264a7923,7950
+> -- Name: avisos_vistos_hasta trg_avisos_vistos_hasta_sellar; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_avisos_vistos_hasta_sellar BEFORE INSERT OR UPDATE ON public.avisos_vistos_hasta FOR EACH ROW EXECUTE FUNCTION public.aviso_visto_hasta_sellar();
+> 
+> 
+> --
+> -- Name: avisos_vistos_hasta trg_avisos_vistos_hasta_sin_truncate; Type: TRIGGER; Schema: public; Owner: postgres
+> --
+> 
+> CREATE TRIGGER trg_avisos_vistos_hasta_sin_truncate BEFORE TRUNCATE ON public.avisos_vistos_hasta FOR EACH STATEMENT EXECUTE FUNCTION public.prohibir_truncate();
+> 
+> 
+> --
 > -- Name: avisos_vistos trg_avisos_vistos_sellar; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -569,7 +738,7 @@
 > 
 > 
 > --
-7320a7841,7847
+7320a8007,8013
 > -- Name: cita_correos trg_cita_correos_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -577,7 +746,7 @@
 > 
 > 
 > --
-7355a7883,7889
+7355a8049,8055
 > -- Name: clinica_conexiones_google trg_conexiones_google_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -585,7 +754,7 @@
 > 
 > 
 > --
-7446a7981,7987
+7446a8147,8153
 > -- Name: gcal_sync_estado trg_gcal_sync_estado_aviso_clinica; Type: TRIGGER; Schema: public; Owner: postgres
 > --
 > 
@@ -593,7 +762,7 @@
 > 
 > 
 > --
-7698a8240,8247
+7698a8406,8421
 > -- Name: avisos_vistos avisos_vistos_clinica_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 > --
 > 
@@ -602,7 +771,15 @@
 > 
 > 
 > --
-8440,8442c8989,8996
+> -- Name: avisos_vistos_hasta avisos_vistos_hasta_clinica_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+> --
+> 
+> ALTER TABLE ONLY public.avisos_vistos_hasta
+>     ADD CONSTRAINT avisos_vistos_hasta_clinica_id_fkey FOREIGN KEY (clinica_id) REFERENCES public.clinicas(id) ON DELETE RESTRICT;
+> 
+> 
+> --
+8440,8442c9163,9170
 < CREATE POLICY avisos_clinica_select ON public.avisos_clinica FOR SELECT TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (EXISTS ( SELECT 1
 <    FROM public.appointments a
 <   WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id()))))));
@@ -615,7 +792,7 @@
 >      OFFSET 0))
 >     ELSE ((medico_id IS NULL) OR (medico_id = auth.uid()) OR public.soy_admin_de_clinica() OR (public.get_my_role() = 'secretaria'::text))
 > END));
-8449,8451c9003,9039
+8449,8451c9177,9240
 < CREATE POLICY avisos_clinica_update ON public.avisos_clinica FOR UPDATE TO authenticated USING (((clinica_id = public.get_clinica_id()) AND (revisado_en IS NULL) AND (EXISTS ( SELECT 1
 <    FROM public.appointments a
 <   WHERE ((a.id = avisos_clinica.cita_id) AND (a.clinica_id = public.get_clinica_id())))))) WITH CHECK (((clinica_id = public.get_clinica_id()) AND (revisado_por = auth.uid())));
@@ -635,6 +812,33 @@
 > --
 > 
 > ALTER TABLE public.avisos_vistos ENABLE ROW LEVEL SECURITY;
+> 
+> --
+> -- Name: avisos_vistos_hasta; Type: ROW SECURITY; Schema: public; Owner: postgres
+> --
+> 
+> ALTER TABLE public.avisos_vistos_hasta ENABLE ROW LEVEL SECURITY;
+> 
+> --
+> -- Name: avisos_vistos_hasta avisos_vistos_hasta_insert; Type: POLICY; Schema: public; Owner: postgres
+> --
+> 
+> CREATE POLICY avisos_vistos_hasta_insert ON public.avisos_vistos_hasta FOR INSERT TO authenticated WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id())));
+> 
+> 
+> --
+> -- Name: avisos_vistos_hasta avisos_vistos_hasta_select; Type: POLICY; Schema: public; Owner: postgres
+> --
+> 
+> CREATE POLICY avisos_vistos_hasta_select ON public.avisos_vistos_hasta FOR SELECT TO authenticated USING ((usuario_id = auth.uid()));
+> 
+> 
+> --
+> -- Name: avisos_vistos_hasta avisos_vistos_hasta_update; Type: POLICY; Schema: public; Owner: postgres
+> --
+> 
+> CREATE POLICY avisos_vistos_hasta_update ON public.avisos_vistos_hasta FOR UPDATE TO authenticated USING ((usuario_id = auth.uid())) WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id())));
+> 
 > 
 > --
 > -- Name: avisos_vistos avisos_vistos_insert; Type: POLICY; Schema: public; Owner: postgres
@@ -657,7 +861,7 @@
 > --
 > 
 > CREATE POLICY avisos_vistos_update ON public.avisos_vistos FOR UPDATE TO authenticated USING (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id()))) WITH CHECK (((usuario_id = auth.uid()) AND (clinica_id = public.get_clinica_id())));
-9325a9914,9933
+9325a10115,10144
 > -- Name: FUNCTION aviso_clinica_de_bloqueo(); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -678,7 +882,17 @@
 > 
 > 
 > --
-9335a9944,9953
+> -- Name: FUNCTION aviso_clinica_de_cambio_medico(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_clinica_de_cambio_medico() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_medico() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_medico() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_clinica_de_cambio_medico() TO service_role;
+> 
+> 
+> --
+9335a10155,10164
 > -- Name: FUNCTION aviso_clinica_de_conexion_google(); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -689,7 +903,7 @@
 > 
 > 
 > --
-9345a9964,9973
+9345a10175,10184
 > -- Name: FUNCTION aviso_clinica_de_correo(); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -700,7 +914,7 @@
 > 
 > 
 > --
-9385a10014,10041
+9385a10225,10252
 > -- Name: FUNCTION aviso_clinica_de_sync_google(); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -729,7 +943,17 @@
 > 
 > 
 > --
-9395a10052,10098
+9395a10263,10343
+> -- Name: FUNCTION aviso_visto_hasta_sellar(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.aviso_visto_hasta_sellar() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.aviso_visto_hasta_sellar() TO anon;
+> GRANT ALL ON FUNCTION public.aviso_visto_hasta_sellar() TO authenticated;
+> GRANT ALL ON FUNCTION public.aviso_visto_hasta_sellar() TO service_role;
+> 
+> 
+> --
 > -- Name: FUNCTION aviso_visto_sellar(); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -737,14 +961,6 @@
 > GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO anon;
 > GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO authenticated;
 > GRANT ALL ON FUNCTION public.aviso_visto_sellar() TO service_role;
-> 
-> 
-> --
-> -- Name: FUNCTION avisos_mas_antiguos(p_tipos text[]); Type: ACL; Schema: public; Owner: postgres
-> --
-> 
-> REVOKE ALL ON FUNCTION public.avisos_mas_antiguos(p_tipos text[]) FROM PUBLIC;
-> GRANT ALL ON FUNCTION public.avisos_mas_antiguos(p_tipos text[]) TO authenticated;
 > 
 > 
 > --
@@ -769,6 +985,22 @@
 > 
 > 
 > --
+> -- Name: FUNCTION avisos_candidatos(p_tipos text[], p_desde timestamp with time zone, p_antes timestamp with time zone, p_tope integer, p_saltar integer, p_sin_ver boolean, p_limite integer); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.avisos_candidatos(p_tipos text[], p_desde timestamp with time zone, p_antes timestamp with time zone, p_tope integer, p_saltar integer, p_sin_ver boolean, p_limite integer) FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.avisos_candidatos(p_tipos text[], p_desde timestamp with time zone, p_antes timestamp with time zone, p_tope integer, p_saltar integer, p_sin_ver boolean, p_limite integer) TO authenticated;
+> 
+> 
+> --
+> -- Name: FUNCTION avisos_mas_antiguos(p_tipos text[]); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.avisos_mas_antiguos(p_tipos text[]) FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.avisos_mas_antiguos(p_tipos text[]) TO authenticated;
+> 
+> 
+> --
 > -- Name: FUNCTION avisos_pendientes(p_tipos text[], p_limite integer); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -777,7 +1009,23 @@
 > 
 > 
 > --
-9571a10275,10282
+> -- Name: FUNCTION avisos_revisar_todos(p_hasta timestamp with time zone); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.avisos_revisar_todos(p_hasta timestamp with time zone) FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.avisos_revisar_todos(p_hasta timestamp with time zone) TO authenticated;
+> 
+> 
+> --
+> -- Name: FUNCTION avisos_vistos_hasta_mia(); Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> REVOKE ALL ON FUNCTION public.avisos_vistos_hasta_mia() FROM PUBLIC;
+> GRANT ALL ON FUNCTION public.avisos_vistos_hasta_mia() TO authenticated;
+> 
+> 
+> --
+9571a10520,10527
 > -- Name: FUNCTION cita_rsvp_google_rechazo(p_clinica_id uuid, p_cita_id uuid, p_calendar_id text, p_google_event_id text, p_rechazaron text[]); Type: ACL; Schema: public; Owner: postgres
 > --
 > 
@@ -786,27 +1034,27 @@
 > 
 > 
 > --
-10387c11098
+10387c11343
 < -- Name: TABLE avisos_clinica; Type: ACL; Schema: public; Owner: postgres
 ---
 > -- Name: TABLE avisos_vistos; Type: ACL; Schema: public; Owner: postgres
-10390c11101
+10390c11346
 < GRANT SELECT ON TABLE public.avisos_clinica TO authenticated;
 ---
 > GRANT SELECT ON TABLE public.avisos_vistos TO authenticated;
-10394c11105
+10394c11350
 < -- Name: COLUMN avisos_clinica.revisado_en; Type: ACL; Schema: public; Owner: postgres
 ---
 > -- Name: COLUMN avisos_vistos.aviso_id; Type: ACL; Schema: public; Owner: postgres
-10397c11108
+10397c11353
 < GRANT UPDATE(revisado_en) ON TABLE public.avisos_clinica TO authenticated;
 ---
 > GRANT INSERT(aviso_id) ON TABLE public.avisos_vistos TO authenticated;
-10401c11112
+10401c11357
 < -- Name: COLUMN avisos_clinica.revisado_por; Type: ACL; Schema: public; Owner: postgres
 ---
 > -- Name: COLUMN avisos_vistos.usuario_id; Type: ACL; Schema: public; Owner: postgres
-10404c11115,11129
+10404c11360,11402
 < GRANT UPDATE(revisado_por) ON TABLE public.avisos_clinica TO authenticated;
 ---
 > GRANT INSERT(usuario_id) ON TABLE public.avisos_vistos TO authenticated;
@@ -824,3 +1072,31 @@
 > --
 > 
 > GRANT UPDATE(visto_en) ON TABLE public.avisos_vistos TO authenticated;
+> 
+> 
+> --
+> -- Name: TABLE avisos_vistos_hasta; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT SELECT ON TABLE public.avisos_vistos_hasta TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_vistos_hasta.usuario_id; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT INSERT(usuario_id) ON TABLE public.avisos_vistos_hasta TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_vistos_hasta.clinica_id; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT INSERT(clinica_id),UPDATE(clinica_id) ON TABLE public.avisos_vistos_hasta TO authenticated;
+> 
+> 
+> --
+> -- Name: COLUMN avisos_vistos_hasta.hasta; Type: ACL; Schema: public; Owner: postgres
+> --
+> 
+> GRANT INSERT(hasta),UPDATE(hasta) ON TABLE public.avisos_vistos_hasta TO authenticated;

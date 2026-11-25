@@ -94,15 +94,16 @@ export interface RespuestaAvisos {
   disponible: boolean
   avisos: AvisoClinica[]
   /**
-   * Hay avisos que la lista YA NO trae: pasó del tope de la respuesta, o quedan fuera de la lectura
-   * acotada de la base (más de 60 días, o más de 500 recientes: `avisos_mas_antiguos`, M1). La
-   * campana lo DICE (`TEXTO_MAS_ANTIGUOS`) y su contador pone «+»: no se ocultan en silencio.
+   * Hay avisos SIN VER que la lista no trae: más de los que caben en la respuesta, o fuera de la
+   * lectura acotada de la base (más de 500 recientes, o de hace 60 a 120 días: `avisos_mas_antiguos`,
+   * M1). Sólo cuando hay algo que la persona puede resolver: «Marcar todos como revisados» lo cubre
+   * todo. La campana lo DICE (`TEXTO_MAS_ANTIGUOS`) y su contador pone «+».
    */
   mas_antiguos?: boolean
 }
 
-/** Lo que dice la campana cuando hay avisos fuera de lo que muestra. Uno solo, para las dos campanas. */
-export const TEXTO_MAS_ANTIGUOS = 'Hay avisos más antiguos que ya no se muestran aquí.'
+/** Lo que dice la campana cuando hay avisos sin ver fuera de lo que muestra, y cómo resolverlo. */
+export const TEXTO_MAS_ANTIGUOS = 'Hay más avisos sin revisar de los que se muestran aquí. «Marcar todos como revisados» también los incluye.'
 
 /** Un aviso «recién llegado» para el aviso emergente (el mismo criterio de E8 y D11: 2 min). */
 export const AVISO_RECIENTE_MS = 120_000

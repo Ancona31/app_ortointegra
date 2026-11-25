@@ -9,7 +9,7 @@
  * MUTACIÓN (comprobada en rojo): volver a `z.array(FilaAviso).parse(data)` con
  * `tipo: z.enum(TIPOS_AVISO)`; la lectura devuelve `{ disponible: false, avisos: [] }`.
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { leerAvisosClinica, TOPE_AVISOS } from '@/lib/avisos/avisosServidor'
 import type { ClienteSesion } from '@/lib/reserva/gestionServidor'
 import { logger } from '@/lib/logger'
@@ -23,6 +23,9 @@ const cita = (id: string) => ({
 /** Lo mínimo del cliente de sesión que recorre `leerAvisosClinica`: dos cadenas, una por tabla.
  *  No filtra: el `.in('tipo', …)` de la consulta no llega aquí, así que se prueba la red de
  *  `conTipoConocido` (lo que pasa si el filtro faltara). */
+/** Las RPC que pidió la lectura, en orden. */
+const llamadas: string[] = []
+
 function cliente(avisos: unknown[], citas: unknown[], pendientes?: unknown[], masAntiguos?: boolean): ClienteSesion {
   const resultado = (data: unknown[]) => Promise.resolve({ data, error: null })
   const deAvisos = { select: () => deAvisos, eq: () => deAvisos, is: () => deAvisos, in: () => deAvisos, order: () => deAvisos, limit: () => resultado(avisos) }
@@ -30,6 +33,7 @@ function cliente(avisos: unknown[], citas: unknown[], pendientes?: unknown[], ma
   /* `pendientes` = lo que devuelve `avisos_pendientes` (la base CON M1); sin él, la función no existe
      (PGRST202) y la lectura cae a la de antes, por clínica. */
   const rpc = (nombre: string): Promise<{ data: unknown; error: { code: string } | null }> => {
+    llamadas.push(nombre)
     /* `avisos_mas_antiguos` (M1): sin decir nada, la función no existe (PGRST202), como en la base de antes. */
     if (nombre === 'avisos_mas_antiguos') {
       return Promise.resolve(masAntiguos === undefined ? { data: null, error: { code: 'PGRST202' } } : { data: masAntiguos, error: null })
@@ -79,17 +83,27 @@ describe('leerAvisosClinica con M1 (pendientes por usuario)', () => {
   })
 })
 
-/* MUTACIONES (comprobadas en rojo): `mas_antiguos` sin mirar la respuesta de la base; sin mirar el tope. */
-describe('leerAvisosClinica dice si hay avisos fuera de lo que trae', () => {
+/* MUTACIONES (comprobadas en rojo): `mas_antiguos` sin mirar la respuesta de la base; sin mirar el tope;
+   preguntando a la base aunque ya sobren filas. */
+describe('leerAvisosClinica dice si hay avisos sin ver fuera de lo que trae', () => {
+  beforeEach(() => { llamadas.length = 0 })
   const fila = (i: number) => ({ id: `a${i}`, tipo: 'reserva_frenada', cita_id: null, creado_en: '2026-11-18T10:00:00Z', medico_id: 'm1', datos: { nombre: `N${i}` } })
   it('la base dice que hay más atrás (ventana de 60 días o tope de 500)', async () => {
     expect((await leerAvisosClinica(cliente([], [], [fila(1)], true), CLINICA)).mas_antiguos).toBe(true)
     expect((await leerAvisosClinica(cliente([], [], [], true), CLINICA)).mas_antiguos).toBe(true)
     expect((await leerAvisosClinica(cliente([], [], [fila(1)], false), CLINICA)).mas_antiguos).toBe(false)
   })
-  it('la respuesta llegó al tope: hay más aunque la base no lo diga', async () => {
-    const llenas = Array.from({ length: TOPE_AVISOS }, (_, i) => fila(i))
-    expect((await leerAvisosClinica(cliente([], [], llenas, false), CLINICA)).mas_antiguos).toBe(true)
+  it('la base trae UNO MÁS del tope: hay más, se enseñan sólo los del tope y no se pregunta más', async () => {
+    const sobran = Array.from({ length: TOPE_AVISOS + 1 }, (_, i) => fila(i))
+    const r = await leerAvisosClinica(cliente([], [], sobran, false), CLINICA)
+    expect([r.mas_antiguos, r.avisos.length]).toEqual([true, TOPE_AVISOS])
+    expect(llamadas).not.toContain('avisos_mas_antiguos')
+  })
+  it('justo el tope: no sobra nada, y la base dice que no hay más atrás', async () => {
+    const justas = Array.from({ length: TOPE_AVISOS }, (_, i) => fila(i))
+    const r = await leerAvisosClinica(cliente([], [], justas, false), CLINICA)
+    expect([r.mas_antiguos, r.avisos.length]).toEqual([false, TOPE_AVISOS])
+    expect(llamadas).toContain('avisos_mas_antiguos')
   })
   it('sin la función (base sin M1), nada que decir y la lista sale igual', async () => {
     const r = await leerAvisosClinica(cliente([], [], [fila(1)]), CLINICA)

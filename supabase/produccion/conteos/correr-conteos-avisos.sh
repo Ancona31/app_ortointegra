@@ -17,11 +17,9 @@
 # en disco. psql sale de la imagen de Postgres del stack local: nada que
 # instalar.
 #
-# Dónde guarda: ~/spinus-produccion-foto/conteos-avisos-<fecha>.txt si esa carpeta ya
-# tiene la foto. Si todavía no existe (o está vacía), en
-# ~/spinus-produccion-conteos/: foto-produccion.sh se niega a escribir en una
-# carpeta que ya tenga archivos, y un conteo previo le cerraría el paso.
-# CONTEOS_DESTINO fuerza otra carpeta.
+# Dónde guarda: ~/spinus-produccion-conteos-avisos/conteos-avisos-<fecha>.txt, una carpeta PROPIA
+# (700): ni la de la foto vieja (~/spinus-produccion-foto, la del 22-nov) ni la de una foto nueva,
+# en la que foto-produccion.sh se niega a escribir si ya tiene archivos. CONTEOS_DESTINO fuerza otra.
 #
 # Salida: 0 = todo OK/INFO · 1 = hay algún ALTO · 4 = sin ALTO pero con AVISO ·
 #         3 = psql falló (conexión, permiso o timeout) · 2 = error de uso.
@@ -39,7 +37,6 @@ BASE="${CONTEOS_BASE:-postgres}"
 SSL="${CONTEOS_SSL:-require}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SQL="$DIR/conteos-avisos-globales.sql"
-FOTO="$HOME/spinus-produccion-foto"
 
 [[ -s "$SQL" ]] || { echo "error: no encuentro $SQL" >&2; exit 2; }
 docker info >/dev/null 2>&1 || { echo "error: Docker no responde; enciéndelo primero." >&2; exit 2; }
@@ -47,16 +44,7 @@ docker info >/dev/null 2>&1 || { echo "error: Docker no responde; enciéndelo pr
 # (si no, la imagen quedaba con un salto de línea delante: «docker: invalid reference format»).
 IMAGEN="${IMAGEN_PG:-$(docker inspect --format '{{.Config.Image}}' supabase_db_app_ortointegra 2>/dev/null | grep . || echo public.ecr.aws/supabase/postgres:17.6.1.167)}"
 
-DESTINO="${CONTEOS_DESTINO:-}"
-if [[ -z "$DESTINO" ]]; then
-  if [[ -d "$FOTO" && -n "$(ls -A "$FOTO" 2>/dev/null)" ]]; then
-    DESTINO="$FOTO"
-  else
-    DESTINO="$HOME/spinus-produccion-conteos"
-    echo "aviso: $FOTO no existe o está vacía (la foto aún no se ha tomado); guardo en $DESTINO" >&2
-    echo "       para no impedir que foto-produccion.sh escriba en una carpeta vacía." >&2
-  fi
-fi
+DESTINO="${CONTEOS_DESTINO:-$HOME/spinus-produccion-conteos-avisos}"
 umask 077
 mkdir -p "$DESTINO"; chmod 700 "$DESTINO"
 SALIDA="$DESTINO/conteos-avisos-$(date +%Y%m%d-%H%M%S).txt"

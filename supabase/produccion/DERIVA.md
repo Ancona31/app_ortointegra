@@ -171,9 +171,12 @@ TEMPLATE postgres` no sirve para guardar una copia del clon (el lanzador de
 
 **Con la foto del 2026-11-24** (primer ensayo de «avisos globales»): 0 errores de
 restauración; 14 diferencias, 14 esperadas, 0 inesperadas, con dos avisos «no
-apareció» para las líneas 7 y 11 de `esperadas-clon.tsv` (la 11 es la de
-`session_preload_libraries` de `authenticator`, que producción ya tiene igual que
-la imagen: §8). No se borró ninguna línea esperada.
+apareció» para las esperadas de `rol * en (todas) : *` y de
+`session_preload_libraries` de `authenticator` (ésta, porque producción ya la tiene
+igual que la imagen: §8). El comparador las cita por su línea en
+`esperadas-clon.tsv`: 7 y 11 con la cabecera de entonces, 11 y 15 con la de hoy.
+En el segundo ensayo (sobre `7cac5d49`): `3519 objetos en foto, 3510 en clon`. No
+se borró ninguna línea esperada.
 
 ## 8. Deriva de la PLATAFORMA entre la foto del 2026-11-23 y la del 2026-11-24
 

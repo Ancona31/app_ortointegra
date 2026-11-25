@@ -39,18 +39,21 @@ cut -f1-5 "$ENSAYO/difs-antes-despues.tsv" | sort > "$ENSAYO/referencia-m1m2.cla
 
 Lo que tiene que salir:
 
-- **El clon ↔ la foto del 24:** `0 errores de restauración`. En el primer ensayo (2026-11-24, equipo
-  de Angel) dio `14 diferencias (14 esperadas, 0 inesperadas)`, con dos avisos «no apareció» para
-  las líneas 7 y 11 de `esperadas-clon.tsv` (ver la cabecera de ese archivo). El recuento exacto de
-  objetos **lo fija el ensayo sobre el commit final**; lo que no puede cambiar es `0 inesperadas`.
+- **El clon ↔ la foto del 24:** `0 errores de restauración` y `14 diferencias (14 esperadas, 0
+  inesperadas)`, con dos avisos «no apareció» para las esperadas de `rol * en (todas) : *` y de
+  `rol authenticator en (todas) : session_preload_libraries` (el comparador las cita por su línea en
+  `esperadas-clon.tsv`: hoy la 11 y la 15; ver la cabecera de ese archivo). En el segundo ensayo
+  (sobre `7cac5d49`, equipo de Angel): `3519 objetos en foto, 3510 en clon`. Lo que no puede cambiar
+  es `0 inesperadas`.
 - **`aplicar.sh`:** `Las 11 aplicadas y registradas.`; las dos rejillas, fila por fila, como en
-  `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §4 (M1: 13 filas, 11 OK y 2 INFO; M2: 3 OK).
+  `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §4.
 - **Antes ↔ después de M1 + M2:** el comparador sale con `exit 1` (normal: no se le dan esperadas) y
-  su `Resumen: … diferencias`. **El número lo fija el ensayo sobre el commit final** (con el M1 del
-  primer ensayo fueron 95; ese M1 ya no es el vigente, así que 95 NO es la referencia). Sus claves
-  quedan en `referencia-m1m2.claves`, que es contra lo que se compara producción el día. El detalle
-  esperado de `public`: `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §5 y
-  `estructura-antes-despues.local.diff`.
+  su `Resumen: … diferencias`. En el segundo ensayo (sobre `7cac5d49`): `3510 objetos en antes, 3603
+  en despues; 99 diferencias`. **La versión 3 de M1 añade estructura** (la tabla `avisos_vistos_hasta`,
+  dos índices, cinco funciones y un disparador más), así que ese número CAMBIA: lo fija el tercer
+  ensayo, sobre el commit final, y el auditor lo apunta aquí. Sus claves quedan en
+  `referencia-m1m2.claves`, que es contra lo que se compara producción el día. El detalle esperado de
+  `public`: `docs/spec/avisos-globales/ENSAYO-EN-EL-CLON.md` §5 y `estructura-antes-despues.local.diff`.
 
 El día, tras `aplicar.sh aplicar` en verde, los §1 a §3 de abajo tal cual, cambiando la referencia:
 `referencia-m1m2.claves` en lugar de `referencia.claves`, y `"$ENSAYO/clon-despues.jsonl"` como

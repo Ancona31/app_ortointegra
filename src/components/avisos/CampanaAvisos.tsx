@@ -32,18 +32,18 @@ import { useAvisosClinica, type EstadoAvisos } from '@/hooks/useAvisosClinica'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useProfile } from '@/hooks/useProfile'
 import { TIPOS_AVISO, type RespuestaAvisos } from '@/lib/avisos/avisosClinica'
-import { leerAvisosClinica, marcarAvisosRevisados } from '@/lib/avisos/avisosServidor'
+import { leerAvisosClinica, marcarAvisosRevisados, marcarTodosRevisados } from '@/lib/avisos/avisosServidor'
 import { createClient } from '@/lib/supabase/client'
 
 /** Cada cuánto se relee con la pestaña a la vista (2 min: la ventana de «recién llegado»). */
 export const SONDEO_MS = 120_000
 
 /**
- * «Avisos», «Avisos (3 sin revisar)»: el número no puede vivir sólo en el dibujo. Con avisos fuera
- * de lo que la lista trae (`masAntiguos`), el número no se da por exacto: «3 o más sin revisar».
+ * «Avisos», «Avisos (3 sin revisar)»: el número no puede vivir sólo en el dibujo. Con avisos sin ver
+ * fuera de lo que la lista trae (`masAntiguos`), el número no se da por exacto: «3 o más sin revisar».
  */
 export function etiquetaCampanaGlobal(m: number | null, masAntiguos = false): string {
-  if (!m) return masAntiguos ? 'Avisos (hay avisos más antiguos)' : 'Avisos'
+  if (!m) return masAntiguos ? 'Avisos (hay avisos sin revisar)' : 'Avisos'
   return masAntiguos ? `Avisos (${m} o más sin revisar)` : `Avisos (${m} sin revisar)`
 }
 
@@ -88,8 +88,10 @@ export default function CampanaAvisos(): ReactElement | null {
     if (!clinicaId || !usuarioId) return false
     return (await marcarAvisosRevisados(createClient(), clinicaId, usuarioId, ids)).ok
   }, [clinicaId, usuarioId])
+  /* «Marcar todos» de un gesto (M1), también lo que la lista no enseña; directo y bajo RLS. */
+  const marcarTodos = useCallback((hasta: string | null): Promise<boolean | null> => marcarTodosRevisados(createClient(), hasta), [])
   const { soloDe } = useSoloMisAvisos()
-  const avisos = useAvisosClinica({ emergentes: TIPOS_AVISO, pedir, marcar, soloDe })
+  const avisos = useAvisosClinica({ emergentes: TIPOS_AVISO, pedir, marcar, marcarTodos, soloDe })
   useSondeo(avisos.recargar)
   const [ranuras] = useState(leerRanuras)
   const [boton, setBoton] = useState<HTMLElement | null>(null)

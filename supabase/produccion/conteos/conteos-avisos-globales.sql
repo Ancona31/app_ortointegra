@@ -42,10 +42,11 @@ WITH
 c AS (
   SELECT ARRAY['aviso_clinica_de_cambio_cita', 'aviso_clinica_de_bloqueo', 'aviso_clinica_de_correo',
                'aviso_clinica_de_conexion_google', 'aviso_clinica_de_sync_google', 'aviso_clinica_registrar',
-               'aviso_clinica_reabrir', 'avisos_pendientes', 'avisos_mas_antiguos', 'aviso_visto_sellar'] AS funciones_m1,
+               'aviso_clinica_reabrir', 'avisos_pendientes', 'avisos_mas_antiguos', 'aviso_visto_sellar',
+               'aviso_clinica_de_cambio_medico', 'avisos_candidatos', 'avisos_revisar_todos', 'aviso_visto_hasta_sellar', 'avisos_vistos_hasta_mia'] AS funciones_m1,
          ARRAY['trg_appointments_aviso_alta_personal', 'trg_appointments_aviso_cambio', 'trg_agenda_bloqueos_aviso_alta',
                'trg_agenda_bloqueos_aviso_baja', 'trg_cita_correos_aviso_clinica', 'trg_conexiones_google_aviso_clinica',
-               'trg_gcal_sync_estado_aviso_clinica', 'trg_avisos_clinica_reabrir'] AS disparadores_m1,
+               'trg_gcal_sync_estado_aviso_clinica', 'trg_avisos_clinica_reabrir', 'trg_appointments_aviso_medico'] AS disparadores_m1,
          ARRAY['avisos_clinica', 'appointments', 'agenda_bloqueos', 'cita_correos', 'clinica_conexiones_google',
                'gcal_sync_estado', 'agenda_ajustes', 'profiles'] AS tablas,
          ARRAY['20261125170000', '20261126120000', '20261201120000', '20261201130000', '20261201140000', '20261201150000',
@@ -56,7 +57,7 @@ m AS (  -- lo de M1 que ya exista
          (SELECT count(*) FROM pg_trigger g, c WHERE NOT g.tgisinternal AND g.tgname = ANY (c.disparadores_m1)) AS disparadores,
          (SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'avisos_clinica'
              AND column_name IN ('destinatario_id', 'actor_id', 'medico_id', 'datos')) AS columnas,
-         (to_regclass('public.avisos_vistos') IS NOT NULL) AS vistos
+         (to_regclass('public.avisos_vistos') IS NOT NULL OR to_regclass('public.avisos_vistos_hasta') IS NOT NULL) AS vistos
 ),
 filas (orden, id, migracion, que, valor, esperado, ok, si_falla) AS (
 SELECT 1, 'G.1', 'las dos', 'rol con el que se pregunta (el mismo con el que se aplicará)', current_user::text, 'postgres',
@@ -105,7 +106,7 @@ SELECT 14, 'A.5', '20261202120000', 'policies de avisos_clinica (las dos de F4 y
          WHERE schemaname = 'public' AND tablename = 'avisos_clinica')
          IS NOT DISTINCT FROM 'avisos_clinica_select:SELECT,avisos_clinica_update:UPDATE', 'ALTO'
 UNION ALL
-SELECT 15, 'A.6', '20261202120000', 'lo de M1 que YA existe: funciones / disparadores / columnas / tabla avisos_vistos',
+SELECT 15, 'A.6', '20261202120000', 'lo de M1 que YA existe: funciones / disparadores / columnas / tablas avisos_vistos y avisos_vistos_hasta',
        (SELECT m.funciones || ' / ' || m.disparadores || ' / ' || m.columnas || ' / ' || m.vistos FROM m),
        '0 / 0 / 0 / false (o 0 / 0 / 4 / false: la forma conservada, ver A.6b)',
        (SELECT m.funciones = 0 AND m.disparadores = 0 AND m.columnas IN (0, 4) AND NOT m.vistos FROM m), 'ALTO'

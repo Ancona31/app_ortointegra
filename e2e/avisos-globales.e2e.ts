@@ -41,6 +41,9 @@ test.afterEach(() => {
   const ids = propios.map((id) => `'${id}'`).join(',')
   if (propios.length) sqlLocal(`delete from public.avisos_vistos where aviso_id in (${ids}); delete from public.avisos_clinica where id in (${ids});`)
   propios.length = 0
+  /* «Marcar todos» deja una marca de agua por usuario (M1): se quita, o escondería a las pruebas
+     siguientes los avisos sembrados con hora vieja. Sólo la de la clínica A. */
+  sqlLocal(`delete from public.avisos_vistos_hasta where clinica_id = ${CL};`)
 })
 test.afterAll(() => { interruptorAgenda('A', false) })
 
@@ -54,13 +57,16 @@ test('fuera de la agenda: la campana cuenta los avisos, la lista los nombra y re
   await expect(fila).toHaveAttribute('href', /^\/agenda\?cita=/)
   await page.locator('[data-panel-avisos-global] [data-revisar-todos]').click()
   await expect(page.locator('[data-panel-avisos-global] [data-avisos-vacio]')).toBeVisible()
-  // M1: «revisado» es POR USUARIO. Queda MI marca; el aviso no se cierra para los demás.
-  await expect.poll(() => sqlLocal(`select count(*) || '|' || (select revisado_en is null from public.avisos_clinica where id = :'id')
-    from public.avisos_vistos where aviso_id = :'id'`, { id: a.id })).toBe('1|true')
+  // M1: «revisado» es POR USUARIO. «Marcar todos» deja MI marca de agua (una fila, no una por aviso),
+  // que cubre el aviso; el aviso no se cierra para los demás.
+  await expect.poll(() => sqlLocal(`select count(*) || '|' || bool_and(h.hasta >= a.creado_en) || '|' || bool_and(a.revisado_en is null)
+    from public.avisos_vistos_hasta h, public.avisos_clinica a
+   where a.id = :'id' and h.usuario_id = (select id from auth.users where email = 'admin.a@semilla.spinus.test')`, { id: a.id })).toBe('1|true|true')
 })
 
-/* MUTACIÓN (comprobada en rojo): `leerAvisosClinica` sin preguntar por `avisos_mas_antiguos`. */
-test('un aviso sin ver de hace más de 60 días ya no sale en la lista, pero la campana LO DICE', async ({ page }) => {
+/* MUTACIONES (comprobadas en rojo): `leerAvisosClinica` sin preguntar por `avisos_mas_antiguos`;
+   «Marcar todos» marcando uno a uno lo que se ve (la nota no se iría nunca). */
+test('un aviso sin ver de hace más de 60 días no sale en la lista: la campana LO DICE y «Marcar todos» lo resuelve', async ({ page }) => {
   const viejo = sembrarAviso('cancelacion_paciente', 2)
   sqlLocal(`update public.avisos_clinica set creado_en = now() - interval '61 days' where id = :'id'`, { id: viejo.id })
   const nuevo = sembrarAviso('confirmacion_paciente', 3)
@@ -72,13 +78,45 @@ test('un aviso sin ver de hace más de 60 días ya no sale en la lista, pero la 
   const panel = page.locator('[data-panel-avisos-global]')
   await expect(panel.locator(`[data-aviso="${nuevo.id}"]`)).toBeVisible()
   await expect(panel.locator(`[data-aviso="${viejo.id}"]`)).toHaveCount(0)
-  await expect(panel.locator('[data-avisos-mas-antiguos]')).toHaveText('Hay avisos más antiguos que ya no se muestran aquí.')
-  // Revisado lo que se ve, la nota sigue: el viejo no se puede revisar desde aquí y no se oculta en silencio.
+  await expect(panel.locator('[data-avisos-mas-antiguos]')).toHaveText(
+    'Hay más avisos sin revisar de los que se muestran aquí. «Marcar todos como revisados» también los incluye.')
+  // El gesto lo resuelve TODO, también lo que la lista no enseñaba: se va la nota, se va el «+».
   await panel.locator('[data-revisar-todos]').click()
   await expect(panel.locator('[data-avisos-vacio]')).toBeVisible()
-  await expect(panel.locator('[data-avisos-mas-antiguos]')).toBeVisible()
-  // No se borró ni se cerró: sigue en la tabla.
+  await expect(panel.locator('[data-avisos-mas-antiguos]')).toHaveCount(0)
+  await expect(campana(page)).toHaveAttribute('aria-label', 'Avisos')
+  // Y sigue así tras releer (la base lo apuntó), sin borrar ni cerrar el viejo: sigue en la tabla.
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await page.waitForTimeout(1500)
+  await expect(campana(page)).toHaveAttribute('aria-label', 'Avisos')
   expect(sqlLocal(`select (revisado_en is null)::text from public.avisos_clinica where id = :'id'`, { id: viejo.id })).toBe('true')
+})
+
+/* Con la lista VACÍA y algo sin ver fuera de ella: no dice «No hay avisos», dice cómo resolverlo. */
+test('lista vacía con un aviso sin ver fuera de ella: la nota y el botón, no «No hay avisos»', async ({ page }) => {
+  /* La lista tiene que estar VACÍA: lo que la clínica A ya tuviera pendiente para adminA se marca
+     visto uno a uno (sólo esas marcas, por hora, y se quitan al final). Así el caso es determinista. */
+  const marca = sqlLocal(`select clock_timestamp()::text`)
+  const yo = `(select id from auth.users where email = 'admin.a@semilla.spinus.test')`
+  sqlLocal(`insert into public.avisos_vistos (aviso_id, usuario_id, clinica_id)
+    select a.id, ${yo}, a.clinica_id from public.avisos_clinica a where a.clinica_id = ${CL}
+    on conflict (aviso_id, usuario_id) do update set visto_en = clock_timestamp()`)
+  try {
+    const viejo = sembrarAviso('cancelacion_paciente', 4)
+    sqlLocal(`update public.avisos_clinica set creado_en = now() - interval '61 days' where id = :'id'`, { id: viejo.id })
+    await page.goto('/dashboard')
+    await expect(campana(page)).toHaveAttribute('aria-label', 'Avisos (hay avisos sin revisar)')
+    await campana(page).click()
+    const panel = page.locator('[data-panel-avisos-global]')
+    await expect(panel.locator('[data-aviso]')).toHaveCount(0)
+    await expect(panel.locator('[data-avisos-mas-antiguos]')).toBeVisible()
+    await expect(panel.locator('[data-avisos-vacio]')).toHaveCount(0)
+    await panel.locator('[data-revisar-todos]').click()
+    await expect(panel.locator('[data-avisos-vacio]')).toBeVisible()
+    await expect(campana(page)).toHaveAttribute('aria-label', 'Avisos')
+  } finally {
+    sqlLocal(`delete from public.avisos_vistos where usuario_id = ${yo} and visto_en >= :'m'::timestamptz`, { m: marca })
+  }
 })
 
 test('la burbuja sale con el nombre cuando llega un aviso con la página abierta, una sola vez', async ({ page }) => {

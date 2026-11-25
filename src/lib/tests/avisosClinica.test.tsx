@@ -20,7 +20,7 @@ vi.mock('@/components/ui/Portal', () => ({ default: ({ children }: { children: R
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: () => { throw new Error('sin red en pruebas') } }))
 
 import {
-  avisosParaEmergente, citaDelEnlace, destacarDeAviso, enlaceDeAviso, leerRespuestaAvisos, textoAviso, textoEmergente,
+  avisosParaEmergente, citaDelEnlace, destacarDeAviso, enlaceDeAviso, leerRespuestaAvisos, TEXTO_MAS_ANTIGUOS, textoAviso, textoEmergente,
   type AvisoDeCita, type CitaDelAviso, type TipoAviso, type TipoConCita,
 } from '@/lib/avisos/avisosClinica'
 import { cambioPuedeAvisar, type CambioCita, type FilaCambioCita } from '@/lib/agenda/porConfirmarTiempoReal'
@@ -146,14 +146,16 @@ describe('ListaAvisos (pieza para toda la app)', () => {
   })
   it('vacía lo dice', () => {
     expect(renderToStaticMarkup(<ListaAvisos avisos={[]} revisar={nada} revisarTodos={nada} />)).toContain('No hay avisos sin revisar.')
-    // Lo que la lectura acotada deja fuera se DICE, con lista y sin ella; sin la marca, no sale.
+    // Lo que la lectura acotada deja fuera se DICE, con lista y sin ella, y siempre con el gesto que
+    // lo resuelve; sin la marca, no sale. Con la lista vacía NO dice «No hay avisos» (sería falso).
     const sinNota = renderToStaticMarkup(<ListaAvisos avisos={[aviso('reserva_enlace')]} revisar={nada} revisarTodos={nada} />)
     const conNota = renderToStaticMarkup(<ListaAvisos avisos={[aviso('reserva_enlace')]} revisar={nada} revisarTodos={nada} masAntiguos />)
     const vacioConNota = renderToStaticMarkup(<ListaAvisos avisos={[]} revisar={nada} revisarTodos={nada} masAntiguos />)
     expect(sinNota).not.toContain('data-avisos-mas-antiguos')
-    expect(conNota).toContain('Hay avisos más antiguos que ya no se muestran aquí.')
-    expect(vacioConNota).toContain('No hay avisos sin revisar.')
+    expect(conNota).toContain(TEXTO_MAS_ANTIGUOS)
+    expect(vacioConNota).not.toContain('No hay avisos sin revisar.')
     expect(vacioConNota).toContain('data-avisos-mas-antiguos')
+    expect(vacioConNota).toContain('data-revisar-todos')
     expect(leerRespuestaAvisos({ avisos_disponibles: true, avisos: [], avisos_mas_antiguos: true })?.mas_antiguos).toBe(true)
   })
   it('integración I3 + I5: «¿No es una cita?» al lado del aviso de Google que SIGUE por asignar, y en ningún otro', () => {

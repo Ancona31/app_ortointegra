@@ -35,6 +35,12 @@ export interface OpcionesAvisos {
   /** Cómo se apunta «revisado» (por usuario, desde M1); por omisión, `PATCH /api/avisos`. `false` = no se apuntó. Identidad estable. */
   marcar?: (ids: string[]) => Promise<boolean>
   /**
+   * «Marcar todos» de una vez, también lo que la lista no enseña (M1: la marca de agua). `hasta` = el
+   * más nuevo a la vista. `null` = la base no lo tiene (se marca uno a uno); `false` = no se apuntó.
+   * Sin él, «Marcar todos» marca uno a uno lo que se ve, como antes. Identidad estable.
+   */
+  marcarTodos?: (hasta: string | null) => Promise<boolean | null>
+  /**
    * «Solo mis avisos» (el médico administrador): con su id, la lista, la cuenta y las burbujas
    * se quedan en los suyos (`esAvisoMio`). Los demás siguen pendientes: no se marcan ni se pierden.
    */
@@ -46,7 +52,7 @@ export interface EstadoAvisos {
   avisos: AvisoClinica[] | null
   /** false = la base no tiene la tabla: quien pinta vuelve a lo de antes. */
   disponible: boolean
-  /** Hay avisos que la lista ya no trae (tope o más de 60 días): la campana lo dice y su contador pone «+». */
+  /** Hay avisos SIN VER que la lista no trae: la campana lo dice y su contador pone «+». «Marcar todos» lo resuelve. */
   masAntiguos: boolean
   revisar: (ids: string[]) => void
   revisarTodos: () => void
@@ -83,7 +89,9 @@ function sinRevisados(r: RespuestaAvisos | null, revisados: ReadonlyMap<string, 
   return r ? r.avisos.filter(a => revisados.get(a.id) !== a.creado_en) : null
 }
 
-export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos, marcar = enviarRevision, soloDe = null }: OpcionesAvisos = {}): EstadoAvisos {
+export function useAvisosClinica({
+  datos, emergentes = [], pedir = pedirAvisos, marcar = enviarRevision, marcarTodos, soloDe = null,
+}: OpcionesAvisos = {}): EstadoAvisos {
   const controlado = datos !== undefined
   const [propios, setPropios] = useState<RespuestaAvisos | null>(null)
   const [revisados, setRevisados] = useState<ReadonlyMap<string, string>>(() => new Map())
@@ -125,12 +133,46 @@ export function useAvisosClinica({ datos, emergentes = [], pedir = pedirAvisos, 
 
   const avisos = useMemo(() => sinRevisados(fuente, revisados), [fuente, revisados])
 
-  /** «Marcar todos»: SÓLO los que están a la vista; lo que llegó después o quedó fuera del tope sigue sin revisar. */
-  const revisarTodos = useCallback((): void => {
-    revisar(avisos?.map(a => a.id) ?? [])
-  }, [avisos, revisar])
+  const { revisarTodos, masAntiguos } = useRevisarTodos({ fuente, avisos, revisar, setRevisados, marcarTodos, soloDe, recargar })
 
-  return { avisos, disponible: fuente?.disponible ?? false, masAntiguos: fuente?.mas_antiguos === true, revisar, revisarTodos, recargar }
+  return { avisos, disponible: fuente?.disponible ?? false, masAntiguos, revisar, revisarTodos, recargar }
+}
+
+interface ParaRevisarTodos {
+  fuente: RespuestaAvisos | null
+  avisos: AvisoClinica[] | null
+  revisar: (ids: string[]) => void
+  setRevisados: (f: (prev: ReadonlyMap<string, string>) => ReadonlyMap<string, string>) => void
+  marcarTodos: OpcionesAvisos['marcarTodos']
+  soloDe: string | null
+  recargar: () => void
+}
+
+/**
+ * «Marcar todos como revisados» y si la campana dice que hay más. Con `marcarTodos` (M1) es UN gesto
+ * que cubre también lo que la lista no enseña: la nota y el «+» se apagan al momento (optimista) y
+ * vuelven si la base no lo apunta. Sin él, o con «Solo mis avisos» (marcar todo marcaría también lo
+ * de los demás, que no se está viendo), marca uno a uno lo que se ve, y la nota no se enseña: habla
+ * de toda la clínica, no de lo filtrado.
+ */
+function useRevisarTodos({ fuente, avisos, revisar, setRevisados, marcarTodos, soloDe, recargar }: ParaRevisarTodos) {
+  const [apagadaEn, setApagadaEn] = useState<RespuestaAvisos | null>(null)
+  const deUnGesto = !!marcarTodos && !soloDe
+  const revisarTodos = useCallback((): void => {
+    const lista = avisos ?? []
+    if (!deUnGesto || !marcarTodos) { revisar(lista.map(a => a.id)); return }
+    const horas = new Map(lista.map(a => [a.id, a.creado_en]))
+    const hasta = lista.reduce<string | null>((m, a) => (m === null || a.creado_en > m ? a.creado_en : m), null)
+    setRevisados(prev => new Map([...prev, ...horas]))
+    setApagadaEn(fuente)
+    void marcarTodos(hasta).then(r => {
+      if (r === null) { revisar(lista.map(a => a.id)); return }
+      if (!r) { setApagadaEn(null); setRevisados(prev => new Map([...prev].filter(([id]) => !horas.has(id)))); return }
+      recargar()
+    })
+  }, [avisos, deUnGesto, marcarTodos, revisar, setRevisados, fuente, recargar])
+  const masAntiguos = deUnGesto && fuente?.mas_antiguos === true && fuente !== apagadaEn
+  return { revisarTodos, masAntiguos }
 }
 
 /**

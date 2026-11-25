@@ -38,6 +38,8 @@ import { useProfile } from '@/hooks/useProfile'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useAvisosClinica, type EstadoAvisos } from '@/hooks/useAvisosClinica'
+import { marcarTodosRevisados } from '@/lib/avisos/avisosServidor'
+import { createClient } from '@/lib/supabase/client'
 import { ListaAvisos } from '@/components/avisos/ListaAvisos'
 import { CapaBarra } from '@/components/agenda/CapaBarra'
 import {
@@ -54,8 +56,8 @@ import {
 const EMERGENTES: readonly TipoAviso[] = TIPOS_AVISO
 
 /**
- * Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. Con avisos fuera de
- * lo que la lista trae (`masAntiguos`), «3+»: el número no se da por exacto.
+ * Tanda L (punto 14) · Lo que dice la burbuja: el número, o «9+» con más de 9. Con avisos sin ver
+ * fuera de lo que la lista trae (`masAntiguos`), «3+»: el número no se da por exacto.
  */
 export function textoBurbuja(pendientes: number, masAntiguos = false): string {
   if (pendientes > 9) return '9+'
@@ -72,7 +74,7 @@ export function etiquetaCampana(cuentas: { n: number; m: number } | null, masAnt
   const total = cuentas.n + cuentas.m
   const base = `Por confirmar (${cuentas.n}) y avisos (${cuentas.m})`
   const dicho = total > 0 ? `${base}: ${total} ${total === 1 ? 'pendiente' : 'pendientes'}` : base
-  return masAntiguos ? `${dicho}; hay avisos más antiguos` : dicho
+  return masAntiguos ? `${dicho}; hay más avisos sin revisar` : dicho
 }
 
 type Pestana = 'por-confirmar' | 'avisos'
@@ -126,7 +128,14 @@ export function CampanaAgenda({ recarga, confirmar, cambiosRef, alAbrirCita, enB
   /* El escudo de siempre: el segundo clic de un doble clic sobre el aviso no cae en la ventana. */
   const escudo = useEscudoTrasRegistro(ligando === null, { dentroDeDialogos: true })
   const { soloDe } = useSoloMisAvisos()
-  const avisos = useAvisosClinica({ datos: listas?.avisos ?? null, emergentes: EMERGENTES, soloDe })
+  /* «Marcar todos» de un gesto (M1), también lo que la lista no enseña: directo y bajo RLS, como la
+     campana global; luego se relee «Por confirmar», que es quien trae aquí los avisos. */
+  const marcarTodos = useCallback(async (hasta: string | null): Promise<boolean | null> => {
+    const r = await marcarTodosRevisados(createClient(), hasta)
+    if (r) recargar()
+    return r
+  }, [recargar])
+  const avisos = useAvisosClinica({ datos: listas?.avisos ?? null, emergentes: EMERGENTES, marcarTodos, soloDe })
   const [boton, setBoton] = useState<HTMLElement | null>(null)
   const cerrar = useCallback(() => setBoton(null), [])
   const n = listas?.citas.length ?? 0

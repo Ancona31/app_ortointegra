@@ -20,7 +20,7 @@ describe('campana global', () => {
   it('con avisos fuera de lo que la lista trae, el contador no se da por exacto y se dice', () => {
     expect([textoContador(3), textoContador(3, true), textoContador(12, true)]).toEqual(['3', '3+', '9+'])
     expect(etiquetaCampanaGlobal(3, true)).toBe('Avisos (3 o más sin revisar)')
-    expect(etiquetaCampanaGlobal(0, true)).toBe('Avisos (hay avisos más antiguos)')
+    expect(etiquetaCampanaGlobal(0, true)).toBe('Avisos (hay avisos sin revisar)')
   })
   it('el sondeo no es más lento que la ventana de «recién llegado»: si lo fuera, se perderían burbujas', () => {
     expect(SONDEO_MS).toBeLessThanOrEqual(AVISO_RECIENTE_MS)

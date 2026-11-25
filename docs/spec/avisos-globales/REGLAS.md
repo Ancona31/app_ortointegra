@@ -63,10 +63,24 @@ Bloque «avisos globales» (rama `feature/avisos-globales`, 2026-11-24/25). Plan
   días** (por `creado_en`, que el reabrir renueva) y, de esos, los **500** más nuevos que la RLS deja
   ver. Lo más viejo no se borra ni se cierra: se queda como registro. No quites la ventana ni el tope:
   el código nuevo ya no cierra avisos y sin ellos cada relectura recorre todos.
-* **Lo que la lectura acotada deja fuera se DICE, no se oculta:** `avisos_mas_antiguos` (más de 500
-  recientes, o alguno sin ver de entre 60 y 120 días) y el tope de la respuesta (`TOPE_AVISOS`) ponen
-  `mas_antiguos` en `RespuestaAvisos`; las dos campanas pintan `TEXTO_MAS_ANTIGUOS` (`ListaAvisos`) y
-  su contador lleva «+» («3 o más sin revisar»). No quites la nota ni des el número por exacto.
+* **Lo que la lectura acotada deja fuera se DICE, y siempre se puede resolver:** el indicador
+  (`mas_antiguos` en `RespuestaAvisos`: la base devolvió más de `TOPE_AVISOS`, o `avisos_mas_antiguos`
+  ve algo SIN VER entre los candidatos 501.º–600.º o entre los de hace 60 a 120 días) pinta
+  `TEXTO_MAS_ANTIGUOS` y pone «+» en el contador; y «Marcar todos como revisados» lo resuelve de UN
+  gesto (`avisos_revisar_todos` → la marca de agua de `avisos_vistos_hasta`: lo creado antes cuenta
+  como visto, lo que se reabre después vuelve). No vuelvas a «Marcar todos» uno a uno con M1, ni
+  enseñes la nota sin el botón, ni digas «No hay avisos» con la nota puesta. Con «Solo mis avisos»
+  no hay nota ni marca de agua (marcaría lo de los demás). El cliente sólo pide `avisos_mas_antiguos`
+  si la lista no se llenó.
+* **El médico invitado lee por índice gracias a la COPIA del médico de la cita en el aviso**
+  (`avisos_clinica.medico_id` en los avisos con cita): la pone `aviso_clinica_reabrir` al nacer y la
+  mantiene `trg_appointments_aviso_medico` (`aviso_clinica_de_cambio_medico`). `avisos_candidatos`
+  separa «toda la clínica» (administrador y secretaria) de «lo mío y lo sin médico» (invitado). La
+  copia NO autoriza: la policy sigue mirando la cita y va encima. Esto es exacto MIENTRAS
+  `appointments_select` deje al médico que no administra ver sólo `medico_id = auth.uid()`: si cambias
+  esa policy, revisa `avisos_candidatos` (lo vigila `av4_policies_como_f4.sql`, parte 2). No quites
+  `plan_cache_mode = force_custom_plan` de `avisos_candidatos` ni metas `auth.uid()` en sus consultas:
+  sin el valor real el planificador vuelve al índice de la clínica (31 ms con 1 200 avisos).
   `av4_policies_como_f4.sql` vigila que las policies de M1, con las columnas nuevas en NULL, dejen ver
   y marcar las mismas filas que las de F4.
 * **El `OFFSET 0` del `EXISTS` de las policies de `avisos_clinica` no es ruido,** ni la subconsulta
@@ -78,8 +92,12 @@ Bloque «avisos globales» (rama `feature/avisos-globales`, 2026-11-24/25). Plan
   volver a aplicar desde ahí** (su pre-vuelo reconoce ese estado y completa lo que falta). La sección
   2 de M1 está escrita con `IF [NOT] EXISTS` para eso: no la «limpies».
 * **M1 y su reversa piden TODOS sus candados al principio y en el orden de los escritores** (tablas de
-  origen → `avisos_clinica` → `avisos_vistos`). No muevas un `ALTER`/`DROP`/`CREATE TRIGGER` por delante
-  de ese `LOCK`.
+  origen → `avisos_clinica` → `avisos_vistos`/`avisos_vistos_hasta`). No muevas un `ALTER`/`DROP`/`CREATE
+  TRIGGER` por delante de ese `LOCK`. El lector de la campana va al revés (`avisos_clinica` y luego
+  `appointments`) y NO se puede alinear sin desproteger a los escritores: contra él, el detector de
+  interbloqueos aborta a uno (casi siempre al lector), limpio.
+* **La forma conservada se reconoce columna a columna** (tipo, admite NULL, sin DEFAULT). Si cambias
+  una columna de M1, cambia esa comprobación del pre-vuelo.
 * **Los avisos los escribe sólo la base** (disparadores DEFINER) y `aviso_clinica_registrar` (sólo
   `service_role`, lista blanca de tres tipos, comprueba la clínica de médico, cita y actor, y que el
   médico de una reserva frenada tenga rol de médico). Un tipo

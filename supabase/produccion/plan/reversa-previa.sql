@@ -29,9 +29,11 @@ WITH c(version, clase, que, tabla, columnas, consulta) AS (VALUES
   -- avisos con la forma de M1 impedirían volver a la de F4.
   ('20261202120000', 'DATOS', 'avisos_vistos (marcas de «revisado» por usuario)', 'public.avisos_vistos', ARRAY[]::text[],
      'SELECT count(*) AS n FROM public.avisos_vistos'),
+  ('20261202120000', 'DATOS', 'avisos_vistos_hasta («Marcar todos como revisados» por usuario)', 'public.avisos_vistos_hasta', ARRAY[]::text[],
+     'SELECT count(*) AS n FROM public.avisos_vistos_hasta'),
   ('20261202120000', 'DATOS', 'avisos_clinica con la forma de M1 (sin cita, dirigidos, con actor o de un tipo nuevo)',
-     'public.avisos_clinica', ARRAY['destinatario_id', 'actor_id', 'medico_id', 'datos'],
-     'SELECT count(*) AS n FROM public.avisos_clinica WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL OR medico_id IS NOT NULL OR datos IS NOT NULL OR tipo NOT IN (''reserva_enlace'', ''cancelacion_paciente'', ''reagendado_paciente'', ''google_por_asignar'', ''empalme_google'', ''google_movimiento_rechazado'', ''confirmacion_paciente'')'),
+     'public.avisos_clinica', ARRAY['destinatario_id', 'actor_id', 'datos'],
+     'SELECT count(*) AS n FROM public.avisos_clinica WHERE cita_id IS NULL OR destinatario_id IS NOT NULL OR actor_id IS NOT NULL OR datos IS NOT NULL OR tipo NOT IN (''reserva_enlace'', ''cancelacion_paciente'', ''reagendado_paciente'', ''google_por_asignar'', ''empalme_google'', ''google_movimiento_rechazado'', ''confirmacion_paciente'')'),
   -- F5b (20261201170000_agenda_f5b_protecciones_cita_reversa.sql)
   ('20261201170000', 'DATOS', 'citas canceladas cerradas (cerrada_en/sustituida_por; reaparecerían en la agenda)',
      'public.appointments', ARRAY['cerrada_en', 'sustituida_por'],

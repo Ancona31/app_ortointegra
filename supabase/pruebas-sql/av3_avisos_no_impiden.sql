@@ -5,19 +5,28 @@
 --   · Con auth.uid() fallando (claims rotos), las funciones de disparador nuevas dejan un WARNING
 --     y la escritura de origen sigue.
 -- Se corre con scripts/pruebas-sql.sh. Crea sus propios datos y termina en rollback.
--- ⚠️ Deja líneas de WARNING a propósito («aviso_clinica_reabrir: aviso … no refrescado (SQLSTATE
---   P0001)» en los casos 1 a 3 y «… no escrito (SQLSTATE 22P02)» en el caso 5). Cualquier ERROR
---   es un fallo.
+-- ⚠️ Deja SEIS líneas de WARNING a propósito, siempre las mismas y en este orden (DETERMINISTA: no
+--   depende de la base ni de la hora):
+--     1. aviso_clinica_reabrir: aviso reserva_enlace no refrescado (SQLSTATE P0001)        caso 1
+--     2. aviso_clinica_reabrir: aviso confirmacion_paciente no refrescado (SQLSTATE P0001) caso 2
+--     3. aviso_clinica_reabrir: aviso cancelacion_paciente no refrescado (SQLSTATE P0001)  caso 3
+--     4. aviso_clinica_de_cambio_medico: médico de los avisos no actualizado (SQLSTATE P0001)  caso 3-bis
+--     5. aviso_clinica_de_cambio_cita: aviso (sin decidir) no escrito (SQLSTATE 22P02)     caso 5
+--     6. aviso_clinica_de_bloqueo: aviso no escrito (SQLSTATE 22P02)                        caso 5
+--   Cualquier ERROR es un fallo. (Hasta la versión 2 el caso 1 no ejercía el fallo: una reserva crea
+--   una cita NUEVA, sin aviso que refrescar, y el WARNING 1 sólo salía con el reabrir de la v1. Ahora
+--   el aviso se presiembra: ver el caso 1.)
 begin;
 
 -- ── Datos (los de d3 y e1, lo mínimo) ─────────────────────────────────
 insert into public.clinicas (id, nombre, es_vip_grant, suscripcion_estado) values
   ('00000000-0000-4000-8000-0000003a0c01', 'AV3 uno', true, 'free');
 insert into auth.users (id, instance_id, aud, role, email, created_at, updated_at) values
-  ('00000000-0000-4000-8000-0000003a0b01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'av3-b1@prueba.local', now(), now());
-update public.profiles set clinica_id = '00000000-0000-4000-8000-0000003a0c01', role = 'medico', es_admin_de_clinica = true,
-                           titulo = 'Dr.', nombres = 'Médico', apellido_paterno = 'Prueba', especialidad = 'Ortopedia'
- where id = '00000000-0000-4000-8000-0000003a0b01';
+  ('00000000-0000-4000-8000-0000003a0b01', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'av3-b1@prueba.local', now(), now()),
+  ('00000000-0000-4000-8000-0000003a0b02', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'av3-b2@prueba.local', now(), now());
+update public.profiles set clinica_id = '00000000-0000-4000-8000-0000003a0c01', role = 'medico', es_admin_de_clinica = (id::text like '%b01'),
+                           titulo = 'Dr.', nombres = 'Médico', apellido_paterno = 'Prueba', especialidad = 'Ortopedia', cedula_profesional = '1234567'
+ where id in ('00000000-0000-4000-8000-0000003a0b01', '00000000-0000-4000-8000-0000003a0b02');
 insert into public.agenda_ajustes (clinica_id, agenda_v2_encendida) values ('00000000-0000-4000-8000-0000003a0c01', true);
 insert into public.consultorios (id, clinica_id, medico_id, nombre, nombre_corto, direccion, activo) values
   ('00000000-0000-4000-8000-0000003a0501', '00000000-0000-4000-8000-0000003a0c01', '00000000-0000-4000-8000-0000003a0b01', 'Consultorio Uno', 'Uno', 'Calle 1', true);
@@ -77,6 +86,17 @@ end $$;
 create trigger av3_romper before update on public.avisos_clinica for each statement execute function public.av3_romper();
 
 -- ── Caso 1: reservar_por_enlace se completa ───────────────────────────
+-- Para que el alta del aviso de la reserva PASE POR EL REFRESCO (lo que está roto), ya tiene que
+-- haber un aviso sin cerrar de esa cita. La cita es nueva y su id no se sabe antes, así que un
+-- disparador de la prueba lo siembra al nacer la cita (BEFORE INSERT, con hora vieja). Después, el
+-- escritor de F4 inserta el suyo → reabrir lo ve → el refresco revienta → WARNING 1 y el alta sigue.
+create function public.av3_presembrar() returns trigger language plpgsql security definer set search_path to '' as $f$
+begin
+  insert into public.avisos_clinica (clinica_id, tipo, cita_id, creado_en) values (NEW.clinica_id, 'reserva_enlace', NEW.id, now() - interval '3 hours');
+  return NEW;
+end $f$;
+create trigger av3_presembrar before insert on public.appointments for each row when (NEW.reserva_canal is not null)
+  execute function public.av3_presembrar();
 do $$
 declare v record;
 begin
@@ -90,9 +110,12 @@ begin
   perform set_config('request.jwt.claims', '', true);
   perform pg_temp.esperar('caso 1 la reserva se hizo', v.r_resultado, 'ok');
   perform pg_temp.esperar('caso 1 la cita existe', (select count(*)::text from public.appointments where id = v.r_cita_id), '1');
-  -- El refresco falló, pero el alta siguió como en F4: el aviso de la reserva nueva SÍ nace.
-  perform pg_temp.esperar('caso 1 el aviso nace igual', (select string_agg(tipo, ',') from public.avisos_clinica where cita_id = v.r_cita_id), 'reserva_enlace');
+  -- El refresco falló y el alta siguió hasta el ON CONFLICT de F4: sigue UN aviso, el presembrado, SIN refrescar.
+  perform pg_temp.esperar('caso 1 un aviso, sin refrescar', (select string_agg(tipo, ',') || ':' || bool_and(creado_en < now() - interval '2 hours')::text
+    from public.avisos_clinica where cita_id = v.r_cita_id), 'reserva_enlace:true');
 end $$;
+drop trigger av3_presembrar on public.appointments;
+drop function public.av3_presembrar();
 
 -- ── Caso 2: la confirmación del paciente se completa ──────────────────
 select pg_temp.esperar('caso 2 respuesta', pg_temp.responder(pg_temp.h('av3-c01'), 'confirmar'), 'confirmada');
@@ -106,6 +129,13 @@ select pg_temp.esperar('caso 3 la cita quedó cancelada', (select status from pu
 select pg_temp.esperar('caso 3 el aviso sigue, uno y SIN refrescar', (select count(*)::text || ':' || bool_and(creado_en < now() - interval '2 hours')::text
   from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-0000003a0a02' and tipo = 'cancelacion_paciente'), '1:true');
 
+-- ── Caso 3-bis: el cambio de MÉDICO de una cita se completa aunque la copia del médico en sus avisos
+--    no se pueda poner al día (aviso_clinica_de_cambio_medico hace un UPDATE: revienta) ──
+update public.appointments set medico_id = '00000000-0000-4000-8000-0000003a0b02' where id = '00000000-0000-4000-8000-0000003a0a01';
+select pg_temp.esperar('caso 3-bis la cita cambió de médico', (select right(medico_id::text, 4) from public.appointments where id = '00000000-0000-4000-8000-0000003a0a01'), '0b02');
+select pg_temp.esperar('caso 3-bis el aviso conserva la copia vieja', (select string_agg(right(coalesce(medico_id::text, '-'), 4), ',')
+  from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-0000003a0a01'), '0b01');
+
 -- ── Caso 4: sin el fallo forzado, el mismo hecho SÍ refresca (el camino normal sigue vivo) ──
 drop trigger av3_romper on public.avisos_clinica;
 drop function public.av3_romper();
@@ -113,6 +143,11 @@ update public.cita_confirmaciones set respuesta = null, respondido_en = null whe
 update public.cita_confirmaciones set respuesta = 'cancelo', respondido_en = now() where id = '00000000-0000-4000-8000-0000003a0d02';
 select pg_temp.esperar('caso 4 refrescado, y sigue siendo uno', (select count(*)::text || ':' || bool_and(creado_en > now() - interval '1 minute')::text
   from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-0000003a0a02' and tipo = 'cancelacion_paciente'), '1:true');
+-- Y el cambio de médico, ya sin el fallo, sí pone al día la copia del médico en los avisos de la cita.
+update public.appointments set medico_id = '00000000-0000-4000-8000-0000003a0b01' where id = '00000000-0000-4000-8000-0000003a0a01';
+update public.appointments set medico_id = '00000000-0000-4000-8000-0000003a0b02' where id = '00000000-0000-4000-8000-0000003a0a01';
+select pg_temp.esperar('caso 4 la copia del médico sigue a la cita', (select string_agg(right(coalesce(medico_id::text, '-'), 4), ',')
+  from public.avisos_clinica where cita_id = '00000000-0000-4000-8000-0000003a0a01'), '0b02');
 
 -- ── Caso 5: la SESIÓN no se puede leer (auth.uid() lanza) → WARNING y la escritura sigue ──
 -- No se puede probar sobre appointments: con los claims rotos fallan ANTES los disparadores de

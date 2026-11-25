@@ -564,4 +564,61 @@ select pg_temp.esperar('caso 19 privilegios', has_function_privilege('anon', 'pu
   || has_function_privilege('authenticated', 'public.avisos_mas_antiguos(text[])', 'EXECUTE')::text
   || has_function_privilege('service_role', 'public.avisos_mas_antiguos(text[])', 'EXECUTE')::text, 'falsetruefalse');
 
+-- ── Caso 20: «Marcar todos como revisados» (avisos_revisar_todos → avisos_vistos_hasta) ──
+-- b6 sigue con lo del caso 18/19: el tope se anuncia (caso 19). Un solo gesto lo resuelve TODO,
+-- también lo que la lista no enseñaba; lo que se reabre DESPUÉS vuelve; y es sólo suyo.
+create function pg_temp.revisar_todos(p_id uuid, p_hasta timestamptz) returns text language plpgsql as $$
+declare v boolean;
+begin
+  perform pg_temp.como(p_id);
+  set local role authenticated;
+  v := public.avisos_revisar_todos(p_hasta);
+  reset role;
+  perform pg_temp.sin_sesion();
+  return v::text;
+end $$;
+update public.avisos_clinica set creado_en = now() - interval '61 days' where tipo = 'google_desconectado' and clinica_id = '00000000-0000-4000-8000-0000001a0c01';
+select pg_temp.esperar('caso 20 antes: b6 tiene algo fuera de la lista', pg_temp.mas('00000000-0000-4000-8000-0000001a0b06'), 'true');
+select pg_temp.esperar('caso 20 el gesto', pg_temp.revisar_todos('00000000-0000-4000-8000-0000001a0b06', null), 'true');
+select pg_temp.esperar('caso 20 después: nada pendiente', pg_temp.pend_b6(50), '0:-:-');
+select pg_temp.esperar('caso 20 después: nada fuera', pg_temp.mas('00000000-0000-4000-8000-0000001a0b06'), 'false');
+select pg_temp.esperar('caso 20 no se escribió una fila por aviso', (select count(*)::text from public.avisos_vistos_hasta where usuario_id = '00000000-0000-4000-8000-0000001a0b06'), '1');
+-- Sólo suyo: la secretaria sigue teniendo el de Google sin ver (61 días: fuera de la lista, se anuncia).
+select pg_temp.esperar('caso 20 que uno marque todo no se lo quita a otro', pg_temp.mas('00000000-0000-4000-8000-0000001a0b04'), 'true');
+-- Un hecho nuevo DESPUÉS del gesto reabre (creado_en nuevo): vuelve a estar pendiente.
+update public.avisos_clinica set creado_en = clock_timestamp() where medico_id = '00000000-0000-4000-8000-0000001a0b06' and (datos ->> 'n')::int = 2;
+select pg_temp.esperar('caso 20 lo reabierto después vuelve', pg_temp.pend_b6(50), '1:2:2');
+-- p_hasta: marcar «hasta lo que tenía a la vista» no marca lo que llegó después; y la marca nunca
+-- va hacia atrás ni al futuro.
+select pg_temp.revisar_todos('00000000-0000-4000-8000-0000001a0b06', now() - interval '1 day');
+select pg_temp.esperar('caso 20 nunca hacia atrás', pg_temp.pend_b6(50), '1:2:2');
+select pg_temp.revisar_todos('00000000-0000-4000-8000-0000001a0b06', now() + interval '10 years');
+select pg_temp.esperar('caso 20 nunca al futuro', (select (hasta <= clock_timestamp())::text from public.avisos_vistos_hasta
+  where usuario_id = '00000000-0000-4000-8000-0000001a0b06'), 'true');
+-- La sesión sólo ve y escribe LA SUYA; ni anon ni service_role la tocan.
+do $$
+declare v integer;
+begin
+  perform pg_temp.como('00000000-0000-4000-8000-0000001a0b04');
+  set local role authenticated;
+  select count(*) into v from public.avisos_vistos_hasta;
+  update public.avisos_vistos_hasta set hasta = now() where usuario_id = '00000000-0000-4000-8000-0000001a0b06';
+  reset role;
+  perform pg_temp.sin_sesion();
+  perform pg_temp.esperar('caso 20 no ve la de otro', v::text, '0');
+  begin
+    perform pg_temp.como('00000000-0000-4000-8000-0000001a0b04');
+    set local role authenticated;
+    insert into public.avisos_vistos_hasta (usuario_id, clinica_id) values ('00000000-0000-4000-8000-0000001a0b06', '00000000-0000-4000-8000-0000001a0c01');
+    reset role;
+    raise exception 'AV1 caso 20: la secretaria escribió la marca de otro';
+  exception when insufficient_privilege then reset role; perform pg_temp.sin_sesion();
+  end;
+end $$;
+select pg_temp.esperar('caso 20 privilegios del gesto', has_function_privilege('anon', 'public.avisos_revisar_todos(timestamptz)', 'EXECUTE')::text
+  || has_function_privilege('authenticated', 'public.avisos_revisar_todos(timestamptz)', 'EXECUTE')::text
+  || has_function_privilege('service_role', 'public.avisos_revisar_todos(timestamptz)', 'EXECUTE')::text
+  || has_table_privilege('anon', 'public.avisos_vistos_hasta', 'SELECT')::text
+  || has_table_privilege('authenticated', 'public.avisos_vistos_hasta', 'DELETE')::text, 'falsetruefalsefalsefalse');
+
 rollback;

@@ -31,13 +31,21 @@ interface Props {
   revisarTodos: () => void
   /** Sin él, cada aviso es un enlace a la agenda. */
   alAbrir?: (a: AvisoClinica) => void
-  /** Hay avisos que la lista ya no trae (tope o más de 60 días): se dice, no se ocultan en silencio. */
+  /** Hay avisos SIN VER que la lista no trae: se dice, y «Marcar todos como revisados» los incluye. */
   masAntiguos?: boolean
 }
 
-/** La nota de «hay más atrás». Con la letra de la ayuda de esta lista. */
+/** La nota de «hay más». Con la letra de la ayuda de esta lista. */
 function NotaMasAntiguos() {
   return <p className="mt-3 text-[12px]" style={{ color: 'var(--ag-muted)' }} data-avisos-mas-antiguos>{TEXTO_MAS_ANTIGUOS}</p>
+}
+
+function BotonRevisarTodos({ revisarTodos }: Pick<Props, 'revisarTodos'>) {
+  return (
+    <button type="button" data-revisar-todos onClick={revisarTodos} className={`mt-3 ${CLASE_BOTON}`} style={ESTILO_BOTON}>
+      Marcar todos como revisados
+    </button>
+  )
 }
 
 function Contenido({ a, ahora }: { a: AvisoClinica; ahora: number }) {
@@ -78,12 +86,16 @@ export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir, masAntiguo
   // «hace N min» se fija al pintar la lista; no hace falta un reloj vivo.
   const [ahora] = useState(() => Date.now())
   if (avisos.length === 0) {
-    return (
-      <>
-        <p className="text-[13px]" style={{ color: 'var(--ag-muted)' }} data-avisos-vacio>No hay avisos sin revisar.</p>
-        {masAntiguos && <NotaMasAntiguos />}
-      </>
-    )
+    /* Nada a la vista pero sí sin ver fuera de la lista: no se dice «no hay», se dice cómo resolverlo. */
+    if (masAntiguos) {
+      return (
+        <div data-lista-avisos>
+          <NotaMasAntiguos />
+          <BotonRevisarTodos revisarTodos={revisarTodos} />
+        </div>
+      )
+    }
+    return <p className="text-[13px]" style={{ color: 'var(--ag-muted)' }} data-avisos-vacio>No hay avisos sin revisar.</p>
   }
   return (
     <div data-lista-avisos>
@@ -102,10 +114,8 @@ export function ListaAvisos({ avisos, revisar, revisarTodos, alAbrir, masAntiguo
           </li>
         ))}
       </ul>
-      <button type="button" data-revisar-todos onClick={revisarTodos} className={`mt-3 ${CLASE_BOTON}`} style={ESTILO_BOTON}>
-        Marcar todos como revisados
-      </button>
       {masAntiguos && <NotaMasAntiguos />}
+      <BotonRevisarTodos revisarTodos={revisarTodos} />
     </div>
   )
 }
