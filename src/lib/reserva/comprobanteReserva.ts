@@ -7,8 +7,12 @@
  * enlace de confirmación (E2) → componer (determinista) → mandar con
  * `Idempotency-Key = comprobante/<envío>` → cerrar (`cita_correo_marcar`).
  * Así la tarea de recordatorios NO manda otro correo para ese mismo inicio
- * (`cita_correo_tomar` del recordatorio lo salta si el comprobante salió o
- * se está mandando): una reserva hecha dentro de la ventana recibe UNO.
+ * cuando la reserva se hizo YA DENTRO de la ventana del recordatorio
+ * (`cita_correo_tomar` del recordatorio lo salta si el comprobante salió, o
+ * se está mandando, desde `inicio − recordatorio_horas`): esa reserva recibe
+ * UNO. Una reserva hecha ANTES de la ventana recibe el comprobante al
+ * reservar y el recordatorio a su hora (R1, `20261207120000`; antes de R1 se
+ * quedaba sin recordatorio: defecto visto en producción el 2026-11-26).
  *
  * Destinatario: el que da la base (`r_para`, la misma expresión que el
  * recordatorio), no el cuerpo de la petición.

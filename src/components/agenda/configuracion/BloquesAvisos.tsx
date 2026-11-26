@@ -8,12 +8,15 @@
  * pestaña «Avisos» (`"config"`: dentro del panel, los plazos a la vista).
  * Los textos, los de cada maqueta.
  *
- * Lo que la maqueta no tiene y se conserva (inventario de J5, filas 24 y 27):
- *   · un recordatorio que la clínica ya tenía en otro valor sale como opción
- *     más del selector (`opcionesRecordatorio`), y no se pisa;
+ * Lo que la maqueta no tiene y se conserva (inventario de J5, fila 27):
  *   · la vigencia del enlace de una vez, como tercer campo de los plazos (sólo
  *     en la pestaña).
  * Quien no administra la clínica lo ve deshabilitado, con la razón.
+ *
+ * EL RECORDATORIO SE ELIGE EN HORAS, LIBRE (decisión de Angel, 2026-11-26: «que cada quien escoja con
+ * cuántas horas de antelación se manda»): un campo numérico como los de los plazos (`CampoNumero`), en el
+ * rango de la base (`LIMITES_AJUSTES_AGENDA`), en vez de la lista fija de cuatro opciones. Se guarda como
+ * ellos (al salir del campo o 700 ms después de la última tecla) y su error sale debajo de él.
  *
  * B13 · AG9/AG10 (rediseño, maquetas `ag-config` y `ag-pv`): filas de ajustes en UNA superficie con separadores
  * (`.agc-lista`): título 15/600 y ayuda 13 a la izquierda, el interruptor a la derecha, alineado con el título.
@@ -23,10 +26,9 @@
 import { useId, useState, type ReactNode } from 'react'
 import { CalendarRange, Mail, Star } from 'lucide-react'
 import Interruptor from '@/components/agenda/configuracion/Interruptor'
-import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, LISTA, PIE, ROTULO, SELECTOR, SOLO_ADMIN, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
+import { AVISO_SOLO_ADMIN, AYUDA, BLOQUE, BOTON_CHICO, CAMPO_NUEVO, ERROR, ETIQUETA, LISTA, PIE, ROTULO, SOLO_ADMIN, TITULO_BLOQUE } from '@/components/agenda/configuracion/estilosConfig'
 import type { EstadoAvisos } from '@/components/agenda/configuracion/estadoAvisos'
-import { opcionesRecordatorio } from '@/lib/agenda/primeraVez'
-import { LIMITES_AJUSTES_AGENDA, type CampoAjusteAgenda } from '@/lib/agenda/ajustesAgenda'
+import { ETIQUETAS_AJUSTES_AGENDA, LIMITES_AJUSTES_AGENDA, type CampoAjusteAgenda } from '@/lib/agenda/ajustesAgenda'
 
 type Variante = 'funnel' | 'config'
 interface Props { estado: EstadoAvisos; puedeEditar: boolean; variante: Variante }
@@ -48,9 +50,13 @@ function ConControl({ titulo, ayuda, control }: { titulo: ReactNode; ayuda: Reac
   )
 }
 
+/** ¿Es del recordatorio el error de validación? (Los mensajes de `ajustesAgenda.ts` empiezan por el nombre del campo.) */
+function esDelRecordatorio(error: string | null): boolean {
+  return error !== null && error.startsWith(ETIQUETAS_AJUSTES_AGENDA.recordatorio_horas.nombre)
+}
+
 function Recordatorio({ estado, puedeEditar, variante }: Props) {
   const id = useId()
-  const horas = estado.textos ? Number(estado.textos.recordatorio_horas) : null
   const titulo = (
     <div className="flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
       <span id={`${id}-r`} className={TITULO_BLOQUE}>Recordarle su cita al paciente</span>
@@ -67,12 +73,10 @@ function Recordatorio({ estado, puedeEditar, variante }: Props) {
         control={<Interruptor encendido={estado.recordatorio === true} etiquetadoPor={`${id}-r`} alCambiar={() => estado.cambiarInterruptor('recordatorio_encendido')}
           deshabilitado={!puedeEditar || estado.recordatorio === null || estado.ocupado !== null} />} />
       {estado.recordatorio === true && estado.textos && (
-        <label className={ETIQUETA}>Mandarlo
-          <select className={`${SELECTOR} w-auto`} value={String(horas)} disabled={!puedeEditar}
-            onChange={e => estado.escribir('recordatorio_horas', e.target.value, true)}>
-            {opcionesRecordatorio(horas).map(o => <option key={o.horas} value={String(o.horas)}>{o.texto}</option>)}
-          </select>
-          antes de la cita</label>
+        <>
+          <CampoNumero estado={estado} campo="recordatorio_horas" antes="Mandarlo" despues="horas antes de la cita" puedeEditar={puedeEditar} />
+          {esDelRecordatorio(estado.invalido) && <p role="alert" className={ERROR}>{estado.invalido}</p>}
+        </>
       )}
     </div>
   )
@@ -116,7 +120,7 @@ function Campos({ estado, puedeEditar, variante }: Props) {
       {variante === 'config' && (
         <CampoNumero estado={estado} campo="vigencia_enlace_unico_dias" antes="Un enlace de una vez deja de servir a los" despues="días" puedeEditar={puedeEditar} />
       )}
-      {estado.invalido && <p role="alert" className={ERROR}>{estado.invalido}</p>}
+      {estado.invalido && !esDelRecordatorio(estado.invalido) && <p role="alert" className={ERROR}>{estado.invalido}</p>}
     </>
   )
 }

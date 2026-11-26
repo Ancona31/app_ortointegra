@@ -460,3 +460,12 @@ Mismo mecanismo y mismas variables (`CONTEOS_*`, `IMAGEN_PG`); guarda
 | C.5 INFO | Citas viejas sin cerrar por las que la agenda nueva preguntará «¿Asistió el paciente?» (sólo las de los últimos 30 días, de 50 en 50, las más recientes primero) y, aparte, las anteriores a 30 días, que quedan fuera: no se preguntan ni se tocan (decisión de Angel, 2026-11-25). Cuatro números: dentro / la clínica con más dentro / fuera / la clínica con más fuera. |
 | C.4 **AVISO** | Alguien tiene un candado fuerte sobre `clinicas` o `agenda_ajustes`: esperar y repetir. |
 
+## R1 · el recordatorio tras el comprobante
+
+`conteos-recordatorio-reserva.sql` (se corre con `correr-conteos-recordatorio-reserva.sh`): las
+condiciones del pre-vuelo de `20261207120000` y los números que sólo da producción. Lo que hay que
+leer: **R.9** (citas futuras hoy sin recordatorio por el defecto, que lo recibirán tras aplicar),
+**R.10** (las que la tarea manda en su primera pasada) y **R.13** (clínicas con el recordatorio a 1
+hora: ventana vacía). Un ALTO en R.4 o R.5 es que el cuerpo de producción de alguna de las dos
+funciones no es el de F4: R1 abortaría limpia; no se aplica hasta saber quién la cambió. Guion:
+`docs/spec/recordatorio-reserva/ENSAYO.md`.

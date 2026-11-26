@@ -135,7 +135,7 @@ test.describe('con el interruptor encendido', () => {
 
   test('el administrador edita los ajustes: se guardan solos, persisten y quedan en audit_log', async ({ page }) => {
     const deshacer = sinPendientesAgenda(CORREO.adminA)
-    // El recordatorio encendido (como postgres, antes de `desde`): sólo así sale su selector de horas.
+    // El recordatorio encendido (como postgres, antes de `desde`): sólo así sale su campo de horas.
     sqlLocal(`update public.agenda_ajustes set recordatorio_encendido = true
                where clinica_id = (select id from public.clinicas where nombre = :'clinica')`, { clinica: CLINICA_A })
     try {
@@ -143,7 +143,9 @@ test.describe('con el interruptor encendido', () => {
       await page.goto(RUTA)
       await pestanaConfig(page, 'Avisos')
       const guardado = page.waitForResponse(r => r.url().includes(API_AJUSTES) && r.request().method() === 'PUT')
-      await page.getByRole('combobox').selectOption('12')
+      const recordatorio = page.getByLabel('Mandarlo')
+      await recordatorio.fill('12')
+      await recordatorio.blur()
       expect((await guardado).status()).toBe(200)
       await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
       const vigencia = page.getByLabel('Un enlace de una vez deja de servir a los')
@@ -153,10 +155,10 @@ test.describe('con el interruptor encendido', () => {
 
       await page.reload()
       await pestanaConfig(page, 'Avisos')
-      await expect(page.getByRole('combobox')).toHaveValue('12')
+      await expect(page.getByLabel('Mandarlo')).toHaveValue('12')
       await expect(page.getByLabel('Un enlace de una vez deja de servir a los')).toHaveValue('14')
 
-      /* Una fila por guardado (dos: el selector y el campo), de `log_tabla_change` (disparador
+      /* Una fila por guardado (dos: el campo del recordatorio y el de la vigencia), de `log_tabla_change` (disparador
          `audit_agenda_ajustes`), con el uuid del administrador: la de `interruptorAgenda` es de `system`. */
       const filas = sqlLocal(`select count(*) from public.audit_log
          where tabla = 'agenda_ajustes' and accion = 'UPDATE' and created_at >= :'desde'::timestamptz

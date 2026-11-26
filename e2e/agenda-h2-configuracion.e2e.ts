@@ -289,7 +289,7 @@ test('9 · el recordatorio viene APAGADO; el administrador lo enciende (queda en
     await expect(page.locator('[data-aviso-config]')).toHaveText('Guardado')
     await expect(interruptor).toHaveAttribute('aria-checked', 'true')
     // Encendido, dice cuándo sale: 24 horas antes (el de fábrica).
-    await expect(page.getByRole('combobox')).toHaveValue('24')
+    await expect(page.getByLabel('Mandarlo')).toHaveValue('24')
     expect(sqlLocal(`select recordatorio_encendido from public.agenda_ajustes where clinica_id = ${CL}`)).toBe('t')
     expect(sqlLocal(`select count(*) from public.audit_log where tabla = 'agenda_ajustes' and accion = 'UPDATE' and created_at >= :'d'::timestamptz
                        and user_id = (select id::text from auth.users where email = :'c')`, { d: desde, c: CORREO.adminA })).toBe('1')

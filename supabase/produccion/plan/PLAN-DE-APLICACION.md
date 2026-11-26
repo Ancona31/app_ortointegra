@@ -1528,3 +1528,15 @@ en `gcal_empalmes_pendientes`, salvo `SET LOCAL spinus.reversa_con_datos =
 
 Las secciones 1 a 15 describen el primer despliegue (las 9 de la agenda v2) y
 no se han reescrito: donde dicen «las 9» o «las 11», se refieren a aquél.
+
+## 17. R1: el recordatorio tras el comprobante (1 migración, 2026-11-26)
+
+> Escrita y ensayada sólo en local. Sin aplicar en producción. Guion, conteos y
+> casos borde: `docs/spec/recordatorio-reserva/ENSAYO.md`.
+
+`20261207120000_recordatorio_tras_comprobante` va después de las 15 anteriores
+(`aplicar.sh` la ofrece la última) y **no depende del código**: puede ir antes o
+después del despliegue. Reescribe dos funciones de F4 y no toca filas. Conteos
+de sólo lectura: `../conteos/conteos-recordatorio-reserva.sql`
+(`correr-conteos-recordatorio-reserva.sh`). Su reversa es la primera de la
+cadena de `aplicar.sh reversa`.

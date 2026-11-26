@@ -468,19 +468,29 @@ test('17 · cambiar el horario de un consultorio no toca su huso ni su duración
     where k.nombre = :'n'`, { n: CONSULTORIO_INVITADA })).toBe('50|true')
 })
 
-test('17 · un recordatorio de 6 horas (no es de las cuatro opciones) se enseña y no se pisa al guardar otro ajuste', async ({ page }) => {
+/* R1 (decisión de Angel, 2026-11-26): el recordatorio se elige en horas, libre, dentro del rango de la base. */
+test('17 · el recordatorio se elige en horas, libre: 6 se enseña y no se pisa; 5 se guarda; fuera de rango no se manda', async ({ page }) => {
   adminSinPendientes()
   sqlLocal(`update public.agenda_ajustes set recordatorio_horas = 6, recordatorio_encendido = true where clinica_id = ${CL}`)
   await page.goto(RUTA)
   await pestanaConfig(page, 'Avisos')
-  const selector = page.getByRole('combobox')
-  await expect(selector).toHaveValue('6')
-  await expect(selector.locator('option')).toHaveText(['2 horas', '6 horas', '12 horas', '1 día (24 horas)', '2 días (48 horas)'])
+  const recordatorio = page.getByLabel('Mandarlo')
+  await expect(recordatorio).toHaveValue('6')
+  await expect(page.getByRole('combobox')).toHaveCount(0)
   const horas = page.getByLabel('No pueden apartar si faltan menos de')
   await horas.fill('3')
   await horas.blur()
   await expect(aviso(page)).toHaveText('Guardado')
   expect(ajuste(`recordatorio_horas || '|' || anticipacion_min_horas`)).toBe('6|3')
+  // Un valor que la lista de antes no tenía.
+  await recordatorio.fill('5')
+  await recordatorio.blur()
+  await expect.poll(() => ajuste('recordatorio_horas')).toBe('5')
+  // Fuera del rango de la base: el error sale junto al campo y no se manda nada.
+  await recordatorio.fill('73')
+  await recordatorio.blur()
+  await expect(page.getByRole('alert').filter({ hasText: 'Recordatorio por correo: de 1 a 72 horas antes de la cita' })).toHaveCount(1)
+  expect(ajuste('recordatorio_horas')).toBe('5')
 })
 
 /* ── la v2 apagada ──────────────────────────────────────────────────── */

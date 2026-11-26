@@ -544,6 +544,17 @@ de las seis y de `20261126120000`; el conjunto pasa a 14 con las 5 de `main`.
     El servidor la procesa al empezar la pasada (un fallo ahí tumba la pasada A
     PROPÓSITO: es la señal) y al acabar cada página. Sin FK a `appointments`, a
     propósito. La semilla borra la tabla antes que las clínicas.
+* **R1 (`20261207120000`, 2026-11-26; escrita, sin aplicar en producción) · el
+  comprobante de la reserva sólo quita el recordatorio si salió YA DENTRO de la
+  ventana del recordatorio de esa cita** (`coalesce(enviado_en, tomado_en) >=
+  inicio − recordatorio_horas`). La condición está DOS veces, en
+  `cita_correo_tomar` y en `cita_recordatorios_pendientes`, y van juntas (como
+  la del destinatario). No vuelvas a «si hay comprobante, no hay recordatorio»:
+  dejaba sin recordatorio a toda cita reservada por enlace con más antelación
+  que la ventana (defecto visto en producción). El recordatorio se elige en
+  horas, libre, en la pantalla (`CampoNumero` de `BloquesAvisos.tsx`), dentro
+  del rango de la base. Pendiente de decidir Angel: con 1 hora la ventana queda
+  vacía (`docs/spec/recordatorio-reserva/ENSAYO.md`, §5).
 * **Rutas públicas nuevas en `src/middleware.ts`**, cada una en su línea:
   * `/reservar/` y `/confirmar/` con prefijo y barra final;
   * `/api/reservar/` con prefijo;
