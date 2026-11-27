@@ -38,9 +38,15 @@ export const FABRICA_AJUSTES_AGENDA = {
   vigencia_enlace_unico_dias: 7,
 } as const
 
-/** Límites de §2, inclusivos. Los mismos que los CHECK de `agenda_ajustes`. */
+/**
+ * Límites de §2, inclusivos. Los mismos que los CHECK de `agenda_ajustes`, con UNA excepción a
+ * propósito: el recordatorio empieza en 2 horas y la base admite 1 (`agenda_ajustes_recordatorio_rango`,
+ * 1–72, sin tocar). Decisión de Angel (2026-11-27): el recordatorio sólo sale mientras falta MÁS de 1
+ * hora para la cita (`cita_recordatorios_pendientes`), así que con «1 hora» la ventana queda vacía y no
+ * saldría ninguno. No lo bajes a 1 sin cambiar antes ese piso en la base.
+ */
 export const LIMITES_AJUSTES_AGENDA = {
-  recordatorio_horas: { min: 1, max: 72 },
+  recordatorio_horas: { min: 2, max: 72 },
   anticipacion_min_horas: { min: 0, max: 72 },
   horizonte_dias: { min: 1, max: 365 },
   vigencia_enlace_unico_dias: { min: 1, max: 30 },

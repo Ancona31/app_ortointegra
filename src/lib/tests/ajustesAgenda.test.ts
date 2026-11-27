@@ -61,9 +61,9 @@ describe('valores de fábrica y límites (§2)', () => {
     expect(AjustesAgendaSchema.safeParse(FABRICA_AJUSTES_AGENDA).success).toBe(true)
   })
 
-  it('los límites son los de §2 (y los de los CHECK de la tabla)', () => {
+  it('los límites son los de §2 (los de los CHECK de la tabla, salvo el recordatorio: mínimo 2 h; con 1 h no saldría ninguno)', () => {
     expect(LIMITES_AJUSTES_AGENDA).toEqual({
-      recordatorio_horas: { min: 1, max: 72 },
+      recordatorio_horas: { min: 2, max: 72 },
       anticipacion_min_horas: { min: 0, max: 72 },
       horizonte_dias: { min: 1, max: 365 },
       vigencia_enlace_unico_dias: { min: 1, max: 30 },
@@ -71,7 +71,7 @@ describe('valores de fábrica y límites (§2)', () => {
   })
 
   it.each([
-    ['recordatorio_horas', 1, 72],
+    ['recordatorio_horas', 2, 72],
     ['anticipacion_min_horas', 0, 72],
     ['horizonte_dias', 1, 365],
     ['vigencia_enlace_unico_dias', 1, 30],

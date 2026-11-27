@@ -116,7 +116,7 @@ describe('PUT /api/me/ajustes-agenda', () => {
 
   it('el 400 de rango dice qué ajuste y sus límites', async () => {
     const res = await putAjustes(peticion('/api/me/ajustes-agenda', { ...AJUSTES, recordatorio_horas: 0 }))
-    expect(await res.json()).toEqual({ error: 'Recordatorio por correo: de 1 a 72 horas antes de la cita' })
+    expect(await res.json()).toEqual({ error: 'Recordatorio por correo: de 2 a 72 horas antes de la cita' })
   })
 
   it.each([['42501', 403], ['23514', 400], ['XX000', 500]])('traduce el error %s de la base a %i', async (code, status) => {

@@ -1,7 +1,7 @@
 # R1 · el recordatorio tras el comprobante — guion de ensayo y aplicación
 
 > Rama `feature/recordatorio-reserva` (nacida de `main` en `148de519`). Escrito el 2026-11-26.
-> **Nada de esto está aplicado en producción.** Lo aplica Angel, con `aplicar.sh`, tras las cuatro
+> **R1 se aplicó en producción el 2026-11-26 (22:13, Mérida) desde `b0d9d21e`.** Lo aplica Angel, con `aplicar.sh`, tras las cuatro
 > cosas de siempre: ensayo sobre el clon de estructura, auditoría (`supabase/AUDITORIA-MIGRACIONES.md`),
 > conteos de sólo lectura y su orden explícita.
 
@@ -83,7 +83,17 @@ citas de R.10. A las que les falta menos de 1 h ya no les llega (regla de F4, si
 comprueba por huella) y vuelve el defecto. Como toda reversa del guion, exige la v2 apagada en todas
 las clínicas; a mano, el archivo de la reversa no lo exige ni toca filas.
 
-## 5. Para decidir Angel: con el recordatorio a 1 hora no sale ninguno
+## 5. Con el recordatorio a 1 hora no sale ninguno — DECIDIDO: opción A (mínimo de 2 horas)
+
+> **Decisión de Angel (2026-11-27): la opción A.** `LIMITES_AJUSTES_AGENDA.recordatorio_horas.min = 2`
+> (`src/lib/agenda/ajustesAgenda.ts`): la pantalla (también el asistente de la primera vez, que usa el
+> mismo campo) y el `PUT /api/me/ajustes-agenda` rechazan 1; la base no se toca (sigue admitiendo
+> 1–72). El conteo R.13 en producción dio `0 / 0`: no había filas que subir.
+> Antes eligió la B (bajar el piso a 30 minutos) y la CANCELÓ el mismo día: la migración
+> `20261208120000_recordatorio_piso_30_min` se escribió, se empujó (`8534049f`) y se revirtió con un
+> commit de reversión; no existe en el repositorio ni se aplicó en ningún sitio que no fuera la base
+> local, donde también se deshizo. Lo de abajo es el planteamiento original.
+
 
 El listado y la toma exigen `inicio > ahora + 1 h` e `inicio <= ahora + recordatorio_horas`. Con
 `recordatorio_horas = 1` las dos condiciones no se cumplen nunca a la vez: **la ventana está vacía**.

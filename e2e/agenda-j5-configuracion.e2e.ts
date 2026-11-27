@@ -487,9 +487,17 @@ test('17 · el recordatorio se elige en horas, libre: 6 se enseña y no se pisa;
   await recordatorio.blur()
   await expect.poll(() => ajuste('recordatorio_horas')).toBe('5')
   // Fuera del rango de la base: el error sale junto al campo y no se manda nada.
+  // 1 hora no vale (con 1 la ventana del recordatorio queda vacía): mínimo 2, también en el servidor.
+  await expect(recordatorio).toHaveAttribute('min', '2')
+  await recordatorio.fill('1')
+  await recordatorio.blur()
+  await expect(page.getByRole('alert').filter({ hasText: 'Recordatorio por correo: de 2 a 72 horas antes de la cita' })).toHaveCount(1)
+  expect(ajuste('recordatorio_horas')).toBe('5')
+  expect((await page.request.put('/api/me/ajustes-agenda', { data: { recordatorio_horas: 1, anticipacion_min_horas: 3, horizonte_dias: 60, vigencia_enlace_unico_dias: 7 } })).status()).toBe(400)
+  expect(ajuste('recordatorio_horas')).toBe('5')
   await recordatorio.fill('73')
   await recordatorio.blur()
-  await expect(page.getByRole('alert').filter({ hasText: 'Recordatorio por correo: de 1 a 72 horas antes de la cita' })).toHaveCount(1)
+  await expect(page.getByRole('alert').filter({ hasText: 'Recordatorio por correo: de 2 a 72 horas antes de la cita' })).toHaveCount(1)
   expect(ajuste('recordatorio_horas')).toBe('5')
 })
 
