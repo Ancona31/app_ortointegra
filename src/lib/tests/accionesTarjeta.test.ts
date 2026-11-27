@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  accionesDeTarjeta, cuandoDeTarjeta, disposicionDeTarjeta, esConvertible, ETIQUETA_ACCION, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion,
+  burbujaDeTarjeta, accionesDeTarjeta, cuandoDeTarjeta, disposicionDeTarjeta, esConvertible, ETIQUETA_ACCION, horarioDeTarjeta, nombreDeTarjeta, pideConfirmacion,
   puedeIniciarConsulta, telefonoDeTarjeta, textoDeConfirmacion,
 } from '@/lib/agenda/accionesTarjeta'
 import { pideComprobarNota, vetoPorEstado, vetoPorNotaLigada } from '@/lib/agenda/estadoCita'
@@ -27,6 +27,23 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
   })
   it('una cancelada POR LIGAR no ofrece «Reasignar»: conserva lo de antes', () => {
     expect(accionesDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'cancelled' }, true)).not.toContain('reasignar')
+  })
+  /* Corrección del 2026-11-27: una por ligar cancelada se quedaba sin ninguna salida. MUTACIÓN: `peligro: viva ?
+     'cancelar' : null` en `disposicionSinCambios` → rojo. */
+  it('una cancelada POR LIGAR (reservó por enlace o es de Google por asignar) ofrece «Eliminar cita», aparte; la no asistida y la atendida, no', () => {
+    const porEnlace = { paciente_id: null, reserva_canal: 'fijo', status: 'cancelled' } as const
+    const porAsignar = { paciente_id: null, reserva_canal: null, google_asignacion: 'por_asignar', status: 'cancelled' } as const
+    for (const cita of [porEnlace, porAsignar]) {
+      expect(disposicionDeTarjeta(cita, false).peligro).toBe('eliminar-cita')
+      expect(disposicionDeTarjeta(cita, true).peligro).toBe('eliminar-cita')
+      expect(accionesDeTarjeta(cita, false)).not.toContain('cancelar')
+      expect(burbujaDeTarjeta(cita, false).pie.at(-1)).toBe('eliminar-cita')
+    }
+    for (const status of ['no_show', 'attended'] as const) {
+      expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status }, true).peligro).toBeNull()
+    }
+    // Viva, como siempre: se cancela, no se elimina.
+    expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'confirmed' }, false).peligro).toBe('cancelar')
   })
   it('una cita con paciente NUNCA se puede eliminar desde la tarjeta', () => {
     expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, true)).not.toContain('eliminar')
@@ -210,6 +227,12 @@ describe('textoDeConfirmacion', () => {
   it('«Eliminar cita» nombra al paciente y dice que sale de la agenda sin borrarse (tanda L, punto 9)', () => {
     expect(textoDeConfirmacion('eliminar-cita', { ...base, pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null } }))
       .toBe('¿Eliminar la cita cancelada de Ana Pech? Sale de la agenda y no se puede deshacer; queda guardada en el historial.')
+  })
+  it('«Eliminar cita» de una por ligar nombra a quien reservó; de una de Google por asignar, su título', () => {
+    expect(textoDeConfirmacion('eliminar-cita', { ...base, reserva_canal: 'fijo', reserva_nombre: 'Luis Canul' }))
+      .toBe('¿Eliminar la cita cancelada de Luis Canul? Sale de la agenda y no se puede deshacer; queda guardada en el historial.')
+    expect(textoDeConfirmacion('eliminar-cita', { ...base, title: 'Revisión de rodilla' }))
+      .toMatch(/^¿Eliminar la cita cancelada de Revisión de rodilla\?/)
   })
   it('«No asistió» nombra al paciente y dice que la cita se queda (tanda L, punto 2)', () => {
     expect(textoDeConfirmacion('no-asistio', { ...base, pacientes: { id: 'p', nombre: 'Ana', apellidos: 'Pech', telefono: null } }))

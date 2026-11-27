@@ -28,7 +28,8 @@
  *         cualquiera de las dos, al guardar, el servidor cierra la cancelada
  *         (`cerrada_en`, `sustituida_por`): deja de pintarse, no se borra.
  *   · Cita por ligar y evento sin paciente: conservan lo que tenían, en su
- *     orden (incluido «Editar»), con el engrane. Tanda J: la principal de una
+ *     orden (incluido «Editar»), con el engrane. Una por ligar CANCELADA ofrece
+ *     además «Eliminar cita» (la cierra, como la cancelada con paciente). Tanda J: la principal de una
  *     por ligar es «Ligar e iniciar consulta» (`ligar`), la ventana pequeña. I3: un evento de Google «por
  *     asignar» es una por ligar con «¿No es una cita?» al final. Evento: «Editar», T3
  *     «Convertir en cita» si nació en Google (§2, AG-DT-29), y «Eliminar»
@@ -135,7 +136,11 @@ function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: Opci
   /* Tanda J (punto 7) · En una por ligar la principal es «Ligar e iniciar
      consulta»: abre la ventana pequeña de ligar (`VentanaLigarCita`), no el
      formulario completo. */
-  return { principal: puedeIniciar ? 'ligar' : null, secundarias, peligro: viva ? 'cancelar' : null }
+  /* Una por ligar CANCELADA (reservó por enlace, o un evento de Google por asignar) sale de la agenda
+     como la cancelada con paciente: «Eliminar cita» la CIERRA (`POST …/quitar`), no la borra. Sin esto
+     se quedaba sin ninguna salida. La no asistida y la atendida, como antes: nada. */
+  const peligro: AccionTarjeta | null = viva ? 'cancelar' : cita.status === 'cancelled' ? 'eliminar-cita' : null
+  return { principal: puedeIniciar ? 'ligar' : null, secundarias, peligro }
 }
 
 /**

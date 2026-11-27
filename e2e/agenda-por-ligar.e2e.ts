@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   CORREO, SESION, DIA_FUTURO_LIBRE, interruptorAgenda, irAAgenda, pasarASemanaSiguiente, modalCita, soloEscritorio, sqlLocal, toastConTexto,
 } from './ayudas'
-import { editarDesdeTarjeta } from './interaccionesAyudas'
+import { editarDesdeTarjeta, tarjetaLectura } from './interaccionesAyudas'
 import { clicEnTarjeta, crearCitaPorLigar, aparcarEnlacesVigentes, devolverEnlaces, limpiarReservasE2e, marcaE2e, type CitaPorLigar } from './reservaAyudas'
 import { fechaHoraLocalAInstante } from '../src/lib/dates'
 
@@ -150,6 +150,34 @@ test('encendido: una cita por ligar que gastó un enlace único se cancela; el D
   await expect.poll(() => estado(c.citaId)).toBe('cancelled')
   expect(sqlLocal(`select count(*) from public.reserva_incidencias where appointment_id = :'id' and tipo = 'cancelacion'`, { id: c.citaId })).toBe('1')
   await expect(tarjeta(page)).toHaveCount(1)
+})
+
+/* Corrección del 2026-11-27 · Una por ligar CANCELADA se quedaba sin ninguna salida en la burbuja.
+   MUTACIÓN: `peligro: viva ? 'cancelar' : null` en `disposicionSinCambios` → rojo (no hay botón «Eliminar cita»). */
+test('encendido: una por ligar CANCELADA ofrece «Eliminar cita»: nombra a quien reservó y la quita de la agenda sin borrarla', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const c = cita('17:00', 'fijo')
+  sqlLocal(`update public.appointments set status = 'cancelled' where id = :'id'`, { id: c.citaId })
+  await abrirAgendaV2(page)
+  await clicEnTarjeta(tarjeta(page))
+  const burbuja = tarjetaLectura(page)
+  await expect(burbuja).toBeVisible()
+  await expect(burbuja.getByRole('button', { name: 'Cancelar cita', exact: true })).toHaveCount(0)
+  await burbuja.getByRole('button', { name: 'Eliminar cita', exact: true }).click()
+  const aviso = page.getByRole('dialog', { name: `¿Eliminar la cita cancelada de ${NOMBRE}? Sale de la agenda y no se puede deshacer; queda guardada en el historial.` })
+  await expect(aviso).toBeVisible()
+  const post = page.waitForResponse(r => r.url().endsWith(`/api/appointments/${c.citaId}/quitar`) && r.request().method() === 'POST')
+  await aviso.getByRole('button', { name: 'Eliminar cita' }).click()
+  expect((await post).status()).toBe(200)
+  await expect(tarjeta(page)).toHaveCount(0)
+  // En la base: sigue, cancelada y cerrada sin sustituta; y auditada a nombre de quien pulsó.
+  await expect.poll(() => sqlLocal(`select status || '|' || (cerrada_en is not null)::text || '|' || coalesce(sustituida_por::text, 'sin')
+                                      from public.appointments where id = :'id'`, { id: c.citaId })).toBe('cancelled|true|sin')
+  expect(sqlLocal(`select count(*) from public.audit_log a join auth.users u on u.id::text = a.user_id
+                    where a.registro_id = :'id' and a.accion = 'cita_quitada_de_agenda' and u.email = :'correo'`, { id: c.citaId, correo: CORREO.adminA })).toBe('1')
+  await page.reload()
+  await pasarASemanaSiguiente(page)
+  await expect(tarjeta(page)).toHaveCount(0)
 })
 
 test('encendido: guardarla sin paciente conserva el título y no manda paciente_id', async ({ page }) => {
