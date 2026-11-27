@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { Loader2, LogOut, MoreHorizontal, Plus } from 'lucide-react'
 import type { ElementType, MouseEvent } from 'react'
 
 /* ═══ EL RIEL DEL DUO CERRADO (`ext`) — B4 del rediseño ═════════════════════
@@ -47,6 +47,8 @@ interface Props {
   pendientes: number
   alAbrirMas: () => void
   accion: AccionRiel | null
+  /** «Cerrar sesión» (corrección 5): el manejador de `useCierreSesion` que le pasa `Sidebar`, tal cual. */
+  salir?: { alPulsar: () => void; ocupado: boolean }
 }
 
 /** «Más», o «Más, 3 datos pendientes» cuando hay distintivo: el número no puede vivir sólo en el dibujo. */
@@ -55,7 +57,7 @@ export function nombreBotonMas(pendientes: number): string {
   return `Más, ${pendientes} dato${pendientes > 1 ? 's' : ''} pendiente${pendientes > 1 ? 's' : ''}`
 }
 
-export default function RielNavegacion({ entradas, masActivo, masAbierto, pendientes, alAbrirMas, accion }: Props) {
+export default function RielNavegacion({ entradas, masActivo, masAbierto, pendientes, alAbrirMas, accion, salir }: Props) {
   return (
     <nav className="nav-riel" aria-label="Navegación principal">
       <ul className="nav-riel-lista">
@@ -78,6 +80,15 @@ export default function RielNavegacion({ entradas, masActivo, masAbierto, pendie
             {pendientes > 0 && <span className="nav-distintivo" aria-hidden="true">{pendientes}</span>}
           </button>
         </li>
+        {/* «Cerrar sesión» al final de la lista de arriba: la acción «+» de abajo no se mueve. */}
+        {salir && (
+          <li>
+            <button type="button" onClick={salir.alPulsar} disabled={salir.ocupado} aria-busy={salir.ocupado}
+              aria-label="Cerrar sesión" data-salir-riel className="nav-riel-boton k-pulsable">
+              {salir.ocupado ? <Loader2 size={22} className="animate-spin" aria-hidden="true" /> : <LogOut size={22} strokeWidth={1.8} aria-hidden="true" />}
+            </button>
+          </li>
+        )}
       </ul>
       {accion && (
         <button type="button" onClick={accion.alPulsar} aria-label={accion.etiqueta} className="nav-riel-accion k-pulsable">

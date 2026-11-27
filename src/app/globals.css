@@ -2579,6 +2579,14 @@ button.nav-consultorio-boton:hover { background: rgba(255, 255, 255, .14); }
   .nav-persona { gap: 8px; padding: 6px; }
   :is(.nav-persona-nombre, .nav-persona-detalle) { white-space: normal; }
 }
+/* Corrección 5 · con «Cerrar sesión» en el pie, la persona ocupa su propia línea y los iconos van debajo,
+   a la derecha (barra de `ih` y `esc` desplegada, y el cajón de `tel`/`iv`/`ext`). En una sola fila la
+   persona se quedaba con 78 px en `ih` (nombre en cuatro líneas), con «Mi perfil · …» recortado en `esc` y
+   con «Dr. Admin …» en el cajón. Medido en `ih` (médico de la semilla, tres pendientes): el pie pasa de
+   ~67 a 89 px de alto y `.nav-barra-medio` desplaza 19 px (su respaldo de siempre). Plegada, es columna. */
+.nav-barra .nav-pie { flex-wrap: wrap; justify-content: flex-end; row-gap: 0; }
+.nav-barra .nav-pie > .nav-persona { flex-basis: 100%; }
+@media (min-width: 1024px) { aside[data-plegada="true"] .nav-pie > .nav-persona { flex-basis: auto; } }
 .nav-plegar { display: none; }
 @media (min-width: 1024px) {
   .nav-plegar {

@@ -346,8 +346,20 @@ function MenuAjustes({ a, alCerrar, idMenu }: { a: Ajustes; alCerrar: () => void
 
 interface Persona { nombre: string; detalle: string; medico: boolean; perfilActivo: boolean; ayudaActiva: boolean }
 
-/** El pie de la barra: la persona («Mi perfil · Ajustes» del médico, «Ajustes» de la secretaria) y Ayuda.
- *  El engrane del médico lleva al grupo «Ajustes» de Mi perfil (mismas tres
+/** «Cerrar sesión» directo en el pie (corrección 5 de Angel), sin pasar por el engrane: el MISMO
+ *  manejador que la fila de los ajustes (`useCierreSesion`, sin confirmación, CALMA §29.14), y gira
+ *  sin admitir un segundo toque mientras se audita. Plegada, queda como icono junto a los otros. */
+function BotonSalirPie({ a }: { a: Ajustes }) {
+  return (
+    <button type="button" onClick={a.cerrarSesion} disabled={a.cerrando} aria-busy={a.cerrando} aria-label="Cerrar sesión"
+      data-salir-pie className="nav-icono nav-icono--barra k-pulsable">
+      {a.cerrando ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : <LogOut size={20} aria-hidden="true" />}
+    </button>
+  )
+}
+
+/** El pie de la barra: la persona («Mi perfil · Ajustes» del médico, «Ajustes» de la secretaria), Ayuda y
+ *  «Cerrar sesión». El engrane del médico lleva al grupo «Ajustes» de Mi perfil (mismas tres
  *  filas, CALMA §23.11). La secretaria no tiene `/perfil`: conserva el menú. */
 function PieBarra({ p, a, alNavegar }: { p: Persona; a: Ajustes; alNavegar: () => void }) {
   const [abierto, setAbierto] = useState(false)
@@ -380,6 +392,7 @@ function PieBarra({ p, a, alNavegar }: { p: Persona; a: Ajustes; alNavegar: () =
           <HelpCircle size={20} aria-hidden="true" />
         </Link>
       )}
+      <BotonSalirPie a={a} />
     </div>
   )
 }
@@ -623,7 +636,8 @@ export default function Sidebar() {
         pendientes={pendientes} alAbrirMas={() => setMasAbierto(true)} menuAbierto={mobileOpen} alAbrirMenu={abrirMenu}
         avatar={{ iniciales: d.iniciales, href: d.secretaria ? null : '/perfil', activo: activa === 'perfil' }} />
       <RielNavegacion entradas={deRiel} masActivo={enMas || (!d.secretaria && activa === 'perfil')} masAbierto={masAbierto}
-        pendientes={pendientes} alAbrirMas={() => setMasAbierto(true)} accion={accion} />
+        pendientes={pendientes} alAbrirMas={() => setMasAbierto(true)} accion={accion}
+        salir={{ alPulsar: handleLogout, ocupado: cerrando }} />
       {/* El velo del cajón: sólo abierto, y sólo donde la `<aside>` es cajón (CSS). */}
       {mobileOpen && <div className="nav-cajon-velo" onClick={cerrarMenu} aria-hidden="true" />}
       <aside id="barra-lateral" data-plegada={plegada ? 'true' : 'false'} data-abierta={mobileOpen ? 'true' : 'false'}
