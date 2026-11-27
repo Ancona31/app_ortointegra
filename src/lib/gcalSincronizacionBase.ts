@@ -5,8 +5,7 @@
  * las RPC de `20261113120000_agenda_c1_gcal_sync_estado.sql` y
  * `20261113130000_agenda_c2_gcal_aplicar.sql` con el cliente de servicio, y a
  * nada más: ninguna consulta directa a una tabla (lo vigila
- * `cerrojoGcalSincronizacion.test.ts`), con UNA excepción anotada y contada por
- * ese mismo cerrojo: `cerrarCancelada` (abajo).
+ * `cerrojoGcalSincronizacion.test.ts`).
  *
  * ── AISLAMIENTO ENTRE CLÍNICAS (pendiente prioritario de CLAUDE.md) ─────────
  * `createAdminClient()` esquiva la RLS. Por eso cada función recibe
@@ -249,33 +248,23 @@ export async function aplicarEvento(clinicaId: string, calendarId: string, a: Ap
   }))
 }
 
+const QuitadaSchema = z.object({ r_cerrada: z.boolean(), r_desvinculada: z.boolean() })
+
 /**
- * Cierra (`cerrada_en`) UNA cita CANCELADA: sale de la agenda sin borrarse, igual que «Eliminar cita».
- * La usa la decisión `quitar` (el evento de una cancelada se borró en Google; decisión de Angel, 2026-11-27).
- * Devuelve si ESTA llamada la cerró (`false` = ya estaba cerrada, ya no está cancelada o no es de la clínica).
- *
- * ⚠️ ÚNICA CONSULTA DIRECTA A UNA TABLA DE LA SINCRONIZACIÓN (auditoría de aislamiento entre clínicas:
- * `createAdminClient()` esquiva la RLS). Es la MISMA excepción, con los MISMOS cuatro filtros, que
- * `cerrar()` de `src/app/api/appointments/[id]/quitar/route.ts`: `id` + `clinica_id` + `status = 'cancelled'`
- * + `cerrada_en IS NULL`. No hay RPC para cerrar y se decidió no añadir una migración sólo para esto.
- * `clinicaId` sale del descriptor de la conexión (servidor), nunca de una petición, y se valida como uuid.
- * La base lo vuelve a imponer: `cita_proteger_cierre` (F5b) sólo deja a `service_role` cerrar una cancelada.
- * NO le quites ningún filtro ni la conviertas en un cierre «general»: el cerrojo
- * (`cerrojoGcalSincronizacion.test.ts`) exige esta función, sola, con sus cuatro filtros.
+ * BASE-2 (B1, `20261208120000`) · El evento de una cita CANCELADA se borró en Google (decisión `quitar`): la
+ * base la CIERRA (`cerrada_en`, como «Eliminar cita»: no se borra) y la desvincula, en una sola sentencia.
+ * Sólo una cancelada de la clínica que sigue ligada a ESE evento y calendario; quien manda sigue siendo
+ * `cita_proteger_cierre`. `cerrada` = ESTA llamada la cerró (false si ya lo estaba); idempotente: la segunda
+ * vez ya no está ligada y devuelve false/false. Sin la migración: `SincronizacionNoDisponible`.
  */
-export async function cerrarCancelada(clinicaId: string, citaId: string): Promise<boolean> {
-  const clinica = comprobarClinica(clinicaId)
-  const cita = UUID.parse(citaId)
-  const { data, error, status } = await createAdminClient().from('appointments')
-    .update({ cerrada_en: new Date().toISOString() })
-    .eq('id', cita).eq('clinica_id', clinica).eq('status', 'cancelled').is('cerrada_en', null)
-    .select('id')
-  if (error) {
-    const e: ErrorRpc = error
-    if (e.code && CODIGOS_AUSENTE.has(e.code)) throw new SincronizacionNoDisponible('cerrar_cancelada')
-    throw new FalloDeLaBase('cerrar_cancelada', e.code ?? '', typeof status === 'number' ? status : 0, e.message)
-  }
-  return (data ?? []).length === 1
+export async function quitarCanceladaDeGoogle(
+  clinicaId: string, calendarId: string, citaId: string, eventoId: string,
+): Promise<{ cerrada: boolean; desvinculada: boolean }> {
+  const filas = z.array(QuitadaSchema).parse(await llamar('gcal_cita_quitar_cancelada', clinicaId, {
+    p_cita_id: UUID.parse(citaId), p_calendar_id: calendarId, p_google_event_id: eventoId,
+  }))
+  const f = filas[0]
+  return { cerrada: f?.r_cerrada === true, desvinculada: f?.r_desvinculada === true }
 }
 
 /** K1 · Mueve o borra el bloqueo de horario de un evento de Google (nunca crea). Devuelve las filas tocadas. */

@@ -42,7 +42,7 @@ import {
   decidirEvento, marcaSpinus, type ContextoDecision, type Decision, type EventoGoogle, type FilaEspejo,
 } from '@/lib/gcalSincronizacionDecidir'
 import {
-  aplicarEvento, cerrarCancelada, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, procesarEmpalmesPendientes, registrarEmpalmesReserva,
+  aplicarEvento, quitarCanceladaDeGoogle, avanzarPagina, citasDeEventos, clinicaHabilitada, confirmarPorRsvp, importarEvento, procesarEmpalmesPendientes, registrarEmpalmesReserva,
   reiniciarToken, soltarCandado, SincronizacionNoDisponible, tomarCandado, CambioRechazadoPorLaBase, registrarMovimientoRechazado, type Candado,
   esFalloPasajeroDeLaBase,
 } from '@/lib/gcalSincronizacionBase'
@@ -516,21 +516,15 @@ async function ejecutar(pasada: Pasada, calendarId: string, d: Decision): Promis
  * Decisión de Angel (2026-11-27) · En Google se borró el evento de una cita ya CANCELADA: Spinus la quita de la
  * agenda (la CIERRA, como «Eliminar cita»: queda en el historial) y la desvincula, para que el evento no se
  * vuelva a crear ni la pasada siguiente la encuentre. Nada se restablece en Google.
- * ORDEN A PROPÓSITO: cerrar → desvincular → auditar. Cerrar es idempotente y no mueve `updated_at`; si el
- * segundo paso falla por algo pasajero se lanza, la página no avanza y la pasada siguiente lo repite. Al revés,
- * una cita ya desvinculada no se volvería a encontrar por su evento y se quedaría en la agenda.
- * Desvincular es la RPC de siempre (`gcal_aplicar_evento` con `desvincular` y sin cambios): en una cancelada no
- * toca estado, hora ni título. Se audita sólo si ESTA pasada la cerró (una que ya estaba cerrada sólo se desvincula).
+ * BASE-2 (B1): cerrar y desvincular son UNA sentencia de la base (`gcal_cita_quitar_cancelada`), no dos pasos:
+ * o las dos o ninguna. Si falla por algo pasajero se lanza, la página no avanza y la pasada siguiente lo repite.
+ * Se audita sólo si ESTA pasada la cerró (una que ya estaba cerrada sólo se desvincula).
  */
 async function quitarCancelada(pasada: Pasada, calendarId: string, d: Extract<Decision, { tipo: 'quitar' }>): Promise<void> {
   const { conexion, r } = pasada
-  const cerro = await cerrarCancelada(conexion.clinicaId, d.citaId)
-  const n = await aplicarEvento(conexion.clinicaId, calendarId, {
-    citaId: d.citaId, esperadoUpdatedAt: d.esperadoUpdatedAt, etag: null, actualizado: d.actualizado,
-    vincular: null, desvincular: true, cambios: {},
-  })
-  if (cerro || n > 0) r.cambios += 1
-  if (!cerro) return
+  const q = await quitarCanceladaDeGoogle(conexion.clinicaId, calendarId, d.citaId, d.eventoId)
+  if (q.cerrada || q.desvinculada) r.cambios += 1
+  if (!q.cerrada) return
   await logAudit({
     userId: conexion.userId, accion: 'cita_quitada_de_agenda', tabla: 'appointments', registroId: d.citaId,
     descripcion: JSON.stringify({ clinica: conexion.clinicaId, campos: ['cerrada_en'], motivo: 'borrado_en_google', via: 'sondeo', origen: 'sistema' }),

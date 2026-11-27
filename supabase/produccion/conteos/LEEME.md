@@ -469,3 +469,13 @@ leer: **R.9** (citas futuras hoy sin recordatorio por el defecto, que lo recibir
 hora: ventana vacía). Un ALTO en R.4 o R.5 es que el cuerpo de producción de alguna de las dos
 funciones no es el de F4: R1 abortaría limpia; no se aplica hasta saber quién la cambió. Guion:
 `docs/spec/recordatorio-reserva/ENSAYO.md`.
+
+## BASE-2 · B1, B2 y B3
+
+`conteos-base-2.sql` (se corre con `correr-conteos-base-2.sh`): las condiciones de los tres pre-vuelos
+(`20261208120000`, `…130000`, `…140000`) y los números que sólo da producción. Un ALTO en **B2.1**,
+**B2.2**, **B3.1** o **B3.2** es que el cuerpo de producción de esa función no es el de M4, M5 o MA: esa
+migración abortaría limpia; no se aplica hasta saber quién la cambió. Lo que hay que leer: **B1.4**
+(canceladas todavía ligadas a Google), **B2.4–B2.7** (cuánto hay por purgar, la cola de empalmes, las
+filas estimadas y si alguna pasada de la purga superó el lote) y **B3.6** (transacciones abiertas mucho
+rato). Guion: `docs/spec/base-2/ENSAYO.md`.

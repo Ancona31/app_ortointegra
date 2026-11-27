@@ -1226,15 +1226,29 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
 * **Una por ligar CANCELADA también ofrece «Eliminar cita»** (2026-11-27; `disposicionSinCambios` de
   `accionesTarjeta.ts`): reserva por enlace o evento de Google por asignar. La no asistida y la atendida, no.
 * **Si en Google se BORRA el evento de una cita ya CANCELADA, Spinus la quita de la agenda** (decisión de
-  Angel, 2026-11-27; sin migración): decisión `quitar` de `gcalSincronizacionDecidir.ts`, que la CIERRA
-  (`cerrada_en`, como «Eliminar cita») y la desvincula; nada se restablece en Google. Sólo `cancelled` y sólo
-  el borrado: mover o editar una cancelada, y todo lo de una atendida o no asistida, se sigue rechazando y
-  restableciendo (C-e). Orden fijo: cerrar → desvincular (`gcal_aplicar_evento` con `desvincular` y sin
-  cambios) → auditar (`cita_quitada_de_agenda`, `motivo: 'borrado_en_google'`). **`cerrarCancelada`
-  (`gcalSincronizacionBase.ts`) es la ÚNICA consulta directa a una tabla de la sincronización** (los mismos
-  cuatro filtros que `POST …/quitar`: `id`, `clinica_id`, `status = 'cancelled'`, `cerrada_en IS NULL`); el
-  cerrojo (`cerrojoGcalSincronizacion.test.ts`) la exige sola y con esa forma. No le quites un filtro ni añadas
-  otra `.from()` ahí. La base lo fija en `supabase/pruebas-sql/gq1_gcal_quitar_cancelada.sql`.
+  Angel, 2026-11-27): decisión `quitar` de `gcalSincronizacionDecidir.ts`, que la CIERRA (`cerrada_en`, como
+  «Eliminar cita») y la desvincula; nada se restablece en Google. Sólo `cancelled` y sólo el borrado: mover o
+  editar una cancelada, y todo lo de una atendida o no asistida, se sigue rechazando y restableciendo (C-e).
+  **Lo hace UNA función de la base, `gcal_cita_quitar_cancelada` (BASE-2 · B1, `20261208120000`; escrita, sin
+  aplicar en producción):** cierra y desvincula en una sentencia, sólo una cancelada de esa clínica que sigue
+  ligada a ESE evento y calendario; INVOKER a propósito (quien manda sigue siendo `cita_proteger_cierre`). El
+  código la llama (`quitarCanceladaDeGoogle`) y audita si la cerró (`cita_quitada_de_agenda`,
+  `motivo: 'borrado_en_google'`). **La sincronización no tiene NINGUNA consulta directa a una tabla:** el
+  cerrojo (`cerrojoGcalSincronizacion.test.ts`) exige cero `.from(`; no vuelvas a la excepción de `d08ad0a3`.
+  **Orden de despliegue: B1 primero, el código después** (`docs/spec/base-2/ENSAYO.md`, §3). La base lo fija en
+  `supabase/pruebas-sql/gq1_gcal_quitar_cancelada.sql`.
+* **Un lote con `LIMIT` se ELIGE en una sentencia y se ESCRIBE en otra** (BASE-2 · B2, `20261208130000`):
+  `SELECT array_agg(id) INTO v_ids FROM (SELECT … ORDER BY … LIMIT n FOR UPDATE SKIP LOCKED) s;` y luego
+  `… WHERE id = ANY (v_ids)`. **Nunca** `DELETE/UPDATE … WHERE id IN (SELECT … LIMIT n FOR UPDATE SKIP LOCKED)`:
+  con el plan «Nested Loop Semi Join» la subconsulta se vuelve a ejecutar por cada fila y el `LIMIT` deja de
+  ser un tope (`docs/spec/base-2/INFORME-LOTES.md`; lo vigila `b2_lotes_sin_reejecucion.sql`). Así están
+  `reserva_purgar` y `reserva_empalmes_pendientes_procesar`.
+* **`avisos_transaccion_mas_antigua()` no la ejecuta ningún rol de la app** (BASE-2 · B3, `20261208140000`):
+  sólo el disparador `aviso_visto_hasta_sellar()`, que por eso es SECURITY DEFINER. No le añadas a ese
+  disparador lecturas ni escrituras de tablas (correrían como su dueño), ni le devuelvas el EXECUTE a
+  `authenticated`. La función tira la foto de estadísticas antes de leer (`pg_stat_clear_snapshot`): no se lo
+  quites. Límite conocido y sin arreglo: una transacción abierta mucho rato retiene la marca de «Marcar
+  todos» (lo compensa el marcado uno a uno). Deshacer MA deshace también esto.
 * **Lo que pregunta antes de hacerse en la burbuja** es `pideConfirmacion`:
   «Cancelar cita», «Eliminar evento», «No asistió» y «Eliminar cita». Una acción
   destructiva nueva va ahí, con su texto en `textoDeConfirmacion`.

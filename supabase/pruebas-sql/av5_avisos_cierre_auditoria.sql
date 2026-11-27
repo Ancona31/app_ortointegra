@@ -16,10 +16,10 @@ begin
   end if;
   if has_function_privilege('anon', 'public.avisos_transaccion_mas_antigua()', 'EXECUTE')
      or has_function_privilege('service_role', 'public.avisos_transaccion_mas_antigua()', 'EXECUTE')
-     or not has_function_privilege('authenticated', 'public.avisos_transaccion_mas_antigua()', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.avisos_transaccion_mas_antigua()', 'EXECUTE')
      or exists (select 1 from pg_proc p, aclexplode(p.proacl) x
                  where p.oid = 'public.avisos_transaccion_mas_antigua()'::regprocedure and x.grantee = 0) then
-    raise exception 'AV5 caso 0: avisos_transaccion_mas_antigua() no es sólo para authenticated';
+    raise exception 'AV5 caso 0: algún rol de la app ejecuta avisos_transaccion_mas_antigua() (BASE-2 B3 se lo quitó a todos; falta 20261208140000 o se deshizo)';
   end if;
   if (select count(*) from pg_proc p
        where (p.oid, md5(replace(p.prosrc, E'\r\n', E'\n'))) in (
@@ -107,9 +107,10 @@ end $$;
 do $$
 declare v_abierta timestamptz; v_hasta timestamptz; v_antes timestamptz;
 begin
+  -- Como postgres: desde BASE-2 (B3) la sesión no puede llamarla; el disparador sí, como su dueño.
+  v_abierta := public.avisos_transaccion_mas_antigua();
   perform pg_temp.como('00000000-0000-4000-8000-0000005a0b04');
   set local role authenticated;
-  v_abierta := public.avisos_transaccion_mas_antigua();
   perform public.avisos_revisar_todos(clock_timestamp() + interval '1 hour');
   select hasta into v_hasta from public.avisos_vistos_hasta where usuario_id = '00000000-0000-4000-8000-0000005a0b04';
   reset role;
@@ -161,27 +162,21 @@ begin
   end if;
 end $$;
 
--- Caso 5: nadie sin sesión de la app llama a la función nueva, y con sesión sólo devuelve un instante.
+-- Caso 5: ningún rol de la app llama a la función (BASE-2 B3: tampoco la sesión; sólo el disparador de
+-- la marca, como su dueño), y sólo devuelve un instante.
 do $$
-declare v timestamptz;
+declare v timestamptz; v_rol text;
 begin
-  set local role anon;
-  begin
-    perform public.avisos_transaccion_mas_antigua();
-    raise exception 'AV5 caso 5: anon ejecutó avisos_transaccion_mas_antigua()';
-  exception when insufficient_privilege then null;
-  end;
-  reset role;
-  set local role service_role;
-  begin
-    perform public.avisos_transaccion_mas_antigua();
-    raise exception 'AV5 caso 5: service_role ejecutó avisos_transaccion_mas_antigua()';
-  exception when insufficient_privilege then null;
-  end;
-  reset role;
-  set local role authenticated;
+  foreach v_rol in array array['anon', 'service_role', 'authenticated'] loop
+    execute format('set local role %I', v_rol);
+    begin
+      perform public.avisos_transaccion_mas_antigua();
+      raise exception 'AV5 caso 5: % ejecutó avisos_transaccion_mas_antigua()', v_rol;
+    exception when insufficient_privilege then null;
+    end;
+    reset role;
+  end loop;
   v := public.avisos_transaccion_mas_antigua();
-  reset role;
   if v > clock_timestamp() then
     raise exception 'AV5 caso 5: devolvió un instante futuro';
   end if;

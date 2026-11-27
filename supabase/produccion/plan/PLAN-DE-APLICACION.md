@@ -1540,3 +1540,22 @@ después del despliegue. Reescribe dos funciones de F4 y no toca filas. Conteos
 de sólo lectura: `../conteos/conteos-recordatorio-reserva.sql`
 (`correr-conteos-recordatorio-reserva.sh`). Su reversa es la primera de la
 cadena de `aplicar.sh reversa`.
+
+## 18. BASE-2: quitar la cancelada por función, los lotes y los hallazgos bajos (3 migraciones, 2026-11-27)
+
+> Escritas y ensayadas sólo en local. Sin aplicar en producción. Guion, orden,
+> rejillas y lo no comprobado: `docs/spec/base-2/ENSAYO.md`. Informe de la
+> reproducción del defecto de los lotes: `docs/spec/base-2/INFORME-LOTES.md`.
+
+`20261208120000_gcal_quitar_cancelada` (B1),
+`20261208130000_lotes_sin_reejecucion` (B2) y
+`20261208140000_avisos_y_correos_cierre_bajos` (B3) van después de las 16
+anteriores; `aplicar.sh` las ofrece las últimas, en ese orden. Ninguna toca
+filas. Un solo ensayo y una sola sesión de aplicación.
+
+**B1 va ANTES que el código de la rama** (el código llama a la función nueva).
+B2 y B3 no dependen del código. Qué pasa en cada orden: `ENSAYO.md`, §3.
+
+Conteos de sólo lectura: `../conteos/conteos-base-2.sql`
+(`correr-conteos-base-2.sh`). Sus reversas son las tres primeras de la cadena
+de `aplicar.sh reversa` (B3, B2, B1).

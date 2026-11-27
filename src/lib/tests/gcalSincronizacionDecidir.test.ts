@@ -209,7 +209,7 @@ describe('borrar', () => {
   it('una CANCELADA cuyo evento se borra en Google: se quita de la agenda (no se rechaza ni se restablece), con o sin paciente', () => {
     for (const conPaciente of [false, true]) {
       expect(decidirEvento({ id: 'ev1', status: 'cancelled', updated: '2031-06-01T00:00:00.000Z' }, fila({ status: 'cancelled', conPaciente }), ctx)).toEqual({
-        tipo: 'quitar', citaId: CITA, esperadoUpdatedAt: fila().updatedAt, actualizado: '2031-06-01T00:00:00.000Z',
+        tipo: 'quitar', citaId: CITA, eventoId: 'ev1',
       })
     }
   })

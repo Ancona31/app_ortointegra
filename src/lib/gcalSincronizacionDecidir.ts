@@ -129,8 +129,8 @@ export type Decision =
       /** El evento de una cita CANCELADA se borró en Google: se cierra y se desvincula; nada se restablece. */
       tipo: 'quitar'
       citaId: string
-      esperadoUpdatedAt: string | null
-      actualizado: string | null
+      /** El evento borrado: la base sólo actúa si la cita sigue ligada a él. */
+      eventoId: string
     }
   | {
       tipo: 'rechazar'
@@ -323,7 +323,8 @@ function decidirBorrado(evento: EventoGoogle, fila: FilaEspejo, ctx: ContextoDec
   /* Antes que «gana el último»: el evento ya no existe y la cita ya estaba cancelada; no hay nada que
      restablecer ni que perder. Con o sin paciente, y también si ya estaba cerrada (sólo se desvincula). */
   if (fila.status === 'cancelled') {
-    return { tipo: 'quitar', citaId: fila.id, esperadoUpdatedAt: fila.updatedAt, actualizado: evento.updated ?? null }
+    /* `decidirEvento` ya descartó el evento sin id; se vuelve a mirar aquí para no afirmarlo con un `as`. */
+    return evento.id ? { tipo: 'quitar', citaId: fila.id, eventoId: evento.id } : { tipo: 'ignorar', motivo: 'sin_id' }
   }
   if (!ACTIVAS.has(fila.status)) {
     return { tipo: 'rechazar', citaId: fila.id, motivo: 'estado_cerrado', campos: ['borrado'], restablecer: true }

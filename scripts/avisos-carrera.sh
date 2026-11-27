@@ -17,6 +17,12 @@
 #      statement_timeout de la app (8 s): termina en menos de 2 s, con el médico
 #      cambiado. El aviso tomado conserva la copia vieja; el UPDATE de reparación
 #      (cabecera de la migración) la corrige.
+#   4. (BASE-2 · B3, hallazgo MA 1) La función que mira la transacción abierta más
+#      antigua lee fresco TAMBIÉN en su segunda llamada dentro de una misma
+#      transacción. A la llama, espera 2 s y la vuelve a llamar; entre medias B
+#      abre una transacción. La segunda lectura la VE. Control: con el cuerpo de
+#      MA (reversa de B3) la segunda lectura sigue diciendo «ninguna» (Postgres
+#      congela pg_stat_activity en la primera lectura). Se vuelve a aplicar B3.
 #
 # Orden: B arranca cuando A ya está en su pg_sleep (se mira en pg_stat_activity),
 # no tras una espera fija.
@@ -46,6 +52,10 @@ X0=00000000-0000-4000-8000-0000a5ca0a00; X1=00000000-0000-4000-8000-0000a5ca0a01
 TIPOS="array['reserva_enlace','cancelacion_paciente','confirmacion_paciente']"
 MIGRACION="$raiz/supabase/migrations/20261203130000_avisos_globales_cierre_auditoria.sql"
 REVERSA="$raiz/supabase/reversas/20261203130000_avisos_globales_cierre_auditoria_reversa.sql"
+# BASE-2 · B3 va encima de MA: deshacer MA la deshace también, así que tras el control del paso 2 se vuelve a aplicar.
+MIGRACION_B3="$raiz/supabase/migrations/20261208140000_avisos_y_correos_cierre_bajos.sql"
+REVERSA_B3="$raiz/supabase/reversas/20261208140000_avisos_y_correos_cierre_bajos_reversa.sql"
+b3_aplicada() { sql -c "select exists (select 1 from pg_proc where oid = to_regprocedure('public.avisos_transaccion_mas_antigua()') and position('pg_stat_clear_snapshot' in prosrc) > 0)"; }
 
 limpiar() {
   sql <<SQL || echo "AVISO: la limpieza falló; revisar la clínica $C a mano." >&2
@@ -141,6 +151,33 @@ SQL
   echo "con A confirmada: $(pendientes | tail -1)"
 }
 
+# A (postgres: ningún rol de la app puede llamarla) lee, espera 2 s y vuelve a leer en la MISMA transacción;
+# mientras duerme, B abre una transacción y la retiene. Imprime «ve» o «no ve» para la segunda lectura.
+# La vuelta sólo vale si la PRIMERA lectura dijo «ninguna» (los servicios locales de Supabase abren
+# transacciones breves de vez en cuando, y una foto congelada con una de ésas no demuestra nada): si no,
+# se repite, hasta 8 veces.
+carrera_lectura() {
+  local i a b
+  for i in $(seq 1 8); do
+    docker exec -e PGAPPNAME=avisos-carrera-l -i "$contenedor" psql -U postgres -d postgres -v ON_ERROR_STOP=1 -At -q > "$tmp/lectura" <<SQL &
+begin;
+select 'a1:' || (public.avisos_transaccion_mas_antigua() is not null)::text;
+select pg_sleep(2);
+select 'a2:' || (public.avisos_transaccion_mas_antigua() is not null)::text;
+commit;
+SQL
+    a=$!
+    esperar_dormida avisos-carrera-l
+    sql -c "begin; select pg_sleep(3); commit;" >/dev/null &
+    b=$!
+    wait "$a"; wait "$b"
+    grep -q '^a1:false$' "$tmp/lectura" || continue
+    if grep -q '^a2:true$' "$tmp/lectura"; then echo "ve"; else echo "no ve"; fi
+    return 0
+  done
+  echo "sin medir: la primera lectura nunca salió limpia"
+}
+
 exigir() {  # $1 = qué; $2 = obtenido; $3 = esperado
   if [ "$2" != "$3" ]; then echo "FALLO · $1: salió «$2», esperaba «$3»" >&2; exit 1; fi
   echo "ok · $1"
@@ -159,6 +196,10 @@ sql -o /dev/null -f - < "$REVERSA"
 salida="$(carrera_marcar)"; echo "$salida" | sed 's/^/   /'
 sql -o /dev/null -f - < "$MIGRACION" 2>/dev/null
 exigir "MA vuelve a estar aplicada" "$(sql -c "select to_regprocedure('public.avisos_transaccion_mas_antigua()') is not null")" "t"
+if [ -f "$MIGRACION_B3" ]; then
+  sql -o /dev/null -f - < "$MIGRACION_B3" 2>/dev/null
+  exigir "B3 vuelve a estar aplicada (deshacer MA la deshizo)" "$(b3_aplicada)" "t"
+fi
 exigir "con M1, el aviso que confirmó después NO sale (el defecto)" "$(echo "$salida" | sed -n 3p)" "con A confirmada: ninguno"
 
 echo "── 3 · reasignar una cita con la fila de su aviso tomada por otra sesión"
@@ -188,5 +229,14 @@ wait "$a"
 exigir "el aviso tomado conserva la copia vieja" "$(sql -c "select medico_id from public.avisos_clinica where cita_id = '$X2'")" "$U1"
 sql -c "update public.avisos_clinica a set medico_id = ap.medico_id from public.appointments ap where a.cita_id = ap.id and a.clinica_id = ap.clinica_id and a.medico_id is distinct from ap.medico_id and a.clinica_id = '$C'" >/dev/null
 exigir "el UPDATE de reparación la corrige" "$(sql -c "select medico_id from public.avisos_clinica where cita_id = '$X2'")" "$U2"
+
+echo "── 4 · la segunda lectura de una transacción ve lo que se abrió después (BASE-2 · B3)"
+exigir "B3 está aplicada" "$(b3_aplicada)" "t"
+exigir "con B3, la segunda lectura VE la transacción que abrió B" "$(carrera_lectura)" "ve"
+sql -o /dev/null -f - < "$REVERSA_B3"
+salida="$(carrera_lectura)"
+sql -o /dev/null -f - < "$MIGRACION_B3" 2>/dev/null
+exigir "B3 vuelve a estar aplicada" "$(b3_aplicada)" "t"
+exigir "control: con el cuerpo de MA, la segunda lectura NO la ve (el defecto)" "$salida" "no ve"
 
 echo "Carreras de avisos: en verde."
