@@ -1406,7 +1406,9 @@ siempre).** Registro: `docs/spec/rediseno/IMPLEMENTACION-REGISTRO.md` («B13 · 
   «Cancelar cita»/«Volver», «Eliminar…», «Guardar», «Mover», «Agendar», y en la configuración «Apagar» y «Cambiar»
   (`alertaDeEnlace`). «Aceptar» queda sólo con la v2 apagada.
 * **Textos unificados (§28):** «Agendada desde Google Calendar», «Reservó por enlace», «Ligar paciente e iniciar
-  consulta», «¿No es una cita?». No reintroduzcas las variantes viejas.
+  consulta», «¿No es una cita?». No reintroduzcas las variantes viejas. **Única excepción
+  aprobada (Angel, 2026-11-27):** el botón de la tarjeta del inicio (`dashboard/page.tsx`) dice «Ligar e iniciar
+  consulta», para no recortar el nombre; la burbuja de la agenda, `VentanaLigarCita` y la campana conservan el largo.
 
 **Pruebas de navegador (2026-11-22, equipo nuevo; AG-DT-256):**
 
