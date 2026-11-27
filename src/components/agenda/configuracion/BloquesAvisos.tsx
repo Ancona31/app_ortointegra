@@ -14,9 +14,11 @@
  * Quien no administra la clínica lo ve deshabilitado, con la razón.
  *
  * EL RECORDATORIO SE ELIGE EN HORAS, LIBRE (decisión de Angel, 2026-11-26: «que cada quien escoja con
- * cuántas horas de antelación se manda»): un campo numérico como los de los plazos (`CampoNumero`), en el
- * rango de la base (`LIMITES_AJUSTES_AGENDA`), en vez de la lista fija de cuatro opciones. Se guarda como
- * ellos (al salir del campo o 700 ms después de la última tecla) y su error sale debajo de él.
+ * cuántas horas de antelación se manda»): un campo numérico con el aspecto y el tamaño de los de los plazos
+ * (el mismo `input` de `CampoNumero`), de 2 a 72 horas (`LIMITES_AJUSTES_AGENDA`), en vez de la lista fija de
+ * cuatro opciones. Va DENTRO de su frase, alineada a la izquierda (no usa `CampoNumero`, que reparte la etiqueta
+ * y el valor a los dos extremos). Se guarda como ellos (al salir del campo o 700 ms después de la última tecla)
+ * y su error sale debajo de él.
  *
  * B13 · AG9/AG10 (rediseño, maquetas `ag-config` y `ag-pv`): filas de ajustes en UNA superficie con separadores
  * (`.agc-lista`): título 15/600 y ayuda 13 a la izquierda, el interruptor a la derecha, alineado con el título.
@@ -74,7 +76,16 @@ function Recordatorio({ estado, puedeEditar, variante }: Props) {
           deshabilitado={!puedeEditar || estado.recordatorio === null || estado.ocupado !== null} />} />
       {estado.recordatorio === true && estado.textos && (
         <>
-          <CampoNumero estado={estado} campo="recordatorio_horas" antes="Mandarlo" despues="horas antes de la cita" puedeEditar={puedeEditar} />
+          {/* La frase JUNTA y a la izquierda («Mandarlo [2] horas antes de la cita»), no repartida a los dos extremos como
+              los plazos de abajo (`CampoNumero`). «Mandarlo» y el campo no se separan; si no cabe, parte después del campo. */}
+          <label className={ETIQUETA}>
+            <span className="flex items-center gap-[8px] whitespace-nowrap">Mandarlo
+              <input type="number" inputMode="numeric" min={LIMITES_AJUSTES_AGENDA.recordatorio_horas.min} max={LIMITES_AJUSTES_AGENDA.recordatorio_horas.max}
+                className={`${CAMPO_NUEVO} agc-num w-[76px]`} disabled={!puedeEditar} value={estado.textos.recordatorio_horas}
+                onChange={e => estado.escribir('recordatorio_horas', e.target.value)} onBlur={estado.soltar} />
+            </span>
+            <span>horas antes de la cita</span>
+          </label>
           {esDelRecordatorio(estado.invalido) && <p role="alert" className={ERROR}>{estado.invalido}</p>}
         </>
       )}
