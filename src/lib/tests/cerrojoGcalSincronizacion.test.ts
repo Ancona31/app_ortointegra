@@ -11,6 +11,10 @@
  *   · NINGÚN `.from(` en los cuatro `src/lib/gcalSincronizacion*.ts`: todo lo
  *     que tocan de la base pasa por RPC con `p_clinica_id`. Es la defensa del
  *     pendiente prioritario de CLAUDE.md (createAdminClient esquiva la RLS).
+ *     UNA EXCEPCIÓN, contada y con forma fija (2026-11-27, decisión de Angel:
+ *     sin migración): `cerrarCancelada` de la base, que cierra una cita
+ *     CANCELADA con los mismos cuatro filtros que `POST …/quitar`. Si aparece
+ *     otro `.from(`, o a éste le falta un filtro, esto falla.
  *
  * Mismo diseño y mismas limitaciones que `cerrojoGcalConexion.test.ts` (léelo:
  * salta en `npm test`, NO en el build; no atrapa la indirección). Se duplica
@@ -87,7 +91,25 @@ describe('cerrojo de la sincronización con Google (bloque C)', () => {
       readFileSync(join(process.cwd(), rel), 'utf8').split('\n')
         .map((linea, i) => (FROM.test(linea) ? `${rel}:${i + 1}` : null))
         .filter((x): x is string => x !== null))
-    expect(conFrom).toEqual([])
+    /* La única permitida: UNA línea, en la base, dentro de `cerrarCancelada`. */
+    expect(conFrom).toHaveLength(1)
+    expect(conFrom[0].startsWith(`${BASE}:`)).toBe(true)
+  })
+
+  it('la única excepción es `cerrarCancelada`, sobre appointments, con sus cuatro filtros y sólo `cerrada_en`', () => {
+    const fuente = readFileSync(join(process.cwd(), BASE), 'utf8')
+    const desde = fuente.indexOf('export async function cerrarCancelada(')
+    expect(desde).toBeGreaterThan(-1)
+    const cuerpo = fuente.slice(desde, fuente.indexOf('\n}\n', desde))
+    expect(cuerpo.match(/\.\s*from\s*\(/g)).toHaveLength(1)
+    expect(cuerpo).toContain(".from('appointments')")
+    expect(cuerpo).toContain('.update({ cerrada_en: new Date().toISOString() })')
+    for (const filtro of [".eq('id', cita)", ".eq('clinica_id', clinica)", ".eq('status', 'cancelled')", ".is('cerrada_en', null)"]) {
+      expect(cuerpo).toContain(filtro)
+    }
+    expect(cuerpo).toContain('comprobarClinica(clinicaId)')
+    // Y el resto del archivo no tiene ninguna.
+    expect((fuente.slice(0, desde) + fuente.slice(desde + cuerpo.length)).match(/\.\s*from\s*\(/g)).toBeNull()
   })
 
   it('el detector no está muerto: ve las doce RPC en sus dueños y un .from( de verdad', () => {

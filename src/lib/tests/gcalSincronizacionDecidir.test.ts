@@ -199,10 +199,29 @@ describe('borrar', () => {
     })
   })
 
-  it.each(['attended', 'no_show', 'cancelled'] as const)('C-e: %s borrada en Google: se rechaza y se restablece', (status) => {
+  it.each(['attended', 'no_show'] as const)('C-e: %s borrada en Google: se rechaza y se restablece', (status) => {
     expect(decidirEvento({ id: 'ev1', status: 'cancelled' }, fila({ status }), ctx)).toEqual({
       tipo: 'rechazar', citaId: CITA, motivo: 'estado_cerrado', campos: ['borrado'], restablecer: true,
     })
+  })
+
+  /* Decisión de Angel (2026-11-27). MUTACIÓN: sin la rama `cancelled` de `decidirBorrado` → rojo (sale `rechazar`). */
+  it('una CANCELADA cuyo evento se borra en Google: se quita de la agenda (no se rechaza ni se restablece), con o sin paciente', () => {
+    for (const conPaciente of [false, true]) {
+      expect(decidirEvento({ id: 'ev1', status: 'cancelled', updated: '2031-06-01T00:00:00.000Z' }, fila({ status: 'cancelled', conPaciente }), ctx)).toEqual({
+        tipo: 'quitar', citaId: CITA, esperadoUpdatedAt: fila().updatedAt, actualizado: '2031-06-01T00:00:00.000Z',
+      })
+    }
+  })
+
+  it('…aunque Spinus la haya tocado después del borrado (no aplica «gana el último»: el evento ya no existe)', () => {
+    const d = decidirEvento({ id: 'ev1', status: 'cancelled', updated: '2031-01-01T00:00:00.000Z' }, fila({ status: 'cancelled', updatedAt: '2031-12-31T00:00:00+00:00' }), ctx)
+    expect(d).toMatchObject({ tipo: 'quitar', citaId: CITA })
+  })
+
+  it('una cancelada que sólo se ligaría por la marca: ignorar (como cualquier borrado sin vínculo)', () => {
+    expect(decidirEvento({ id: 'ev1', status: 'cancelled' }, fila({ status: 'cancelled', googleEventId: null }), ctx))
+      .toEqual({ tipo: 'ignorar', motivo: 'cancelado_sin_vinculo' })
   })
 
   it('borrado de un evento sin fila: ignorar (no se crea nada)', () => {

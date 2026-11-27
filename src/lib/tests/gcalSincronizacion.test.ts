@@ -125,6 +125,12 @@ const db = vi.hoisted(() => ({
   /** Tanda I, punto 9: la base rechaza (candado de la cita por enlace) lo que cambia contenido. */
   rechazarAplicar: new Set<string>(),
   aplicarDevuelve: 1,
+  /** 2026-11-27: las llamadas a `cerrarCancelada`, lo que devuelve y si falla (con el error de la capa REAL). */
+  cerradas: [] as string[],
+  cerrarDevuelve: true,
+  errorCerrar: null as unknown,
+  /** El orden en que se llama a la base en una decisión `quitar`. */
+  orden: [] as string[],
   /** E9: las llamadas a `confirmarPorRsvp` y lo que devuelve (o lanza). */
   rsvps: [] as Array<{ citaId: string; eventId: string; aceptaron: string[] }>,
   rsvpDevuelve: true as boolean | 'lanza',
@@ -178,7 +184,14 @@ vi.mock('@/lib/gcalSincronizacionBase', async (importOriginal) => {
       if (db.espejoFalla && ids.length + marcas.length > 0) throw new Error('la base falló')
       return db.filas.filter((f) => (f.googleEventId && ids.includes(f.googleEventId)) || marcas.includes(f.id))
     },
+    cerrarCancelada: async (_c: string, citaId: string) => {
+      db.orden.push('cerrar')
+      if (db.errorCerrar) throw db.errorCerrar
+      db.cerradas.push(citaId)
+      return db.cerrarDevuelve
+    },
     aplicarEvento: async (_c: string, _cal: string, a: Aplicacion) => {
+      db.orden.push('aplicar')
       if (db.fallarAplicar.has(a.citaId)) throw new Error('la base falló')
       if (db.errorAplicar) throw db.errorAplicar
       if (db.rechazarAplicar.has(a.citaId) && Object.keys(a.cambios).length > 0) throw new real.CambioRechazadoPorLaBase('gcal_aplicar_evento')
@@ -257,7 +270,7 @@ beforeEach(() => {
   Object.assign(db, {
     fase: 'completa', syncToken: null, pageToken: null, ventana: null, candado: null, ocupado: false, habilitada: true,
     noDisponible: false, noDisponibleC2: false, soltados: [], reinicios: 0, filas: [fila()], aplicadas: [], importadas: [], fallarAplicar: new Set(), errorAplicar: null, rechazarAplicar: new Set(),
-    aplicarDevuelve: 1, rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, empalmesFallan: 0, espejoFalla: false, movimientos: [], movimientosFalla: null,
+    aplicarDevuelve: 1, cerradas: [], cerrarDevuelve: true, errorCerrar: null, orden: [], rsvps: [], rsvpDevuelve: true, empalmes: [], empalmesFalla: null, empalmesFallan: 0, espejoFalla: false, movimientos: [], movimientosFalla: null,
     cola: 'ausente', colaBuenas: 0, colaLlamadas: 0,
   })
   Object.assign(h.estado, { guion: [], llamadas: [], opcionesLista: [], calendarioRegistrado: CAL, insertCalendario: 0, parches: [], patchFalla: null })
@@ -411,6 +424,56 @@ describe('cada decisión llega a su RPC', () => {
     }))
     const desc = JSON.parse(vi.mocked(logAudit).mock.calls[0][0].descripcion ?? '{}')
     expect(desc).toEqual({ clinica: CLINICA, gana: 'spinus', motivo: 'estado_cerrado', campos: ['hora'], via: 'sondeo', origen: 'sistema' })
+  })
+
+  /* Decisión de Angel (2026-11-27). MUTACIONES: sin `cerrarCancelada` en `quitarCancelada` → rojo (no se cierra);
+     desvincular antes de cerrar → rojo (el orden); `r.restablecer.push` en `quitar` → rojo (se restablecería). */
+  it('una CANCELADA borrada en Google: se cierra, se desvincula y se audita; nada se restablece ni se escribe en Google', async () => {
+    db.filas = [fila({ status: 'cancelled', conPaciente: true, tituloSinPaciente: null, paciente: { nombre: 'Ana', apellidos: 'Pech' } })]
+    h.estado.guion = [pagina([evento({ status: 'cancelled', etag: undefined })], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r).toMatchObject({ estado: 'ok', errores: 0, cambios: 1, restablecer: [] })
+    expect(db.cerradas).toEqual([CITA])
+    expect(db.orden).toEqual(['cerrar', 'aplicar'])
+    expect(db.aplicadas).toEqual([expect.objectContaining({ citaId: CITA, desvincular: true, vincular: null, etag: null, cambios: {}, esperadoUpdatedAt: fila().updatedAt })])
+    expect(h.estado.parches).toEqual([])
+    expect(vi.mocked(logAudit)).toHaveBeenCalledTimes(1)
+    const llamada = vi.mocked(logAudit).mock.calls[0][0]
+    expect(llamada).toMatchObject({ accion: 'cita_quitada_de_agenda', registroId: CITA, userId: DUENO, tabla: 'appointments' })
+    // Sin PII: clínica, nombres de campo y de dónde vino. Ni nombre, ni título, ni hora.
+    expect(JSON.parse(llamada.descripcion ?? '{}')).toEqual({ clinica: CLINICA, campos: ['cerrada_en'], motivo: 'borrado_en_google', via: 'sondeo', origen: 'sistema' })
+    expect(db.syncToken).toBe('t')
+  })
+
+  it('…una cancelada que YA estaba cerrada: sólo se desvincula; sin auditoría nueva', async () => {
+    db.filas = [fila({ status: 'cancelled' })]
+    db.cerrarDevuelve = false
+    h.estado.guion = [pagina([evento({ status: 'cancelled', etag: undefined })], { nextSyncToken: 't' })]
+    expect(await sincronizarClinica(conexion, op)).toMatchObject({ estado: 'ok', errores: 0, cambios: 1, restablecer: [] })
+    expect(db.aplicadas).toEqual([expect.objectContaining({ citaId: CITA, desvincular: true, cambios: {} })])
+    expect(vi.mocked(logAudit)).not.toHaveBeenCalled()
+  })
+
+  it('…si la base falla por algo PASAJERO al cerrar, la página no avanza y no se desvincula (la pasada siguiente lo repite)', async () => {
+    Object.assign(db, { fase: 'incremental', syncToken: 'tok-1', ventana: '2031-05-02T00:00:00.000Z' })
+    db.filas = [fila({ status: 'cancelled' })]
+    const real = await vi.importActual<typeof import('@/lib/gcalSincronizacionBase')>('@/lib/gcalSincronizacionBase')
+    db.errorCerrar = new real.FalloDeLaBase('cerrar_cancelada', '57014', 500, 'canceling statement')
+    h.estado.guion = [pagina([evento({ status: 'cancelled', etag: undefined })], { nextSyncToken: 'tok-2' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r.errores).toBeGreaterThan(0)
+    expect(db.aplicadas).toEqual([])
+    expect(db.syncToken).toBe('tok-1')
+    expect(vi.mocked(logAudit)).not.toHaveBeenCalled()
+  })
+
+  it.each(['attended', 'no_show'] as const)('…una %s borrada en Google sigue como antes: se rechaza y se restablece, sin cerrar nada', async (status) => {
+    db.filas = [fila({ status })]
+    h.estado.guion = [pagina([evento({ status: 'cancelled', etag: undefined })], { nextSyncToken: 't' })]
+    const r = await sincronizarClinica(conexion, op)
+    expect(r.restablecer).toEqual([CITA])
+    expect(db.cerradas).toEqual([])
+    expect(vi.mocked(logAudit)).toHaveBeenCalledWith(expect.objectContaining({ accion: 'gcal_cambio_rechazado' }))
   })
 
   it('conflicto: gana Google sobre una escritura de Spinus pendiente, y se audita', async () => {
@@ -582,10 +645,13 @@ describe('C5 · restablecer en Google lo rechazado', () => {
     expect(params.requestBody).not.toHaveProperty('description')
   })
 
-  it('cancelada borrada en Google: se restaura con «CANCELADA — » (status confirmed)', async () => {
+  /* Desde el 2026-11-27 una cancelada BORRADA en Google ya no se restaura (se quita de la agenda: «cada decisión
+     llega a su RPC»). MOVERLA o editarla sigue rechazándose y restaurándose con su prefijo. */
+  it('cancelada MOVIDA en Google: se restaura con «CANCELADA — » (status confirmed)', async () => {
     db.filas = [fila({ status: 'cancelled' })]
-    h.estado.guion = [pagina([{ id: 'ev1', etag: '"e9"', status: 'cancelled' }], { nextSyncToken: 't' })]
+    h.estado.guion = [pagina([evento({ etag: '"e9"' })], { nextSyncToken: 't' })]
     await sincronizarClinica(conexion, op)
+    expect(db.cerradas).toEqual([])
     const { params } = h.estado.parches[0] as { params: calendar_v3.Params$Resource$Events$Patch }
     expect(params.requestBody).toMatchObject({ summary: 'CANCELADA — Junta', status: 'confirmed', colorId: '11' })
   })

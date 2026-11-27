@@ -296,6 +296,43 @@ test('encendido: un borrado en Google cancela la cita (no la borra)', async ({ p
   expect(fila(id)).toMatchObject({ estado: 'cancelled', evento: '' })
 })
 
+/* Decisión de Angel (2026-11-27) · Borrar en Google el evento de una cita YA cancelada la quita de la agenda
+   (la cierra, como «Eliminar cita»): antes Spinus lo rechazaba y volvía a crear el evento.
+   MUTACIÓN: sin la rama `cancelled` de `decidirBorrado` → rojo (la cita sigue abierta y el evento reaparece). */
+test('encendido: borrar en Google el evento de una cita CANCELADA la quita de la agenda (la cierra) y no vuelve a crear el evento', async ({ page }) => {
+  interruptorAgenda('A', true)
+  const id = await alta(page, { apellidos: 'Prueba 24', hora: '16:15', minutos: 30, dia: DIA_FUTURO })
+  const ev = await esperarLigada(id)
+  const res = await page.request.put(`/api/appointments/${id}`, { data: { status: 'cancelled' } })
+  expect(res.ok(), await res.text()).toBeTruthy()
+  // El after() del PUT: el evento se queda en Google con «CANCELADA — » y su etag nuevo queda guardado.
+  await expect.poll(() => g().eventos.get(ev.id)?.summary ?? '').toContain('CANCELADA')
+  await expect.poll(() => fila(id).etag).toBe(g().eventos.get(ev.id)?.etag)
+
+  const desde = sqlLocal('select clock_timestamp()::text')
+  g().borrar(ev.id)
+  permitirSondeo()
+  const r = await abrirYSondear(page)
+  expect(r.estado).toBe('ok')
+  // En la base: sigue (cancelada), CERRADA sin sustituta y desvinculada.
+  expect(sqlLocal(`select status || '|' || (cerrada_en is not null)::text || '|' || coalesce(sustituida_por::text, 'sin') || '|'
+                          || coalesce(google_event_id, 'sin') || '|' || gcal_sync_status
+                     from public.appointments where id = :'id'`, { id })).toBe('cancelled|true|sin|sin|unbound')
+  // Auditada como «quitada de la agenda», de la sincronización y sin PII; nada de «cambio rechazado».
+  expect(sqlLocal(`select count(*) || '|' || coalesce(max(descripcion), '') from public.audit_log
+                    where accion = 'cita_quitada_de_agenda' and registro_id = :'id' and created_at >= :'d'::timestamptz`, { id, d: desde }))
+    .toMatch(/^1\|\{.*"motivo":"borrado_en_google".*"origen":"sistema".*\}$/)
+  expect(sqlLocal(`select count(*) from public.audit_log where accion = 'gcal_cambio_rechazado' and registro_id = :'id'`, { id })).toBe('0')
+  // En Google NO se vuelve a crear: ningún evento vivo lleva la marca de esta cita.
+  const vivos = [...g().eventos.values()].filter(e => e.status !== 'cancelled' && e.extendedProperties?.private?.spinus_cita === id)
+  expect(vivos).toEqual([])
+  // Y otra pasada no la revive ni la reabre.
+  permitirSondeo()
+  await abrirYSondear(page)
+  expect(sqlLocal(`select (cerrada_en is not null)::text || '|' || coalesce(google_event_id, 'sin') from public.appointments where id = :'id'`, { id })).toBe('true|sin')
+  expect([...g().eventos.values()].filter(e => e.status !== 'cancelled' && e.extendedProperties?.private?.spinus_cita === id)).toEqual([])
+})
+
 test('encendido: un evento creado en Google aparece como fila editable y una sola vez', async ({ page }) => {
   interruptorAgenda('A', true)
   const titulo = tituloUnico('Creado en Google')

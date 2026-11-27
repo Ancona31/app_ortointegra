@@ -18,6 +18,11 @@
  *   se rechaza, se audita y se marca para volver a escribir en Google el
  *   estado de Spinus. La reescritura NO es de aquí (la hace C5): aquí sólo se
  *   decide y se marca. Restaurar en Google un evento borrado no reactiva nada.
+ *   ÚNICA EXCEPCIÓN (decisión de Angel, 2026-11-27): si se BORRA en Google el
+ *   evento de una cita ya CANCELADA, Spinus la quita de la agenda (la cierra,
+ *   como «Eliminar cita») y la desvincula: decisión `quitar`. Sólo `cancelled`
+ *   y sólo el borrado; mover o editar una cancelada, y todo lo de una atendida
+ *   o no asistida, sigue como arriba.
  * · S1: las observaciones escritas en Spinus no viajan a Google. Única
  *   excepción: una fila nacida en Google (`origen='google'`) y SIN paciente
  *   conserva su descripción en los dos sentidos. Ligada a un paciente, deja de
@@ -119,6 +124,13 @@ export type Decision =
       conflicto: 'gana_google' | null
       /** Lo que Google cambió y NO se acepta: C5 vuelve a escribir el de Spinus. */
       restablecer: CampoCambio[]
+    }
+  | {
+      /** El evento de una cita CANCELADA se borró en Google: se cierra y se desvincula; nada se restablece. */
+      tipo: 'quitar'
+      citaId: string
+      esperadoUpdatedAt: string | null
+      actualizado: string | null
     }
   | {
       tipo: 'rechazar'
@@ -308,6 +320,11 @@ function decidirSinFila(evento: EventoGoogle, id: string, ctx: ContextoDecision)
 /** Borrado en Google de un evento ligado. */
 function decidirBorrado(evento: EventoGoogle, fila: FilaEspejo, ctx: ContextoDecision, vincular: string | null): Decision {
   if (vincular) return { tipo: 'ignorar', motivo: 'cancelado_sin_vinculo' }
+  /* Antes que «gana el último»: el evento ya no existe y la cita ya estaba cancelada; no hay nada que
+     restablecer ni que perder. Con o sin paciente, y también si ya estaba cerrada (sólo se desvincula). */
+  if (fila.status === 'cancelled') {
+    return { tipo: 'quitar', citaId: fila.id, esperadoUpdatedAt: fila.updatedAt, actualizado: evento.updated ?? null }
+  }
   if (!ACTIVAS.has(fila.status)) {
     return { tipo: 'rechazar', citaId: fila.id, motivo: 'estado_cerrado', campos: ['borrado'], restablecer: true }
   }

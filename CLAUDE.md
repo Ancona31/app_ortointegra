@@ -1223,6 +1223,18 @@ proyecto, 32 con las de `main`).** Además de lo de arriba:
   (`consultaCitas`, el tiempo real, el buscador) y ninguna se reabre desde la
   app; sólo `postgres`, en SQL. No uses `DELETE` para esto:
   `cita_proteger_borrado` lo veta con la v2 y debe seguir así.
+* **Una por ligar CANCELADA también ofrece «Eliminar cita»** (2026-11-27; `disposicionSinCambios` de
+  `accionesTarjeta.ts`): reserva por enlace o evento de Google por asignar. La no asistida y la atendida, no.
+* **Si en Google se BORRA el evento de una cita ya CANCELADA, Spinus la quita de la agenda** (decisión de
+  Angel, 2026-11-27; sin migración): decisión `quitar` de `gcalSincronizacionDecidir.ts`, que la CIERRA
+  (`cerrada_en`, como «Eliminar cita») y la desvincula; nada se restablece en Google. Sólo `cancelled` y sólo
+  el borrado: mover o editar una cancelada, y todo lo de una atendida o no asistida, se sigue rechazando y
+  restableciendo (C-e). Orden fijo: cerrar → desvincular (`gcal_aplicar_evento` con `desvincular` y sin
+  cambios) → auditar (`cita_quitada_de_agenda`, `motivo: 'borrado_en_google'`). **`cerrarCancelada`
+  (`gcalSincronizacionBase.ts`) es la ÚNICA consulta directa a una tabla de la sincronización** (los mismos
+  cuatro filtros que `POST …/quitar`: `id`, `clinica_id`, `status = 'cancelled'`, `cerrada_en IS NULL`); el
+  cerrojo (`cerrojoGcalSincronizacion.test.ts`) la exige sola y con esa forma. No le quites un filtro ni añadas
+  otra `.from()` ahí. La base lo fija en `supabase/pruebas-sql/gq1_gcal_quitar_cancelada.sql`.
 * **Lo que pregunta antes de hacerse en la burbuja** es `pideConfirmacion`:
   «Cancelar cita», «Eliminar evento», «No asistió» y «Eliminar cita». Una acción
   destructiva nueva va ahí, con su texto en `textoDeConfirmacion`.
