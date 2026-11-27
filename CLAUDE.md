@@ -371,6 +371,34 @@ del médico logueado). Origen: sección 1 de `PLAN_LANDING_SPINUS.md`.
 
 ---
 
+## 🎛️ Sistema de diseño — reglas permanentes
+
+Aplican a todo cambio visual de la app (`src/app/`, `src/components/`, sus hojas CSS y los correos de la agenda). Fuente de
+verdad: `SISTEMA_DE_DISENO.md` (raíz). Los registros de `docs/spec/rediseno/` son historia; las maquetas, la referencia visual.
+
+1. **Todo cambio visual sale del sistema.** Antes de escribir UI se lee `SISTEMA_DE_DISENO.md` (la sección que toque: tokens,
+   formatos, catálogo de piezas). Si una pieza o un token sirve, se usa; no se reinventa.
+2. **Si falta una pieza o un token, se PROPONE añadirlo al sistema antes de usarlo**, con OK explícito (Protocolo 4), y el
+   documento se actualiza **en el mismo commit**. Nada de piezas, factories o hooks de UI nuevos «de paso».
+3. **Para código nuevo en la app autenticada:** tokens neutros del kit (`sistema.css`) + primitivas `k-*`. `--sp-*` y `--ag-*`
+   son heredados (alias del kit o propios de una zona); la landing usa solo `--lp-*`.
+4. **Nada de colores ni tamaños escritos a mano** (hex, `text-[13px]`, `slate-*`): siempre token, escala del kit
+   (12 · 13 · 14 · 15 · 16 · 17 · 20 · 26 · 32) o utilidad del kit.
+5. **Letra mínima 12 px** (única excepción: el mes del chip de fecha, 11 px).
+6. **Área de toque 44 px en `ext`/`tel`/`iv` y 36 px en `ih`/`esc`** (`--k-toque`). El dibujo puede ser menor; el área no.
+7. **Solo se anima `transform` y `opacity`**, con los tokens de movimiento del kit y tope de 400 ms en la agenda;
+   `prefers-reduced-motion` se escribe junto a cada animación, nunca como parche final.
+8. **Claro y oscuro siempre** (clase `html.dark`, no `prefers-color-scheme`). Las páginas públicas de la agenda y los correos
+   van **siempre en claro**.
+9. **Los cinco formatos** (`ext`, `tel`, `ih`, `iv`, `esc`) se resuelven por CSS (`ext:`, `tel:`, `ih:`, `iv:`, `esc:`), nunca
+   decidiendo el marcado por formato en el primer render. En `ext`/`ih` ningún `fixed` toca el borde de la franja salvo el cromo.
+10. **`--cp` es el navy oscuro y `--cs` el azul brillante; `--sp-primary` apunta a `--cs`.** Verifica el token, no deduzcas por
+    el nombre.
+11. **La «Deuda conocida» de `SISTEMA_DE_DISENO.md` (§8) no se corrige sin orden explícita**, ni «de paso» en otro cambio.
+12. **Ante conflicto entre el documento y el código, manda el código y se corrige el documento** en el mismo commit.
+
+---
+
 ## 📁 Estructura del proyecto
 
 * `src/app/` — páginas y API routes (App Router)
