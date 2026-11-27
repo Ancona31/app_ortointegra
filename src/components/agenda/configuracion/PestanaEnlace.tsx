@@ -23,7 +23,8 @@
  * el único botón relleno; «Mandar por WhatsApp», tonal. La dirección, en letra de máquina sin caja.
  */
 import { useEffect, useId, useState } from 'react'
-import { AlertTriangle, Copy, Link2, MessageCircle, Plus, Ticket } from 'lucide-react'
+import { AlertTriangle, Copy, Link2, Plus, Ticket } from 'lucide-react'
+import { LogoWhatsApp } from '@/components/agenda/BotonWhatsAppCita'
 import ConfirmModal from '@/components/agenda/ConfirmModal'
 import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import CrearEnlaceUnaVez from '@/components/agenda/configuracion/CrearEnlaceUnaVez'
@@ -99,7 +100,7 @@ function EnlaceFijo({ prendido, ocupado, pausado, alPrender, alApagar }: {
               <div className="flex flex-wrap gap-[8px]">
                 <BotonCopiar texto={url} etiqueta="Copiar enlace" className={BOTON_AZUL} icono={<Copy size={18} aria-hidden="true" />} />
                 <a href={urlWhatsApp(url)} target="_blank" rel="noopener noreferrer" className={BOTON_CHICO}>
-                  <MessageCircle size={18} aria-hidden="true" /> Mandar por WhatsApp
+                  <LogoWhatsApp size={18} /> Mandar por WhatsApp
                 </a>
               </div>
             )}

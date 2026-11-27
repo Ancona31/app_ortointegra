@@ -17,7 +17,8 @@
  */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { Check, Copy, Link2, MessageCircle, User } from 'lucide-react'
+import { Check, Copy, Link2, User } from 'lucide-react'
+import { LogoWhatsApp } from '@/components/agenda/BotonWhatsAppCita'
 import BotonCopiar from '@/components/agenda/configuracion/BotonCopiar'
 import CrearEnlaceUnaVez from '@/components/agenda/configuracion/CrearEnlaceUnaVez'
 import { urlWhatsApp } from '@/components/agenda/configuracion/accionesConfig'
@@ -57,7 +58,7 @@ function TuEnlace({ enlace, aviso }: Pick<Props, 'enlace' | 'aviso'>) {
             <div className="flex flex-wrap gap-[8px]">
               <BotonCopiar texto={enlace.url} etiqueta="Copiar enlace" className={BOTON_CHICO} icono={<Copy size={18} aria-hidden="true" />} />
               <a href={urlWhatsApp(enlace.url)} target="_blank" rel="noopener noreferrer" className={BOTON_TEXTO}>
-                <MessageCircle size={18} aria-hidden="true" /> Mandar por WhatsApp
+                <LogoWhatsApp size={18} /> Mandar por WhatsApp
               </a>
             </div>
           </>
