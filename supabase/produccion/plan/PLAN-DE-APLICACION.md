@@ -1540,3 +1540,13 @@ después del despliegue. Reescribe dos funciones de F4 y no toca filas. Conteos
 de sólo lectura: `../conteos/conteos-recordatorio-reserva.sql`
 (`correr-conteos-recordatorio-reserva.sh`). Su reversa es la primera de la
 cadena de `aplicar.sh reversa`.
+
+## 18. R2: el piso del recordatorio a 30 minutos (1 migración, 2026-11-27)
+
+> R1 (§17) se aplicó en producción el 2026-11-26. R2 está escrita y ensayada sólo
+> en local. Guion: `docs/spec/recordatorio-reserva/ENSAYO.md`, §8.
+
+`20261208120000_recordatorio_piso_30_min` va después de R1 (exige sus cuerpos por
+huella) y **no depende del código**. Reescribe las mismas dos funciones y no toca
+filas. Conteos: `../conteos/conteos-recordatorio-piso.sql`
+(`correr-conteos-recordatorio-piso.sh`). Su reversa es la primera de la cadena.

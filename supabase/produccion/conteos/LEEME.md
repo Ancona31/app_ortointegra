@@ -469,3 +469,10 @@ leer: **R.9** (citas futuras hoy sin recordatorio por el defecto, que lo recibir
 hora: ventana vacía). Un ALTO en R.4 o R.5 es que el cuerpo de producción de alguna de las dos
 funciones no es el de F4: R1 abortaría limpia; no se aplica hasta saber quién la cambió. Guion:
 `docs/spec/recordatorio-reserva/ENSAYO.md`.
+
+## R2 · el piso del recordatorio a 30 minutos
+
+`conteos-recordatorio-piso.sql` (se corre con `correr-conteos-recordatorio-piso.sh`): las condiciones
+del pre-vuelo de `20261208120000` (P.1 a P.6; un ALTO en P.4 o P.5 es que alguna de las dos funciones
+no tiene el cuerpo de R1) y, de INFO, cuántas clínicas tienen el recordatorio a 1 hora (P.8) y cuántas
+citas entrarían en la primera pasada (P.9). Guion: `docs/spec/recordatorio-reserva/ENSAYO.md`, §8.

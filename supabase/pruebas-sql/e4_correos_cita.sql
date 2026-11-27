@@ -81,7 +81,7 @@ insert into public.appointments (id, clinica_id, paciente_id, medico_id, title, 
   ('00000000-0000-4000-8000-000000e4a003', '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4f001', '00000000-0000-4000-8000-000000e4b001',
    'Cita 3', now() + interval '25 hours', now() + interval '25 hours 30 min', 'scheduled', false, null, null, null, null, null),
   ('00000000-0000-4000-8000-000000e4a004', '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4f001', '00000000-0000-4000-8000-000000e4b001',
-   'Cita 4', now() + interval '50 min', now() + interval '80 min', 'scheduled', false, null, null, null, null, null),
+   'Cita 4', now() + interval '20 min', now() + interval '50 min', 'scheduled', false, null, null, null, null, null),
   ('00000000-0000-4000-8000-000000e4a005', '00000000-0000-4000-8000-000000e4c001', null, '00000000-0000-4000-8000-000000e4b001',
    'Junta', now() + interval '5 hours', now() + interval '5 hours 30 min', 'scheduled', false, null, null, null, null, null),
   ('00000000-0000-4000-8000-000000e4a006', '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4f002', '00000000-0000-4000-8000-000000e4b001',
@@ -163,7 +163,7 @@ $$;
 
 -- ── Caso 1: el listado respeta ventana, destinatario, estado, interruptor y S3 ──
 -- c1 (N=24): a01 +5 h, a02 +23 h, a10 confirmada, a13 por ligar, a14 respaldo de reserva_correo.
--- Fuera: a03 (+25 h), a04 (<1 h), a05 sin paciente, a06 inactivo, a07 sin correo, a08 cancelada,
+-- Fuera: a03 (+25 h), a04 (<30 min; el piso es de 30 minutos desde R2, 20261208120000), a05 sin paciente, a06 inactivo, a07 sin correo, a08 cancelada,
 -- a09 todo el día, a11 no_show, a12 atendida, a20 degradada, a30 apagada.
 -- c5 (N=2): a50 +90 min sí; a51 +3 h no.
 select pg_temp.esperar('caso 1 listado', pg_temp.listados(), 'a001,a002,a010,a013,a014,a050');
@@ -200,7 +200,7 @@ begin
   select count(*) into n0 from public.cita_correos;
   for v_caso in select * from (values
       ('fuera de N',        '00000000-0000-4000-8000-000000e4c001'::uuid, '00000000-0000-4000-8000-000000e4a003'::uuid),
-      ('menos de 1 h',      '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4a004'),
+      ('menos de 30 min',     '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4a004'),
       ('sin paciente',      '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4a005'),
       ('inactivo',          '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4a006'),
       ('sin correo',        '00000000-0000-4000-8000-000000e4c001', '00000000-0000-4000-8000-000000e4a007'),
