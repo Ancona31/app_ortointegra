@@ -140,7 +140,10 @@ function disposicionSinCambios(cita: CitaTarjeta, puedeIniciar: boolean, o: Opci
      como la cancelada con paciente: «Eliminar cita» la CIERRA (`POST …/quitar`), no la borra. Sin esto
      se quedaba sin ninguna salida. La no asistida y la atendida, como antes: nada. */
   const peligro: AccionTarjeta | null = viva ? 'cancelar' : cita.status === 'cancelled' ? 'eliminar-cita' : null
-  return { principal: puedeIniciar ? 'ligar' : null, secundarias, peligro }
+  /* Decisión de Angel (2026-11-27) · «Ligar…» sólo en una por ligar VIVA. La ventana ya rechazaba las
+     demás («Esta cita ya no está vigente.») y el aviso de la campana tampoco las liga (`avisoSeLiga`):
+     el botón no llevaba a nada. El formulario va a la par (`showLigarYConsultar`). */
+  return { principal: puedeIniciar && viva ? 'ligar' : null, secundarias, peligro }
 }
 
 /**

@@ -586,6 +586,8 @@ export default function AppointmentModal({
      primero ligarla (`ligar`, abajo). */
   const showLigarYConsultar = Boolean(
     isEdit && canVerExpediente && reserva && !paciente && agendaV2 &&
+    /* Sólo en una viva, a la par de la tarjeta (`disposicionSinCambios`): la ventana (`VentanaLigarCita`) tampoco liga otra. */
+    (apt?.status === 'scheduled' || apt?.status === 'confirmed') &&
     defaultMedicoId === apt?.medico_id && (citaConsultorio || (porAsignar && consultoriosList.length > 0)),
   )
   const router = useRouter()

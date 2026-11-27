@@ -45,6 +45,25 @@ describe('accionesDeTarjeta (G3: por estado)', () => {
     // Viva, como siempre: se cancela, no se elimina.
     expect(disposicionDeTarjeta({ paciente_id: null, reserva_canal: 'fijo', status: 'confirmed' }, false).peligro).toBe('cancelar')
   })
+  /* Decisión de Angel (2026-11-27). MUTACIÓN: `principal: puedeIniciar ? 'ligar' : null` → rojo. */
+  it('«Ligar paciente e iniciar consulta» sólo en una por ligar VIVA: cancelada, no asistida y atendida no la ofrecen', () => {
+    const porEnlace = { paciente_id: null, reserva_canal: 'fijo' } as const
+    const porAsignar = { paciente_id: null, reserva_canal: null, google_asignacion: 'por_asignar' } as const
+    for (const base of [porEnlace, porAsignar]) {
+      for (const status of ['cancelled', 'no_show', 'attended'] as const) {
+        const cita = { ...base, status }
+        expect(disposicionDeTarjeta(cita, true).principal).toBeNull()
+        expect(accionesDeTarjeta(cita, true)).not.toContain('ligar')
+        expect(burbujaDeTarjeta(cita, true).principal).toBeNull()
+      }
+      for (const status of ['scheduled', 'confirmed'] as const) {
+        expect(disposicionDeTarjeta({ ...base, status }, true).principal).toBe('ligar')
+        expect(disposicionDeTarjeta({ ...base, status }, false).principal).toBeNull()
+      }
+    }
+    // Lo demás de la cancelada, igual: «Editar» y «Eliminar cita».
+    expect(accionesDeTarjeta({ ...porEnlace, status: 'cancelled' }, true)).toEqual(['editar', 'eliminar-cita'])
+  })
   it('una cita con paciente NUNCA se puede eliminar desde la tarjeta', () => {
     expect(accionesDeTarjeta({ ...CITA, status: 'scheduled' }, true)).not.toContain('eliminar')
   })

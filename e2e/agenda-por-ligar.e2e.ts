@@ -163,6 +163,8 @@ test('encendido: una por ligar CANCELADA ofrece «Eliminar cita»: nombra a quie
   const burbuja = tarjetaLectura(page)
   await expect(burbuja).toBeVisible()
   await expect(burbuja.getByRole('button', { name: 'Cancelar cita', exact: true })).toHaveCount(0)
+  // Decisión de Angel (2026-11-27): una por ligar que ya no está viva no ofrece ligarla.
+  await expect(burbuja.getByRole('button', { name: 'Ligar paciente e iniciar consulta', exact: true })).toHaveCount(0)
   await burbuja.getByRole('button', { name: 'Eliminar cita', exact: true }).click()
   const aviso = page.getByRole('dialog', { name: `¿Eliminar la cita cancelada de ${NOMBRE}? Sale de la agenda y no se puede deshacer; queda guardada en el historial.` })
   await expect(aviso).toBeVisible()
