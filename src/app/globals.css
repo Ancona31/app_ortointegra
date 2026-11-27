@@ -6644,7 +6644,9 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-frame { min-height: 104px; }
 :root[data-formato="ih"] .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-frame { min-height: 78px; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day { background: var(--sup); }
-:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today { background: var(--cal-hoy); }
+/* Corrección 7 · `!important` porque la regla de siempre de Mes (`.fc-daygrid .fc-day-today`, con
+   `--ag-month-today-bg`: el navy al 10 %, un gris azulado) lo lleva y ganaba: hoy salía gris, como cerrado. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day.fc-day-today { background: var(--cal-hoy) !important; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day.fc-day-other { background: color-mix(in srgb, var(--fondo) 55%, var(--sup)); }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view td, :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view th { border-color: var(--cal-linea) !important; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-col-header-cell-cushion { font-size: 12px; font-weight: 600; color: var(--tinta2); }
@@ -6704,6 +6706,8 @@ html.dark .nav-fila-icono { color: var(--enlace); }
    transparente en Mes. */
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-daygrid-day-top { flex-direction: row; }
 :root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-non-business { background: var(--cal-fuera) !important; opacity: 1; }
+/* Corrección 7 · hoy sin consulta: el rayado azul y gris sobre el azul de la celda, no el gris de un día cerrado. */
+:root .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc:not(.ag-cal-mes-movil) .fc-dayGridMonth-view .fc-day-today .fc-non-business { background: var(--cal-hoy-fuera) !important; }
 /* El panel del día del Mes del teléfono con las filas de la Semana (`FilaDelPanel` v2). */
 /* Con filas de dos renglones, un día cargado ya no aplasta la mini-rejilla: el panel ocupa lo que queda
    (base 0) y se desplaza por dentro. */
@@ -6924,6 +6928,9 @@ body:has(#barra-lateral):has(.agenda-raiz[data-agenda-v2="encendida"] .ag-banda-
 .agenda-raiz[data-agenda-v2="encendida"] .fc .fc-timegrid-col.fc-day-today { background: var(--cal-hoy) !important; }
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc .fc-col-header-cell.fc-day-today { background: var(--sup) !important; box-shadow: none; }
 .agenda-raiz[data-agenda-v2="encendida"] .agenda-fc .fc-timegrid .fc-daygrid-day.fc-day-today { background: var(--cal-hoy) !important; }
+/* Corrección 7 · las horas sin consulta de hoy: rayado azul y gris (`--cal-hoy-fuera`) sobre el azul de la
+   columna, no el gris liso de los demás días (con él, hoy parecía cerrado). Sólo CSS, sólo con la v2. */
+.agenda-raiz[data-agenda-v2="encendida"] .fc .fc-timegrid-col.fc-day-today .fc-non-business { background: var(--cal-hoy-fuera); }
 
 /* Hora actual: línea de 2 px `--cal-ahora` y la píldora 20 de alto, 12/700,
    `--sup` sobre `--cal-ahora` (en oscuro el rojo es claro: el texto oscuro). */

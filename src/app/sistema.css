@@ -238,7 +238,14 @@ html.dark {
   --cal-bloqueo-tinta: var(--tinta2);
   --cal-fuera: var(--fondo);
   --cal-linea: var(--linea);
-  --cal-hoy: color-mix(in srgb, var(--accion) 5%, transparent);
+  /* Corrección 7 (Angel, maqueta A): hoy es un tinte azul MUY tenue de la marca y no puede
+     confundirse con el gris de fuera de horario. Al 5 % sobre `--sup` daba ≈#F5F7FB, el mismo gris
+     azulado que `--cal-fuera` (#F2F4F8) al 88 %: hoy parecía un día cerrado. Al 9 % (≈#ECF1F9) se lee
+     azul. Las horas sin consulta de HOY (o hoy entero si no hay consulta) llevan `--cal-hoy-fuera`:
+     bandas de 8 px del gris de fuera de horario sobre el azul de la columna (rayado azul y gris), a
+     −45° para no confundirse con el rayado del bloqueo (45°). Oscuro: sale solo de los mismos tokens. */
+  --cal-hoy: color-mix(in srgb, var(--accion) 9%, transparent);
+  --cal-hoy-fuera: repeating-linear-gradient(-45deg, transparent 0 8px, color-mix(in srgb, var(--cal-fuera) 88%, transparent) 8px 16px);
   --cal-hoy-num: var(--accion);
   --cal-ahora: var(--mes);
   --cal-hueco: var(--accion);

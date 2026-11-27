@@ -189,7 +189,10 @@ Claro en `SC:40-95`, oscuro en `html.dark` `SC:153-191`. Todos tienen utilidad d
 | No asistió (`--cal-noas-`) | `color-mix(--sup2 70%, --sup)` | `--tinta3` | `--tinta2` | `SC:226-228` |
 
 * Otros: `--cal-bloqueo-fondo/-raya/-tinta` (`--tinta2` al 5 % / 20 % / sólido), `--cal-fuera: var(--fondo)`,
-  `--cal-linea: var(--linea)`, `--cal-hoy` (`--accion` al 5 %), `--cal-hoy-num`/`--cal-hueco`/`--cal-sel:
+  `--cal-linea: var(--linea)`, `--cal-hoy` (`--accion` al 9 %; era 5 % y se confundía con `--cal-fuera`, corrección 7),
+  `--cal-hoy-fuera` (horas sin consulta de hoy: bandas de 8 px a −45° del gris de `--cal-fuera` al 88 % sobre el azul
+  de la columna, «rayado azul y gris»; el oscuro sale de los mismos tokens; lo pintan la columna de hoy y la celda de hoy
+  de Mes, solo con la v2), `--cal-hoy-num`/`--cal-hueco`/`--cal-sel:
   var(--accion)`, `--cal-ahora: var(--mes)` (`SC:236-245`).
 * Colores de evento elegidos por el usuario (`SC:230-235`; oscuro `SC:253-258`): indigo `#3730a3`/`#818cf8`, magenta
   `#a21caf`/`#e879f9`, carmin `#9d174d`/`#f391ca`, oliva `#4d7c0f`/`#a3e635`, bronce `#78350f`/`#c98a4b`, grafito
