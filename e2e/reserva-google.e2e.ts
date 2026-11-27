@@ -698,10 +698,10 @@ test('J11 · lo de Google con los colores de estado y su «G»; la leyenda sin m
   // `?cita=` lleva a su día (vista Día) y abre su tarjeta de lectura: con la «G».
   await page.goto(`/agenda?cita=${importada}`)
   const tarjeta = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: 'Más opciones de la cita', exact: true }) })
-  /* Tanda K, punto 21: en la burbuja la «G» va en la línea «Agendada desde Google Calendar» (CALMA §28; antes «Llegó de Google Calendar»), a color. */
+  /* Tanda K, punto 21 (corrección 6: el icono de Google Calendar, ya no la «G»): en la burbuja el icono va en la línea «Agendada desde Google Calendar» (CALMA §28; antes «Llegó de Google Calendar»), a color. */
   const linea = tarjeta.locator('.ag-burbuja-origen', { hasText: 'Agendada desde Google Calendar' })
   await expect(linea).toBeVisible({ timeout: 120_000 })
-  await expect(linea.locator('path[fill="#4285F4"]')).toHaveCount(1)
+  await expect(linea.locator('rect[fill="#4285F4"]')).toHaveCount(1)
   await page.keyboard.press('Escape')
   await expect(tarjeta).toBeHidden()
   // En la rejilla la «G» se ve y lo dice la etiqueta de la tarjeta (la marca es decorativa ahí).

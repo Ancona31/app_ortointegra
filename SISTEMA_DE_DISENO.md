@@ -669,8 +669,8 @@ transparente; lo usan `ComboEscribible`, `EspecialidadSelector` y los formulario
 | `.k-etq` (+ `-ok`, `-mal`, `-aviso`, `-tonal`) | `SC:468-481` | etiqueta de estado: alto 24, `padding 0 8px`, radio 8, 12/16 600, icono de 14; neutra `--sup2`/`--tinta2`. 26 archivos | «Como mucho dos juntas» (`SC:469-470`); píldoras con fondo **solo** para estado que cambia una decisión; contadores, códigos, tipos y fechas van como texto plano en `--tinta2`; máximo un chip por fila (`CALMA` §3). Alergias: etiqueta icono + texto `--mal-tinta` sobre `--mal-fondo`, no bloque sólido (`CALMA:25`) |
 | `IconoEstadoCita` | `CMP/ui/IconoEstadoCita.tsx:69` (+ `.k-est*`, `SC:540-560`) | círculo de 26 px (24 `compacto`) con icono de 15 y texto 12/600. Props `estado`, `texto?: 'ancho' \| 'siempre' \| 'nunca'` (defecto `'ancho'`), `compacto?`, `className?` (`:61-67`). El texto sale de `STATUS_CONFIG` (`src/lib/agenda/tarjetasAgenda.ts`) | `texto="nunca"` → `role="img"` + `aria-label` (`:78`); `'ancho'`: texto visible solo en `ih`/`iv`/`esc`, en `ext`/`tel` queda para el lector (`SC:557-560`). 7 consumidores |
 | `IconoTipoDocumento` | `CMP/ui/IconoTipoDocumento.tsx:62` (+ `.k-doc*`, `SC:562-577`) | props `tipo`, `nivel?: 'lista' \| 'rejilla'`, `className?`; acepta el tipo de la base o la clave corta (`:26-40`); desconocido = `otro` gris | decorativo (`aria-hidden`, `:67`): el nombre va al lado. **Color de documento solo en esos dos niveles** (2.1.4) |
-| `MarcaOrigen` | `CMP/ui/MarcaOrigen.tsx:60` (+ `.k-origen`, `SC:579-582`) | `origen: 'enlace' \| 'google'`, `corto?`, `soloIcono?`. Textos «Reservó por enlace» / «Agendada desde Google Calendar» (`:27-30`). Lo usa `PiezasCita.tsx:78` | `soloIcono` → `role="img"` + `aria-label` (`:63`) |
-| `MarcasCita`, `MarcaOrigenGoogle`, `GoogleGIcon` | `CMP/agenda/MarcasCita.tsx:60`, `MarcaOrigenGoogle.tsx:27`, `GoogleGIcon.tsx:10` | marcas de procedencia de la agenda (expediente tachado, eslabón, «G» de Google). Solo con v2 (`:19-21`); `MarcaOrigenGoogle` se ve solo dentro de `.agenda-raiz[data-agenda-v2="encendida"]` por CSS | `decorativa` → `aria-hidden`; si no, `role="img"` + `aria-label` |
+| `MarcaOrigen` | `CMP/ui/MarcaOrigen.tsx:68` (+ `.k-origen`, `SC:579-582`) | `origen: 'enlace' \| 'google'`, `corto?`, `soloIcono?`. Exporta `IconoGoogleCalendar` (`:45`, `size?`): el ÚNICO icono de Google fuera de «Continuar con Google» del login y el registro (corrección 6); sin `size` lo mide `.k-origen svg`. Textos «Reservó por enlace» / «Agendada desde Google Calendar» (`:27-30`). Lo usa `PiezasCita.tsx:78` | `soloIcono` → `role="img"` + `aria-label` (`:63`) |
+| `MarcasCita`, `MarcaOrigenGoogle` | `CMP/agenda/MarcasCita.tsx:60`, `MarcaOrigenGoogle.tsx:32` | marcas de procedencia de la agenda (expediente tachado, eslabón, icono de Google Calendar; la «G» se retiró en la corrección 6 y queda solo en el login y el registro, `/google/boton-g.svg`). Solo con v2 (`:19-21`); `MarcaOrigenGoogle` se ve solo dentro de `.agenda-raiz[data-agenda-v2="encendida"]` por CSS | `decorativa` → `aria-hidden`; si no, `role="img"` + `aria-label` |
 | Distintivos de navegación | `.nav-distintivo` (`GC:2327`), `.nav-distintivo--avisos` (`GC:2351`); `RielNavegacion.tsx:78`, `EncabezadoFundido.tsx:86`, `CampanaAvisos.tsx:112` | número ámbar sobre «···» o el botón de menú; rojo en la campana | el número va en el `aria-label` (`nombreBotonMas`, `RielNavegacion.tsx:53-56`; `etiquetaCampanaGlobal`, `CampanaAvisos.tsx:45`) |
 
 **Marcas de procedencia: sin pieza única** (tres sitios y dos `IconoEnlace`; ver Deuda).
@@ -799,7 +799,8 @@ errores de ventanas de la agenda: `.ag-capa-error` con `role="alert"` (`VentanaL
   `RielNavegacion.tsx:67`); «+» del riel 24; icono de alerta 28 (`SC:732`); estado vacío 24/20; botón icono 20 (`SC:398`);
   icono de etiqueta 14 (`SC:476`). Regla (`CALMA:26`): iconos solo donde ayudan a reconocer (navegación, tipo de documento,
   acción de icono), en un solo color `--tinta2` y sin cuadritos de fondo de colores. SVG propios (no lucide): `IconoEstadoCita`,
-  `IconoTipoDocumento` (trazo 1,8, copiados de la maqueta, `:6-8`), `MarcaOrigen`, `MarcasCita`, `GoogleGIcon`, logo de
+  `IconoTipoDocumento` (trazo 1,8, copiados de la maqueta, `:6-8`), `MarcaOrigen` (con `IconoGoogleCalendar`), `MarcasCita`,
+  `LogoWhatsApp` (`CMP/agenda/BotonWhatsAppCita.tsx:58`), logo de
   `CabeceraBarra` (`Sidebar.tsx:233`).
 
 ### 5.11 Piezas propias de la agenda (resumen)
@@ -1003,8 +1004,8 @@ prueba solo vigila controles fijos (`rediseno-formatos.e2e.ts:109-111`). No se m
 8. **Marcas de procedencia en tres sitios:** `ui/MarcaOrigen.tsx:60`, `agenda/MarcasCita.tsx:60` + `MarcaOrigenGoogle.tsx:27` y
    `dashboard/PiezasCita.tsx:72` (otro componente también llamado `MarcasCita`); dos `IconoEnlace` (`MarcaOrigen.tsx:32`,
    `MarcasCita.tsx:39`); textos distintos («Agendada por enlace», «Agendada en Google»).
-9. **`GoogleGIcon` dos veces:** `CMP/agenda/GoogleGIcon.tsx:10` y `CMP/perfil/piezasDatos.tsx:42` (con su motivo,
-   `:30-40`).
+9. ~~**`GoogleGIcon` dos veces:** `CMP/agenda/GoogleGIcon.tsx:10` y `CMP/perfil/piezasDatos.tsx:42`.~~ Sin objeto desde
+   la corrección 6 (orden de Angel): las dos «G» se sustituyeron por `IconoGoogleCalendar` y se borraron.
 10. **Segmentado y pestañas sin pieza única:** `.k-seg` a mano en 5 archivos (`AGC/DialogoHorario.tsx`,
     `CMP/documentos/EditorEscrito.tsx`, `CMP/perfil/FirmaCaptura.tsx`, `expediente/[id]/editar/page.tsx`, `pacientes/nuevo/page.tsx`);
     `.k-tab` a mano en tres componentes (solo `PestanasConfiguracion` implementa flechas y `tabIndex` itinerante); tablist

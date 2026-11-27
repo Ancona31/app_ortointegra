@@ -35,9 +35,17 @@ function IconoEnlace(): ReactElement {
   )
 }
 
-function IconoGoogleCalendar(): ReactElement {
+/**
+ * El icono de Google Calendar, el ÚNICO de Google fuera del login y el registro (corrección 6 de Angel: la
+ * «G» queda sólo en «Continuar con Google», `/google/boton-g.svg`). Lo usan esta marca, la agenda (filas,
+ * tarjetas, Mes, burbujas, leyenda, avisos), la invitación de Google y la integración del perfil. Colores de
+ * la marca de Google: no se recolorea ni se deforma; sólo cambia el tamaño. Sin `size`, lo mide la hoja
+ * (`.k-origen svg`).
+ */
+export function IconoGoogleCalendar({ size }: { size?: number } = {}): ReactElement {
+  const medida = size === undefined ? {} : { width: size, height: size, style: { display: 'block', flexShrink: 0 } }
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" {...medida}>
       <rect x="2.5" y="2.5" width="19" height="19" rx="3.5" fill="#4285F4" />
       <path d="M17 7h4.5v10H17z" fill="#FBBC04" />
       <path d="M7 17h10v4.5H7z" fill="#34A853" />

@@ -9,7 +9,7 @@ import { memo } from 'react'
 import type { IconoEvento, ColorEvento } from '@/lib/appointments'
 import type { Status } from '@/lib/agenda/tiposAgenda'
 import { tintasDelChipDeBanda } from '@/lib/agenda/tarjetasAgenda'
-import { GoogleGIcon } from './GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
 import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
@@ -122,7 +122,7 @@ export const BandaChip = memo(function BandaChip(
       style={{ background: fondo, borderColor: marco, borderLeftColor: filo }}
     >
       {esDeGoogle
-        ? <GoogleGIcon size={14} />
+        ? <IconoGoogleCalendar size={14} />
         : icono && <IconoDelEvento nombre={icono} size={14} color={tinta} />}
       {!esDeGoogle && origenGoogle && <MarcaOrigenGoogle size={12} />}
       <span className="ag-banda-titulo">{title}</span>

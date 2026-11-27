@@ -14,7 +14,7 @@
  * leyenda` es un área de rejilla de `.agenda-fc` en `globals.css`.
  */
 
-import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { ETIQUETA_SIN_EXPEDIENTE, IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
 import type { Status } from '@/lib/agenda/tiposAgenda'
@@ -61,7 +61,7 @@ export function LeyendaEstados({ clasica = false }: { clasica?: boolean }) {
       )}
       {clasica ? <MarcaGCal /> : (
         <div className="flex items-center gap-1.5" data-leyenda-google>
-          <GoogleGIcon size={11} />
+          <IconoGoogleCalendar size={11} />
           <span className="text-[11px] font-medium text-[var(--ag-muted)]">{ETIQUETA_LEYENDA_GOOGLE}</span>
         </div>
       )}
@@ -94,7 +94,7 @@ export const ETIQUETA_LEYENDA_ENLACE = 'Reservó por enlace'
 function MarcaGCal() {
   return (
     <div className="flex items-center gap-1.5">
-      <GoogleGIcon size={11} />
+      <IconoGoogleCalendar size={11} />
       {/* ── «GCal» Y NO «GOOGLE CALENDAR», POR ANCHO ─────────────────
           Medido el 2026-08-25 a 1280 px de ventana, con la tarjeta a 954
           px de interior: la leyenda pedía 542 px para caber en UNA línea y

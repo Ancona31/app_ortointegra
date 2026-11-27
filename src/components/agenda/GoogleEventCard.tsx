@@ -6,7 +6,7 @@
  */
 
 import { memo } from 'react'
-import { GoogleGIcon } from './GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 
 /* Tarjeta de evento del calendario de Google (no arrastrable). Solo
    presentación: la lógica de fetch/resta de Google no se toca.
@@ -32,7 +32,7 @@ export const GoogleEventCard = memo(function GoogleEventCard({
   return (
     <div className="ag-gcal">
       <div className="ag-gcal-cab">
-        <GoogleGIcon size={12} />
+        <IconoGoogleCalendar size={12} />
         <span className="ag-gcal-hora">{timeText}</span>
         <span className="ag-gcal-badge">
           {/* "Evento", y antes decía "Sin cita". Aquel texto venía del modelo

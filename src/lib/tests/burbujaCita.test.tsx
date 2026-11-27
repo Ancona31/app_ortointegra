@@ -14,7 +14,7 @@
  *   · `conDestacada` sin aplicar (`disposicionDeTarjeta` → `disposicionPorEstado`) → «desde un aviso»;
  *   · `'no-es-cita': '¿No es una cita?'` → «textos»;
  *   · `Procedencia` con `enlace = !cita.paciente_id && …` → «eslabón permanente»;
- *   · `<GoogleGIcon>` cambiado por una «G» de texto → «G a color»;
+ *   · `<IconoGoogleCalendar>` cambiado por una «G» de texto → «Google Calendar a color»;
  *   · el engrane de vuelta en la cabecera → «sin engrane»;
  *   · `BotonCorreoCita` con `aria-label={nombre}` siempre → «correo con etiqueta».
  */
@@ -121,10 +121,11 @@ describe('lo que pinta', () => {
     expect(html).toContain('aria-label="Sin expediente: este paciente aún no tiene expediente"')
     expect(html).not.toMatch(/Por ligar/i)
   })
-  it('G a color: «Agendada desde Google Calendar» (CALMA §28) con la «G» de cuatro tintas', () => {
+  it('Google Calendar a color: «Agendada desde Google Calendar» (CALMA §28) con su icono (corrección 6: ya no la «G»)', () => {
     const html = pintar({ origen: 'google' })
     expect(html).toContain('Agendada desde Google Calendar')
-    expect(html).toContain('fill="#4285F4"')
+    expect(html).toContain('<rect x="2.5" y="2.5" width="19" height="19" rx="3.5" fill="#4285F4">')
+    expect(html).not.toContain('M45.12')
   })
   it('sin engrane: el lápiz «Más opciones de la cita» (CALMA §29.5) y la ✕', () => {
     const html = pintar({})

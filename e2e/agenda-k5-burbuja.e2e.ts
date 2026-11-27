@@ -73,7 +73,7 @@ test('procedencia: la «G» a color en la de Google, el eslabón en la ligada po
 
   let t = await abrir(page, google)
   await expect(t.locator('.ag-burbuja-origen').first()).toHaveText('Agendada desde Google Calendar')
-  await expect(t.locator('.ag-burbuja-origen path[fill="#4285F4"]')).toHaveCount(1)
+  await expect(t.locator('.ag-burbuja-origen rect[fill="#4285F4"]')).toHaveCount(1)
   const sinExp = t.getByRole('button', { name: 'Sin expediente: este paciente aún no tiene expediente' })
   await sinExp.hover()
   await expect(t.getByRole('tooltip')).toHaveText('Aún no tiene expediente')

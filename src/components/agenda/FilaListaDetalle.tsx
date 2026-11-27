@@ -9,7 +9,7 @@ import { memo } from 'react'
 import type { IconoEvento } from '@/lib/appointments'
 import type { Status } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG } from '@/lib/agenda/tarjetasAgenda'
-import { GoogleGIcon } from './GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
 import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
@@ -69,7 +69,7 @@ export const FilaListaDetalle = memo(function FilaListaDetalle(
      baja por herencia hasta aquí. Es la MISMA que pinta el punto del compacto,
      así que las dos variantes no pueden divergir de color. */
   const marca = esDeGoogle
-    ? <span className="ag-listadia-slot"><GoogleGIcon size={19} /></span>
+    ? <span className="ag-listadia-slot"><IconoGoogleCalendar size={19} /></span>
     : icono
       ? <span className="ag-listadia-slot"><IconoDelEvento nombre={icono} size={21} color="var(--ag-ev-marca)" /></span>
       : <span className="ag-listadia-punto" />

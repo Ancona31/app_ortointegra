@@ -10,7 +10,7 @@ import { nombreCortoPaciente } from '@/lib/agenda/nombresTarjeta'
 import type { EventContentArg } from '@fullcalendar/core'
 import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { STATUS_CONFIG, esEventoGenerico, marcaPorLigar, marcasDeCita, tintasDelChipDeMes } from '@/lib/agenda/tarjetasAgenda'
-import { GoogleGIcon } from './GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
 import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
@@ -64,7 +64,7 @@ export const MonthChip = memo(function MonthChip({ arg }: { arg: EventContentArg
           sus cuatro colores. Lo demás es el punto, redondo en una cita y
           cuadrado en un evento — el icono ya NO lo sustituye, va detrás. */}
       {isGcal
-        ? <GoogleGIcon size={10} />
+        ? <IconoGoogleCalendar size={10} />
         : <span
             className={esEvento ? 'ag-mes-punto ag-mes-punto--cuadro' : 'ag-mes-punto'}
             style={{ background: tinta }}

@@ -78,8 +78,8 @@ test.describe('rejilla', () => {
       .toHaveAttribute('aria-label', /· Sin expediente\. Al reservar traía 2 cancelaciones o inasistencias\. · Agendada por enlace$/)
     await expect(caja(page, google).locator('.ag-icono-sin-exp')).toBeVisible()
     await expect(caja(page, google).locator('.ag-icono-enlace')).toHaveCount(0)
-    /* 19 · la «G» de la fila nacida en Google, a color (sus cuatro tintas). */
-    await expect(caja(page, google).locator('.ag-g-origen path[fill="#4285F4"]')).toHaveCount(1)
+    /* 19 · el icono de Google Calendar de la fila nacida en Google, a color (corrección 6: antes la «G»). */
+    await expect(caja(page, google).locator('.ag-g-origen rect[fill="#4285F4"]')).toHaveCount(1)
     await expect(page.locator('.fc-event .ag-tarjeta-marca')).toHaveCount(0)
 
     interruptorAgenda('A', false)
@@ -119,14 +119,14 @@ test.describe('rejilla', () => {
     await expect(enMes.locator('.ag-mes-badge')).toHaveCount(0)
   })
 
-  test('leyenda de la v2: la «G» a color, el eslabón y el expediente tachado, con sus textos', async ({ page }) => {
+  test('leyenda de la v2: el icono de Google Calendar a color, el eslabón y el expediente tachado, con sus textos', async ({ page }) => {
     interruptorAgenda('A', true)
     await abrirAgendaV2(page)
     await page.getByRole('button', { name: 'Opciones de la agenda' }).click()
     await page.getByRole('menuitem', { name: 'Leyenda de estados' }).click()
     const l = page.getByRole('dialog', { name: 'Leyenda de estados' })
     await expect(l.locator('[data-leyenda-google]')).toHaveText('Agendada desde Google Calendar')
-    await expect(l.locator('[data-leyenda-google] path[fill="#4285F4"]')).toHaveCount(1)
+    await expect(l.locator('[data-leyenda-google] rect[fill="#4285F4"]')).toHaveCount(1)
     await expect(l.locator('[data-leyenda-enlace]')).toHaveText('Reservó por enlace')
     await expect(l.locator('[data-leyenda-enlace] .ag-icono-enlace')).toBeVisible()
     await expect(l.locator('[data-leyenda-sin-expediente]')).toHaveText('Sin expediente')

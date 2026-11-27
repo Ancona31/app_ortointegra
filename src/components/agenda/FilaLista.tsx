@@ -7,7 +7,7 @@
 
 import { memo } from 'react'
 import type { IconoEvento } from '@/lib/appointments'
-import { GoogleGIcon } from './GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { MarcaOrigenGoogle } from './MarcaOrigenGoogle'
 import { MarcasCita } from './MarcasCita'
 import { IconoDelEvento } from './IconoDelEvento'
@@ -69,7 +69,7 @@ export const FilaLista = memo(function FilaLista(
   }
   return (
     <span className="ag-listafila" data-cita-id={citaId}>
-      {esDeGoogle && <GoogleGIcon size={11} />}
+      {esDeGoogle && <IconoGoogleCalendar size={11} />}
       {!esDeGoogle && origenGoogle && <MarcaOrigenGoogle size={11} />}
       {/* 13 px es el `.ico--sm` del mockup, el tamaño del icono cuando acompaña
           al nombre en vez de ocupar su propio cuadro. El color es el del evento,
@@ -106,7 +106,7 @@ function FilaListaV2({ citaId, nombre, esDeGoogle, origenGoogle, deEnlace, sinEx
       <span className="ag-listafila-barra" aria-hidden="true" />
       <span className="ag-listafila-cuerpo">
         <span className={cancelada ? 'ag-listafila-nombre ag-listafila-nombre--cancelada' : 'ag-listafila-nombre'}>
-          {esDeGoogle && <GoogleGIcon size={12} />}
+          {esDeGoogle && <IconoGoogleCalendar size={12} />}
           {!esDeGoogle && origenGoogle && <MarcaOrigenGoogle size={12} />}
           {icono && <IconoDelEvento nombre={icono} size={13} color={tinta ?? undefined} />}
           {nombre}

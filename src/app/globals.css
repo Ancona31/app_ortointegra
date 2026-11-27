@@ -4947,8 +4947,8 @@ html.dark .nav-fila-icono { color: var(--enlace); }
 /* Vista Día: fila única y la misma subida de cuerpo que la tarjeta de cita.
    `display: contents` en la cabecera sube sus tres hijos a items del flex raíz, y
    la píldora se va al final con `order` — es la única pieza que cambia de sitio,
-   el resto ya viene en el orden bueno desde el markup. El tamaño de la «G» se
-   fija aquí y no por prop: el `size` de `GoogleGIcon` sale como atributo del
+   el resto ya viene en el orden bueno desde el markup. El tamaño del icono de
+   Google se fija aquí y no por prop: el `size` de `IconoGoogleCalendar` sale como atributo del
    `<svg>`, y cualquier regla CSS le gana sin necesidad de `!important`. */
 .agenda-fc .fc-timeGridDay-view .ag-gcal {
   flex-direction: row;

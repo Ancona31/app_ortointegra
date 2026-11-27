@@ -49,7 +49,7 @@ import Portal from '@/components/ui/Portal'
 import QuickPatientModal from '@/components/ui/QuickPatientModal'
 import { BotonWhatsAppCita } from '@/components/agenda/BotonWhatsAppCita'
 import { BotonCorreoCita } from '@/components/agenda/BotonCorreoCita'
-import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { useDialogoModal } from '@/hooks/useDialogoModal'
 import { useEscudoTrasRegistro } from '@/hooks/useEscudoTrasRegistro'
 import type { PacienteBusqueda } from '@/components/agenda/AppointmentModal'
@@ -420,7 +420,7 @@ function BotonInvitarGoogle({ conectado, clase, idAyuda, alPulsar }: {
   return (
     <button type="button" className={`ag-capa-boton ag-invitar-google ${clase}`} onClick={conectado ? alPulsar : undefined}
       disabled={!conectado} aria-disabled={!conectado || undefined} aria-describedby={conectado ? undefined : idAyuda}>
-      <GoogleGIcon size={15} /> Invitar con Google Calendar
+      <IconoGoogleCalendar size={15} /> Invitar con Google Calendar
     </button>
   )
 }

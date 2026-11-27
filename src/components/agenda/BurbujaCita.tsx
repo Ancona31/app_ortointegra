@@ -13,7 +13,7 @@
  * Los cuatro ajustes de Angel sobre la maqueta: «Confirmar» abre WhatsApp, correo y «Marcar como
  * confirmada» (cada una si aplica); en la cancelada, «Darle otra cita» y «Reasignar el horario»;
  * los tres puntos sustituyen al engrane; el pie dice «No es una cita». Los iconos son los trazos
- * de la maqueta; la «G», a color (`GoogleGIcon`).
+ * de la maqueta; el icono de Google Calendar, a color (`IconoGoogleCalendar`; corrección 6).
  *
  * Tanda M, punto 4 de Angel: «Los tres puntos de la burbuja abren directamente el formulario
  * completo de la cita. Quita el menú chico. Las observaciones, si la cita las tiene, se muestran en
@@ -32,7 +32,7 @@ import type { Appointment } from '@/lib/agenda/tiposAgenda'
 import { marcasDeCita } from '@/lib/agenda/tarjetasAgenda'
 import IconoEstadoCita from '@/components/ui/IconoEstadoCita'
 import { indiceTrasTecla } from '@/lib/agenda/opcionesLista'
-import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { IconoEnlace, IconoSinExpediente } from '@/components/agenda/MarcasCita'
 import {
   burbujaDeTarjeta, cuandoDeTarjeta, diaLargoDeTarjeta, ETIQUETA_ACCION, horarioDeTarjeta, inicialesDeMedico, nombreDeTarjeta,
@@ -133,7 +133,7 @@ function Procedencia({ cita, historial }: { cita: Appointment; historial: string
     <>
       {google && (
         <p className="ag-burbuja-origen">
-          <span className="ag-burbuja-origen-icono ag-burbuja-origen-icono--g"><GoogleGIcon size={14} /></span>Agendada desde Google Calendar
+          <span className="ag-burbuja-origen-icono ag-burbuja-origen-icono--g"><IconoGoogleCalendar size={14} /></span>Agendada desde Google Calendar
         </p>
       )}
       {enlace && (

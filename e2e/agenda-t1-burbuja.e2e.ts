@@ -188,7 +188,7 @@ test('punto 13: con el evento de Google en camino, «Invitar con Google Calendar
   await expect(b.getByRole('button', { name: 'Enviar confirmación por correo', exact: true })).toBeVisible()
   const invitar = b.getByRole('button', { name: 'Invitar con Google Calendar', exact: true })
   await expect(invitar).toBeEnabled()
-  await expect(invitar.locator('svg path[fill="#4285F4"]')).toHaveCount(1) // la «G» de Google (`GoogleGIcon`)
+  await expect(invitar.locator('svg rect[fill="#4285F4"]')).toHaveCount(1) // el icono de Google Calendar (corrección 6)
   await invitar.click()
   // El diálogo que abre (`ModalInvitacionCita`) conserva su título.
   await expect(page.getByRole('dialog', { name: 'Invitar por correo' })).toBeVisible()

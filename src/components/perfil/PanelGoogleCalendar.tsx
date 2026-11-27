@@ -2,7 +2,7 @@
 
 import { Loader2, RefreshCw, LogIn, LogOut } from 'lucide-react'
 import EstadoError from '@/components/ui/EstadoError'
-import { GoogleGIcon } from '@/components/perfil/piezasDatos'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 
 /**
  * Región 5 del spec: la pestaña Google Calendar.
@@ -213,7 +213,7 @@ function Cabecera({ apoyo, chip }: { apoyo: string; chip?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] bg-sup2">
-        <GoogleGIcon size={22} />
+        <IconoGoogleCalendar size={22} />
       </span>
       <div className="min-w-0 flex-1 basis-[160px]">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

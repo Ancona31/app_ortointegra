@@ -25,7 +25,7 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Calendar, ChevronsDownUp, Globe, TriangleAlert } from 'lucide-react'
 import { Banda } from '@/components/agenda/Banda'
-import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { componerNombreMedicoCompleto } from '@/lib/nombreMedico'
 import type { MedicoConfig } from '@/lib/configApp'
 import { duracionMovimiento } from '@/lib/agenda/movimientoAgenda'
@@ -170,7 +170,7 @@ export function AvisosAgenda({
           reconecta de verdad. */}
       <ConSalida visible={googleFallo}>{(_, saliendo) => (
         <Banda tono="gcal" saliendo={saliendo}>
-          <GoogleGIcon size={14} />
+          <IconoGoogleCalendar size={14} />
           <p className="ag-aviso-texto">
             <strong>No se pudo sincronizar con Google Calendar.</strong> Tus citas se muestran normal; faltan los eventos del calendario.
           </p>

@@ -2,7 +2,7 @@
 
 import { memo, type CSSProperties } from 'react'
 import { ChevronRight } from 'lucide-react'
-import { GoogleGIcon } from '@/components/agenda/GoogleGIcon'
+import { IconoGoogleCalendar } from '@/components/ui/MarcaOrigen'
 import { MarcaOrigenGoogle } from '@/components/agenda/MarcaOrigenGoogle'
 import { MarcasCita } from '@/components/agenda/MarcasCita'
 import { useSinAvisoFlotante } from '@/components/agenda/MemoizedEventContent'
@@ -31,7 +31,7 @@ export const FilaDelPanel = memo(function FilaDelPanel(
         {fila.hora}
       </span>
       {fila.esDeGoogle
-        ? <GoogleGIcon size={11} />
+        ? <IconoGoogleCalendar size={11} />
         : <span
             className={`ag-mespanel-punto${fila.esEvento ? ' ag-mespanel-punto--cuadro' : ''}`}
             style={{ background: fila.tinta }}
@@ -57,7 +57,7 @@ function FilaDelPanelV2({ fila, onAbrir }: { fila: FilaDelDia; onAbrir: (id: str
         <span className="ag-listafila-barra" aria-hidden="true" />
         <span className="ag-listafila-cuerpo">
           <span className={fila.cancelada ? 'ag-listafila-nombre ag-listafila-nombre--cancelada' : 'ag-listafila-nombre'}>
-            {fila.esDeGoogle && <GoogleGIcon size={12} />}
+            {fila.esDeGoogle && <IconoGoogleCalendar size={12} />}
             {fila.origenGoogle && <MarcaOrigenGoogle size={12} />}
             {fila.nombre}
             {!fila.esDeGoogle && <MarcasCita enlace={fila.deEnlace} sinExpediente={fila.sinExpediente} size={12} soloV2 />}
