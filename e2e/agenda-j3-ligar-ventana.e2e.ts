@@ -114,7 +114,7 @@ test('punto 6: en Próximas citas la por ligar lleva «Ligar e iniciar consulta�
   await abrirDashboard(page)
   const acciones = await accionesDe(page, nombre)
   await expect(acciones.getByRole('link', { name: /en la agenda/ })).toHaveCount(0)
-  await acciones.getByRole('button', { name: `Ligar paciente e iniciar consulta de ${nombre}` }).click()
+  await acciones.getByRole('button', { name: `Ligar e iniciar consulta de ${nombre}` }).click()
   // Paso 1: lo que dio quien reservó, nada del formulario de edición.
   const v = ventana(page)
   await expect(v.getByText(nombre)).toBeVisible()
@@ -151,7 +151,7 @@ test('punto 6 · a 1280, en la fila de Google el botón cabe junto a «¿No es u
   await abrirDashboard(page)
   const fila = await accionesDe(page, titulo)
   await expect(fila.getByRole('button', { name: '¿No es una cita?' })).toBeVisible()
-  const boton = fila.getByRole('button', { name: `Ligar paciente e iniciar consulta de ${titulo}` })
+  const boton = fila.getByRole('button', { name: `Ligar e iniciar consulta de ${titulo}` })
   const [b, f] = [await boton.boundingBox(), await fila.boundingBox()]
   if (!b || !f) throw new Error('sin caja')
   expect(b.x + b.width).toBeLessThanOrEqual(f.x + f.width)

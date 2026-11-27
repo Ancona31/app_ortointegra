@@ -606,9 +606,12 @@ nombre por `etiquetadoPor` o `etiqueta` (`:10-11`); encendido `--accion`, apagad
 (`:19-24`). Consumidores: `EditorDias`, `PestanaEnlace`, `BloquesAvisos`, `MenuEngraneAgenda`. **Sin pieza única:** otros
 `role="switch"` escritos a mano (ver Deuda).
 
-**`BotonNoEsCita`** — `CMP/agenda/BotonNoEsCita.tsx:36`. «¿No es una cita?»; un clic, sin confirmación; error debajo con
+**`BotonNoEsCita`** — `CMP/agenda/BotonNoEsCita.tsx:57`. «¿No es una cita?»; un clic, sin confirmación; error debajo con
 `role="alert"`. Solo para filas «por asignar» (`esPorAsignar`, `:11-14`); se monta en el formulario, «Próximas citas» y el
-aviso de la campana. **`BotonBloquearHorario`** — `CMP/agenda/BotonBloquearHorario.tsx:23`: candado de la barra de la v2;
+aviso de la campana. Con `modo="inicio"` (solo la tarjeta del inicio, corrección 8): la ayuda no se pinta en la tarjeta;
+en `esc` sale como burbuja al pasar el cursor o con el foco (CSS, tokens del kit; no hay pieza de burbuja en el sistema) y
+el botón actúa al momento; en `ext`/`tel`/`iv`/`ih` abre `ConfirmModal` con verbo «Dejar como evento» / «Volver»,
+apilada. La ayuda sigue en `aria-describedby` en todos los formatos. **`BotonBloquearHorario`** — `CMP/agenda/BotonBloquearHorario.tsx:23`: candado de la barra de la v2;
 va en el chunk de la barra, nunca importado en estático desde `AgendaCliente` (`CLAUDE.md`, tanda L).
 
 ### 5.2 Campos y formularios
@@ -713,7 +716,8 @@ en `ext` ninguna capa es hoja inferior (`SC:799`); la hoja arrastrable es solo d
 | Pieza | Archivo:línea | Qué es y cuándo | Cuándo NO / reglas | A11y |
 |---|---|---|---|---|
 | **`ModalShell`** (modal y alerta; **vigente** para ambos: es la base de la alerta del catálogo, `CALMA:84-88`) | `CMP/ui/ModalShell.tsx:336` | Props (`:246-286`): `open`, `onClose`, `title`, `subtitle?`, `icon?`, `iconBg?`, `headerRight?`, `maxWidth?`, `elevated?`, `hideClose?`, `footer?`, `fullscreenMobile?`, `spinusGeometry?`, `variante?: 'alerta'`, `tono?: 'confirmar' \| 'destruir' \| 'avisar'`, `apilada?`, `rol?`, `cierraConVelo?` (defecto `true`). Modo alerta (`CuerpoAlerta`, `:318`): icono 28 en círculo de 48, título centrado, mensaje justificado. 40 archivos | `cierraConVelo={false}` **en toda capa con campos editables** (decisión del dueño, `:273-284`). La alerta: el velo NO cierra, Esc sí (`:19-26`, `:383`); `autoFocus` en el principal, o en «Cancelar» si destruye | `role` `dialog`/`alertdialog` + `aria-modal` + `aria-labelledby` + `tabIndex={-1}` (`:386-392`); foco atrapado y Escape (`teclaDelModal` `:188`, `useFocoDelModal` `:211`; solo cierra el modal más interno); bloqueo de scroll del `body`; foco vuelve al disparador; `inert` mientras sale (`:381`); hoja de `tel` con `useArrastreHoja` (`:155`) |
-| **`ConfirmModal`** | `CMP/agenda/ConfirmModal.tsx:91` | con `verbo` → `AlertaCatalogo` (`:62`): la alerta del catálogo con título partido (`partirPregunta`, `:47`); principal rojo (`k-b-mal`) si `icono` es `cancelar`/`eliminar`, si no `k-b-prim`; `autoFocus` en el secundario (`:79`). Sin `verbo` → `ConfirmacionClasica` (`:96`) | **Con la v2, toda confirmación es la alerta del catálogo con su VERBO** (`CLAUDE.md`, B13; `CALMA` §29.3-§29.4: «Volver» si cancela algo, verbo concreto en el principal). «Aceptar» solo con la v2 apagada | `role="dialog"` + `aria-modal` + `aria-labelledby` + `useDialogoModal` (`:62-74`) |
+| **`ConfirmModal`** | `CMP/agenda/ConfirmModal.tsx:91` | con `verbo` → `AlertaCatalogo` (`:62`): la alerta del catálogo con título partido (`partirPregunta`, `:47`); principal rojo (`k-b-mal`) si `icono` es `cancelar`/`eliminar`, si no `k-b-prim`; `autoFocus` en el secundario (`:79`);
+`apilada` pone los botones uno sobre otro (`.k-al-pila`, el principal arriba) cuando el verbo no cabe junto al secundario. Sin `verbo` → `ConfirmacionClasica` (`:96`) | **Con la v2, toda confirmación es la alerta del catálogo con su VERBO** (`CLAUDE.md`, B13; `CALMA` §29.3-§29.4: «Volver» si cancela algo, verbo concreto en el principal). «Aceptar» solo con la v2 apagada | `role="dialog"` + `aria-modal` + `aria-labelledby` + `useDialogoModal` (`:62-74`) |
 | **`CapaMenu`** | `CMP/ui/CapaMenu.tsx:132` | «···», orden, filtros y selectores: lo que se usa poco (`:14`). API (`:20-58`): `abierto`, `alCerrar`, `ancla`, `titulo`, `opciones` (`{ id, texto, icono?, detalle?, peligro?, marcada?, deshabilitada?, alElegir }`), `seleccion?`. Por formato: `esc` desplegable anclado sin velo; `ext`/`ih`/`iv` tarjeta de 280 con velo; `tel` hoja corta (`:66-70`). `peligro` va al final, en rojo (`:155-157`). 5 consumidores | **«Más» del cromo NO usa `CapaMenu`** (lleva tarjeta ámbar, filas que despliegan, enlaces reales: `layout/MenuMas.tsx:13-21`) | `role="menu"` + `aria-label`, `menuitem`/`menuitemradio` + `aria-checked`, `role="separator"`; ↑ ↓ Inicio Fin; Enter/Espacio elige; Esc y Tab cierran y devuelven el foco (`:77-117`, `:177`). El disparador (del consumidor) lleva `aria-haspopup="menu"`, `aria-expanded`, `aria-label` (`:30-32`) |
 | `QuickPatientModal` | `CMP/ui/QuickPatientModal.tsx:47` | alta rápida de paciente; monta su propia `.k-capa` (`:243`, `data-modo="hoja"`, `z-[70]`) con la alerta «Paciente duplicado» (`k-al-pila`); el velo NO cierra (`:245-246`); sin salida animada a propósito (`:233-236`). 5 consumidores | — | botón «Cerrar» con `aria-label` (`:300`); en el marcado leído **no hay** `role="dialog"`, `aria-modal`, foco atrapado ni Escape (ver Deuda) |
 | `ConsultaRapidaModal` | `CMP/launcher/ConsultaRapidaModal.tsx` | buscador/registro rápido, `.k-capa` con `data-modo="arriba"` (`SC:793-796`); lo monta `Sidebar` | — | `role="dialog"`, `aria-modal`, `aria-label` (`:292-293`); Escape (`:134`) y Tab atrapado (`:73`) |
@@ -940,7 +944,8 @@ Solo reglas que constan en el código, en `CLAUDE.md` o en `CALMA`. Cada punto c
 22. **Montar `ScriptTema` en el layout raíz** (`ScriptTema.tsx:11-12`).
 23. **Cargar Inter fuera de la landing y `/login`** (`src/lib/fonts.ts`).
 24. **Reintroducir variantes viejas de los textos unificados.** Los vigentes son «Agendada desde Google Calendar»,
-    «Reservó por enlace», «Ligar paciente e iniciar consulta» y «¿No es una cita?» (`CLAUDE.md`, B13 §28).
+    «Reservó por enlace», «Ligar paciente e iniciar consulta» y «¿No es una cita?» (`CLAUDE.md`, B13 §28). **Única
+    excepción aprobada** (Angel, corrección 8): el botón de la tarjeta del inicio dice «Ligar e iniciar consulta».
 
 ---
 

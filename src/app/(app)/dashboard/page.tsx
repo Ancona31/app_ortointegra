@@ -161,7 +161,10 @@ export default function DashboardPage(): ReactElement {
   }
   /* Tanda J (punto 6) · «Ligar paciente e iniciar consulta» (la ventana
      pequeña), con las condiciones de la agenda (`puedeIniciarConsulta`: médico
-     de la cita, con su consultorio). Si no, `null` y queda «Ver en la agenda». */
+     de la cita, con su consultorio). Si no, `null` y queda «Ver en la agenda».
+     Corrección 8 (Angel): aquí, y SÓLO aquí, el texto corto «Ligar e iniciar
+     consulta» (el largo dejaba el nombre recortado); la burbuja, la ventana y
+     la campana conservan el unificado de CLAUDE.md §28. */
   const ligar = (cita: Cita, _enCurso: boolean, alQuitar: () => void, donde: Donde): ReactNode => {
     const conConsultorio = cita.consultorio_id ? consultorios.some(c => c.id === cita.consultorio_id)
       : esPorAsignar(cita) && consultorios.length > 0
@@ -169,9 +172,9 @@ export default function DashboardPage(): ReactElement {
     if (!(profile?.role === 'medico' && esPorLigar(cita) && conConsultorio)) return null
     return (
       <button type="button" onClick={() => { escudoLigar.activar(); setLigando({ id: cita.id, alQuitar }) }}
-        aria-label={`Ligar paciente e iniciar consulta de ${nombreDeCita(cita)}`}
+        aria-label={`Ligar e iniciar consulta de ${nombreDeCita(cita)}`}
         className={`k-b k-b-prim whitespace-normal py-2 text-center ${donde === 'hoja' ? 'k-b-capa h-auto min-h-11 w-full' : 'h-auto min-h-11 flex-1 ih:min-h-10 ih:flex-none iv:flex-none esc:min-h-10 esc:flex-none'}`}>
-        <Link2 aria-hidden="true" className="size-[18px]" /> Ligar paciente e iniciar consulta
+        <Link2 aria-hidden="true" className="size-[18px]" /> Ligar e iniciar consulta
       </button>
     )
   }

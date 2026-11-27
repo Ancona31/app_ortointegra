@@ -37,6 +37,9 @@ export interface PropsConfirmacion {
   /** B13 · AG5: «Volver» cuando la acción cancela algo; por omisión, «Cancelar». */
   secundario?: string
   icono?: IconoConfirmacion
+  /** Botones uno sobre otro (`.k-al-pila` del catálogo, el principal arriba): para un verbo que no cabe al
+      lado de «Volver» en la alerta de 310/320 («Dejar como evento», corrección 8). Sólo con `verbo`. */
+  apilada?: boolean
 }
 
 /**
@@ -59,7 +62,7 @@ function IconoAlerta({ icono }: { icono: IconoConfirmacion }): ReactElement {
 }
 
 /** La alerta del catálogo (v2). */
-function AlertaCatalogo({ message, onConfirm, onCancel, verbo, secundario = 'Cancelar', icono = 'aviso' }: PropsConfirmacion & { verbo: string }): ReactElement {
+function AlertaCatalogo({ message, onConfirm, onCancel, verbo, secundario = 'Cancelar', icono = 'aviso', apilada = false }: PropsConfirmacion & { verbo: string }): ReactElement {
   const { montarPanel, alPulsarTecla } = useDialogoModal(onCancel)
   const tituloId = useId()
   const mensajeId = useId()
@@ -75,7 +78,7 @@ function AlertaCatalogo({ message, onConfirm, onCancel, verbo, secundario = 'Can
             <span className={`k-al-i ${destruye ? 'k-al-i-destruir' : 'k-al-i-avisar'}`} aria-hidden="true"><IconoAlerta icono={icono} /></span>
             <h2 id={tituloId} className="k-al-tit">{titulo}</h2>
             {resto && <p id={mensajeId} className="k-al-t">{resto}</p>}
-            <div className="k-al-b">
+            <div className={apilada ? 'k-al-b k-al-pila' : 'k-al-b'}>
               <button type="button" autoFocus onClick={onCancel} className="k-b k-b-capa k-b-quieto">{secundario}</button>
               <button type="button" data-principal onClick={onConfirm} className={`k-b k-b-capa ${destruye ? 'k-b-mal' : 'k-b-prim'}`}>{verbo}</button>
             </div>

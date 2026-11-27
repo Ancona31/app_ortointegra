@@ -190,7 +190,10 @@ type AccionesCita = (cita: Cita, enCurso: boolean, donde: Donde) => ReactNode
  * devuelve un botón, ése sustituye a «Ver en la agenda»: la ventana de ligar,
  * que sí lleva a la nota, la monta el llamador, nunca este archivo.
  * Rediseño B5: la explicación de «¿No es una cita?», que sólo vivía en su
- * `title`, se ve debajo (CALMA §29.7).
+ * `title`, se ve debajo (CALMA §29.7). Corrección 8 (Angel): en la tarjeta ya
+ * no se ve (se encimaba con «Desde Google Calendar»): burbuja en `esc` y
+ * confirmación en los táctiles (`modo="inicio"` de `BotonNoEsCita`). En la
+ * hoja sigue a la vista, debajo, como antes.
  */
 function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar, donde }: {
   cita: Cita; enCurso: boolean; alQuitar: () => void; ligar?: AccionLigar; donde: Donde
@@ -210,7 +213,7 @@ function AccionesSinPaciente({ cita, enCurso, alQuitar, ligar, donde }: {
       )}
       {esPorAsignar(cita) && (
         <span data-no-cierra className={`flex flex-col items-center ${donde === 'hoja' ? 'mt-3 w-full' : ''}`}>
-          <BotonNoEsCita citaId={cita.id} alHecho={alQuitar} className="k-b k-b-texto" />
+          <BotonNoEsCita citaId={cita.id} alHecho={alQuitar} className="k-b k-b-texto" modo={donde === 'hoja' ? 'siempre' : 'inicio'} />
           {donde === 'hoja' && <span className="mt-1 text-center text-[13px] leading-[18px] text-tinta2">Dejarlo como evento sin paciente: deja de pedir que se ligue</span>}
         </span>
       )}
@@ -450,7 +453,7 @@ export default function ProximasCitas({ medicoId, acciones, ligar, claseHero = '
               <ul className="k-lista">
                 {visibles.map(cita => (
                   <FilaCitaClinica key={cita.id} cita={cita} enCurso={cita.id === idEnCurso}
-                    extra={esPorAsignar(cita) ? <BotonNoEsCita citaId={cita.id} alHecho={() => quitar(cita.id)} className="k-b k-b-texto text-[14px]" /> : undefined} />
+                    extra={esPorAsignar(cita) ? <BotonNoEsCita citaId={cita.id} alHecho={() => quitar(cita.id)} className="k-b k-b-texto text-[14px]" modo="inicio" /> : undefined} />
                 ))}
               </ul>
               {pie}
